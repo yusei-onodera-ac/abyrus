@@ -1,14 +1,18 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { ResourceBar } from '../ui/ResourceBar';
-import { Button } from '../ui/Button';
-import { createPanel } from '../ui/Panel';
+import { IconNavButton } from '../ui/IconNavButton';
+import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { applyBackground } from '../ui/Background';
-import { stageNodeIcon, type StageNodeState } from '../ui/Icons';
-import { heading, caption, sectionLabel, COLORS } from '../ui/theme';
+import { questIcon, gachaIcon, rosterIcon } from '../ui/Icons';
+import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
+import type { HeroData } from '../types';
 
+/** Character-first home hub: a big asymmetric portrait of the player's best
+ *  hero layered over the background, with a round icon-cluster nav
+ *  underneath instead of a stage-select grid (that lives in
+ *  StageSelectScene now) or a stack of long rectangle menu buttons. */
 export class HomeScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
 
@@ -21,92 +25,64 @@ export class HomeScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'home');
 
-    const title = heading(this, 360, 100, 'ABYRUS', { fontSize: '52px' }).setOrigin(0.5);
-    const subtitle = caption(this, 360, 150, '無限算盤の子', { fontSize: '15px' }).setOrigin(0.5);
-    enter(this, title, { dy: -16, duration: 420 });
-    enter(this, subtitle, { dy: -10, delay: 90, duration: 360 });
-
     this.resourceBar = new ResourceBar(this, 0, 0, 720);
     this.resourceBar.update(SaveSystem.getGold(save), save.gems);
     enter(this, this.resourceBar, { dy: -20, duration: 300 });
 
-    this.buildStageMap(save);
-    this.buildMenuButtons();
+    const wordmark = caption(this, 24, 86, 'ABYRUS', { fontSize: '15px', color: '#9a93b8', fontStyle: 'bold' }).setOrigin(0, 0.5);
+    enter(this, wordmark, { dx: -10, dy: 0, duration: 280, delay: 80 });
+
+    this.buildCharacterShowcase(save);
+    this.buildNav();
   }
 
   private getSave(): SaveData {
     return this.game.registry.get('save');
   }
 
-  private buildStageMap(save: SaveData): void {
-    const label = sectionLabel(this, 40, 194, 'ステージ進行');
-    enter(this, label, { delay: 60 });
-
-    const perRow = 6;
-    const visibleStages = Math.min(ProgressionSystem.STAGE_COUNT, save.stageProgress + 8);
-    const nodes: Phaser.GameObjects.Container[] = [];
-
-    const roadPanel = createPanel(this, 360, 250 + Math.floor((visibleStages - 1) / perRow) * 90, 660, Math.ceil(visibleStages / perRow) * 90 + 50, {
-      fillColor: COLORS.panelFill,
-      fillAlpha: 0.45,
-      borderColor: COLORS.border,
-      glowColor: COLORS.accent,
-      radius: 20,
-      gradient: false,
-    });
-    roadPanel.setDepth(-1);
-
-    const linkLine = this.add.graphics().setDepth(-0.5);
-
-    for (let i = 0; i < visibleStages; i++) {
-      const col = i % perRow;
-      const row = Math.floor(i / perRow);
-      const x = 70 + col * 100;
-      const y = 250 + row * 90;
-      const unlocked = i <= save.stageProgress;
-      const cleared = i < save.stageProgress;
-      const state: StageNodeState = cleared ? 'cleared' : unlocked ? 'unlocked' : 'locked';
-
-      if (i > 0) {
-        const prevCol = (i - 1) % perRow;
-        const prevRow = Math.floor((i - 1) / perRow);
-        const px = 70 + prevCol * 100;
-        const py = 250 + prevRow * 90;
-        linkLine.lineStyle(3, unlocked ? COLORS.accent : COLORS.border, unlocked ? 0.6 : 0.4);
-        linkLine.beginPath();
-        linkLine.moveTo(px, py);
-        linkLine.lineTo(x, y);
-        linkLine.strokePath();
-      }
-
-      const node = this.add.container(x, y);
-      const icon = this.add.image(0, 0, stageNodeIcon(this, state, 64));
-      const numText = this.add
-        .text(0, 0, `${i + 1}`, { fontSize: '17px', color: unlocked ? '#ffffff' : '#60627a', fontStyle: 'bold' })
-        .setOrigin(0.5);
-      node.add([icon, numText]);
-      node.setSize(64, 64);
-      nodes.push(node);
-
-      if (unlocked) {
-        node.setInteractive(new Phaser.Geom.Circle(0, 0, 32), Phaser.Geom.Circle.Contains);
-        if (node.input) node.input.cursor = 'pointer';
-        node.on('pointerover', () => this.tweens.add({ targets: node, scale: 1.1, duration: 100 }));
-        node.on('pointerout', () => this.tweens.add({ targets: node, scale: 1, duration: 120 }));
-        node.on('pointerdown', () => this.tweens.add({ targets: node, scale: 0.92, duration: 60 }));
-        node.on('pointerup', () => this.scene.start('Battle', { stageIndex: i }));
-      }
+  /** Highest rarity among owned heroes, ties broken by whichever was added
+   *  most recently (heroes are appended on pull/starter-grant, so later
+   *  array entries are newer). */
+  private pickShowcaseHero(save: SaveData): HeroData | null {
+    if (save.heroes.length === 0) return null;
+    let best = save.heroes[0];
+    for (const hero of save.heroes) {
+      if (hero.rarity >= best.rarity) best = hero;
     }
-
-    enterStagger(this, nodes, { dy: 14, duration: 280, delay: 100, stagger: 18 });
+    return best;
   }
 
-  private buildMenuButtons(): void {
-    const buttons: { label: string; scene: string; y: number }[] = [
-      { label: '召喚の間', scene: 'Gacha', y: 1070 },
-      { label: '英雄名鑑', scene: 'Roster', y: 1150 },
-    ];
-    const made = buttons.map((b) => new Button(this, 360, b.y, 320, 64, b.label, () => this.scene.start(b.scene), { variant: 'primary' }));
-    enterStagger(this, made, { dy: 24, duration: 320, delay: 150, stagger: 70 });
+  private buildCharacterShowcase(save: SaveData): void {
+    const hero = this.pickShowcaseHero(save);
+    if (!hero) return;
+
+    const cx = 460;
+    const cy = 520;
+    const frameW = 480;
+    const frameH = 680;
+
+    const shadow = this.add.ellipse(cx, cy + frameH * 0.47, frameW * 0.55, 42, 0x000000, 0.35);
+    shadow.setDepth(-1);
+
+    let portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+    if (hero.heroId && this.textures.exists(hero.heroId)) {
+      const frame = this.textures.get(hero.heroId).getSourceImage();
+      const scale = Math.min(frameW / frame.width, frameH / frame.height);
+      portrait = this.add.image(cx, cy, hero.heroId).setScale(scale);
+    } else {
+      const generator = new CharacterGenerator(this);
+      const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
+      const fallbackSize = Math.min(frameW, frameH) * 0.78;
+      portrait = this.add.sprite(cx, cy, textureKey).setDisplaySize(fallbackSize, fallbackSize);
+    }
+    enter(this, portrait, { dy: 26, duration: 480, ease: 'Cubic.easeOut' });
+  }
+
+  private buildNav(): void {
+    const y = 1160;
+    const quest = new IconNavButton(this, 360, y, questIcon(this, 108), 'クエスト', 108, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 192, y, gachaIcon(this, 84), '召喚', 84, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, 528, y, rosterIcon(this, 84), '名鑑', 84, () => this.scene.start('Roster'));
+    enterStagger(this, [gacha, quest, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }

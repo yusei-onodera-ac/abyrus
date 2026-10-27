@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 
-export type BackgroundScreen = 'home' | 'battle' | 'gacha' | 'roster' | 'hero_detail';
+export type BackgroundScreen = 'home' | 'battle' | 'gacha' | 'roster' | 'hero_detail' | 'stage_select';
 
-const BACKGROUND_SCREENS: BackgroundScreen[] = ['home', 'battle', 'gacha', 'roster', 'hero_detail'];
+const BACKGROUND_SCREENS: BackgroundScreen[] = ['home', 'battle', 'gacha', 'roster', 'hero_detail', 'stage_select'];
 
 function textureKey(screen: BackgroundScreen): string {
   return `bg_${screen}`;

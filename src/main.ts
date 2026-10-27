@@ -6,6 +6,7 @@ import { BattleScene } from './game/scenes/BattleScene';
 import { GachaScene } from './game/scenes/GachaScene';
 import { RosterScene } from './game/scenes/RosterScene';
 import { HeroDetailScene } from './game/scenes/HeroDetailScene';
+import { StageSelectScene } from './game/scenes/StageSelectScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -18,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
     height: 1280,
   },
   fps: { target: 60 },
-  scene: [BootScene, HomeScene, BattleScene, GachaScene, RosterScene, HeroDetailScene],
+  scene: [BootScene, HomeScene, BattleScene, GachaScene, RosterScene, HeroDetailScene, StageSelectScene],
 };
 
 new Phaser.Game(config);
