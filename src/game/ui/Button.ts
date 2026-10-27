@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { createPanel, type PanelOptions } from './Panel';
 import { buttonLabel, buttonSubLabel, COLORS } from './theme';
+import { hasButtonAsset, buttonAssetKeys } from './ButtonAssets';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
@@ -24,6 +25,10 @@ export interface ButtonOptions {
 export class Button extends Phaser.GameObjects.Container {
   private hitZone: Phaser.GameObjects.Zone;
   private disabled = false;
+  /** Set only when this variant has a supplied normal/pressed skin; the
+   *  procedural Panel background is used otherwise. */
+  private normalSkin?: Phaser.GameObjects.Image;
+  private pressedSkin?: Phaser.GameObjects.Image;
 
   constructor(
     scene: Phaser.Scene,
@@ -37,8 +42,16 @@ export class Button extends Phaser.GameObjects.Container {
   ) {
     super(scene, x, y);
     const variant = opts.variant ?? 'secondary';
-    const panel = createPanel(scene, 0, 0, width, height, VARIANT_PANEL[variant]);
-    this.add(panel);
+
+    if (hasButtonAsset(scene, variant)) {
+      const { normal, pressed } = buttonAssetKeys(variant);
+      this.normalSkin = scene.add.image(0, 0, normal).setDisplaySize(width, height);
+      this.pressedSkin = scene.add.image(0, 0, pressed).setDisplaySize(width, height).setVisible(false);
+      this.add([this.normalSkin, this.pressedSkin]);
+    } else {
+      const panel = createPanel(scene, 0, 0, width, height, VARIANT_PANEL[variant]);
+      this.add(panel);
+    }
 
     const hasSub = !!opts.subLabel;
     const label1 = buttonLabel(scene, 0, hasSub ? -11 : 0, label, opts.fontSize ? { fontSize: opts.fontSize } : undefined).setOrigin(0.5);
@@ -54,9 +67,16 @@ export class Button extends Phaser.GameObjects.Container {
 
     this.hitZone.setInteractive({ useHandCursor: true });
     this.hitZone.on('pointerover', () => this.animateTo(1.04, 110));
-    this.hitZone.on('pointerout', () => this.animateTo(1, 140));
-    this.hitZone.on('pointerdown', () => this.animateTo(0.94, 70));
+    this.hitZone.on('pointerout', () => {
+      this.setPressedSkin(false);
+      this.animateTo(1, 140);
+    });
+    this.hitZone.on('pointerdown', () => {
+      this.setPressedSkin(true);
+      this.animateTo(0.94, 70);
+    });
     this.hitZone.on('pointerup', () => {
+      this.setPressedSkin(false);
       if (this.disabled) return;
       this.animateTo(1.04, 90);
       onClick();
@@ -68,6 +88,12 @@ export class Button extends Phaser.GameObjects.Container {
   private animateTo(scale: number, duration: number): void {
     if (this.disabled) return;
     this.scene.tweens.add({ targets: this, scale, duration, ease: 'Sine.easeOut' });
+  }
+
+  private setPressedSkin(pressed: boolean): void {
+    if (!this.normalSkin || !this.pressedSkin) return;
+    this.normalSkin.setVisible(!pressed);
+    this.pressedSkin.setVisible(pressed);
   }
 
   setEnabled(enabled: boolean): this {

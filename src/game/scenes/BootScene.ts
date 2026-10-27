@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SaveSystem } from '../systems/SaveSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
+import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -22,6 +23,7 @@ export class BootScene extends Phaser.Scene {
       this.load.image(hero.id, `/assets/characters/${hero.id}.png`);
     }
     preloadBackgrounds(this);
+    preloadButtonAssets(this);
   }
 
   create(): void {
