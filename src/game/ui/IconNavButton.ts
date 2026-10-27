@@ -42,11 +42,16 @@ export class IconNavButton extends Phaser.GameObjects.Container {
       // setDisplaySize(size, size) assumes a square source texture; the
       // supplied badge art isn't pixel-square, so forcing both axes to the
       // same value squashed it. Scale uniformly to fit within size x size
-      // instead, preserving the art's own aspect ratio.
+      // instead, preserving the art's own aspect ratio. normal/pressed are
+      // separate source images at their own (often very different) native
+      // resolutions, so each needs its own fit scale - reusing one scale
+      // for both made the badge visibly jump size on press.
       const normalFrame = scene.textures.get(normal).getSourceImage();
-      const fitScale = Math.min(size / normalFrame.width, size / normalFrame.height);
-      this.normalIcon = scene.add.image(0, 0, normal).setScale(fitScale);
-      this.pressedIcon = scene.add.image(0, 0, pressed).setScale(fitScale).setVisible(false);
+      const pressedFrame = scene.textures.get(pressed).getSourceImage();
+      const normalScale = Math.min(size / normalFrame.width, size / normalFrame.height);
+      const pressedScale = Math.min(size / pressedFrame.width, size / pressedFrame.height);
+      this.normalIcon = scene.add.image(0, 0, normal).setScale(normalScale);
+      this.pressedIcon = scene.add.image(0, 0, pressed).setScale(pressedScale).setVisible(false);
       this.add([this.normalIcon, this.pressedIcon]);
     } else {
       this.add(scene.add.image(0, 0, fallbackTextureKey).setDisplaySize(size, size));

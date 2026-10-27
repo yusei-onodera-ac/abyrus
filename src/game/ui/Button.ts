@@ -49,10 +49,14 @@ export class Button extends Phaser.GameObjects.Container {
       // matches the button's own width:height exactly; it rarely does, so
       // forcing both axes distorted the art. Scale uniformly to fit within
       // the button's footprint instead, preserving the art's aspect ratio.
+      // normal/pressed are separate source images at their own native
+      // resolutions, so each needs its own fit scale.
       const normalFrame = scene.textures.get(normal).getSourceImage();
-      const fitScale = Math.min(width / normalFrame.width, height / normalFrame.height);
-      this.normalSkin = scene.add.image(0, 0, normal).setScale(fitScale);
-      this.pressedSkin = scene.add.image(0, 0, pressed).setScale(fitScale).setVisible(false);
+      const pressedFrame = scene.textures.get(pressed).getSourceImage();
+      const normalScale = Math.min(width / normalFrame.width, height / normalFrame.height);
+      const pressedScale = Math.min(width / pressedFrame.width, height / pressedFrame.height);
+      this.normalSkin = scene.add.image(0, 0, normal).setScale(normalScale);
+      this.pressedSkin = scene.add.image(0, 0, pressed).setScale(pressedScale).setVisible(false);
       this.add([this.normalSkin, this.pressedSkin]);
     } else {
       const panel = createPanel(scene, 0, 0, width, height, VARIANT_PANEL[variant]);

@@ -117,9 +117,9 @@ export class HomeScene extends Phaser.Scene {
    *  mid-sized overlapping below-right, roster smallest at the base. Drawn
    *  in that order so later (smaller) badges sit on top of earlier ones. */
   private buildNav(): void {
-    const quest = new IconNavButton(this, 230, 790, 'quest', questIcon(this, 108), 'クエスト', 280, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 410, 960, 'gacha', gachaIcon(this, 84), '召喚', 230, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, 180, 1110, 'roster', rosterIcon(this, 84), '名鑑', 230, () => this.scene.start('Roster'));
+    const quest = new IconNavButton(this, 240, 780, 'quest', questIcon(this, 108), 'クエスト', 360, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 440, 990, 'gacha', gachaIcon(this, 84), '召喚', 300, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, 175, 1140, 'roster', rosterIcon(this, 84), '名鑑', 280, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
