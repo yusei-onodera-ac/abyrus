@@ -56,19 +56,26 @@ export class HomeScene extends Phaser.Scene {
     const hero = this.pickShowcaseHero(save);
     if (!hero) return;
 
-    const cx = 400;
+    // Driven by target HEIGHT, not a width x height bounding box: the
+    // reference composition has the hero filling nearly the full screen
+    // height (hair near the top, boots near the bottom), right-of-center.
+    // A box-fit (min of two ratios) tends to under-fill on one axis
+    // whenever the source art's aspect doesn't exactly match the box's,
+    // which is what made an earlier version look small.
+    const cx = 460;
     const cy = 600;
-    const frameW = 600;
-    const frameH = 860;
-
-    const shadow = this.add.ellipse(cx, cy + frameH * 0.47, frameW * 0.55, 42, 0x000000, 0.35);
-    shadow.setDepth(-1);
-
     let portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+
     if (hero.heroId && this.textures.exists(hero.heroId)) {
+      const floorY = 1260;
+      const targetHeight = 1060;
+      const portraitCy = floorY - targetHeight / 2;
+      const shadow = this.add.ellipse(cx, floorY, targetHeight * 0.4, 42, 0x000000, 0.35);
+      shadow.setDepth(-1);
+
       const frame = this.textures.get(hero.heroId).getSourceImage();
-      const scale = Math.min(frameW / frame.width, frameH / frame.height);
-      portrait = this.add.image(cx, cy, hero.heroId).setScale(scale);
+      const scale = targetHeight / frame.height;
+      portrait = this.add.image(cx, portraitCy, hero.heroId).setScale(scale);
     } else {
       // The procedural portrait is baked at a small, fixed resolution for
       // card-sized use elsewhere (HeroCard, gacha reveals): stretching it to
@@ -76,6 +83,9 @@ export class HomeScene extends Phaser.Scene {
       // modest medallion size instead, with its own soft glow backdrop, so a
       // hero without illustrated art still reads as a deliberate placeholder
       // rather than a broken giant sprite.
+      const shadow = this.add.ellipse(cx, cy + 103, 330, 42, 0x000000, 0.35);
+      shadow.setDepth(-1);
+
       const medallionSize = 220;
       const glow = this.add.graphics();
       const glowColor = RARITY_COLORS[hero.rarity];
@@ -87,7 +97,18 @@ export class HomeScene extends Phaser.Scene {
       const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
       portrait = this.add.sprite(cx, cy, textureKey).setDisplaySize(medallionSize, medallionSize);
     }
+
     enter(this, portrait, { dy: 26, duration: 480, ease: 'Cubic.easeOut' });
+    this.floatIdle(portrait);
+  }
+
+  /** Gentle drifting bob so the showcase hero reads as hovering rather than
+   *  pasted on flat. Two independent yoyo tweens at different periods, so
+   *  the vertical and horizontal drift fall out of phase instead of
+   *  tracing a perfectly repeating diagonal line. */
+  private floatIdle(target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite): void {
+    this.tweens.add({ targets: target, y: target.y - 18, duration: 2600, delay: 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: target, x: target.x + 10, duration: 3400, delay: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   /** Cascading diamond cluster in the lower-left, overlapping the bottom of
