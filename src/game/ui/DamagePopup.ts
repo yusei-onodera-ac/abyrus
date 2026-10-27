@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { BigNumber } from '../systems/BigNumber';
+import { COLORS } from './theme';
 
 interface PoolEntry {
   text: Phaser.GameObjects.Text;
@@ -38,31 +39,49 @@ export class DamagePopupPool {
     entry.inUse = true;
     const { text } = entry;
     const crit = !!opts.crit;
+    const heal = !!opts.heal;
 
-    text.setText((opts.heal ? '+' : '') + amount.toString());
-    text.setColor(opts.heal ? '#7cfc9a' : crit ? '#ffd23f' : '#ffffff');
-    text.setFontSize(crit ? 38 : 24);
+    text.setText((heal ? '+' : '') + amount.toString());
+    text.setColor(heal ? Phaser.Display.Color.ValueToColor(COLORS.heal).rgba : crit ? Phaser.Display.Color.ValueToColor(COLORS.gold).rgba : '#ffffff');
+    text.setFontSize(crit ? 40 : 24);
     text.setPosition(x + Phaser.Math.Between(-10, 10), y);
-    text.setScale(crit ? 0.4 : 0.6);
+    text.setRotation(Phaser.Math.DegToRad(Phaser.Math.Between(-6, 6)));
+    this.scene.tweens.killTweensOf(text);
+
+    // Squash-and-stretch pop: land wide and flat, then snap up to full size
+    // with an elastic overshoot before drifting up and fading - reads as a
+    // much punchier hit than a flat scale tween.
+    text.setScale(crit ? 0.5 : 0.75, crit ? 0.3 : 0.45);
     text.setAlpha(1);
     text.setVisible(true);
 
     this.scene.tweens.add({
       targets: text,
-      y: y - (crit ? 70 : 50),
-      scale: crit ? 1.3 : 1,
-      duration: 160,
-      ease: 'Back.easeOut',
+      scaleX: crit ? 1.35 : 1.05,
+      scaleY: crit ? 1.35 : 1.05,
+      duration: 110,
+      ease: 'Quad.easeOut',
       onComplete: () => {
         this.scene.tweens.add({
           targets: text,
-          alpha: 0,
-          y: text.y - 20,
-          delay: 260,
-          duration: 300,
+          scaleX: crit ? 1.1 : 1,
+          scaleY: crit ? 1.1 : 1,
+          y: y - (crit ? 72 : 50),
+          rotation: 0,
+          duration: 180,
+          ease: 'Back.easeOut',
           onComplete: () => {
-            entry.inUse = false;
-            text.setVisible(false);
+            this.scene.tweens.add({
+              targets: text,
+              alpha: 0,
+              y: text.y - 22,
+              delay: 250,
+              duration: 320,
+              onComplete: () => {
+                entry.inUse = false;
+                text.setVisible(false);
+              },
+            });
           },
         });
       },

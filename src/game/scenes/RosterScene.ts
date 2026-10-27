@@ -2,7 +2,12 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { HeroCard } from '../ui/HeroCard';
-import type { HeroData, Row } from '../types';
+import { Button } from '../ui/Button';
+import { createPanel } from '../ui/Panel';
+import { applyBackground } from '../ui/Background';
+import { heading, caption, sectionLabel, COLORS } from '../ui/theme';
+import { enter, enterStagger } from '../ui/Transitions';
+import { hex, RARITY_COLORS, type HeroData, type Row } from '../types';
 
 interface RosterSceneData {
   /** Hero id to arrive pre-selected for formation placement, e.g. after
@@ -28,9 +33,12 @@ export class RosterScene extends Phaser.Scene {
     this.generator = new CharacterGenerator(this);
     this.save = this.game.registry.get('save');
     this.cameras.main.setBackgroundColor('#141420');
+    applyBackground(this, 'roster');
 
-    this.add.text(360, 50, '英雄名鑑', { fontSize: '28px', color: '#ffffff' }).setOrigin(0.5);
-    this.add.text(360, 80, 'タップで詳細表示 / 長押しで編成選択', { fontSize: '13px', color: '#9a93b8' }).setOrigin(0.5);
+    const title = heading(this, 360, 50, '英雄名鑑', { fontSize: '28px' }).setOrigin(0.5);
+    const hint = caption(this, 360, 82, 'タップで詳細表示 / 長押しで編成選択', { fontSize: '13px' }).setOrigin(0.5);
+    enter(this, title, { dy: -12, duration: 340 });
+    enter(this, hint, { dy: -8, delay: 70 });
 
     this.buildFormationSlots();
     this.buildRosterGrid();
@@ -42,18 +50,33 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private buildFormationSlots(): void {
-    this.add.text(40, 130, '前衛', { fontSize: '14px', color: '#9a93b8' });
+    const frontLabel = sectionLabel(this, 40, 130, '前衛');
+    const backLabel = sectionLabel(this, 40, 240, '後衛');
+    enter(this, frontLabel, { delay: 60 });
+    enter(this, backLabel, { delay: 80 });
     for (let i = 0; i < 3; i++) this.makeSlot('front', i, 100 + i * 90, 180);
-    this.add.text(40, 240, '後衛', { fontSize: '14px', color: '#9a93b8' });
     for (let i = 0; i < 2; i++) this.makeSlot('back', i, 145 + i * 90, 290);
   }
 
   private makeSlot(row: Row, slot: number, x: number, y: number): void {
-    const bg = this.add.rectangle(x, y, 76, 76, 0x23263a).setStrokeStyle(2, 0x4a4d66).setInteractive({ useHandCursor: true });
     const heroId = this.save.party[row][slot];
     const hero = heroId ? SaveSystem.getHero(this.save, heroId) : undefined;
-    this.add.text(x, y, hero ? hero.name.slice(0, 2) : '空', { fontSize: '14px', color: '#ffffff' }).setOrigin(0.5);
-    bg.on('pointerdown', () => this.onSlotTap(row, slot));
+    const borderColor = hero ? RARITY_COLORS[hero.rarity] : COLORS.border;
+
+    const panel = createPanel(this, x, y, 76, 76, {
+      fillColor: COLORS.panelFill,
+      fillAlpha: hero ? 0.95 : 0.5,
+      borderColor,
+      glowColor: borderColor,
+      radius: 14,
+      rarity: hero?.rarity,
+    });
+    this.add.text(x, y, hero ? hero.name.slice(0, 2) : '空', { fontSize: '14px', color: hero ? '#ffffff' : hex(COLORS.textMuted) }).setOrigin(0.5);
+
+    const hit = this.add.zone(x, y, 76, 76).setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => this.onSlotTap(row, slot));
+
+    enter(this, panel, { dy: 10, delay: 100 });
   }
 
   private onSlotTap(row: Row, slot: number): void {
@@ -77,6 +100,7 @@ export class RosterScene extends Phaser.Scene {
     const cellSize = 100;
     const startX = 60 + cellSize / 2;
     const startY = 400;
+    const cards: HeroCard[] = [];
     this.save.heroes.forEach((hero, i) => {
       const col = i % cols;
       const row = Math.floor(i / cols);
@@ -87,7 +111,9 @@ export class RosterScene extends Phaser.Scene {
       card.setReadyGlow(hero.id === this.selectedHeroId);
       this.wireCardInput(hero, card);
       this.rosterContainer.add(card);
+      cards.push(card);
     });
+    enterStagger(this, cards, { dy: 16, duration: 260, delay: 140, stagger: 20 });
   }
 
   /** Short tap opens the full detail view; holding the card down instead
@@ -130,8 +156,7 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private buildBackButton(): void {
-    const bg = this.add.rectangle(80, 1230, 120, 48, 0x2a2c3d).setStrokeStyle(2, 0x4a4d66).setInteractive({ useHandCursor: true });
-    this.add.text(80, 1230, '戻る', { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
-    bg.on('pointerdown', () => this.scene.start('Home'));
+    const btn = new Button(this, 90, 1230, 140, 52, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
+    enter(this, btn, { delay: 200 });
   }
 }
