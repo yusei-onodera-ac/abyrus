@@ -1,10 +1,10 @@
 import Phaser from 'phaser';
-import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import { SaveSystem, type SaveData, type HeroPullOutcome } from '../systems/SaveSystem';
 import { GachaSystem, GACHA_RATES, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ResourceBar } from '../ui/ResourceBar';
 import { HeroCard } from '../ui/HeroCard';
-import { RARITY_COLORS, hex, type HeroData } from '../types';
+import { RARITY_COLORS, hex } from '../types';
 
 export class GachaScene extends Phaser.Scene {
   private generator!: CharacterGenerator;
@@ -71,10 +71,10 @@ export class GachaScene extends Phaser.Scene {
       return;
     }
     const results = GachaSystem.pullMany(count);
-    for (const hero of results) SaveSystem.addHero(save, hero);
+    const outcomes = results.map((hero) => SaveSystem.addHero(save, hero));
     SaveSystem.save(save);
     this.refreshResources();
-    this.showResults(results);
+    this.showResults(outcomes);
   }
 
   private flashMessage(text: string): void {
@@ -82,18 +82,19 @@ export class GachaScene extends Phaser.Scene {
     this.tweens.add({ targets: msg, alpha: 0, delay: 900, duration: 400, onComplete: () => msg.destroy() });
   }
 
-  private showResults(results: HeroData[]): void {
+  private showResults(outcomes: HeroPullOutcome[]): void {
     this.resultContainer?.destroy();
     const container = this.add.container(0, 0);
     this.resultContainer = container;
     const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0.75).setInteractive();
     container.add(overlay);
 
-    const cols = Math.min(5, results.length);
-    const rows = Math.ceil(results.length / cols);
+    const cols = Math.min(5, outcomes.length);
+    const rows = Math.ceil(outcomes.length / cols);
     const startY = 640 - (rows - 1) * 90;
 
-    results.forEach((hero, i) => {
+    outcomes.forEach((outcome, i) => {
+      const { hero } = outcome;
       const col = i % cols;
       const row = Math.floor(i / cols);
       const x = 360 - ((cols - 1) * 140) / 2 + col * 140;
@@ -101,6 +102,12 @@ export class GachaScene extends Phaser.Scene {
       const card = new HeroCard(this, x, y, hero, this.generator, 110);
       card.setScale(0);
       container.add(card);
+      if (outcome.duplicate) {
+        const dupLabel = this.add
+          .text(x, y + 70, `ダブり → +${outcome.duplicateGold.toString()}G`, { fontSize: '12px', color: '#ffd23f' })
+          .setOrigin(0.5);
+        container.add(dupLabel);
+      }
       this.tweens.add({
         targets: card,
         scale: 1,

@@ -30,9 +30,12 @@ const SILHOUETTES: Record<HeroClass, 'round' | 'broad' | 'slim'> = {
 };
 
 /**
- * Builds unique hero/enemy portraits purely from procedural shapes, so no
- * external image-generation tooling is needed. Four layers are composited
- * in order: aura (rarity glow) -> silhouette -> weapon -> accessory.
+ * Builds hero/enemy portraits. When a roster hero's illustration
+ * (`assets/characters/<heroId>.png`) has been loaded, that artwork is used;
+ * otherwise falls back to procedural shapes composited purely from Graphics,
+ * so the game never breaks for a hero whose art hasn't been drawn yet. Four
+ * layers make up the procedural fallback, in order: aura (rarity glow) ->
+ * silhouette -> weapon -> accessory.
  */
 export class CharacterGenerator {
   private scene: Phaser.Scene;
@@ -41,12 +44,33 @@ export class CharacterGenerator {
     this.scene = scene;
   }
 
-  generate(seed: number, heroClass: HeroClass, rarity: Rarity): GeneratedCharacter {
+  generate(seed: number, heroClass: HeroClass, rarity: Rarity, heroId?: string): GeneratedCharacter {
+    if (heroId && this.scene.textures.exists(heroId)) {
+      return { textureKey: this.illustrationTexture(heroId), size: SIZE };
+    }
     const key = `char_${heroClass}_${rarity}_${seed}`;
     if (!this.scene.textures.exists(key)) {
       this.draw(key, seed, heroClass, rarity);
     }
     return { textureKey: key, size: SIZE };
+  }
+
+  /** Bakes the loaded illustration into a SIZE x SIZE square texture, scaled
+   *  to fit with aspect preserved, so it drops into the same sprite
+   *  pipeline (uniform setDisplaySize) as the procedural portraits. */
+  private illustrationTexture(heroId: string): string {
+    const key = `char_illust_${heroId}`;
+    if (this.scene.textures.exists(key)) return key;
+
+    const frame = this.scene.textures.getFrame(heroId);
+    const scale = Math.min(SIZE / frame.width, SIZE / frame.height);
+    const temp = this.scene.add.image(CENTER, CENTER, heroId).setScale(scale).setVisible(false);
+    const rt = this.scene.add.renderTexture(0, 0, SIZE, SIZE);
+    rt.draw(temp, CENTER, CENTER);
+    rt.saveTexture(key);
+    rt.destroy();
+    temp.destroy();
+    return key;
   }
 
   private draw(key: string, seed: number, heroClass: HeroClass, rarity: Rarity): void {
