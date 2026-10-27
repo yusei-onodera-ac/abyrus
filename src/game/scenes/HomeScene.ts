@@ -56,10 +56,10 @@ export class HomeScene extends Phaser.Scene {
     const hero = this.pickShowcaseHero(save);
     if (!hero) return;
 
-    const cx = 460;
-    const cy = 520;
-    const frameW = 480;
-    const frameH = 680;
+    const cx = 400;
+    const cy = 600;
+    const frameW = 600;
+    const frameH = 860;
 
     const shadow = this.add.ellipse(cx, cy + frameH * 0.47, frameW * 0.55, 42, 0x000000, 0.35);
     shadow.setDepth(-1);
@@ -80,9 +80,9 @@ export class HomeScene extends Phaser.Scene {
 
   private buildNav(): void {
     const y = 1160;
-    const quest = new IconNavButton(this, 360, y, questIcon(this, 108), 'クエスト', 108, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 192, y, gachaIcon(this, 84), '召喚', 84, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, 528, y, rosterIcon(this, 84), '名鑑', 84, () => this.scene.start('Roster'));
+    const quest = new IconNavButton(this, 360, y, 'quest', questIcon(this, 108), 'クエスト', 108, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 192, y, 'gacha', gachaIcon(this, 84), '召喚', 84, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, 528, y, 'roster', rosterIcon(this, 84), '名鑑', 84, () => this.scene.start('Roster'));
     enterStagger(this, [gacha, quest, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }

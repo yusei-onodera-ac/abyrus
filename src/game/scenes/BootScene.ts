@@ -3,6 +3,7 @@ import { SaveSystem } from '../systems/SaveSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
+import { preloadIconAssets } from '../ui/IconAssets';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -24,6 +25,7 @@ export class BootScene extends Phaser.Scene {
     }
     preloadBackgrounds(this);
     preloadButtonAssets(this);
+    preloadIconAssets(this);
   }
 
   create(): void {

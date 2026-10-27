@@ -46,7 +46,7 @@ export class HeroDetailScene extends Phaser.Scene {
   }
 
   private buildBackButton(): void {
-    const btn = new Button(this, 90, 50, 140, 52, '戻る', () => this.scene.start(this.detailData.from), { variant: 'ghost', fontSize: '15px' });
+    const btn = new Button(this, 115, 53, 190, 66, '戻る', () => this.scene.start(this.detailData.from), { variant: 'ghost', fontSize: '15px' });
     enter(this, btn, { duration: 260 });
   }
 

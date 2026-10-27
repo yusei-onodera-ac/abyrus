@@ -34,7 +34,7 @@ export class StageSelectScene extends Phaser.Scene {
   }
 
   private buildBackButton(): void {
-    const btn = new Button(this, 90, 60, 140, 52, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
+    const btn = new Button(this, 115, 60, 190, 66, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
     enter(this, btn, { duration: 260 });
   }
 

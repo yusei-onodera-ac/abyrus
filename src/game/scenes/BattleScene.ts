@@ -53,7 +53,7 @@ export class BattleScene extends Phaser.Scene {
     const title = subheading(this, 360, 40, stage.name, { fontSize: '22px' }).setOrigin(0.5);
     enter(this, title, { dy: -14, duration: 300 });
 
-    const backBtn = new Button(this, 85, 42, 130, 48, '撤退', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
+    const backBtn = new Button(this, 115, 53, 190, 66, '撤退', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
     enter(this, backBtn, { duration: 260 });
 
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);

@@ -161,7 +161,7 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private buildBackButton(): void {
-    const btn = new Button(this, 90, 1230, 140, 52, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
+    const btn = new Button(this, 115, 1230, 190, 66, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
     enter(this, btn, { delay: 200 });
   }
 }
