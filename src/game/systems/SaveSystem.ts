@@ -27,6 +27,10 @@ export interface HeroPullOutcome {
 
 const STORAGE_KEY = 'abyrus_save_v1';
 
+export function expToNextLevel(level: number): number {
+  return Math.round(80 * Math.pow(1.22, level - 1));
+}
+
 export const SaveSystem = {
   createDefault(): SaveData {
     const heroes: HeroData[] = [
@@ -115,9 +119,8 @@ export const SaveSystem = {
     const hero = this.getHero(data, heroId);
     if (!hero) return;
     hero.exp += exp;
-    const needed = () => Math.round(80 * Math.pow(1.22, hero.level - 1));
-    while (hero.exp >= needed()) {
-      hero.exp -= needed();
+    while (hero.exp >= expToNextLevel(hero.level)) {
+      hero.exp -= expToNextLevel(hero.level);
       hero.level += 1;
     }
   },
