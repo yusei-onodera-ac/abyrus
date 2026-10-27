@@ -107,7 +107,12 @@ export class RosterScene extends Phaser.Scene {
       const x = startX + col * cellSize;
       const y = startY + row * (cellSize + 10);
       const card = new HeroCard(this, x, y, hero, this.generator, 86);
-      card.setInteractive(new Phaser.Geom.Rectangle(-43, -43, 86, 86), Phaser.Geom.Rectangle.Contains);
+      // Container hit-testing (Phaser InputManager.pointWithinHitArea) adds
+      // displayOriginX/Y (half width/height) to the local point before
+      // testing it against the hit area shape, so the shape must be defined
+      // in top-left-relative space (0, 0, w, h) - not centered on the
+      // container's own local (0, 0) - or real taps on the card miss it.
+      card.setInteractive(new Phaser.Geom.Rectangle(0, 0, 86, 86), Phaser.Geom.Rectangle.Contains);
       card.setReadyGlow(hero.id === this.selectedHeroId);
       this.wireCardInput(hero, card);
       this.rosterContainer.add(card);
