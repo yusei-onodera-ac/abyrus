@@ -36,7 +36,8 @@ export class IconNavButton extends Phaser.GameObjects.Container {
   ) {
     super(scene, x, y);
 
-    if (hasIconAsset(scene, iconName)) {
+    const hasArt = hasIconAsset(scene, iconName);
+    if (hasArt) {
       const { normal, pressed } = iconAssetKeys(iconName);
       this.normalIcon = scene.add.image(0, 0, normal).setDisplaySize(size, size);
       this.pressedIcon = scene.add.image(0, 0, pressed).setDisplaySize(size, size).setVisible(false);
@@ -45,8 +46,13 @@ export class IconNavButton extends Phaser.GameObjects.Container {
       this.add(scene.add.image(0, 0, fallbackTextureKey).setDisplaySize(size, size));
     }
 
-    const labelText = caption(scene, 0, size / 2 + 16, label, { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5);
-    this.add(labelText);
+    // Supplied icon art already has its label baked in (e.g. "クエスト"
+    // lettering drawn into the diamond badge); only add a separate caption
+    // for the procedural fallback, which is just a bare badge shape.
+    if (!hasArt) {
+      const labelText = caption(scene, 0, size / 2 + 16, label, { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5);
+      this.add(labelText);
+    }
 
     this.hitZone = scene.add.zone(0, 0, size, size).setOrigin(0.5);
     this.add(this.hitZone);

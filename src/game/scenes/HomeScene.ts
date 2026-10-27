@@ -7,7 +7,7 @@ import { applyBackground } from '../ui/Background';
 import { questIcon, gachaIcon, rosterIcon } from '../ui/Icons';
 import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
-import type { HeroData } from '../types';
+import { RARITY_COLORS, type HeroData } from '../types';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
  *  hero layered over the background, with a round icon-cluster nav
@@ -70,19 +70,35 @@ export class HomeScene extends Phaser.Scene {
       const scale = Math.min(frameW / frame.width, frameH / frame.height);
       portrait = this.add.image(cx, cy, hero.heroId).setScale(scale);
     } else {
+      // The procedural portrait is baked at a small, fixed resolution for
+      // card-sized use elsewhere (HeroCard, gacha reveals): stretching it to
+      // fill a showcase-sized frame just blows up a blurry blob. Cap it to a
+      // modest medallion size instead, with its own soft glow backdrop, so a
+      // hero without illustrated art still reads as a deliberate placeholder
+      // rather than a broken giant sprite.
+      const medallionSize = 220;
+      const glow = this.add.graphics();
+      const glowColor = RARITY_COLORS[hero.rarity];
+      for (let i = 3; i > 0; i--) {
+        glow.fillStyle(glowColor, 0.05 + i * 0.04);
+        glow.fillCircle(cx, cy, medallionSize * 0.5 + i * 14);
+      }
       const generator = new CharacterGenerator(this);
       const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
-      const fallbackSize = Math.min(frameW, frameH) * 0.78;
-      portrait = this.add.sprite(cx, cy, textureKey).setDisplaySize(fallbackSize, fallbackSize);
+      portrait = this.add.sprite(cx, cy, textureKey).setDisplaySize(medallionSize, medallionSize);
     }
     enter(this, portrait, { dy: 26, duration: 480, ease: 'Cubic.easeOut' });
   }
 
+  /** Cascading diamond cluster in the lower-left, overlapping the bottom of
+   *  the character showcase - matches the composition of the reference
+   *  mock the user supplied: quest biggest/top of the stack, gacha
+   *  mid-sized overlapping below-right, roster smallest at the base. Drawn
+   *  in that order so later (smaller) badges sit on top of earlier ones. */
   private buildNav(): void {
-    const y = 1160;
-    const quest = new IconNavButton(this, 360, y, 'quest', questIcon(this, 108), 'クエスト', 108, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 192, y, 'gacha', gachaIcon(this, 84), '召喚', 84, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, 528, y, 'roster', rosterIcon(this, 84), '名鑑', 84, () => this.scene.start('Roster'));
-    enterStagger(this, [gacha, quest, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
+    const quest = new IconNavButton(this, 230, 790, 'quest', questIcon(this, 108), 'クエスト', 280, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 410, 960, 'gacha', gachaIcon(this, 84), '召喚', 230, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, 180, 1110, 'roster', rosterIcon(this, 84), '名鑑', 230, () => this.scene.start('Roster'));
+    enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
