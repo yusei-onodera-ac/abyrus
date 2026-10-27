@@ -4,32 +4,6 @@
  * Represented as mantissa * 10^exponent, with 1 <= |mantissa| < 10.
  */
 
-interface UnitEntry {
-  threshold: number;
-  suffix: string;
-}
-
-const UNITS: UnitEntry[] = [
-  { threshold: 0, suffix: '' },
-  { threshold: 4, suffix: '万' },
-  { threshold: 8, suffix: '億' },
-  { threshold: 12, suffix: '兆' },
-  { threshold: 16, suffix: '京' },
-  { threshold: 20, suffix: '垓' },
-  { threshold: 24, suffix: '秭' },
-  { threshold: 28, suffix: '穣' },
-  { threshold: 32, suffix: '溝' },
-  { threshold: 36, suffix: '澗' },
-  { threshold: 40, suffix: '正' },
-  { threshold: 44, suffix: '載' },
-  { threshold: 48, suffix: '極' },
-  { threshold: 52, suffix: '恒河沙' },
-  { threshold: 56, suffix: '阿僧祇' },
-  { threshold: 60, suffix: '那由他' },
-  { threshold: 64, suffix: '不可思議' },
-  { threshold: 68, suffix: '無量大数' },
-];
-
 export class BigNumber {
   mantissa: number;
   exponent: number;
@@ -152,22 +126,26 @@ export class BigNumber {
     return this.mantissa * Math.pow(10, this.exponent);
   }
 
+  /** Full digit count, comma-grouped, never abbreviated to 万/億/兆ーstyle
+   *  units: the raw number of zeros is the point. */
   toString(): string {
     if (this.mantissa === 0) return '0';
     const sign = this.mantissa < 0 ? '-' : '';
     const absMantissa = Math.abs(this.mantissa);
-    if (this.exponent < 4) {
-      const value = absMantissa * Math.pow(10, this.exponent);
-      return sign + Math.round(value).toLocaleString('ja-JP');
+
+    if (this.exponent <= 14) {
+      // Well within double precision: round to the nearest integer.
+      const value = Math.round(absMantissa * Math.pow(10, this.exponent));
+      return sign + value.toLocaleString('ja-JP');
     }
-    let unit: UnitEntry = UNITS[0];
-    for (const u of UNITS) {
-      if (this.exponent >= u.threshold) unit = u;
-      else break;
-    }
-    const scaled = absMantissa * Math.pow(10, this.exponent - unit.threshold);
-    const text = scaled >= 100 ? scaled.toFixed(0) : scaled.toFixed(1);
-    return sign + text + unit.suffix;
+
+    // Beyond this a double can't carry every digit anyway (the mantissa
+    // only ever holds ~17 significant digits), so the low-order digits are
+    // zero-padded rather than fabricated.
+    const digits = absMantissa.toPrecision(17).replace('.', '');
+    const integerLength = this.exponent + 1;
+    const fullDigits = digits.padEnd(integerLength, '0').slice(0, integerLength);
+    return sign + fullDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
 
   toJSON(): [number, number] {

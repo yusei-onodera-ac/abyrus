@@ -89,7 +89,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean): void {
-    const { textureKey, size } = this.generator.generate(unit.seed, unit.heroClass, unit.rarity);
+    const { textureKey, size } = this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
     const sprite = this.add.sprite(x, y, textureKey).setDisplaySize(size * 0.9, size * 0.9);
     if (!isPlayer) sprite.setFlipX(true);
 

@@ -14,7 +14,7 @@ export class HeroCard extends Phaser.GameObjects.Container {
   constructor(scene: Phaser.Scene, x: number, y: number, hero: HeroData, generator: CharacterGenerator, width = 96) {
     super(scene, x, y);
     this.hero = hero;
-    const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity);
+    const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
 
     const frame = scene.add.rectangle(0, 0, width, width, 0x1b1d29, 0.9).setStrokeStyle(3, RARITY_COLORS[hero.rarity]);
     this.portrait = scene.add.sprite(0, -4, textureKey).setDisplaySize(width * 0.8, width * 0.8);

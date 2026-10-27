@@ -25,7 +25,10 @@ export function hex(color: number): string {
 }
 
 export interface HeroData {
+  /** Unique id of this owned copy (distinct pulls of the same hero differ). */
   id: string;
+  /** Which HERO_ROSTER entry this copy is; drives name/class/rarity/portrait. */
+  heroId: string;
   seed: number;
   rarity: Rarity;
   heroClass: HeroClass;

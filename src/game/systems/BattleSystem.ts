@@ -11,6 +11,8 @@ export interface UnitInstance {
   heroClass: HeroClass;
   rarity: Rarity;
   seed: number;
+  /** Roster hero id (player units only); lets the view use its illustration. */
+  heroId?: string;
   maxHp: BigNumber;
   hp: BigNumber;
   atk: BigNumber;
@@ -48,6 +50,7 @@ export const BattleSystem = {
       heroClass: hero.heroClass,
       rarity: hero.rarity,
       seed: hero.seed,
+      heroId: hero.heroId,
       maxHp: stats.maxHp,
       hp: stats.maxHp,
       atk: stats.atk,

@@ -1,5 +1,7 @@
 import { BigNumber } from './BigNumber';
-import type { HeroClass, HeroData, Row } from '../types';
+import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
+import { createHeroInstance } from '../data/heroes';
+import type { HeroData, Row } from '../types';
 
 export interface PartyFormation {
   front: (string | null)[];
@@ -16,18 +18,21 @@ export interface SaveData {
   updatedAt: number;
 }
 
-const STORAGE_KEY = 'abyrus_save_v1';
-
-function makeHero(id: string, seed: number, rarity: HeroData['rarity'], heroClass: HeroClass, name: string): HeroData {
-  return { id, seed, rarity, heroClass, name, level: 1, exp: 0 };
+export interface HeroPullOutcome {
+  hero: HeroData;
+  /** True if this hero was already owned: no copy was added, gold instead. */
+  duplicate: boolean;
+  duplicateGold: BigNumber;
 }
+
+const STORAGE_KEY = 'abyrus_save_v1';
 
 export const SaveSystem = {
   createDefault(): SaveData {
     const heroes: HeroData[] = [
-      makeHero('starter-1', 1001, 3, 'warrior', '断刃のレイ'),
-      makeHero('starter-2', 1002, 2, 'archer', '疾風のミナ'),
-      makeHero('starter-3', 1003, 2, 'healer', '祈算のユノ'),
+      createHeroInstance('touma', 'starter-1'),
+      createHeroInstance('mina', 'starter-2'),
+      createHeroInstance('yuno', 'starter-3'),
     ];
     return {
       version: 1,
@@ -75,8 +80,16 @@ export const SaveSystem = {
     return true;
   },
 
-  addHero(data: SaveData, hero: HeroData): void {
+  /** Adds a newly pulled hero, or converts it to gold if already owned. */
+  addHero(data: SaveData, hero: HeroData): HeroPullOutcome {
+    const owned = data.heroes.some((h) => h.heroId === hero.heroId);
+    if (owned) {
+      const duplicateGold = BigNumber.from(DUPLICATE_GOLD_REWARD[hero.rarity]);
+      this.addGold(data, duplicateGold);
+      return { hero, duplicate: true, duplicateGold };
+    }
     data.heroes.push(hero);
+    return { hero, duplicate: false, duplicateGold: BigNumber.ZERO };
   },
 
   getHero(data: SaveData, id: string): HeroData | undefined {
