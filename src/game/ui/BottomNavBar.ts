@@ -1,5 +1,16 @@
 import Phaser from 'phaser';
-import { COLORS } from './theme';
+import { createPanel, createDivider } from './Panel';
+import { eventTabIcon, legionTabIcon, homeTabIcon, profileTabIcon, settingsTabIcon } from './Icons';
+
+// Sampled from the topbar artwork's own wood plank and gilt trim (not the
+// generic purple COLORS accent palette), so this code-drawn bar reads as
+// the same physical material as that illustrated bar instead of a
+// different, mismatched piece of UI chrome.
+const WOOD_FILL = 0x2e1f12;
+const WOOD_GRAIN = 0x1c1309;
+const BRASS_DARK = 0x8a6a3a;
+const BRASS = 0xc9a052;
+const BRASS_BRIGHT = 0xffdca0;
 
 export type NavTab = 'event' | 'legion' | 'home' | 'profile' | 'settings';
 
@@ -19,99 +30,129 @@ const TAB_SCENE: Record<NavTab, string> = {
   settings: 'Settings',
 };
 
+const TAB_ICON: Record<NavTab, (scene: Phaser.Scene, size?: number) => string> = {
+  event: eventTabIcon,
+  legion: legionTabIcon,
+  home: homeTabIcon,
+  profile: profileTabIcon,
+  settings: settingsTabIcon,
+};
+
 const TABS: NavTab[] = ['event', 'legion', 'home', 'profile', 'settings'];
 
-// The wood-plank art's five circular slots sit at this fraction of the
-// art's own height/width, measured directly from the source image rather
-// than eyeballed - the slot ring runs from ~y0.27 to ~y0.87 of the art
-// (center 0.58, diameter 0.59 of the art's height). Expressing every
-// measurement as a fraction of the art's own size - never a fixed pixel
-// count - is what keeps this correctly aligned at any canvas/device size,
-// since Phaser's FIT scale mode only guarantees the 720x1280 design
-// canvas stays internally consistent, not any particular pixel count.
-const SLOT_CENTER_Y_FRAC = 0.58;
-const SLOT_DIAMETER_FRAC = 0.56;
-/** Extra strip below the art itself, reserved for the label (the art has
- *  only a sliver of plank below the ring - not enough room for legible
- *  text), sized relative to the art's own height so it scales with it. */
-const LABEL_STRIP_FRAC = 0.34;
+const BAR_HEIGHT = 124;
 
+/** Persistent 5-tab bar fixed to the bottom of the screen, drawn entirely
+ *  from code (panel chrome + the same procedural round-badge icon family
+ *  as the home screen's quest/gacha/roster nav) rather than from supplied
+ *  art, so it never depends on external art being well-calibrated. Dressed
+ *  up with the game's highest-rarity panel treatment (extra glow layers,
+ *  corner accents) plus a raised gold rail and a glowing medallion under
+ *  the active tab, so it reads as its own piece of chrome rather than a
+ *  plain rounded box. */
 export class BottomNavBar extends Phaser.GameObjects.Container {
-  /** Total height this bar occupies (art + label strip, or the flat
-   *  fallback height), so other scenes can lay out content above it
-   *  without guessing. */
-  static totalHeight(scene: Phaser.Scene, canvasWidth: number): number {
-    if (scene.textures.exists('bottombar')) {
-      const frame = scene.textures.get('bottombar').getSourceImage();
-      const artHeight = canvasWidth / (frame.width / frame.height);
-      return artHeight * (1 + LABEL_STRIP_FRAC);
-    }
-    return 96;
+  static totalHeight(): number {
+    return BAR_HEIGHT;
   }
 
   constructor(scene: Phaser.Scene, canvasWidth: number, canvasHeight: number, active: NavTab) {
     super(scene, 0, 0);
 
-    const hasArt = scene.textures.exists('bottombar');
-    let artHeight: number;
-    let barY: number;
-    let labelY: number;
-
-    if (hasArt) {
-      const frame = scene.textures.get('bottombar').getSourceImage();
-      artHeight = canvasWidth / (frame.width / frame.height);
-      const total = artHeight * (1 + LABEL_STRIP_FRAC);
-      barY = canvasHeight - total;
-      labelY = barY + artHeight + (total - artHeight) * 0.5;
-      const bg = scene.add.image(0, barY, 'bottombar').setOrigin(0, 0).setDisplaySize(canvasWidth, artHeight);
-      this.add(bg);
-      // No flat panel behind the label strip: it sits on whatever the
-      // scene's own background already is, so it reads as part of the
-      // screen rather than a separate box bolted under the plank art.
-    } else {
-      artHeight = 96;
-      barY = canvasHeight - artHeight;
-      labelY = barY + artHeight * 0.86;
-      const bg = scene.add.rectangle(0, barY, canvasWidth, artHeight, COLORS.panelFill, 0.96).setOrigin(0, 0);
-      this.add(bg);
-    }
-
-    const slotCenterY = barY + artHeight * SLOT_CENTER_Y_FRAC;
-    const iconSize = artHeight * SLOT_DIAMETER_FRAC;
+    const barY = canvasHeight - BAR_HEIGHT;
+    const barCx = canvasWidth / 2;
+    const barCy = barY + BAR_HEIGHT / 2;
     const slotWidth = canvasWidth / TABS.length;
-    const totalHeight = hasArt ? artHeight * (1 + LABEL_STRIP_FRAC) : artHeight;
+    // Sized so the supplied icon art reads as the star of each slot - large
+    // enough to spill slightly past its own glow medallion rather than
+    // sitting shrunk safely inside it.
+    const iconSize = BAR_HEIGHT * 0.8;
+
+    const panel = createPanel(scene, barCx, barCy, canvasWidth - 6, BAR_HEIGHT - 6, {
+      fillColor: WOOD_FILL,
+      fillAlpha: 0.97,
+      borderColor: BRASS_DARK,
+      glowColor: BRASS,
+      radius: 0,
+      rarity: 5,
+    });
+    this.add(panel);
+
+    // Faint horizontal grain so the panel body reads as the same carved
+    // plank the top bar is painted on, not a flat UI rectangle.
+    const grain = scene.add.graphics();
+    grain.lineStyle(1, WOOD_GRAIN, 0.3);
+    for (let gy = barY + 10; gy < barY + BAR_HEIGHT - 6; gy += 8) {
+      grain.beginPath();
+      grain.moveTo(8, gy);
+      grain.lineTo(canvasWidth - 8, gy);
+      grain.strokePath();
+    }
+    this.add(grain);
+
+    // A thin bright rail along the very top edge, like the gilt trim on a
+    // physical chest/console, so the bar reads as a distinct fixture
+    // instead of just another rounded panel.
+    const rail = scene.add.graphics();
+    rail.fillGradientStyle(BRASS_BRIGHT, BRASS, BRASS_BRIGHT, BRASS, 1);
+    rail.fillRect(3, barY, canvasWidth - 6, 3);
+    this.add(rail);
+
+    for (let i = 1; i < TABS.length; i++) {
+      this.add(createDivider(scene, slotWidth * i, barCy, BAR_HEIGHT * 0.56, BRASS_DARK).setAngle(90));
+    }
 
     TABS.forEach((tab, i) => {
       const cx = slotWidth * (i + 0.5);
       const isActive = tab === active;
+      const iconCy = barY + BAR_HEIGHT * 0.38;
 
-      const iconKey = `tab_${tab}`;
-      if (scene.textures.exists(iconKey)) {
-        const frame = scene.textures.get(iconKey).getSourceImage();
-        const scale = Math.min(iconSize / frame.width, iconSize / frame.height);
-        const icon = scene.add.image(cx, slotCenterY, iconKey).setScale(scale);
-        if (!isActive) icon.setAlpha(0.6);
-        this.add(icon);
+      if (isActive) {
+        const medallion = scene.add.graphics();
+        for (let r = 3; r >= 1; r--) {
+          medallion.fillStyle(BRASS_BRIGHT, 0.05 + r * 0.05);
+          medallion.fillCircle(cx, iconCy, iconSize * 0.46 + r * 5);
+        }
+        medallion.lineStyle(2, BRASS_BRIGHT, 0.8);
+        medallion.strokeCircle(cx, iconCy, iconSize * 0.46);
+        this.add(medallion);
       }
 
-      // Matches the gold-on-parchment lettering style of the bar/icon art
-      // itself (serif, stroked for legibility over the plank's wood grain)
-      // instead of the game's plain sans-serif UI caption style, which read
-      // as a cheap placeholder bolted under an otherwise painted bar.
+      // Prefer the supplied illustrated icon over the procedural badge -
+      // only the bar chrome itself is code-drawn now, per direction; the
+      // icon art still comes from the user's (text-free) source images.
+      const suppliedKey = `tab_${tab}`;
+      let icon: Phaser.GameObjects.Image;
+      if (scene.textures.exists(suppliedKey)) {
+        const frame = scene.textures.get(suppliedKey).getSourceImage();
+        const scale = Math.min(iconSize / frame.width, iconSize / frame.height);
+        icon = scene.add.image(cx, iconCy, suppliedKey).setScale(scale);
+      } else {
+        icon = scene.add.image(cx, iconCy, TAB_ICON[tab](scene, iconSize));
+      }
+      if (!isActive) icon.setAlpha(0.55);
+      this.add(icon);
+
       const label = scene.add
-        .text(cx, labelY, TAB_LABELS[tab], {
-          fontFamily: 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif',
-          fontSize: isActive ? '15px' : '14px',
-          color: isActive ? '#ffd23f' : '#c9b38a',
+        .text(cx, barY + BAR_HEIGHT * 0.87, TAB_LABELS[tab], {
+          fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
+          fontSize: isActive ? '15px' : '13px',
+          color: isActive ? '#ffe9b8' : '#d8c49a',
           fontStyle: isActive ? 'bold' : 'normal',
-          stroke: '#2a1a0f',
-          strokeThickness: 3,
+          stroke: '#1c130a',
+          strokeThickness: isActive ? 4 : 3,
         })
         .setOrigin(0.5);
       this.add(label);
 
-      const hitZone = scene.add.zone(cx, barY + totalHeight / 2, slotWidth, totalHeight).setOrigin(0.5);
+      if (isActive) {
+        const underline = scene.add.rectangle(cx, barY + BAR_HEIGHT * 0.97, iconSize * 0.8, 3, BRASS_BRIGHT, 0.95);
+        this.add(underline);
+      }
+
+      const hitZone = scene.add.zone(cx, barCy, slotWidth, BAR_HEIGHT).setOrigin(0.5);
       hitZone.setInteractive({ useHandCursor: true });
+      hitZone.on('pointerover', () => { if (!isActive) icon.setAlpha(0.8); });
+      hitZone.on('pointerout', () => { if (!isActive) icon.setAlpha(0.55); });
       hitZone.on('pointerup', () => {
         if (!isActive) scene.scene.start(TAB_SCENE[tab]);
       });
