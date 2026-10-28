@@ -29,8 +29,13 @@ export class HomeScene extends Phaser.Scene {
     this.resourceBar.update(SaveSystem.getGold(save), save.gems);
     enter(this, this.resourceBar, { dy: -20, duration: 300 });
 
-    const wordmark = caption(this, 24, 86, 'ABYRUS', { fontSize: '15px', color: '#9a93b8', fontStyle: 'bold' }).setOrigin(0, 0.5);
-    enter(this, wordmark, { dx: -10, dy: 0, duration: 280, delay: 80 });
+    // The topbar artwork already has its own "ABYRUS" lettering baked in;
+    // only draw this standalone wordmark while running on the plain-panel
+    // fallback, so the title isn't duplicated once real art is loaded.
+    if (!this.resourceBar.hasArt) {
+      const wordmark = caption(this, 24, 86, 'ABYRUS', { fontSize: '15px', color: '#9a93b8', fontStyle: 'bold' }).setOrigin(0, 0.5);
+      enter(this, wordmark, { dx: -10, dy: 0, duration: 280, delay: 80 });
+    }
 
     this.buildCharacterShowcase(save);
     this.buildNav();

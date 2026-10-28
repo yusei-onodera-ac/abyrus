@@ -26,6 +26,7 @@ export class BootScene extends Phaser.Scene {
     preloadBackgrounds(this);
     preloadButtonAssets(this);
     preloadIconAssets(this);
+    this.load.image('topbar', '/assets/ui/topbar.png');
   }
 
   create(): void {
