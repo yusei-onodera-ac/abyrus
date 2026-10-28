@@ -11,6 +11,7 @@ import Phaser from 'phaser';
 
 const ICON_COIN = 'icon_coin';
 const ICON_GEM = 'icon_gem';
+const ICON_STAMINA = 'icon_stamina';
 const ICON_STAGE_PREFIX = 'icon_stage_';
 const ICON_NAV_QUEST = 'icon_nav_quest';
 const ICON_NAV_GACHA = 'icon_nav_gacha';
@@ -66,6 +67,54 @@ export function gemIcon(scene: Phaser.Scene, size = 28): string {
     g.lineStyle(1.2, 0x15486b, 0.85);
     g.strokeTriangle(c, top, size - 2, waist, c, bottom);
     g.strokeTriangle(c, top, 2, waist, c, bottom);
+  });
+}
+
+/** Stamina icon for the energy meter: a stamped medallion matching the
+ *  coin/gem family, with a lightning-bolt glyph instead of their motifs. */
+export function staminaIcon(scene: Phaser.Scene, size = 28): string {
+  return ensureTexture(scene, `${ICON_STAMINA}_${size}`, size, (g, c) => {
+    g.fillStyle(0x7a3f0a, 1);
+    g.fillCircle(c, c, c);
+    g.fillStyle(0xff9f3f, 1);
+    g.fillCircle(c, c, c - 2);
+    g.fillStyle(0xffe0b0, 0.9);
+    g.fillCircle(c, c, c - 6);
+    g.lineStyle(1.5, 0x7a3f0a, 0.85);
+    g.strokeCircle(c, c, c - 5);
+
+    const bolt = [
+      [0.58, 0.1], [0.3, 0.52], [0.46, 0.52], [0.4, 0.9], [0.72, 0.44], [0.54, 0.44],
+    ].map(([fx, fy]) => ({ x: fx * c * 2, y: fy * c * 2 }));
+    g.fillStyle(0x7a3f0a, 0.9);
+    g.fillPoints(bolt, true);
+  });
+}
+
+/** Placeholder legion crest for the top bar's shield plaque: brass/bronze
+ *  to match that bar's own wood-and-gilt art (not the cooler palette the
+ *  bottom nav bar's own procedural badges use), until a real legion logo
+ *  exists. */
+export function legionCrestIcon(scene: Phaser.Scene, size = 40): string {
+  return ensureTexture(scene, 'icon_legion_crest_' + size, size, (g, c) => {
+    g.fillStyle(0x6b4a28, 1);
+    g.fillCircle(c, c, c);
+    g.fillStyle(0xc9a052, 1);
+    g.fillCircle(c, c, c - 2);
+    g.fillStyle(0xe8cb8a, 0.85);
+    g.fillCircle(c, c, c - 6);
+    g.lineStyle(1.5, 0x6b4a28, 0.9);
+    g.strokeCircle(c, c, c - 5);
+
+    g.lineStyle(c * 0.16, 0x4a3118, 1);
+    g.beginPath();
+    g.moveTo(c - c * 0.5, c - c * 0.5);
+    g.lineTo(c + c * 0.5, c + c * 0.5);
+    g.strokePath();
+    g.beginPath();
+    g.moveTo(c + c * 0.5, c - c * 0.5);
+    g.lineTo(c - c * 0.5, c + c * 0.5);
+    g.strokePath();
   });
 }
 

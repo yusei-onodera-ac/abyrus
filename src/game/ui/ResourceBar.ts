@@ -1,16 +1,21 @@
 import Phaser from 'phaser';
-import type { BigNumber } from '../systems/BigNumber';
+import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { createPanel } from './Panel';
-import { coinIcon, gemIcon } from './Icons';
+import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
 import { COLORS } from './theme';
 
-/** Top HUD strip showing the player's two currencies. Uses the supplied
- *  "topbar" artwork (circular portrait frame + ABYRUS plate + wood plank)
- *  when loaded, laying the gold/gem readout into the open plank area to
- *  the right of the plate; falls back to a plain glass panel otherwise. */
+const INK = '#2a1608';
+
+/** Top HUD strip. Uses the supplied "topbar" artwork (level circle + legion
+ *  shield + name plank + ABYRUS plate + currency plank) when loaded, laying
+ *  every readout into that art's own frames; falls back to a plain glass
+ *  panel (gold/gems only) otherwise. */
 export class ResourceBar extends Phaser.GameObjects.Container {
   private goldText: Phaser.GameObjects.Text;
   private gemText: Phaser.GameObjects.Text;
+  private staminaText?: Phaser.GameObjects.Text;
+  private levelText?: Phaser.GameObjects.Text;
+  private nameText?: Phaser.GameObjects.Text;
   /** True when the real topbar artwork is in use, so callers (HomeScene's
    *  separate "ABYRUS" wordmark) can skip anything the art already shows. */
   readonly hasArt: boolean;
@@ -22,17 +27,53 @@ export class ResourceBar extends Phaser.GameObjects.Container {
     let height: number;
     let goldPos: { x: number; y: number };
     let gemPos: { x: number; y: number };
+    let staminaPos: { x: number; y: number } | null = null;
 
     if (this.hasArt) {
       const frame = scene.textures.get('topbar').getSourceImage();
       height = width / (frame.width / frame.height);
       const bg = scene.add.image(0, 0, 'topbar').setOrigin(0, 0).setDisplaySize(width, height);
       this.add(bg);
-      // The art's circular portrait frame + ABYRUS plate occupy roughly the
-      // left 60% of the bar; the open wood-plank area to the right of that
-      // is where the currency readout goes.
-      goldPos = { x: width * 0.635, y: height * 0.42 };
-      gemPos = { x: width * 0.635, y: height * 0.67 };
+
+      // Every position below was read off the source art's own 2000x350
+      // canvas (measured by sampling its pixels for the circle/shield/plank
+      // bounds) and is scaled by width/2000 here - the same uniform factor
+      // the background image itself is scaled by - so these line up with
+      // the illustrated frames at any bar width.
+      const art = (ox: number, oy: number) => ({ x: width * (ox / 2000), y: width * (oy / 2000) });
+
+      const levelPos = art(156, 141);
+      this.levelText = scene.add
+        .text(levelPos.x, levelPos.y, '', {
+          fontFamily: 'Georgia, "Hiragino Mincho ProN", serif',
+          fontSize: '22px',
+          color: '#ffe9b8',
+          fontStyle: 'bold',
+          stroke: INK,
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5);
+      this.add(this.levelText);
+
+      const crestPos = art(388, 200);
+      this.add(scene.add.image(crestPos.x, crestPos.y, legionCrestIcon(scene, 40)));
+
+      const namePos = art(410, 50);
+      this.nameText = scene.add
+        .text(namePos.x, namePos.y, '', {
+          fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
+          fontSize: '15px',
+          color: '#f5e6c8',
+          fontStyle: 'bold',
+          stroke: INK,
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5);
+      this.add(this.nameText);
+
+      goldPos = art(1420, 205);
+      gemPos = art(1600, 205);
+      staminaPos = art(1780, 205);
     } else {
       height = 64;
       const panel = createPanel(scene, width / 2, height / 2, width, height, {
@@ -47,25 +88,50 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       gemPos = { x: 34, y: 46 };
     }
 
-    const goldIconSize = this.hasArt ? 24 : 26;
-    const gemIconSize = this.hasArt ? 20 : 22;
-    const goldIcon = scene.add.image(goldPos.x, goldPos.y, coinIcon(scene, goldIconSize));
-    const gemIconImg = scene.add.image(gemPos.x, gemPos.y, gemIcon(scene, gemIconSize));
+    if (this.hasArt) {
+      // Icon-left, number-right (like the fallback panel) rather than a
+      // stacked icon-over-number: a single row gives the number the whole
+      // slot's width to grow into instead of splitting it with the icon.
+      const statStyle = (color: string): Phaser.Types.GameObjects.Text.TextStyle => ({
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '19px',
+        color,
+        fontStyle: 'bold',
+        stroke: INK,
+        strokeThickness: 3,
+      });
+      const goldIcon = scene.add.image(goldPos.x - 17, goldPos.y, coinIcon(scene, 32));
+      this.goldText = scene.add.text(goldPos.x + 2, goldPos.y, '', statStyle('#ffe79a')).setOrigin(0, 0.5);
+      const gemIconImg = scene.add.image(gemPos.x - 17, gemPos.y, gemIcon(scene, 32));
+      this.gemText = scene.add.text(gemPos.x + 2, gemPos.y, '', statStyle('#bfeaff')).setOrigin(0, 0.5);
+      this.add([goldIcon, this.goldText, gemIconImg, this.gemText]);
 
-    const textOffset = this.hasArt ? 18 : 20;
-    this.goldText = scene.add
-      .text(goldPos.x + textOffset, goldPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffe79a', fontStyle: 'bold' })
-      .setOrigin(0, 0.5);
-    this.gemText = scene.add
-      .text(gemPos.x + textOffset, gemPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '14px', color: '#bfeaff' })
-      .setOrigin(0, 0.5);
+      if (staminaPos) {
+        const staminaIconImg = scene.add.image(staminaPos.x - 17, staminaPos.y, staminaIcon(scene, 32));
+        this.staminaText = scene.add.text(staminaPos.x + 2, staminaPos.y, '', statStyle('#ffd9a0')).setOrigin(0, 0.5);
+        this.add([staminaIconImg, this.staminaText]);
+      }
+    } else {
+      const goldIcon = scene.add.image(goldPos.x, goldPos.y, coinIcon(scene, 26));
+      const gemIconImg = scene.add.image(gemPos.x, gemPos.y, gemIcon(scene, 22));
+      this.goldText = scene.add
+        .text(goldPos.x + 20, goldPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffe79a', fontStyle: 'bold' })
+        .setOrigin(0, 0.5);
+      this.gemText = scene.add
+        .text(gemPos.x + 20, gemPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '14px', color: '#bfeaff' })
+        .setOrigin(0, 0.5);
+      this.add([goldIcon, gemIconImg, this.goldText, this.gemText]);
+    }
 
-    this.add([goldIcon, gemIconImg, this.goldText, this.gemText]);
     scene.add.existing(this);
   }
 
-  update(gold: BigNumber, gems: number): void {
-    this.goldText.setText(`${gold.toString()} G`);
-    this.gemText.setText(`${gems.toLocaleString('ja-JP')} 魔晶石`);
+  update(save: SaveData): void {
+    const unit = this.hasArt ? '' : ' G';
+    this.goldText.setText(`${SaveSystem.getGold(save).toString()}${unit}`);
+    this.gemText.setText(this.hasArt ? save.gems.toLocaleString('ja-JP') : `${save.gems.toLocaleString('ja-JP')} 魔晶石`);
+    this.levelText?.setText(`Lv${save.playerLevel}`);
+    this.nameText?.setText(save.playerName);
+    this.staminaText?.setText(`${save.stamina[0]}/${save.stamina[1]}`);
   }
 }

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import type { SaveData } from '../systems/SaveSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
@@ -27,7 +27,7 @@ export class HomeScene extends Phaser.Scene {
     applyBackground(this, 'home');
 
     this.resourceBar = new ResourceBar(this, 0, 0, 720);
-    this.resourceBar.update(SaveSystem.getGold(save), save.gems);
+    this.resourceBar.update(save);
     enter(this, this.resourceBar, { dy: -20, duration: 300 });
 
     // The topbar artwork already has its own "ABYRUS" lettering baked in;

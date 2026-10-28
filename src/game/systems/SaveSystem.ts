@@ -16,6 +16,12 @@ export interface SaveData {
   party: PartyFormation;
   stageProgress: number;
   updatedAt: number;
+  playerName: string;
+  playerLevel: number;
+  /** [current, max]. No stamina-gated feature consumes this yet - it's
+   *  surfaced on the top bar ahead of that system so the HUD reads as
+   *  complete. */
+  stamina: [number, number];
 }
 
 export interface HeroPullOutcome {
@@ -50,6 +56,9 @@ export const SaveSystem = {
       party: { front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] },
       stageProgress: 0,
       updatedAt: Date.now(),
+      playerName: 'プレイヤー',
+      playerLevel: 1,
+      stamina: [50, 50],
     };
   },
 
@@ -59,7 +68,9 @@ export const SaveSystem = {
       if (!raw) return this.createDefault();
       const parsed = JSON.parse(raw) as SaveData;
       if (!parsed.version) return this.createDefault();
-      return parsed;
+      // Spread over a fresh default so a save written before a field (like
+      // playerName) existed still gets a sane value instead of undefined.
+      return { ...this.createDefault(), ...parsed };
     } catch {
       return this.createDefault();
     }

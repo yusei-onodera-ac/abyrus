@@ -42,8 +42,7 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private refreshResources(): void {
-    const save = this.getSave();
-    this.resourceBar.update(SaveSystem.getGold(save), save.gems);
+    this.resourceBar.update(this.getSave());
   }
 
   private buildRateTable(): void {
