@@ -365,23 +365,27 @@ export function settingsTabIcon(scene: Phaser.Scene, size = 72): string {
   });
 }
 
+// The three corner buttons share one plain neutral badge + a single glyph
+// tone instead of each getting its own saturated color, per direction -
+// they read as one simple, consistent family; only the unread dot (drawn
+// by the caller) gets to be a loud color.
+const CORNER_BADGE_FILL = 0x262840;
+const CORNER_BADGE_RING = 0xaaa4c2;
+const CORNER_GLYPH = 0xe9e6f2;
+
 /** Notification-bell icon for the home screen's corner button row. */
 export function notificationIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `${ICON_NOTIFICATION}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0xa06a1a, 0xffe29a);
-    const top = c - c * 0.4;
-    g.fillStyle(0xffe9b8, 1);
-    g.fillCircle(c, top, c * 0.08);
-    g.fillStyle(0xfff3d6, 1);
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillCircle(c, c - c * 0.4, c * 0.07);
     g.beginPath();
     g.arc(c, c + c * 0.04, c * 0.42, Math.PI, 0, false);
     g.lineTo(c + c * 0.5, c + c * 0.36);
     g.lineTo(c - c * 0.5, c + c * 0.36);
     g.closePath();
     g.fillPath();
-    g.fillStyle(0xa06a1a, 1);
     g.fillRoundedRect(c - c * 0.56, c + c * 0.32, c * 1.12, c * 0.1, 4);
-    g.fillStyle(0xa06a1a, 1);
     g.fillEllipse(c, c + c * 0.52, c * 0.26, c * 0.14);
   });
 }
@@ -391,36 +395,29 @@ export function notificationIcon(scene: Phaser.Scene, size = 72): string {
  *  two don't read as the same feature. */
 export function giftBoxIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `${ICON_GIFT_BOX}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0xa0295e, 0xffb8d9);
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
     const boxTop = c - c * 0.06;
     const boxSize = c * 0.86;
-    g.fillStyle(0xff8fbf, 1);
-    g.fillRect(c - boxSize / 2, boxTop, boxSize, c * 0.5);
-    g.fillStyle(0xffd9ea, 1);
-    g.fillRect(c - boxSize / 2, boxTop - c * 0.12, boxSize, c * 0.14);
-    g.fillStyle(0xe85a9a, 1);
+    g.lineStyle(2, CORNER_GLYPH, 1);
+    g.strokeRect(c - boxSize / 2, boxTop, boxSize, c * 0.5);
+    g.strokeRect(c - boxSize / 2, boxTop - c * 0.12, boxSize, c * 0.14);
+    g.fillStyle(CORNER_GLYPH, 1);
     g.fillRect(c - c * 0.07, boxTop - c * 0.12, c * 0.14, c * 0.62);
-    g.fillStyle(0xffd9ea, 1);
-    g.fillCircle(c - c * 0.18, boxTop - c * 0.14, c * 0.14);
-    g.fillCircle(c + c * 0.18, boxTop - c * 0.14, c * 0.14);
-    g.fillStyle(0xa0295e, 1);
-    g.fillCircle(c, boxTop - c * 0.12, c * 0.07);
+    g.lineStyle(2, CORNER_GLYPH, 1);
+    g.strokeCircle(c - c * 0.18, boxTop - c * 0.14, c * 0.14);
+    g.strokeCircle(c + c * 0.18, boxTop - c * 0.14, c * 0.14);
   });
 }
 
 /** Envelope icon for the home screen's corner button row. */
 export function mailIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `${ICON_MAIL}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0x1f5a96, 0xbfe0ff);
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
     const w = c * 0.88;
     const h = c * 0.62;
     const left = c - w / 2;
     const top = c - h / 2;
-    g.fillStyle(0xe8f4ff, 1);
-    g.fillRect(left, top, w, h);
-    g.fillStyle(0xbfe0ff, 1);
-    g.fillTriangle(left, top, c, top + h * 0.56, left + w, top);
-    g.lineStyle(1.5, 0x1f5a96, 0.8);
+    g.lineStyle(2, CORNER_GLYPH, 1);
     g.strokeRect(left, top, w, h);
     g.beginPath();
     g.moveTo(left, top);

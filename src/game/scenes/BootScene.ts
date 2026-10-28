@@ -30,6 +30,9 @@ export class BootScene extends Phaser.Scene {
     for (const tab of ['event', 'legion', 'home', 'profile', 'settings']) {
       this.load.image(`tab_${tab}`, `/assets/ui/tab_${tab}.png`);
     }
+    this.load.image('currency_coin', '/assets/ui/coin.png');
+    this.load.image('currency_gem', '/assets/ui/gem.png');
+    this.load.image('currency_stamina', '/assets/ui/stamina.png');
   }
 
   create(): void {

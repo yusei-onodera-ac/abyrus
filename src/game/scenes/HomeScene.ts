@@ -40,7 +40,7 @@ export class HomeScene extends Phaser.Scene {
 
     this.buildCharacterShowcase(save);
     this.buildNav();
-    this.buildCornerButtons();
+    this.buildCornerButtons(save);
     new BottomNavBar(this, 720, 1280, 'home');
   }
 
@@ -140,23 +140,39 @@ export class HomeScene extends Phaser.Scene {
    *  features exist yet, so tapping one just surfaces a placeholder toast
    *  instead of a real inbox - same "show the chrome before the system
    *  behind it exists" approach the stamina meter and legion crest use. */
-  private buildCornerButtons(): void {
+  private buildCornerButtons(save: SaveData): void {
     const size = 72;
     const x = 656;
     const startY = 176;
     const spacing = 92;
-    const items: { texture: string; label: string }[] = [
-      { texture: notificationIcon(this, size), label: 'お知らせ' },
-      { texture: giftBoxIcon(this, size), label: 'プレゼントBOX' },
-      { texture: mailIcon(this, size), label: 'メール' },
+    const items: { texture: string; label: string; unread: boolean }[] = [
+      { texture: notificationIcon(this, size), label: 'お知らせ', unread: save.unread.notification },
+      { texture: giftBoxIcon(this, size), label: 'プレゼントBOX', unread: save.unread.giftBox },
+      { texture: mailIcon(this, size), label: 'メール', unread: save.unread.mail },
     ];
-    const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item.texture, item.label));
+    const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item));
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
-  private buildCornerButton(x: number, y: number, size: number, textureKey: string, label: string): Phaser.GameObjects.Container {
+  private buildCornerButton(
+    x: number,
+    y: number,
+    size: number,
+    item: { texture: string; label: string; unread: boolean },
+  ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
-    const icon = this.add.image(0, 0, textureKey).setDisplaySize(size, size);
+    const icon = this.add.image(0, 0, item.texture).setDisplaySize(size, size);
+    container.add(icon);
+
+    if (item.unread) {
+      const dot = this.add.graphics();
+      dot.fillStyle(0x1b1d29, 1);
+      dot.fillCircle(size * 0.34, -size * 0.34, 9);
+      dot.fillStyle(0xff4d4d, 1);
+      dot.fillCircle(size * 0.34, -size * 0.34, 7);
+      container.add(dot);
+    }
+
     const hitZone = this.add.zone(0, 0, size, size).setOrigin(0.5);
     hitZone.setInteractive({ useHandCursor: true });
     hitZone.on('pointerover', () => this.tweens.add({ targets: container, scale: 1.08, duration: 110, ease: 'Sine.easeOut' }));
@@ -164,9 +180,9 @@ export class HomeScene extends Phaser.Scene {
     hitZone.on('pointerdown', () => this.tweens.add({ targets: container, scale: 0.92, duration: 70, ease: 'Sine.easeOut' }));
     hitZone.on('pointerup', () => {
       this.tweens.add({ targets: container, scale: 1.08, duration: 90, ease: 'Sine.easeOut' });
-      this.showToast(`${label}: 準備中です`);
+      this.showToast(`${item.label}: 準備中です`);
     });
-    container.add([icon, hitZone]);
+    container.add(hitZone);
     return container;
   }
 

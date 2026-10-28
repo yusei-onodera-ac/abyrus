@@ -22,6 +22,10 @@ export interface SaveData {
    *  surfaced on the top bar ahead of that system so the HUD reads as
    *  complete. */
   stamina: [number, number];
+  /** Whether each home-screen corner button has something unread. No
+   *  notification/gift/mail system exists yet - these just drive the red
+   *  dot badge ahead of that system existing. */
+  unread: { notification: boolean; giftBox: boolean; mail: boolean };
 }
 
 export interface HeroPullOutcome {
@@ -59,6 +63,7 @@ export const SaveSystem = {
       playerName: 'プレイヤー',
       playerLevel: 1,
       stamina: [50, 50],
+      unread: { notification: true, giftBox: true, mail: false },
     };
   },
 

@@ -6,6 +6,18 @@ import { COLORS } from './theme';
 
 const INK = '#2a1608';
 
+/** Prefers the supplied currency illustration (coin/gem/stamina) over the
+ *  procedural badge icon, scaled to fit `size` while preserving its own
+ *  aspect ratio since none of the three source images are square. */
+function statIcon(scene: Phaser.Scene, suppliedKey: string, fallbackTextureKey: string, x: number, y: number, size: number): Phaser.GameObjects.Image {
+  if (scene.textures.exists(suppliedKey)) {
+    const frame = scene.textures.get(suppliedKey).getSourceImage();
+    const scale = Math.min(size / frame.width, size / frame.height);
+    return scene.add.image(x, y, suppliedKey).setScale(scale);
+  }
+  return scene.add.image(x, y, fallbackTextureKey);
+}
+
 /** Top HUD strip. Uses the supplied "topbar" artwork (level circle + legion
  *  shield + name plank + ABYRUS plate + currency plank) when loaded, laying
  *  every readout into that art's own frames; falls back to a plain glass
@@ -104,20 +116,20 @@ export class ResourceBar extends Phaser.GameObjects.Container {
         stroke: INK,
         strokeThickness: 3,
       });
-      const goldIcon = scene.add.image(goldPos.x - 17, goldPos.y, coinIcon(scene, 32));
+      const goldIcon = statIcon(scene, 'currency_coin', coinIcon(scene, 32), goldPos.x - 17, goldPos.y, 38);
       this.goldText = scene.add.text(goldPos.x + 2, goldPos.y, '', statStyle('#ffe79a')).setOrigin(0, 0.5);
-      const gemIconImg = scene.add.image(gemPos.x - 17, gemPos.y, gemIcon(scene, 32));
+      const gemIconImg = statIcon(scene, 'currency_gem', gemIcon(scene, 32), gemPos.x - 17, gemPos.y, 38);
       this.gemText = scene.add.text(gemPos.x + 2, gemPos.y, '', statStyle('#bfeaff')).setOrigin(0, 0.5);
       this.add([goldIcon, this.goldText, gemIconImg, this.gemText]);
 
       if (staminaPos) {
-        const staminaIconImg = scene.add.image(staminaPos.x - 17, staminaPos.y, staminaIcon(scene, 32));
+        const staminaIconImg = statIcon(scene, 'currency_stamina', staminaIcon(scene, 32), staminaPos.x - 17, staminaPos.y, 38);
         this.staminaText = scene.add.text(staminaPos.x + 2, staminaPos.y, '', statStyle('#ffd9a0')).setOrigin(0, 0.5);
         this.add([staminaIconImg, this.staminaText]);
       }
     } else {
-      const goldIcon = scene.add.image(goldPos.x, goldPos.y, coinIcon(scene, 26));
-      const gemIconImg = scene.add.image(gemPos.x, gemPos.y, gemIcon(scene, 22));
+      const goldIcon = statIcon(scene, 'currency_coin', coinIcon(scene, 26), goldPos.x, goldPos.y, 30);
+      const gemIconImg = statIcon(scene, 'currency_gem', gemIcon(scene, 22), gemPos.x, gemPos.y, 26);
       this.goldText = scene.add
         .text(goldPos.x + 20, goldPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#ffe79a', fontStyle: 'bold' })
         .setOrigin(0, 0.5);
