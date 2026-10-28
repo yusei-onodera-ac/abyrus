@@ -1,16 +1,15 @@
 import Phaser from 'phaser';
 import { createPanel, createDivider } from './Panel';
 import { eventTabIcon, legionTabIcon, homeTabIcon, profileTabIcon, settingsTabIcon } from './Icons';
+import { CHROME } from './theme';
 
-// Sampled from the topbar artwork's own wood plank and gilt trim (not the
-// generic purple COLORS accent palette), so this code-drawn bar reads as
-// the same physical material as that illustrated bar instead of a
-// different, mismatched piece of UI chrome.
-const WOOD_FILL = 0x2e1f12;
-const WOOD_GRAIN = 0x1c1309;
-const BRASS_DARK = 0x8a6a3a;
-const BRASS = 0xc9a052;
-const BRASS_BRIGHT = 0xffdca0;
+// Sampled from the topbar artwork (see CHROME in theme.ts), so this
+// code-drawn bar reads as the same physical material as that illustrated bar.
+const WOOD_FILL = CHROME.woodFill;
+const WOOD_GRAIN = CHROME.woodGrain;
+const BRASS_DARK = CHROME.brassDark;
+const BRASS = CHROME.brass;
+const BRASS_BRIGHT = CHROME.brassBright;
 
 export type NavTab = 'event' | 'legion' | 'home' | 'profile' | 'settings';
 
@@ -55,7 +54,9 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
     return BAR_HEIGHT;
   }
 
-  constructor(scene: Phaser.Scene, canvasWidth: number, canvasHeight: number, active: NavTab) {
+  /** `active` is null on screens that aren't one of the five tabs (e.g.
+   *  Gacha): no tab is highlighted, and every tab stays tappable. */
+  constructor(scene: Phaser.Scene, canvasWidth: number, canvasHeight: number, active: NavTab | null) {
     super(scene, 0, 0);
 
     const barY = canvasHeight - BAR_HEIGHT;

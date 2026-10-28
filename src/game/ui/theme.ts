@@ -25,6 +25,18 @@ export const COLORS = {
   black: 0x000000,
 };
 
+/** Wood plank + gilt trim colors, sampled from the topbar artwork's own
+ *  pixels (not the generic purple accent palette above) so any code-drawn
+ *  chrome using them reads as the same physical material as that
+ *  illustrated bar. Shared by the bottom nav bar and the gacha screen. */
+export const CHROME = {
+  woodFill: 0x2e1f12,
+  woodGrain: 0x1c1309,
+  brassDark: 0x8a6a3a,
+  brass: 0xc9a052,
+  brassBright: 0xffdca0,
+};
+
 /** Soft glow tint used behind rarity-decorated panels/cards, keyed the same
  *  as RARITY_COLORS in types.ts but intentionally separate so UI chrome can
  *  diverge from gameplay rarity colors later without touching game data. */

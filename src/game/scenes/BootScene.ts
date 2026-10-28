@@ -6,6 +6,8 @@ import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { preloadIconAssets } from '../ui/IconAssets';
 import { preloadBanners } from '../ui/BannerStack';
 import { BANNERS } from '../data/banners';
+import { preloadGachaArt } from '../ui/GachaPanels';
+import { GACHA_BANNERS } from '../data/gachaBanners';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -36,6 +38,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('currency_gem', '/assets/ui/gem.png');
     this.load.image('currency_stamina', '/assets/ui/stamina.png');
     preloadBanners(this, BANNERS);
+    preloadGachaArt(this, GACHA_BANNERS);
   }
 
   create(): void {

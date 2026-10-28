@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 
-export type ButtonAssetVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+export type ButtonAssetVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'gold' | 'wood';
 
-const VARIANTS: ButtonAssetVariant[] = ['primary', 'secondary', 'ghost', 'danger'];
+const VARIANTS: ButtonAssetVariant[] = ['primary', 'secondary', 'ghost', 'danger', 'gold', 'wood'];
 
 function normalKey(variant: ButtonAssetVariant): string {
   return `btn_${variant}_normal`;
