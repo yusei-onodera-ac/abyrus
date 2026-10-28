@@ -117,8 +117,8 @@ export class HomeScene extends Phaser.Scene {
    *  the vertical and horizontal drift fall out of phase instead of
    *  tracing a perfectly repeating diagonal line. */
   private floatIdle(target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite): void {
-    this.tweens.add({ targets: target, y: target.y - 18, duration: 2600, delay: 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.tweens.add({ targets: target, x: target.x + 10, duration: 3400, delay: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: target, y: target.y - 26, duration: 2600, delay: 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: target, x: target.x + 16, duration: 3400, delay: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   }
 
   /** Cascading diamond cluster in the lower-left, overlapping the bottom of
@@ -128,7 +128,7 @@ export class HomeScene extends Phaser.Scene {
   private buildNav(): void {
     const clusterX = 210;
     const size = 300;
-    const quest = new IconNavButton(this, clusterX, 630, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
+    const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
     const gacha = new IconNavButton(this, 415, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
     const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
