@@ -5,9 +5,9 @@ import { heading, body } from '../ui/theme';
 import { enter } from '../ui/Transitions';
 
 /** Shared placeholder for bottom-nav tabs that don't have a real screen
- *  yet (Event/Legion/Profile/Settings). Keeps the tab bar live and
- *  tappable everywhere even before those features exist, instead of the
- *  tab doing nothing. */
+ *  yet (Legion/Profile/Settings - Event now has a real screen, see
+ *  InfiniteModeScene). Keeps the tab bar live and tappable everywhere even
+ *  before those features exist, instead of the tab doing nothing. */
 export abstract class ComingSoonScene extends Phaser.Scene {
   protected abstract readonly tab: NavTab;
   protected abstract readonly title: string;
@@ -22,14 +22,6 @@ export abstract class ComingSoonScene extends Phaser.Scene {
     enter(this, sub, { dy: -8, duration: 300, delay: 60 });
 
     new BottomNavBar(this, 720, 1280, this.tab);
-  }
-}
-
-export class EventScene extends ComingSoonScene {
-  protected readonly tab: NavTab = 'event';
-  protected readonly title = 'イベント';
-  constructor() {
-    super('Event');
   }
 }
 

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local Firebase config for the Infinite Mode leaderboard - never commit.
+# See .env.example for what's needed and BACKEND_SETUP.md for how to get it.
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
