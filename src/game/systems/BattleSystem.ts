@@ -1,5 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { ProgressionSystem, type EnemyUnitDef } from './ProgressionSystem';
+import { castSkill, effectiveAtk, effectiveDef, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
+import { getUnlockedSkillsForHero, type UnlockedSkill } from '../data/skills';
 import type { HeroClass, HeroData, Rarity, Row } from '../types';
 
 export interface UnitInstance {
@@ -24,10 +26,23 @@ export interface UnitInstance {
   cooldown: number;
   baseCooldown: number;
   alive: boolean;
+  /** This hero's currently-unlocked skills (player units only; empty for
+   *  enemies), cast in round-robin order on each ult trigger. */
+  skills: UnlockedSkill[];
+  nextSkillIndex: number;
+  /** Status multipliers applied to atk/def while `now < ...StatusUntil`,
+   *  set by buff_atk/buff_def/debuff_atk/debuff_def skills. 1 = no effect. */
+  atkStatusMul: number;
+  atkStatusUntil: number;
+  defStatusMul: number;
+  defStatusUntil: number;
+  /** Set by a stun skill; the unit skips its turn while `now < this`. */
+  stunnedUntil: number;
 }
 
 export type BattleEvent =
-  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean; isUlt: boolean }
+  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean }
+  | { kind: 'skillCast'; casterId: string; skillName: string; effectKind: string; results: SkillTargetResult[] }
   | { kind: 'ultCharged'; unitId: string }
   | { kind: 'defeated'; unitId: string }
   | { kind: 'victory' }
@@ -39,7 +54,6 @@ export type BattleEvent =
 // stage battles instead of drifting with a second copy of these numbers.
 export const ULT_GAIN = 25;
 export const ULT_MAX = 100;
-export const ULT_MULTIPLIER = 3.2;
 export const BASE_COOLDOWN = 1200;
 
 export const BattleSystem = {
@@ -66,6 +80,13 @@ export const BattleSystem = {
       cooldown: BASE_COOLDOWN,
       baseCooldown: BASE_COOLDOWN,
       alive: true,
+      skills: getUnlockedSkillsForHero(hero),
+      nextSkillIndex: 0,
+      atkStatusMul: 1,
+      atkStatusUntil: 0,
+      defStatusMul: 1,
+      defStatusUntil: 0,
+      stunnedUntil: 0,
     };
   },
 
@@ -91,6 +112,13 @@ export const BattleSystem = {
       cooldown: BASE_COOLDOWN,
       baseCooldown: BASE_COOLDOWN,
       alive: true,
+      skills: [],
+      nextSkillIndex: 0,
+      atkStatusMul: 1,
+      atkStatusUntil: 0,
+      defStatusMul: 1,
+      defStatusUntil: 0,
+      stunnedUntil: 0,
     };
   },
 };
@@ -98,12 +126,15 @@ export const BattleSystem = {
 /**
  * Real-time turn engine: every unit ticks down an SPD-scaled cooldown and
  * auto-attacks when it expires. Player units also build an ult gauge on
- * every normal attack, which can only be spent via an explicit triggerUlt
- * call (i.e. a tap on the hero), never automatically.
+ * every normal attack; spending it via an explicit triggerUlt call (i.e. a
+ * tap on the hero) casts that hero's next unlocked skill in round-robin
+ * order rather than a generic ultimate, so a ★5 hero with all 4 slots
+ * unlocked cycles through all 4 real effects over a long fight.
  */
 export class BattleEngine {
   units: UnitInstance[];
   private finished = false;
+  private clockMs = 0;
 
   constructor(playerUnits: UnitInstance[], enemyUnits: UnitInstance[]) {
     this.units = [...playerUnits, ...enemyUnits];
@@ -123,13 +154,14 @@ export class BattleEngine {
 
   update(deltaMs: number): BattleEvent[] {
     if (this.finished) return [];
+    this.clockMs += deltaMs;
     const events: BattleEvent[] = [];
     for (const unit of this.units) {
-      if (!unit.alive) continue;
+      if (!unit.alive || isStunned(unit, this.clockMs)) continue;
       unit.cooldown -= deltaMs * (unit.spd / 100);
       if (unit.cooldown <= 0) {
         unit.cooldown += unit.baseCooldown;
-        const result = this.performAttack(unit, false);
+        const result = this.performAttack(unit);
         if (result) events.push(...result);
       }
       if (this.finished) break;
@@ -147,13 +179,26 @@ export class BattleEngine {
   triggerUlt(unitId: string): BattleEvent[] {
     if (this.finished) return [];
     const unit = this.units.find((u) => u.id === unitId);
-    if (!unit || !unit.alive || !unit.isPlayer || unit.ultGauge < ULT_MAX) return [];
-    const events = this.performAttack(unit, true) ?? [];
+    if (!unit || !unit.alive || !unit.isPlayer || unit.ultGauge < ULT_MAX || unit.skills.length === 0) return [];
+
+    const skill = unit.skills[unit.nextSkillIndex % unit.skills.length];
+    unit.nextSkillIndex += 1;
+    unit.ultGauge = 0;
+
+    const allies = unit.isPlayer ? this.playerUnits : this.enemyUnits;
+    const enemies = unit.isPlayer ? this.enemyUnits : this.playerUnits;
+    const outcome = castSkill(unit, skill.def, skill.level, allies, enemies, this.clockMs);
+
+    const events: BattleEvent[] = [
+      { kind: 'skillCast', casterId: unit.id, skillName: outcome.skillName, effectKind: outcome.effectKind, results: outcome.results },
+    ];
+    for (const id of outcome.defeatedIds) events.push({ kind: 'defeated', unitId: id });
+
     if (!this.finished) {
-      const outcome = this.checkOutcome();
-      if (outcome) {
+      const finalOutcome = this.checkOutcome();
+      if (finalOutcome) {
         this.finished = true;
-        events.push({ kind: outcome });
+        events.push({ kind: finalOutcome });
       }
     }
     return events;
@@ -161,23 +206,19 @@ export class BattleEngine {
 
   private pickTarget(attacker: UnitInstance): UnitInstance | null {
     const opponents = this.units.filter((u) => u.isPlayer !== attacker.isPlayer && u.alive);
-    if (opponents.length === 0) return null;
-    const front = opponents.filter((u) => u.row === 'front');
-    const pool = front.length > 0 ? front : opponents;
-    return pool[Math.floor(Math.random() * pool.length)];
+    return pickFrontPreferred(opponents);
   }
 
-  private performAttack(attacker: UnitInstance, isUlt: boolean): BattleEvent[] | null {
+  private performAttack(attacker: UnitInstance): BattleEvent[] | null {
     const target = this.pickTarget(attacker);
     if (!target) return null;
     const events: BattleEvent[] = [];
 
     const variance = 0.9 + Math.random() * 0.2;
-    const crit = Math.random() < attacker.critRate + (isUlt ? 0.1 : 0);
-    let damage = attacker.atk.mul(variance);
-    if (isUlt) damage = damage.mul(ULT_MULTIPLIER);
+    const crit = Math.random() < attacker.critRate;
+    let damage = effectiveAtk(attacker, this.clockMs).mul(variance);
     if (crit) damage = damage.mul(attacker.critMul);
-    damage = damage.mul(100 / (100 + target.def));
+    damage = damage.mul(100 / (100 + effectiveDef(target, this.clockMs)));
 
     target.hp = target.hp.sub(damage);
     let defeated = false;
@@ -187,12 +228,10 @@ export class BattleEngine {
       defeated = true;
     }
 
-    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit, isUlt });
+    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit });
     if (defeated) events.push({ kind: 'defeated', unitId: target.id });
 
-    if (isUlt) {
-      attacker.ultGauge = 0;
-    } else if (attacker.isPlayer) {
+    if (attacker.isPlayer) {
       attacker.ultGauge = Math.min(ULT_MAX, attacker.ultGauge + ULT_GAIN);
       if (attacker.ultGauge >= ULT_MAX) events.push({ kind: 'ultCharged', unitId: attacker.id });
     }

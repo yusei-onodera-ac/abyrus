@@ -1,6 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
 import { createHeroInstance } from '../data/heroes';
+import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
 import type { HeroData, Row } from '../types';
 
 export interface PartyFormation {
@@ -12,6 +13,13 @@ export interface SaveData {
   version: number;
   gold: [number, number];
   gems: number;
+  /** Spent to raise a hero's individual skill level (1-10); earned from
+   *  stage clears and Infinite Mode runs. Kept separate from `gems`/`gold`
+   *  (and from the concurrently-in-progress `phaseMaterials` currency) so
+   *  skill progression - a per-hero, level-gated investment - has its own
+   *  economy rather than competing with gacha pulls or phase fusion for
+   *  the same pool. */
+  skillEssence: number;
   heroes: HeroData[];
   party: PartyFormation;
   stageProgress: number;
@@ -73,6 +81,7 @@ export const SaveSystem = {
       version: 1,
       gold: BigNumber.from(500).toJSON(),
       gems: 1500,
+      skillEssence: 300,
       heroes,
       party: { front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] },
       stageProgress: 0,
@@ -93,7 +102,11 @@ export const SaveSystem = {
       if (!parsed.version) return this.createDefault();
       // Spread over a fresh default so a save written before a field (like
       // playerName) existed still gets a sane value instead of undefined.
-      return { ...this.createDefault(), ...parsed };
+      const merged = { ...this.createDefault(), ...parsed };
+      // `heroes` is replaced wholesale by the spread above, so a hero saved
+      // before `skillLevels` existed needs its own per-object migration too.
+      merged.heroes = merged.heroes.map((hero) => ({ ...hero, skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1) }));
+      return merged;
     } catch {
       return this.createDefault();
     }
@@ -119,6 +132,26 @@ export const SaveSystem = {
   spendGems(data: SaveData, amount: number): boolean {
     if (data.gems < amount) return false;
     data.gems -= amount;
+    return true;
+  },
+
+  addSkillEssence(data: SaveData, amount: number): void {
+    data.skillEssence += amount;
+  },
+
+  /** Spends skillEssence to raise one hero's skill (by slot index) one
+   *  level, if that slot is unlocked, not already maxed, and affordable.
+   *  Returns false (no state changed) otherwise. */
+  upgradeHeroSkill(data: SaveData, heroId: string, slotIndex: number): boolean {
+    const hero = this.getHero(data, heroId);
+    if (!hero) return false;
+    if (!isSkillSlotUnlocked(slotIndex, hero.level)) return false;
+    const currentLevel = hero.skillLevels[slotIndex] ?? 1;
+    if (currentLevel >= MAX_SKILL_LEVEL) return false;
+    const cost = skillUpgradeCost(currentLevel);
+    if (data.skillEssence < cost) return false;
+    data.skillEssence -= cost;
+    hero.skillLevels[slotIndex] = currentLevel + 1;
     return true;
   },
 

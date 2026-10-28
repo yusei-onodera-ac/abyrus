@@ -2,10 +2,21 @@ import Phaser from 'phaser';
 import { SaveSystem, expToNextLevel, type SaveData } from '../systems/SaveSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import {
+  MAX_SKILL_LEVEL,
+  SKILL_KIND_LABELS,
+  SKILL_SLOT_UNLOCK_LEVEL,
+  formatSkillEffectSummary,
+  getHeroSkillLoadout,
+  getSkillSlotCount,
+  isSkillSlotUnlocked,
+  skillUpgradeCost,
+  type SkillDefinition,
+} from '../data/skills';
 import { Button } from '../ui/Button';
 import { createPanel } from '../ui/Panel';
 import { applyBackground } from '../ui/Background';
-import { subheading, caption, statLabel, numeric, COLORS } from '../ui/theme';
+import { subheading, body, caption, statLabel, numeric, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
 import { CLASS_LABELS, RARITY_COLORS, hex, type HeroData } from '../types';
 
@@ -19,6 +30,8 @@ interface HeroDetailData {
  *  stats. Opened by tapping a hero card (roster grid, formation slot, ...). */
 export class HeroDetailScene extends Phaser.Scene {
   private detailData!: HeroDetailData;
+  private save!: SaveData;
+  private skillModal?: Phaser.GameObjects.Container;
 
   constructor() {
     super('HeroDetail');
@@ -30,6 +43,8 @@ export class HeroDetailScene extends Phaser.Scene {
 
   create(): void {
     const save: SaveData = this.game.registry.get('save');
+    this.save = save;
+    this.skillModal = undefined;
     const hero = SaveSystem.getHero(save, this.detailData.heroId);
     if (!hero) {
       this.scene.start(this.detailData.from);
@@ -39,6 +54,7 @@ export class HeroDetailScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#141420');
     applyBackground(this, 'hero_detail');
     this.buildBackButton();
+    this.buildSkillButton(hero);
     this.buildHeader(hero);
     this.buildPortrait(hero);
     this.buildStatsPanel(hero);
@@ -53,6 +69,137 @@ export class HeroDetailScene extends Phaser.Scene {
   private buildFormationButton(hero: HeroData): void {
     const btn = new Button(this, 360, 1180, 320, 60, '編成にセット', () => this.scene.start('Roster', { preSelect: hero.id }), { variant: 'primary' });
     enter(this, btn, { dy: 20, delay: 260 });
+  }
+
+  private buildSkillButton(hero: HeroData): void {
+    const btn = new Button(this, 605, 53, 190, 66, 'スキル', () => this.openSkillModal(hero), { variant: 'ghost', fontSize: '15px' });
+    enter(this, btn, { duration: 260 });
+  }
+
+  /** Full-screen overlay listing every skill slot this hero's rarity grants
+   *  (locked slots shown greyed-out with their unlock level, unlocked ones
+   *  with their live level/effect and a material-spend upgrade button).
+   *  Rebuilt from scratch on open and after every upgrade rather than
+   *  patched in place - at most 4 rows, so this is cheap and keeps the
+   *  row-building logic in one place. */
+  private openSkillModal(hero: HeroData): void {
+    this.skillModal?.destroy();
+
+    const loadout = getHeroSkillLoadout(hero.heroId);
+    const slotCount = getSkillSlotCount(hero.rarity);
+    const rowBand = 150;
+    const headerH = 150;
+    const footerH = 80;
+    const panelW = 620;
+    const panelH = headerH + slotCount * rowBand + footerH;
+    const cx = 360;
+    const cy = 640;
+    const top = cy - panelH / 2;
+
+    const container = this.add.container(0, 0).setDepth(500);
+    this.skillModal = container;
+
+    const overlay = this.add.rectangle(cx, cy, 720, 1280, 0x000000, 0).setInteractive();
+    container.add(overlay);
+    this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 180 });
+
+    const rarityColor = RARITY_COLORS[hero.rarity];
+    const panel = createPanel(this, cx, cy, panelW, panelH, {
+      fillColor: COLORS.panelFill,
+      borderColor: rarityColor,
+      glowColor: rarityColor,
+      radius: 20,
+      rarity: hero.rarity,
+    });
+    container.add(panel);
+    panel.setScale(0.92);
+    popIn(this, panel, { duration: 260 });
+
+    const title = subheading(this, cx, top + 36, `${hero.name} のスキル`, { fontSize: '19px' }).setOrigin(0.5);
+    container.add(title);
+    const essenceText = caption(this, cx, top + 68, `所持 技素: ${this.save.skillEssence.toLocaleString('ja-JP')}`, { fontSize: '13px' }).setOrigin(0.5);
+    container.add(essenceText);
+
+    for (let slotIndex = 0; slotIndex < slotCount; slotIndex++) {
+      const def = loadout[slotIndex];
+      if (!def) continue;
+      const rowY = top + headerH + slotIndex * rowBand + rowBand / 2;
+      this.buildSkillRow(container, hero, def, slotIndex, cx, rowY, panelW - 40, rowBand - 16);
+    }
+
+    const closeBtn = new Button(this, cx, top + panelH - footerH / 2, 200, 56, '閉じる', () => this.closeSkillModal(), { variant: 'secondary' });
+    container.add(closeBtn);
+  }
+
+  private buildSkillRow(
+    container: Phaser.GameObjects.Container,
+    hero: HeroData,
+    def: SkillDefinition,
+    slotIndex: number,
+    cx: number,
+    rowY: number,
+    rowW: number,
+    rowH: number,
+  ): void {
+    const unlocked = isSkillSlotUnlocked(slotIndex, hero.level);
+    const rowPanel = createPanel(this, cx, rowY, rowW, rowH, {
+      fillColor: COLORS.panelFillLight,
+      fillAlpha: unlocked ? 0.9 : 0.5,
+      borderColor: unlocked ? COLORS.borderLight : COLORS.border,
+      glowColor: unlocked ? RARITY_COLORS[hero.rarity] : COLORS.border,
+      radius: 14,
+    });
+    container.add(rowPanel);
+
+    const left = cx - rowW / 2 + 22;
+    const nameText = body(this, left, rowY - rowH / 2 + 26, def.name, {
+      fontSize: '16px',
+      color: unlocked ? hex(COLORS.textPrimary) : hex(COLORS.textMuted),
+      fontStyle: 'bold',
+    });
+    container.add(nameText);
+    const kindText = caption(this, left, rowY - rowH / 2 + 50, SKILL_KIND_LABELS[def.kind], { fontSize: '12px' });
+    container.add(kindText);
+
+    if (!unlocked) {
+      const threshold = SKILL_SLOT_UNLOCK_LEVEL[slotIndex];
+      const lockText = caption(this, left, rowY + 16, `Lv.${threshold} で解放`, { fontSize: '13px', color: '#ff8080' });
+      container.add(lockText);
+      return;
+    }
+
+    const level = hero.skillLevels[slotIndex] ?? 1;
+    const effectText = caption(this, left, rowY + 14, `Lv.${level}/${MAX_SKILL_LEVEL} ・ ${formatSkillEffectSummary(def, level)}`, {
+      fontSize: '13px',
+      color: '#cfc9ea',
+    });
+    container.add(effectText);
+
+    const maxed = level >= MAX_SKILL_LEVEL;
+    const cost = maxed ? 0 : skillUpgradeCost(level);
+    const canAfford = !maxed && this.save.skillEssence >= cost;
+    const upgradeBtn = new Button(
+      this,
+      cx + rowW / 2 - 92,
+      rowY + 6,
+      160,
+      56,
+      maxed ? 'MAX' : '強化',
+      () => {
+        if (SaveSystem.upgradeHeroSkill(this.save, hero.id, slotIndex)) {
+          SaveSystem.save(this.save);
+          this.openSkillModal(hero);
+        }
+      },
+      { variant: maxed ? 'ghost' : 'primary', subLabel: maxed ? undefined : `${cost.toLocaleString('ja-JP')} 技素`, fontSize: '14px' },
+    );
+    if (maxed || !canAfford) upgradeBtn.setEnabled(false);
+    container.add(upgradeBtn);
+  }
+
+  private closeSkillModal(): void {
+    this.skillModal?.destroy();
+    this.skillModal = undefined;
   }
 
   private buildHeader(hero: HeroData): void {
