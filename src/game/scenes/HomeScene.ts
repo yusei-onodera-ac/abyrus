@@ -118,8 +118,8 @@ export class HomeScene extends Phaser.Scene {
   private buildNav(): void {
     const clusterX = 230;
     const quest = new IconNavButton(this, clusterX, 640, 'quest', questIcon(this, 108), 'クエスト', 420, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 460, 880, 'gacha', gachaIcon(this, 84), '召喚', 340, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, clusterX, 1080, 'roster', rosterIcon(this, 84), '名鑑', 300, () => this.scene.start('Roster'));
+    const gacha = new IconNavButton(this, 435, 840, 'gacha', gachaIcon(this, 84), '召喚', 340, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 1020, 'roster', rosterIcon(this, 84), '名鑑', 300, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
