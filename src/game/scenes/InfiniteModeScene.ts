@@ -311,6 +311,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private handleEvents(events: InfiniteBattleEvent[]): void {
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
+      else if (event.kind === 'skillCast') this.onSkillCast(event);
       else if (event.kind === 'defeated') this.onDefeated(event.unitId);
       else if (event.kind === 'enemySpawned') this.onEnemySpawned(event.unit, event.position);
       else if (event.kind === 'runOver') this.endRun();
@@ -325,6 +326,52 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
+  }
+
+  /** Mirrors BattleScene's onSkillCast: a hero's unlocked skill firing can
+   *  hit every enemy, land on allies, or revive a party member whose view
+   *  onDefeated already tore down (and, here, removed from `views`
+   *  entirely) - that case rebuilds the view instead of animating nothing. */
+  private onSkillCast(event: Extract<InfiniteBattleEvent, { kind: 'skillCast' }>): void {
+    const casterView = this.views.get(event.casterId);
+    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+
+    for (const result of event.results) {
+      if (result.revived) {
+        const unit = this.engine?.playerUnits.find((u) => u.id === result.targetId);
+        if (!unit) continue;
+        const pos = this.computePlayerUnitPosition(unit);
+        this.createUnitView(unit, pos.x, pos.y, true);
+        const view = this.views.get(unit.id);
+        if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
+        continue;
+      }
+
+      const targetView = this.views.get(result.targetId);
+      if (!targetView) continue;
+      if (result.damage) {
+        this.anim.hitFlash(targetView.sprite, !!result.crit);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
+        if (result.crit) this.anim.critShake(this.cameras.main);
+      } else if (result.heal) {
+        this.anim.statusFlash(targetView.sprite, COLORS.heal);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+      } else if (result.buffAtk || result.buffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.gold);
+      } else if (result.debuffAtk || result.debuffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.danger);
+      } else if (result.stunned) {
+        this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      }
+    }
+  }
+
+  private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
+    const rowUnits = (this.engine?.playerUnits ?? []).filter((u) => u.row === unit.row);
+    const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
+    const spacing = 150;
+    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
+    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
   }
 
   private onEnemySpawned(unit: UnitInstance, position: EnemySlotPosition): void {
@@ -379,11 +426,13 @@ export class InfiniteModeScene extends Phaser.Scene {
 
     const previousBestScore = this.save.infiniteMode.bestScore;
     SaveSystem.recordInfiniteModeResult(this.save, result);
+    const skillEssenceGained = Math.round(result.score / 40);
+    SaveSystem.addSkillEssence(this.save, skillEssenceGained);
     SaveSystem.save(this.save);
-    this.showResult(result, result.score > previousBestScore);
+    this.showResult(result, result.score > previousBestScore, skillEssenceGained);
   }
 
-  private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean): void {
+  private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean, skillEssenceGained: number): void {
     this.enterState('result');
     const container = this.add.container(0, 0);
     this.stateContainer = container;
@@ -407,7 +456,7 @@ export class InfiniteModeScene extends Phaser.Scene {
       this,
       360,
       430,
-      `生存時間 ${formatTime(result.survivalSeconds)}\n撃破数 ${result.enemiesDefeated}体\n到達難易度 Lv.${Math.floor(result.difficultyReached) + 1}`,
+      `生存時間 ${formatTime(result.survivalSeconds)}\n撃破数 ${result.enemiesDefeated}体\n到達難易度 Lv.${Math.floor(result.difficultyReached) + 1}\n+${skillEssenceGained} 技素`,
       { fontSize: '15px', align: 'center', color: '#f0ecff' },
     ).setOrigin(0.5);
     container.add(statsText);

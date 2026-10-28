@@ -163,6 +163,7 @@ export class BattleScene extends Phaser.Scene {
   private handleEvents(events: BattleEvent[]): void {
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
+      else if (event.kind === 'skillCast') this.onSkillCast(event);
       else if (event.kind === 'defeated') this.onDefeated(event.unitId);
       else if (event.kind === 'victory') this.onBattleEnd(true);
       else if (event.kind === 'defeat') this.onBattleEnd(false);
@@ -177,6 +178,56 @@ export class BattleScene extends Phaser.Scene {
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
+  }
+
+  /** A hero's unlocked skill firing: unlike a plain attack this can hit
+   *  every enemy (AoE), land on allies (heals/buffs), or revive a unit
+   *  whose view was already torn down by onDefeated - that last case
+   *  rebuilds the view from scratch instead of animating a destroyed one. */
+  private onSkillCast(event: Extract<BattleEvent, { kind: 'skillCast' }>): void {
+    const casterView = this.views.get(event.casterId);
+    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+
+    for (const result of event.results) {
+      if (result.revived) {
+        const unit = this.engine.units.find((u) => u.id === result.targetId);
+        if (!unit) continue;
+        const pos = this.computePlayerUnitPosition(unit);
+        this.createUnitView(unit, pos.x, pos.y, true);
+        const view = this.views.get(unit.id);
+        if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
+        continue;
+      }
+
+      const targetView = this.views.get(result.targetId);
+      if (!targetView) continue;
+      if (result.damage) {
+        this.anim.hitFlash(targetView.sprite, !!result.crit);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
+        if (result.crit) this.anim.critShake(this.cameras.main);
+      } else if (result.heal) {
+        this.anim.statusFlash(targetView.sprite, COLORS.heal);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+      } else if (result.buffAtk || result.buffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.gold);
+      } else if (result.debuffAtk || result.debuffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.danger);
+      } else if (result.stunned) {
+        this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      }
+    }
+  }
+
+  /** Recomputes a player unit's on-screen slot from its row/position among
+   *  the party, the same layout formula layoutUnits/placeRow used when the
+   *  battle started - needed to rebuild a revived unit's view, since its
+   *  original one was already destroyed by onDefeated. */
+  private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
+    const rowUnits = this.engine.playerUnits.filter((u) => u.row === unit.row);
+    const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
+    const spacing = 150;
+    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
+    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
   }
 
   private onDefeated(unitId: string): void {
@@ -222,12 +273,19 @@ export class BattleScene extends Phaser.Scene {
     if (victory) {
       const stage = ProgressionSystem.getStage(this.stageIndex);
       SaveSystem.addGold(this.save, stage.rewardGold);
+      SaveSystem.addSkillEssence(this.save, stage.rewardSkillEssence);
       for (const unit of this.engine.playerUnits) {
         SaveSystem.grantExp(this.save, unit.id, stage.rewardExp);
       }
       SaveSystem.clearStage(this.save, this.stageIndex);
       SaveSystem.save(this.save);
-      const rewardText = numeric(this, 360, 600, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
+      const rewardText = numeric(
+        this,
+        360,
+        600,
+        `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP   +${stage.rewardSkillEssence} 技素`,
+        { fontSize: '16px' },
+      ).setOrigin(0.5);
       container.add(rewardText);
       enter(this, rewardText, { dy: 12, delay: 320 });
     }

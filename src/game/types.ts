@@ -35,6 +35,10 @@ export interface HeroData {
   name: string;
   level: number;
   exp: number;
+  /** Per-skill level (1-10), indexed by skill slot (0-3). Always length 4
+   *  regardless of how many slots this hero's rarity actually grants - see
+   *  RARITY_SKILL_SLOTS in data/skills.ts for which indices are in play. */
+  skillLevels: number[];
 }
 
 export interface CombatStats {

@@ -38,6 +38,7 @@ export interface StageDef {
   enemies: EnemyUnitDef[];
   rewardGold: BigNumber;
   rewardExp: number;
+  rewardSkillEssence: number;
 }
 
 export const ProgressionSystem = {
@@ -63,6 +64,7 @@ export const ProgressionSystem = {
       enemies,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, index)),
       rewardExp: Math.round(25 * Math.pow(1.11, index)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, index)),
     };
   },
 
