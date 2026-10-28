@@ -33,10 +33,14 @@ export function expToNextLevel(level: number): number {
 
 export const SaveSystem = {
   createDefault(): SaveData {
+    // Starters are drawn from the illustrated roster, not the un-illustrated
+    // base 12, so a brand-new save's showcase hero (highest rarity owned)
+    // has real art instead of falling back to the bare procedural medallion
+    // on the very first screen a player sees.
     const heroes: HeroData[] = [
-      createHeroInstance('touma', 'starter-1'),
-      createHeroInstance('mina', 'starter-2'),
-      createHeroInstance('yuno', 'starter-3'),
+      createHeroInstance('mizuki', 'starter-1'),
+      createHeroInstance('ember', 'starter-2'),
+      createHeroInstance('lumi', 'starter-3'),
     ];
     return {
       version: 1,
