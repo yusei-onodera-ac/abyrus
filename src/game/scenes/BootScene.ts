@@ -27,6 +27,10 @@ export class BootScene extends Phaser.Scene {
     preloadButtonAssets(this);
     preloadIconAssets(this);
     this.load.image('topbar', '/assets/ui/topbar.png');
+    this.load.image('bottombar', '/assets/ui/bottombar.png');
+    for (const tab of ['event', 'legion', 'home', 'profile', 'settings']) {
+      this.load.image(`tab_${tab}`, `/assets/ui/tab_${tab}.png`);
+    }
   }
 
   create(): void {

@@ -7,6 +7,7 @@ import { applyBackground } from '../ui/Background';
 import { questIcon, gachaIcon, rosterIcon } from '../ui/Icons';
 import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
+import { BottomNavBar } from '../ui/BottomNavBar';
 import { RARITY_COLORS, type HeroData } from '../types';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
@@ -39,6 +40,7 @@ export class HomeScene extends Phaser.Scene {
 
     this.buildCharacterShowcase(save);
     this.buildNav();
+    new BottomNavBar(this, 720, 1280, 'home');
   }
 
   private getSave(): SaveData {
@@ -72,8 +74,11 @@ export class HomeScene extends Phaser.Scene {
     let portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
 
     if (hero.heroId && this.textures.exists(hero.heroId)) {
-      const floorY = 1260;
-      const targetHeight = 1060;
+      // floorY sits above the bottom nav bar, not the screen edge, so the
+      // portrait's feet don't land behind it. Measured from the bar itself
+      // rather than hardcoded, so it stays correct if that art changes.
+      const floorY = 1280 - BottomNavBar.totalHeight(this, 720) - 10;
+      const targetHeight = 960;
       const portraitCy = floorY - targetHeight / 2;
       const shadow = this.add.ellipse(cx, floorY, targetHeight * 0.4, 42, 0x000000, 0.35);
       shadow.setDepth(-1);
@@ -122,9 +127,9 @@ export class HomeScene extends Phaser.Scene {
    *  the two with diagonal overlap on both sides. */
   private buildNav(): void {
     const clusterX = 230;
-    const quest = new IconNavButton(this, clusterX, 640, 'quest', questIcon(this, 108), 'クエスト', 420, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 435, 840, 'gacha', gachaIcon(this, 84), '召喚', 340, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, clusterX, 1020, 'roster', rosterIcon(this, 84), '名鑑', 300, () => this.scene.start('Roster'));
+    const quest = new IconNavButton(this, clusterX, 560, 'quest', questIcon(this, 108), 'クエスト', 380, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 435, 740, 'gacha', gachaIcon(this, 84), '召喚', 310, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 900, 'roster', rosterIcon(this, 84), '名鑑', 270, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
