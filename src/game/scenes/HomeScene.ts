@@ -127,9 +127,10 @@ export class HomeScene extends Phaser.Scene {
    *  the two with diagonal overlap on both sides. */
   private buildNav(): void {
     const clusterX = 210;
-    const quest = new IconNavButton(this, clusterX, 630, 'quest', questIcon(this, 108), 'クエスト', 380, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 415, 810, 'gacha', gachaIcon(this, 108), '召喚', 380, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 108), '名鑑', 380, () => this.scene.start('Roster'));
+    const size = 300;
+    const quest = new IconNavButton(this, clusterX, 630, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 415, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
