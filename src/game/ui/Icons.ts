@@ -21,6 +21,9 @@ const ICON_TAB_LEGION = 'icon_tab_legion';
 const ICON_TAB_HOME = 'icon_tab_home';
 const ICON_TAB_PROFILE = 'icon_tab_profile';
 const ICON_TAB_SETTINGS = 'icon_tab_settings';
+const ICON_NOTIFICATION = 'icon_notification';
+const ICON_GIFT_BOX = 'icon_gift_box';
+const ICON_MAIL = 'icon_mail';
 
 export type StageNodeState = 'locked' | 'unlocked' | 'cleared';
 
@@ -359,5 +362,70 @@ export function settingsTabIcon(scene: Phaser.Scene, size = 72): string {
     g.strokeCircle(c, c, c * 0.46);
     g.fillStyle(0x4a2d6e, 1);
     g.fillCircle(c, c, c * 0.18);
+  });
+}
+
+/** Notification-bell icon for the home screen's corner button row. */
+export function notificationIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_NOTIFICATION}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0xa06a1a, 0xffe29a);
+    const top = c - c * 0.4;
+    g.fillStyle(0xffe9b8, 1);
+    g.fillCircle(c, top, c * 0.08);
+    g.fillStyle(0xfff3d6, 1);
+    g.beginPath();
+    g.arc(c, c + c * 0.04, c * 0.42, Math.PI, 0, false);
+    g.lineTo(c + c * 0.5, c + c * 0.36);
+    g.lineTo(c - c * 0.5, c + c * 0.36);
+    g.closePath();
+    g.fillPath();
+    g.fillStyle(0xa06a1a, 1);
+    g.fillRoundedRect(c - c * 0.56, c + c * 0.32, c * 1.12, c * 0.1, 4);
+    g.fillStyle(0xa06a1a, 1);
+    g.fillEllipse(c, c + c * 0.52, c * 0.26, c * 0.14);
+  });
+}
+
+/** Present-box icon (ribboned gift) for the home screen's corner button
+ *  row - distinct from the bottom bar's chest-shaped Event icon so the
+ *  two don't read as the same feature. */
+export function giftBoxIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_GIFT_BOX}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0xa0295e, 0xffb8d9);
+    const boxTop = c - c * 0.06;
+    const boxSize = c * 0.86;
+    g.fillStyle(0xff8fbf, 1);
+    g.fillRect(c - boxSize / 2, boxTop, boxSize, c * 0.5);
+    g.fillStyle(0xffd9ea, 1);
+    g.fillRect(c - boxSize / 2, boxTop - c * 0.12, boxSize, c * 0.14);
+    g.fillStyle(0xe85a9a, 1);
+    g.fillRect(c - c * 0.07, boxTop - c * 0.12, c * 0.14, c * 0.62);
+    g.fillStyle(0xffd9ea, 1);
+    g.fillCircle(c - c * 0.18, boxTop - c * 0.14, c * 0.14);
+    g.fillCircle(c + c * 0.18, boxTop - c * 0.14, c * 0.14);
+    g.fillStyle(0xa0295e, 1);
+    g.fillCircle(c, boxTop - c * 0.12, c * 0.07);
+  });
+}
+
+/** Envelope icon for the home screen's corner button row. */
+export function mailIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_MAIL}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x1f5a96, 0xbfe0ff);
+    const w = c * 0.88;
+    const h = c * 0.62;
+    const left = c - w / 2;
+    const top = c - h / 2;
+    g.fillStyle(0xe8f4ff, 1);
+    g.fillRect(left, top, w, h);
+    g.fillStyle(0xbfe0ff, 1);
+    g.fillTriangle(left, top, c, top + h * 0.56, left + w, top);
+    g.lineStyle(1.5, 0x1f5a96, 0.8);
+    g.strokeRect(left, top, w, h);
+    g.beginPath();
+    g.moveTo(left, top);
+    g.lineTo(c, top + h * 0.56);
+    g.lineTo(left + w, top);
+    g.strokePath();
   });
 }

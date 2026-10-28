@@ -71,9 +71,13 @@ export class ResourceBar extends Phaser.GameObjects.Container {
         .setOrigin(0.5);
       this.add(this.nameText);
 
-      goldPos = art(1420, 205);
-      gemPos = art(1600, 205);
-      staminaPos = art(1780, 205);
+      // The plate sits well above this row (bottom edge ~y130 vs this
+      // row's y205), so the plank is open the whole way from the shield's
+      // right edge (~x460) to the bar's right edge - spread across that
+      // full width instead of bunching against the right edge.
+      goldPos = art(720, 205);
+      gemPos = art(1215, 205);
+      staminaPos = art(1710, 205);
     } else {
       height = 64;
       const panel = createPanel(scene, width / 2, height / 2, width, height, {

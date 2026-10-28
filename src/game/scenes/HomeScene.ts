@@ -4,7 +4,7 @@ import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { applyBackground } from '../ui/Background';
-import { questIcon, gachaIcon, rosterIcon } from '../ui/Icons';
+import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon } from '../ui/Icons';
 import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -40,6 +40,7 @@ export class HomeScene extends Phaser.Scene {
 
     this.buildCharacterShowcase(save);
     this.buildNav();
+    this.buildCornerButtons();
     new BottomNavBar(this, 720, 1280, 'home');
   }
 
@@ -132,5 +133,45 @@ export class HomeScene extends Phaser.Scene {
     const gacha = new IconNavButton(this, 415, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
     const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
+  }
+
+  /** Small round utility buttons stacked in the top-right corner, under the
+   *  resource bar: notifications / present box / mail. None of those
+   *  features exist yet, so tapping one just surfaces a placeholder toast
+   *  instead of a real inbox - same "show the chrome before the system
+   *  behind it exists" approach the stamina meter and legion crest use. */
+  private buildCornerButtons(): void {
+    const size = 72;
+    const x = 656;
+    const startY = 176;
+    const spacing = 92;
+    const items: { texture: string; label: string }[] = [
+      { texture: notificationIcon(this, size), label: 'お知らせ' },
+      { texture: giftBoxIcon(this, size), label: 'プレゼントBOX' },
+      { texture: mailIcon(this, size), label: 'メール' },
+    ];
+    const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item.texture, item.label));
+    enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
+  }
+
+  private buildCornerButton(x: number, y: number, size: number, textureKey: string, label: string): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+    const icon = this.add.image(0, 0, textureKey).setDisplaySize(size, size);
+    const hitZone = this.add.zone(0, 0, size, size).setOrigin(0.5);
+    hitZone.setInteractive({ useHandCursor: true });
+    hitZone.on('pointerover', () => this.tweens.add({ targets: container, scale: 1.08, duration: 110, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerout', () => this.tweens.add({ targets: container, scale: 1, duration: 140, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerdown', () => this.tweens.add({ targets: container, scale: 0.92, duration: 70, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerup', () => {
+      this.tweens.add({ targets: container, scale: 1.08, duration: 90, ease: 'Sine.easeOut' });
+      this.showToast(`${label}: 準備中です`);
+    });
+    container.add([icon, hitZone]);
+    return container;
+  }
+
+  private showToast(text: string): void {
+    const msg = caption(this, 360, 145, text, { fontSize: '14px', color: '#f0ecff' }).setOrigin(0.5);
+    this.tweens.add({ targets: msg, alpha: 0, delay: 900, duration: 400, onComplete: () => msg.destroy() });
   }
 }
