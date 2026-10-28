@@ -19,9 +19,11 @@ const CLASS_BASE: Record<HeroClass, ClassBase> = {
 
 const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2 };
 
-const ENEMY_CLASSES: HeroClass[] = ['warrior', 'mage', 'archer', 'tank', 'healer'];
-const NAME_P1 = ['零', '虚', '影', '灰', '銀', '黒', '蝕', '綺', '幻', '棄'];
-const NAME_P2 = ['算兵', '演算体', '断片', '残響', '執行者', '番人', '傀儡', '古算'];
+// Exported so InfiniteModeSystem can generate its own continuously-scaling
+// enemy defs from the same name/class pools instead of duplicating them.
+export const ENEMY_CLASSES: HeroClass[] = ['warrior', 'mage', 'archer', 'tank', 'healer'];
+export const NAME_P1 = ['零', '虚', '影', '灰', '銀', '黒', '蝕', '綺', '幻', '棄'];
+export const NAME_P2 = ['算兵', '演算体', '断片', '残響', '執行者', '番人', '傀儡', '古算'];
 
 export interface EnemyUnitDef {
   seed: number;

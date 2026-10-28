@@ -33,10 +33,14 @@ export type BattleEvent =
   | { kind: 'victory' }
   | { kind: 'defeat' };
 
-const ULT_GAIN = 25;
-const ULT_MAX = 100;
-const ULT_MULTIPLIER = 3.2;
-const BASE_COOLDOWN = 1200;
+// Exported so InfiniteModeSystem's own attack-resolution loop (which can't
+// reuse BattleEngine directly - its win-the-moment-enemies-are-wiped
+// lifecycle doesn't fit an endless mode) can stay tuned identically to
+// stage battles instead of drifting with a second copy of these numbers.
+export const ULT_GAIN = 25;
+export const ULT_MAX = 100;
+export const ULT_MULTIPLIER = 3.2;
+export const BASE_COOLDOWN = 1200;
 
 export const BattleSystem = {
   createPlayerUnit(hero: HeroData, row: Row, slot: number): UnitInstance {
