@@ -14,7 +14,14 @@ const config: Phaser.Types.Core.GameConfig = {
   parent: 'app',
   backgroundColor: '#10121c',
   scale: {
-    mode: Phaser.Scale.FIT,
+    // EXPAND keeps the design width (720) fixed and stretches the design
+    // height to match whatever the real device's aspect ratio actually is,
+    // so the canvas fills the full screen edge-to-edge on any phone - no
+    // FIT-mode letterbox bars, and nothing cropped either. Every screen's
+    // background/bottom-bar/overlay code reads the live this.scale.height
+    // instead of assuming 1280, so they stretch to fill whatever height
+    // EXPAND computes.
+    mode: Phaser.Scale.EXPAND,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 720,
     height: 1280,

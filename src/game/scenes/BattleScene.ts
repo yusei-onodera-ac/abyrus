@@ -58,7 +58,7 @@ export class BattleScene extends Phaser.Scene {
 
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);
     if (pFront.length + pBack.length === 0) {
-      caption(this, 360, 640, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
+      caption(this, 360, this.scale.height / 2, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
       return;
     }
 
@@ -197,11 +197,17 @@ export class BattleScene extends Phaser.Scene {
     if (this.resultOverlay) return;
     const container = this.add.container(0, 0);
     this.resultOverlay = container;
-    const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
+    const overlay = this.add
+      .rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, 0x000000, 0)
+      .setInteractive();
     container.add(overlay);
     this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 220 });
 
-    const panel = createPanel(this, 360, 630, 560, 320, {
+    // This whole result dialog is one cluster of fixed offsets from its own
+    // center, so only that center needs to track the real screen height.
+    const cy = this.scale.height / 2;
+
+    const panel = createPanel(this, 360, cy - 10, 560, 320, {
       fillColor: COLORS.panelFill,
       borderColor: victory ? COLORS.gold : COLORS.danger,
       glowColor: victory ? COLORS.gold : COLORS.danger,
@@ -211,7 +217,7 @@ export class BattleScene extends Phaser.Scene {
     panel.setScale(0.85);
     popIn(this, panel, { duration: 320, delay: 100 });
 
-    const title = heading(this, 360, 540, victory ? '勝利!' : '敗北…', {
+    const title = heading(this, 360, cy - 100, victory ? '勝利!' : '敗北…', {
       fontSize: '40px',
       color: victory ? '#ffd23f' : '#ff6b6b',
     }).setOrigin(0.5);
@@ -227,12 +233,12 @@ export class BattleScene extends Phaser.Scene {
       }
       SaveSystem.clearStage(this.save, this.stageIndex);
       SaveSystem.save(this.save);
-      const rewardText = numeric(this, 360, 600, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
+      const rewardText = numeric(this, 360, cy - 40, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
       container.add(rewardText);
       enter(this, rewardText, { dy: 12, delay: 320 });
     }
 
-    const btn = new Button(this, 360, 700, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.scene.start('Home'), {
+    const btn = new Button(this, 360, cy + 60, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.scene.start('Home'), {
       variant: victory ? 'primary' : 'secondary',
     });
     container.add(btn);

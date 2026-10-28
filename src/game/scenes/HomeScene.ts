@@ -40,7 +40,7 @@ export class HomeScene extends Phaser.Scene {
 
     this.buildCharacterShowcase(save);
     this.buildNav();
-    new BottomNavBar(this, 720, 1280, 'home');
+    new BottomNavBar(this, this.scale.width, this.scale.height, 'home');
   }
 
   private getSave(): SaveData {
@@ -77,7 +77,7 @@ export class HomeScene extends Phaser.Scene {
       // floorY sits above the bottom nav bar, not the screen edge, so the
       // portrait's feet don't land behind it. Measured from the bar itself
       // rather than hardcoded, so it stays correct if that art changes.
-      const floorY = 1280 - BottomNavBar.totalHeight() + 6;
+      const floorY = this.scale.height - BottomNavBar.totalHeight() + 6;
       const targetHeight = 960;
       const portraitCy = floorY - targetHeight / 2;
       const shadow = this.add.ellipse(cx, floorY, targetHeight * 0.4, 42, 0x000000, 0.35);

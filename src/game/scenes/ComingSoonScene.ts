@@ -21,7 +21,7 @@ export abstract class ComingSoonScene extends Phaser.Scene {
     enter(this, title, { dy: -14, duration: 340 });
     enter(this, sub, { dy: -8, duration: 300, delay: 60 });
 
-    new BottomNavBar(this, 720, 1280, this.tab);
+    new BottomNavBar(this, this.scale.width, this.scale.height, this.tab);
   }
 }
 
