@@ -145,7 +145,7 @@ export class HomeScene extends Phaser.Scene {
    *  content: see data/banners.ts to add/swap one without touching this
    *  scene. */
   private buildBanners(): void {
-    const cards = buildBannerStack(this, 145, 168, BANNERS);
+    const cards = buildBannerStack(this, 145, 180, BANNERS);
     enterStagger(this, cards, { dx: -18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
