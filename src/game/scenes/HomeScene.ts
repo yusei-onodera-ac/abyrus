@@ -1,8 +1,21 @@
 import Phaser from 'phaser';
-import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { ProgressionSystem } from '../systems/ProgressionSystem';
+import type { SaveData } from '../systems/SaveSystem';
 import { ResourceBar } from '../ui/ResourceBar';
+import { IconNavButton } from '../ui/IconNavButton';
+import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { applyBackground } from '../ui/Background';
+import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon } from '../ui/Icons';
+import { caption } from '../ui/theme';
+import { enter, enterStagger } from '../ui/Transitions';
+import { BottomNavBar } from '../ui/BottomNavBar';
+import { buildBannerStack } from '../ui/BannerStack';
+import { BANNERS } from '../data/banners';
+import { RARITY_COLORS, type HeroData } from '../types';
 
+/** Character-first home hub: a big asymmetric portrait of the player's best
+ *  hero layered over the background, with a round icon-cluster nav
+ *  underneath instead of a stage-select grid (that lives in
+ *  StageSelectScene now) or a stack of long rectangle menu buttons. */
 export class HomeScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
 
@@ -13,53 +26,182 @@ export class HomeScene extends Phaser.Scene {
   create(): void {
     const save = this.getSave();
     this.cameras.main.setBackgroundColor('#10121c');
-
-    this.add.text(360, 90, 'ABYRUS', { fontFamily: 'Georgia, serif', fontSize: '52px', color: '#e8d9ff' }).setOrigin(0.5);
-    this.add.text(360, 140, '無限算盤の子', { fontSize: '16px', color: '#8f88a8' }).setOrigin(0.5);
+    applyBackground(this, 'home');
 
     this.resourceBar = new ResourceBar(this, 0, 0, 720);
-    this.resourceBar.update(SaveSystem.getGold(save), save.gems);
+    this.resourceBar.update(save);
+    enter(this, this.resourceBar, { dy: -20, duration: 300 });
 
-    this.buildStageMap(save);
-    this.buildMenuButtons();
+    // The topbar artwork already has its own "ABYRUS" lettering baked in;
+    // only draw this standalone wordmark while running on the plain-panel
+    // fallback, so the title isn't duplicated once real art is loaded.
+    if (!this.resourceBar.hasArt) {
+      const wordmark = caption(this, 24, 86, 'ABYRUS', { fontSize: '15px', color: '#9a93b8', fontStyle: 'bold' }).setOrigin(0, 0.5);
+      enter(this, wordmark, { dx: -10, dy: 0, duration: 280, delay: 80 });
+    }
+
+    this.buildCharacterShowcase(save);
+    this.buildNav();
+    this.buildCornerButtons(save);
+    this.buildBanners();
+    new BottomNavBar(this, 720, 1280, 'home');
   }
 
   private getSave(): SaveData {
     return this.game.registry.get('save');
   }
 
-  private buildStageMap(save: SaveData): void {
-    this.add.text(40, 190, 'ステージ進行', { fontSize: '18px', color: '#ffffff' });
-    const perRow = 6;
-    const visibleStages = Math.min(ProgressionSystem.STAGE_COUNT, save.stageProgress + 8);
-    for (let i = 0; i < visibleStages; i++) {
-      const col = i % perRow;
-      const rowIdx = Math.floor(i / perRow);
-      const x = 70 + col * 100;
-      const y = 250 + rowIdx * 90;
-      const unlocked = i <= save.stageProgress;
-      const cleared = i < save.stageProgress;
-      const node = this.add
-        .circle(x, y, 32, unlocked ? (cleared ? 0x2f7a4d : 0x3b5fc4) : 0x2a2b36)
-        .setStrokeStyle(2, unlocked ? 0xffffff : 0x44465a);
-      this.add.text(x, y, `${i + 1}`, { fontSize: '16px', color: unlocked ? '#ffffff' : '#60627a' }).setOrigin(0.5);
-      if (unlocked) {
-        node.setInteractive({ useHandCursor: true }).on('pointerdown', () => {
-          this.scene.start('Battle', { stageIndex: i });
-        });
-      }
+  /** Highest rarity among owned heroes, ties broken by whichever was added
+   *  most recently (heroes are appended on pull/starter-grant, so later
+   *  array entries are newer). */
+  private pickShowcaseHero(save: SaveData): HeroData | null {
+    if (save.heroes.length === 0) return null;
+    let best = save.heroes[0];
+    for (const hero of save.heroes) {
+      if (hero.rarity >= best.rarity) best = hero;
     }
+    return best;
   }
 
-  private buildMenuButtons(): void {
-    const buttons: { label: string; scene: string; y: number }[] = [
-      { label: '召喚の間', scene: 'Gacha', y: 1060 },
-      { label: '英雄名鑑', scene: 'Roster', y: 1130 },
-    ];
-    for (const b of buttons) {
-      const bg = this.add.rectangle(360, b.y, 300, 56, 0x2a2c3d).setStrokeStyle(2, 0x4a4d66).setInteractive({ useHandCursor: true });
-      this.add.text(360, b.y, b.label, { fontSize: '20px', color: '#ffffff' }).setOrigin(0.5);
-      bg.on('pointerdown', () => this.scene.start(b.scene));
+  private buildCharacterShowcase(save: SaveData): void {
+    const hero = this.pickShowcaseHero(save);
+    if (!hero) return;
+
+    // Driven by target HEIGHT, not a width x height bounding box: the
+    // reference composition has the hero filling nearly the full screen
+    // height (hair near the top, boots near the bottom), right-of-center.
+    // A box-fit (min of two ratios) tends to under-fill on one axis
+    // whenever the source art's aspect doesn't exactly match the box's,
+    // which is what made an earlier version look small.
+    const cx = 460;
+    const cy = 600;
+    let portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite;
+
+    if (hero.heroId && this.textures.exists(hero.heroId)) {
+      // floorY sits above the bottom nav bar, not the screen edge, so the
+      // portrait's feet don't land behind it. Measured from the bar itself
+      // rather than hardcoded, so it stays correct if that art changes.
+      const floorY = 1280 - BottomNavBar.totalHeight() + 6;
+      const targetHeight = 960;
+      const portraitCy = floorY - targetHeight / 2;
+      const shadow = this.add.ellipse(cx, floorY, targetHeight * 0.4, 42, 0x000000, 0.35);
+      shadow.setDepth(-1);
+
+      const frame = this.textures.get(hero.heroId).getSourceImage();
+      const scale = targetHeight / frame.height;
+      portrait = this.add.image(cx, portraitCy, hero.heroId).setScale(scale);
+    } else {
+      // The procedural portrait is baked at a small, fixed resolution for
+      // card-sized use elsewhere (HeroCard, gacha reveals): stretching it to
+      // fill a showcase-sized frame just blows up a blurry blob. Cap it to a
+      // modest medallion size instead, with its own soft glow backdrop, so a
+      // hero without illustrated art still reads as a deliberate placeholder
+      // rather than a broken giant sprite.
+      const shadow = this.add.ellipse(cx, cy + 103, 330, 42, 0x000000, 0.35);
+      shadow.setDepth(-1);
+
+      const medallionSize = 220;
+      const glow = this.add.graphics();
+      const glowColor = RARITY_COLORS[hero.rarity];
+      for (let i = 3; i > 0; i--) {
+        glow.fillStyle(glowColor, 0.05 + i * 0.04);
+        glow.fillCircle(cx, cy, medallionSize * 0.5 + i * 14);
+      }
+      const generator = new CharacterGenerator(this);
+      const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
+      portrait = this.add.sprite(cx, cy, textureKey).setDisplaySize(medallionSize, medallionSize);
     }
+
+    enter(this, portrait, { dy: 26, duration: 480, ease: 'Cubic.easeOut' });
+    this.floatIdle(portrait);
+  }
+
+  /** Gentle drifting bob so the showcase hero reads as hovering rather than
+   *  pasted on flat. Two independent yoyo tweens at different periods, so
+   *  the vertical and horizontal drift fall out of phase instead of
+   *  tracing a perfectly repeating diagonal line. */
+  private floatIdle(target: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite): void {
+    this.tweens.add({ targets: target, y: target.y - 26, duration: 2600, delay: 400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: target, x: target.x + 16, duration: 3400, delay: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  /** Cascading diamond cluster in the lower-left, overlapping the bottom of
+   *  the character showcase. Quest (biggest) sits directly above roster on
+   *  a shared centerline; gacha (mid-sized) offsets to the right, bridging
+   *  the two with diagonal overlap on both sides. */
+  private buildNav(): void {
+    // clusterX is set so the diamond's left-most point (clusterX - size/2)
+    // lines up with the banner stack's own left edge (bannerX - 100).
+    const clusterX = 195;
+    const size = 300;
+    const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 400, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
+    enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
+  }
+
+  /** Vertical stack of promo banners in the top-left corner, under the
+   *  resource bar - gacha pushes, event announcements, limited packs. Pure
+   *  content: see data/banners.ts to add/swap one without touching this
+   *  scene. */
+  private buildBanners(): void {
+    const cards = buildBannerStack(this, 145, 190, BANNERS);
+    enterStagger(this, cards, { dx: -18, dy: 0, duration: 280, delay: 220, stagger: 70 });
+  }
+
+  /** Small round utility buttons stacked in the top-right corner, under the
+   *  resource bar: notifications / present box / mail. None of those
+   *  features exist yet, so tapping one just surfaces a placeholder toast
+   *  instead of a real inbox - same "show the chrome before the system
+   *  behind it exists" approach the stamina meter and legion crest use. */
+  private buildCornerButtons(save: SaveData): void {
+    const size = 72;
+    const x = 656;
+    const startY = 176;
+    const spacing = 92;
+    const items: { texture: string; label: string; unread: boolean }[] = [
+      { texture: notificationIcon(this, size), label: 'お知らせ', unread: save.unread.notification },
+      { texture: giftBoxIcon(this, size), label: 'プレゼントBOX', unread: save.unread.giftBox },
+      { texture: mailIcon(this, size), label: 'メール', unread: save.unread.mail },
+    ];
+    const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item));
+    enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
+  }
+
+  private buildCornerButton(
+    x: number,
+    y: number,
+    size: number,
+    item: { texture: string; label: string; unread: boolean },
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+    const icon = this.add.image(0, 0, item.texture).setDisplaySize(size, size);
+    container.add(icon);
+
+    if (item.unread) {
+      const dot = this.add.graphics();
+      dot.fillStyle(0x1b1d29, 1);
+      dot.fillCircle(size * 0.34, -size * 0.34, 9);
+      dot.fillStyle(0xff4d4d, 1);
+      dot.fillCircle(size * 0.34, -size * 0.34, 7);
+      container.add(dot);
+    }
+
+    const hitZone = this.add.zone(0, 0, size, size).setOrigin(0.5);
+    hitZone.setInteractive({ useHandCursor: true });
+    hitZone.on('pointerover', () => this.tweens.add({ targets: container, scale: 1.08, duration: 110, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerout', () => this.tweens.add({ targets: container, scale: 1, duration: 140, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerdown', () => this.tweens.add({ targets: container, scale: 0.92, duration: 70, ease: 'Sine.easeOut' }));
+    hitZone.on('pointerup', () => {
+      this.tweens.add({ targets: container, scale: 1.08, duration: 90, ease: 'Sine.easeOut' });
+      this.showToast(`${item.label}: 準備中です`);
+    });
+    container.add(hitZone);
+    return container;
+  }
+
+  private showToast(text: string): void {
+    const msg = caption(this, 360, 145, text, { fontSize: '14px', color: '#f0ecff' }).setOrigin(0.5);
+    this.tweens.add({ targets: msg, alpha: 0, delay: 900, duration: 400, onComplete: () => msg.destroy() });
   }
 }

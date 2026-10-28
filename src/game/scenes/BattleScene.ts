@@ -5,6 +5,11 @@ import { BattleSystem, BattleEngine, type UnitInstance, type BattleEvent } from 
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
+import { Button } from '../ui/Button';
+import { createPanel } from '../ui/Panel';
+import { applyBackground } from '../ui/Background';
+import { subheading, caption, heading, numeric, COLORS } from '../ui/theme';
+import { enter, popIn } from '../ui/Transitions';
 
 interface UnitView {
   unit: UnitInstance;
@@ -13,6 +18,7 @@ interface UnitView {
   ultFill: Phaser.GameObjects.Rectangle;
   readyRing: Phaser.GameObjects.Arc;
   nameText: Phaser.GameObjects.Text;
+  readyPulse?: Phaser.Tweens.Tween;
 }
 
 export class BattleScene extends Phaser.Scene {
@@ -41,19 +47,18 @@ export class BattleScene extends Phaser.Scene {
     this.anim = new AnimationController(this);
     this.popups = new DamagePopupPool(this);
     this.cameras.main.setBackgroundColor('#0c0e18');
+    applyBackground(this, 'battle');
 
     const stage = ProgressionSystem.getStage(this.stageIndex);
-    this.add.text(360, 40, stage.name, { fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
+    const title = subheading(this, 360, 40, stage.name, { fontSize: '22px' }).setOrigin(0.5);
+    enter(this, title, { dy: -14, duration: 300 });
 
-    const backBtn = this.add.rectangle(60, 40, 90, 40, 0x2a2c3d).setStrokeStyle(2, 0x4a4d66).setInteractive({ useHandCursor: true });
-    this.add.text(60, 40, '撤退', { fontSize: '14px', color: '#ffffff' }).setOrigin(0.5);
-    backBtn.on('pointerdown', () => this.scene.start('Home'));
+    const backBtn = new Button(this, 115, 53, 190, 66, '撤退', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
+    enter(this, backBtn, { duration: 260 });
 
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);
     if (pFront.length + pBack.length === 0) {
-      this.add
-        .text(360, 640, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' })
-        .setOrigin(0.5);
+      caption(this, 360, 640, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
       return;
     }
 
@@ -93,11 +98,15 @@ export class BattleScene extends Phaser.Scene {
     const sprite = this.add.sprite(x, y, textureKey).setDisplaySize(size * 0.9, size * 0.9);
     if (!isPlayer) sprite.setFlipX(true);
 
-    const nameText = this.add.text(x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
+    const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;
-    this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6);
-    const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5);
-    const ultFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 13, barWidth, 4, 0xffd23f).setOrigin(0, 0.5).setScale(0, 1);
+    this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
+    const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
+    const ultFill = this.add
+      .rectangle(x - barWidth / 2, y + size / 2 + 13, barWidth, 4, 0xffd23f)
+      .setOrigin(0, 0.5)
+      .setScale(0, 1)
+      .setRounded(2);
     const readyRing = this.add.circle(x, y, size * 0.52).setStrokeStyle(3, 0xffd23f, 0.9).setVisible(false);
 
     this.anim.idle(sprite);
@@ -130,7 +139,23 @@ export class BattleScene extends Phaser.Scene {
       view.hpFill.setFillStyle(ratio < 0.3 ? 0xe05353 : ratio < 0.6 ? 0xe0c653 : 0x4caf50);
       if (view.unit.isPlayer) {
         view.ultFill.setScale(Phaser.Math.Clamp(view.unit.ultGauge / 100, 0, 1), 1);
-        view.readyRing.setVisible(view.unit.ultGauge >= 100);
+        const ready = view.unit.ultGauge >= 100;
+        if (ready && !view.readyRing.visible) {
+          view.readyRing.setVisible(true).setScale(1).setAlpha(1);
+          view.readyPulse = this.tweens.add({
+            targets: view.readyRing,
+            scale: 1.18,
+            alpha: 0.4,
+            duration: 480,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut',
+          });
+        } else if (!ready && view.readyRing.visible) {
+          view.readyPulse?.stop();
+          view.readyPulse = undefined;
+          view.readyRing.setVisible(false).setScale(1).setAlpha(1);
+        }
       }
     }
   }
@@ -158,6 +183,7 @@ export class BattleScene extends Phaser.Scene {
     const view = this.views.get(unitId);
     if (!view) return;
     this.anim.destroyAura(unitId);
+    view.readyPulse?.stop();
     view.readyRing.destroy();
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
@@ -171,13 +197,27 @@ export class BattleScene extends Phaser.Scene {
     if (this.resultOverlay) return;
     const container = this.add.container(0, 0);
     this.resultOverlay = container;
-    const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0.8).setInteractive();
+    const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
     container.add(overlay);
+    this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 220 });
 
-    const title = this.add
-      .text(360, 540, victory ? '勝利!' : '敗北…', { fontSize: '40px', color: victory ? '#ffd23f' : '#ff6b6b' })
-      .setOrigin(0.5);
+    const panel = createPanel(this, 360, 630, 560, 320, {
+      fillColor: COLORS.panelFill,
+      borderColor: victory ? COLORS.gold : COLORS.danger,
+      glowColor: victory ? COLORS.gold : COLORS.danger,
+      radius: 22,
+    });
+    container.add(panel);
+    panel.setScale(0.85);
+    popIn(this, panel, { duration: 320, delay: 100 });
+
+    const title = heading(this, 360, 540, victory ? '勝利!' : '敗北…', {
+      fontSize: '40px',
+      color: victory ? '#ffd23f' : '#ff6b6b',
+    }).setOrigin(0.5);
     container.add(title);
+    title.setScale(0);
+    popIn(this, title, { duration: 360, delay: 180 });
 
     if (victory) {
       const stage = ProgressionSystem.getStage(this.stageIndex);
@@ -187,15 +227,16 @@ export class BattleScene extends Phaser.Scene {
       }
       SaveSystem.clearStage(this.save, this.stageIndex);
       SaveSystem.save(this.save);
-      const rewardText = this.add
-        .text(360, 600, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px', color: '#ffffff' })
-        .setOrigin(0.5);
+      const rewardText = numeric(this, 360, 600, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
       container.add(rewardText);
+      enter(this, rewardText, { dy: 12, delay: 320 });
     }
 
-    const btn = this.add.rectangle(360, 700, 220, 60, 0x2a2c3d).setStrokeStyle(2, 0x4a4d66).setInteractive({ useHandCursor: true });
-    const btnText = this.add.text(360, 700, victory ? '次へ進む' : 'ホームへ戻る', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
-    container.add([btn, btnText]);
-    btn.on('pointerdown', () => this.scene.start('Home'));
+    const btn = new Button(this, 360, 700, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.scene.start('Home'), {
+      variant: victory ? 'primary' : 'secondary',
+    });
+    container.add(btn);
+    btn.setScale(0);
+    this.tweens.add({ targets: btn, scale: 1, duration: 280, delay: 380, ease: 'Back.easeOut' });
   }
 }
