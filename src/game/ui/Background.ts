@@ -52,8 +52,8 @@ export function preloadBackgrounds(scene: Phaser.Scene): void {
 export function applyBackground(
   scene: Phaser.Scene,
   screen: BackgroundScreen,
-  width = scene.scale.width,
-  height = scene.scale.height,
+  width = 720,
+  height = 1280,
 ): Phaser.GameObjects.Image | null {
   const key = textureKey(screen);
   if (!scene.textures.exists(key)) return null;

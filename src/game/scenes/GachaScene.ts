@@ -100,15 +100,13 @@ export class GachaScene extends Phaser.Scene {
     this.resultContainer?.destroy();
     const container = this.add.container(0, 0);
     this.resultContainer = container;
-    const overlay = this.add
-      .rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, 0x000000, 0)
-      .setInteractive();
+    const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
     container.add(overlay);
     this.tweens.add({ targets: overlay, fillAlpha: 0.78, duration: 220 });
 
     const cols = Math.min(5, outcomes.length);
     const rows = Math.ceil(outcomes.length / cols);
-    const startY = this.scale.height / 2 - (rows - 1) * 90;
+    const startY = 640 - (rows - 1) * 90;
 
     outcomes.forEach((outcome, i) => {
       const { hero } = outcome;
