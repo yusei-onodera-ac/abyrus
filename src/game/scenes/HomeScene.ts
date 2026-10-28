@@ -8,6 +8,8 @@ import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIc
 import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
+import { buildBannerStack } from '../ui/BannerStack';
+import { BANNERS } from '../data/banners';
 import { RARITY_COLORS, type HeroData } from '../types';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
@@ -41,6 +43,7 @@ export class HomeScene extends Phaser.Scene {
     this.buildCharacterShowcase(save);
     this.buildNav();
     this.buildCornerButtons(save);
+    this.buildBanners();
     new BottomNavBar(this, 720, 1280, 'home');
   }
 
@@ -127,12 +130,23 @@ export class HomeScene extends Phaser.Scene {
    *  a shared centerline; gacha (mid-sized) offsets to the right, bridging
    *  the two with diagonal overlap on both sides. */
   private buildNav(): void {
-    const clusterX = 210;
+    // clusterX is set so the diamond's left-most point (clusterX - size/2)
+    // lines up with the banner stack's own left edge (bannerX - 100).
+    const clusterX = 175;
     const size = 300;
     const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 415, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
+    const gacha = new IconNavButton(this, 380, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
     const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
+  }
+
+  /** Vertical stack of promo banners in the top-left corner, under the
+   *  resource bar - gacha pushes, event announcements, limited packs. Pure
+   *  content: see data/banners.ts to add/swap one without touching this
+   *  scene. */
+  private buildBanners(): void {
+    const cards = buildBannerStack(this, 125, 182, BANNERS);
+    enterStagger(this, cards, { dx: -18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
   /** Small round utility buttons stacked in the top-right corner, under the

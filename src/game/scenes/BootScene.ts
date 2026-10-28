@@ -4,6 +4,8 @@ import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { preloadIconAssets } from '../ui/IconAssets';
+import { preloadBanners } from '../ui/BannerStack';
+import { BANNERS } from '../data/banners';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -33,6 +35,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('currency_coin', '/assets/ui/coin.png');
     this.load.image('currency_gem', '/assets/ui/gem.png');
     this.load.image('currency_stamina', '/assets/ui/stamina.png');
+    preloadBanners(this, BANNERS);
   }
 
   create(): void {
