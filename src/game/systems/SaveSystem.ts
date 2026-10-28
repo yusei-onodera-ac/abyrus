@@ -16,6 +16,33 @@ export interface SaveData {
   party: PartyFormation;
   stageProgress: number;
   updatedAt: number;
+  playerName: string;
+  playerLevel: number;
+  /** [current, max]. No stamina-gated feature consumes this yet - it's
+   *  surfaced on the top bar ahead of that system so the HUD reads as
+   *  complete. */
+  stamina: [number, number];
+  /** Whether each home-screen corner button has something unread. No
+   *  notification/gift/mail system exists yet - these just drive the red
+   *  dot badge ahead of that system existing. */
+  unread: { notification: boolean; giftBox: boolean; mail: boolean };
+  /** This device's own best Infinite Mode (Event tab) run. Kept locally so
+   *  the Event tab still shows a meaningful personal best even before the
+   *  global leaderboard call resolves, or when the backend isn't configured. */
+  infiniteMode: {
+    bestScore: number;
+    bestSurvivalSeconds: number;
+    bestEnemiesDefeated: number;
+    bestDifficultyReached: number;
+    totalRuns: number;
+  };
+}
+
+export interface InfiniteModeRunResult {
+  score: number;
+  survivalSeconds: number;
+  enemiesDefeated: number;
+  difficultyReached: number;
 }
 
 export interface HeroPullOutcome {
@@ -33,10 +60,14 @@ export function expToNextLevel(level: number): number {
 
 export const SaveSystem = {
   createDefault(): SaveData {
+    // Starters are drawn from the illustrated roster, not the un-illustrated
+    // base 12, so a brand-new save's showcase hero (highest rarity owned)
+    // has real art instead of falling back to the bare procedural medallion
+    // on the very first screen a player sees.
     const heroes: HeroData[] = [
-      createHeroInstance('touma', 'starter-1'),
-      createHeroInstance('mina', 'starter-2'),
-      createHeroInstance('yuno', 'starter-3'),
+      createHeroInstance('mizuki', 'starter-1'),
+      createHeroInstance('ember', 'starter-2'),
+      createHeroInstance('lumi', 'starter-3'),
     ];
     return {
       version: 1,
@@ -46,6 +77,11 @@ export const SaveSystem = {
       party: { front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] },
       stageProgress: 0,
       updatedAt: Date.now(),
+      playerName: 'プレイヤー',
+      playerLevel: 1,
+      stamina: [50, 50],
+      unread: { notification: true, giftBox: true, mail: false },
+      infiniteMode: { bestScore: 0, bestSurvivalSeconds: 0, bestEnemiesDefeated: 0, bestDifficultyReached: 0, totalRuns: 0 },
     };
   },
 
@@ -55,7 +91,9 @@ export const SaveSystem = {
       if (!raw) return this.createDefault();
       const parsed = JSON.parse(raw) as SaveData;
       if (!parsed.version) return this.createDefault();
-      return parsed;
+      // Spread over a fresh default so a save written before a field (like
+      // playerName) existed still gets a sane value instead of undefined.
+      return { ...this.createDefault(), ...parsed };
     } catch {
       return this.createDefault();
     }
@@ -127,5 +165,17 @@ export const SaveSystem = {
 
   clearStage(data: SaveData, stageIndex: number): void {
     if (stageIndex >= data.stageProgress) data.stageProgress = stageIndex + 1;
+  },
+
+  /** Records an Infinite Mode run, bumping each personal-best field
+   *  independently (a longer survival time and a higher score don't
+   *  necessarily come from the same run). */
+  recordInfiniteModeResult(data: SaveData, result: InfiniteModeRunResult): void {
+    const best = data.infiniteMode;
+    best.totalRuns += 1;
+    best.bestScore = Math.max(best.bestScore, result.score);
+    best.bestSurvivalSeconds = Math.max(best.bestSurvivalSeconds, result.survivalSeconds);
+    best.bestEnemiesDefeated = Math.max(best.bestEnemiesDefeated, result.enemiesDefeated);
+    best.bestDifficultyReached = Math.max(best.bestDifficultyReached, result.difficultyReached);
   },
 };

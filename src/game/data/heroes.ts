@@ -52,6 +52,20 @@ export const HERO_ROSTER: HeroDefinition[] = [
   { id: 'toxar', name: '毒蛇のトクサル', heroClass: 'mage', rarity: 3 },
   { id: 'nyx', name: '夜魔のニクス', heroClass: 'mage', rarity: 3 },
   { id: 'morrigan', name: '狙撃のモリガン', heroClass: 'archer', rarity: 3 },
+
+  // Illustrated batch 3 ("普通そう" — normal-looking, second drop), ★1-3.
+  { id: 'brisa', name: '原野のブリサ', heroClass: 'warrior', rarity: 1 },
+  { id: 'finn', name: '調合のフィン', heroClass: 'mage', rarity: 1 },
+  { id: 'rin', name: '拳闘のリン', heroClass: 'warrior', rarity: 1 },
+  { id: 'volt', name: '電撃のヴォルト', heroClass: 'warrior', rarity: 2 },
+  { id: 'karna', name: '双撃のカルナ', heroClass: 'warrior', rarity: 2 },
+  { id: 'mei', name: '双刃舞のメイ', heroClass: 'warrior', rarity: 2 },
+  { id: 'raiga', name: '疾風のライガ', heroClass: 'warrior', rarity: 2 },
+  { id: 'tia', name: '旋槍のティア', heroClass: 'warrior', rarity: 2 },
+  { id: 'joker', name: '賭数のジョーカー', heroClass: 'mage', rarity: 2 },
+  { id: 'elrin', name: '聖盾のエルリン', heroClass: 'tank', rarity: 3 },
+  { id: 'fros', name: '氷晶のフロス', heroClass: 'mage', rarity: 3 },
+  { id: 'noct', name: '星暦のノクト', heroClass: 'mage', rarity: 3 },
 ];
 
 export function getHeroDefinition(heroId: string): HeroDefinition | undefined {
