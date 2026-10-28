@@ -7,6 +7,7 @@ import { GachaScene } from './game/scenes/GachaScene';
 import { RosterScene } from './game/scenes/RosterScene';
 import { HeroDetailScene } from './game/scenes/HeroDetailScene';
 import { StageSelectScene } from './game/scenes/StageSelectScene';
+import { StoryScene } from './game/scenes/StoryScene';
 import { InfiniteModeScene } from './game/scenes/InfiniteModeScene';
 import { LegionScene, ProfileScene, SettingsScene } from './game/scenes/ComingSoonScene';
 
@@ -29,6 +30,7 @@ const config: Phaser.Types.Core.GameConfig = {
     RosterScene,
     HeroDetailScene,
     StageSelectScene,
+    StoryScene,
     InfiniteModeScene,
     LegionScene,
     ProfileScene,

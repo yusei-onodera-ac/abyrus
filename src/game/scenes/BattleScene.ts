@@ -1,6 +1,15 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { BigNumber } from '../systems/BigNumber';
+import {
+  ProgressionSystem,
+  STAGES_PER_REGION,
+  FINAL_STAGE_INDEX,
+  type EnemyUnitDef,
+  type StageDef,
+  type FinalStageDef,
+} from '../systems/ProgressionSystem';
+import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
 import { BattleSystem, BattleEngine, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AnimationController } from '../characters/AnimationController';
@@ -14,6 +23,7 @@ import { enter, popIn } from '../ui/Transitions';
 interface UnitView {
   unit: UnitInstance;
   sprite: Phaser.GameObjects.Sprite;
+  hpBg: Phaser.GameObjects.Rectangle;
   hpFill: Phaser.GameObjects.Rectangle;
   ultFill: Phaser.GameObjects.Rectangle;
   readyRing: Phaser.GameObjects.Arc;
@@ -21,8 +31,15 @@ interface UnitView {
   readyPulse?: Phaser.Tweens.Tween;
 }
 
+/** 'final' = the finite-wave 最終決戦 (see ProgressionSystem.getFinalStage);
+ *  'extra' = a post-ending Extra dungeon stage (getExtraStage), its own
+ *  index space from the main campaign; undefined = an ordinary main-quest
+ *  stage (getStage). */
+type BattleMode = 'final' | 'extra' | undefined;
+
 export class BattleScene extends Phaser.Scene {
   private stageIndex = 0;
+  private mode: BattleMode;
   private save!: SaveData;
   private generator!: CharacterGenerator;
   private anim!: AnimationController;
@@ -31,14 +48,26 @@ export class BattleScene extends Phaser.Scene {
   private views = new Map<string, UnitView>();
   private resultOverlay?: Phaser.GameObjects.Container;
 
+  private currentStageDef?: StageDef;
+  private finalStage?: FinalStageDef;
+  private waveIndex = 0;
+  private rewardGold = BigNumber.ZERO;
+  private rewardExp = 0;
+
   constructor() {
     super('Battle');
   }
 
-  init(data: { stageIndex?: number }): void {
+  init(data: { stageIndex?: number; mode?: BattleMode }): void {
     this.stageIndex = data.stageIndex ?? 0;
+    this.mode = data.mode;
     this.views.clear();
     this.resultOverlay = undefined;
+    this.currentStageDef = undefined;
+    this.finalStage = undefined;
+    this.waveIndex = 0;
+    this.rewardGold = BigNumber.ZERO;
+    this.rewardExp = 0;
   }
 
   create(): void {
@@ -49,9 +78,26 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0c0e18');
     applyBackground(this, 'battle');
 
-    const stage = ProgressionSystem.getStage(this.stageIndex);
-    const title = subheading(this, 360, 40, stage.name, { fontSize: '22px' }).setOrigin(0.5);
-    enter(this, title, { dy: -14, duration: 300 });
+    let title: string;
+    if (this.mode === 'final') {
+      this.finalStage = ProgressionSystem.getFinalStage();
+      title = this.finalStage.name;
+      this.rewardGold = this.finalStage.rewardGold;
+      this.rewardExp = this.finalStage.rewardExp;
+    } else if (this.mode === 'extra') {
+      this.currentStageDef = ProgressionSystem.getExtraStage(this.stageIndex);
+      title = this.currentStageDef.name;
+      this.rewardGold = this.currentStageDef.rewardGold;
+      this.rewardExp = this.currentStageDef.rewardExp;
+    } else {
+      this.currentStageDef = ProgressionSystem.getStage(this.stageIndex);
+      title = this.currentStageDef.name;
+      this.rewardGold = this.currentStageDef.rewardGold;
+      this.rewardExp = this.currentStageDef.rewardExp;
+    }
+
+    const titleText = subheading(this, 360, 40, title, { fontSize: '22px' }).setOrigin(0.5);
+    enter(this, titleText, { dy: -14, duration: 300 });
 
     const backBtn = new Button(this, 115, 53, 190, 66, '撤退', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
     enter(this, backBtn, { duration: 260 });
@@ -66,18 +112,29 @@ export class BattleScene extends Phaser.Scene {
       ...pFront.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i)),
       ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
     ];
-
-    const frontEnemies = stage.enemies.slice(0, 3);
-    const backEnemies = stage.enemies.slice(3, 5);
-    const enemyUnits: UnitInstance[] = [
-      ...frontEnemies.map((def, i) => BattleSystem.createEnemyUnit(def, this.stageIndex, 'front', i)),
-      ...backEnemies.map((def, i) => BattleSystem.createEnemyUnit(def, this.stageIndex, 'back', i)),
-    ];
-
-    this.engine = new BattleEngine(playerUnits, enemyUnits);
-
     this.layoutUnits(playerUnits, true);
-    this.layoutUnits(enemyUnits, false);
+
+    if (this.mode === 'final' && this.finalStage) {
+      this.waveIndex = 0;
+      const wave = this.finalStage.waves[0];
+      const enemyUnits = this.buildEnemyUnits(wave.enemies, wave.difficulty);
+      this.engine = new BattleEngine(playerUnits, enemyUnits);
+      this.layoutUnits(enemyUnits, false);
+      this.announceWave(wave.name);
+    } else if (this.currentStageDef) {
+      const enemyUnits = this.buildEnemyUnits(this.currentStageDef.enemies, this.currentStageDef.difficulty);
+      this.engine = new BattleEngine(playerUnits, enemyUnits);
+      this.layoutUnits(enemyUnits, false);
+    }
+  }
+
+  private buildEnemyUnits(defs: EnemyUnitDef[], difficulty: number): UnitInstance[] {
+    const front = defs.slice(0, 3);
+    const back = defs.slice(3, 5);
+    return [
+      ...front.map((def, i) => BattleSystem.createEnemyUnit(def, difficulty, 'front', i)),
+      ...back.map((def, i) => BattleSystem.createEnemyUnit(def, difficulty, 'back', i)),
+    ];
   }
 
   private layoutUnits(units: UnitInstance[], isPlayer: boolean): void {
@@ -100,7 +157,7 @@ export class BattleScene extends Phaser.Scene {
 
     const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;
-    this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
+    const hpBg = this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
     const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
     const ultFill = this.add
       .rectangle(x - barWidth / 2, y + size / 2 + 13, barWidth, 4, 0xffd23f)
@@ -117,7 +174,7 @@ export class BattleScene extends Phaser.Scene {
       sprite.on('pointerdown', () => this.onHeroTap(unit.id));
     }
 
-    this.views.set(unit.id, { unit, sprite, hpFill, ultFill, readyRing, nameText });
+    this.views.set(unit.id, { unit, sprite, hpBg, hpFill, ultFill, readyRing, nameText });
   }
 
   private onHeroTap(unitId: string): void {
@@ -164,7 +221,7 @@ export class BattleScene extends Phaser.Scene {
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
       else if (event.kind === 'defeated') this.onDefeated(event.unitId);
-      else if (event.kind === 'victory') this.onBattleEnd(true);
+      else if (event.kind === 'victory') this.onWaveOrBattleVictory();
       else if (event.kind === 'defeat') this.onBattleEnd(false);
     }
   }
@@ -187,11 +244,66 @@ export class BattleScene extends Phaser.Scene {
     view.readyRing.destroy();
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
+      view.hpBg.destroy();
       view.hpFill.destroy();
       view.ultFill.destroy();
       view.nameText.destroy();
     });
   }
+
+  // ----------------------------------------------------------- waves --
+  // The final battle is a fixed, ordered list of waves (ProgressionSystem.
+  // getFinalStage), not an endless mode - so unlike InfiniteRunEngine this
+  // just swaps BattleEngine instances wave-to-wave, carrying the *same*
+  // player UnitInstance objects forward (hp/ultGauge/alive intact) while
+  // only the enemy squad resets.
+
+  private onWaveOrBattleVictory(): void {
+    if (this.mode === 'final' && this.finalStage && this.waveIndex < this.finalStage.waves.length - 1) {
+      // A short beat before the next wave spawns, so the last enemy's own
+      // death animation/ult-ring teardown has time to finish instead of
+      // being cut off by clearEnemyViews() in the same frame it died.
+      this.time.delayedCall(500, () => this.startNextWave());
+    } else {
+      this.onBattleEnd(true);
+    }
+  }
+
+  private startNextWave(): void {
+    if (!this.finalStage) return;
+    this.waveIndex += 1;
+    const wave = this.finalStage.waves[this.waveIndex];
+    this.clearEnemyViews();
+    const survivors = this.engine.playerUnits;
+    const enemyUnits = this.buildEnemyUnits(wave.enemies, wave.difficulty);
+    this.engine = new BattleEngine(survivors, enemyUnits);
+    this.layoutUnits(enemyUnits, false);
+    this.announceWave(wave.name);
+  }
+
+  private clearEnemyViews(): void {
+    for (const [id, view] of [...this.views]) {
+      if (view.unit.isPlayer) continue;
+      this.anim.destroyAura(id);
+      view.readyPulse?.stop();
+      view.sprite.destroy();
+      view.hpBg.destroy();
+      view.hpFill.destroy();
+      view.ultFill.destroy();
+      view.nameText.destroy();
+      view.readyRing.destroy();
+      this.views.delete(id);
+    }
+  }
+
+  private announceWave(name: string): void {
+    const banner = heading(this, 360, 170, name, { fontSize: '22px' }).setOrigin(0.5).setDepth(20);
+    banner.setAlpha(0).setScale(0.9);
+    this.tweens.add({ targets: banner, alpha: 1, scale: 1, duration: 260, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: banner, alpha: 0, delay: 1300, duration: 400, onComplete: () => banner.destroy() });
+  }
+
+  // ------------------------------------------------------------ result --
 
   private onBattleEnd(victory: boolean): void {
     if (this.resultOverlay) return;
@@ -220,23 +332,60 @@ export class BattleScene extends Phaser.Scene {
     popIn(this, title, { duration: 360, delay: 180 });
 
     if (victory) {
-      const stage = ProgressionSystem.getStage(this.stageIndex);
-      SaveSystem.addGold(this.save, stage.rewardGold);
+      SaveSystem.addGold(this.save, this.rewardGold);
       for (const unit of this.engine.playerUnits) {
-        SaveSystem.grantExp(this.save, unit.id, stage.rewardExp);
+        SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
       }
-      SaveSystem.clearStage(this.save, this.stageIndex);
+      this.applyProgressionOnVictory();
       SaveSystem.save(this.save);
-      const rewardText = numeric(this, 360, 600, `+${stage.rewardGold.toString()} G   +${stage.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
+      const rewardText = numeric(this, 360, 600, `+${this.rewardGold.toString()} G   +${this.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
       container.add(rewardText);
       enter(this, rewardText, { dy: 12, delay: 320 });
     }
 
-    const btn = new Button(this, 360, 700, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.scene.start('Home'), {
+    const btn = new Button(this, 360, 700, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.onContinue(victory), {
       variant: victory ? 'primary' : 'secondary',
     });
     container.add(btn);
     btn.setScale(0);
     this.tweens.add({ targets: btn, scale: 1, duration: 280, delay: 380, ease: 'Back.easeOut' });
+  }
+
+  private applyProgressionOnVictory(): void {
+    if (this.mode === 'extra') {
+      SaveSystem.clearExtraStage(this.save, this.stageIndex);
+    } else if (this.mode === 'final') {
+      SaveSystem.clearStage(this.save, FINAL_STAGE_INDEX);
+    } else {
+      SaveSystem.clearStage(this.save, this.stageIndex);
+    }
+  }
+
+  private onContinue(victory: boolean): void {
+    if (!victory) {
+      this.scene.start('Home');
+      return;
+    }
+
+    if (this.mode === 'final') {
+      this.scene.start('Story', { lines: getEndingScript().lines, next: { scene: 'Home' }, markSeen: { kind: 'ending' } });
+      return;
+    }
+    if (this.mode === 'extra') {
+      this.scene.start('StageSelect', { initialTab: 'extra' });
+      return;
+    }
+
+    const regionIndex = Math.floor(this.stageIndex / STAGES_PER_REGION);
+    const stageInRegion = this.stageIndex % STAGES_PER_REGION;
+    if (stageInRegion === STAGES_PER_REGION - 1 && !this.save.storyFlags.regionOutro[regionIndex]) {
+      this.scene.start('Story', {
+        lines: getRegionOutroScript(regionIndex).lines,
+        next: { scene: 'Home' },
+        markSeen: { kind: 'regionOutro', regionIndex },
+      });
+      return;
+    }
+    this.scene.start('Home');
   }
 }
