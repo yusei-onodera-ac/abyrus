@@ -112,18 +112,14 @@ export class HomeScene extends Phaser.Scene {
   }
 
   /** Cascading diamond cluster in the lower-left, overlapping the bottom of
-   *  the character showcase - matches the composition of the reference
-   *  mock the user supplied: quest biggest/top of the stack, gacha
-   *  mid-sized overlapping below-right, roster smallest at the base. Drawn
-   *  in that order so later (smaller) badges sit on top of earlier ones. */
+   *  the character showcase. Quest (biggest) sits directly above roster on
+   *  a shared centerline; gacha (mid-sized) offsets to the right, bridging
+   *  the two with diagonal overlap on both sides. */
   private buildNav(): void {
-    // Positioned at the same relative (x%, y%) of the 720x1280 canvas as
-    // the reference mock, instead of absolute pixel guesses - the earlier
-    // version sat noticeably lower and with uneven spacing between the
-    // middle and bottom badge, which read as an unbalanced cluster.
-    const quest = new IconNavButton(this, 230, 666, 'quest', questIcon(this, 108), 'クエスト', 360, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 403, 819, 'gacha', gachaIcon(this, 84), '召喚', 300, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, 173, 986, 'roster', rosterIcon(this, 84), '名鑑', 280, () => this.scene.start('Roster'));
+    const clusterX = 230;
+    const quest = new IconNavButton(this, clusterX, 640, 'quest', questIcon(this, 108), 'クエスト', 420, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 460, 880, 'gacha', gachaIcon(this, 84), '召喚', 340, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 1080, 'roster', rosterIcon(this, 84), '名鑑', 300, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 }
