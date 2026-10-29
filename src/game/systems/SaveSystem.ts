@@ -3,7 +3,9 @@ import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
 import { createHeroInstance } from '../data/heroes';
 import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emptyDeck } from './DeckSystem';
 import { REGION_COUNT } from '../data/regions';
-import { MAX_PHASE, type HeroData, type Row } from '../types';
+import { EQUIP_SLOTS, MAX_LEVEL, MAX_PHASE, emptyGear, type EquipmentItem, type HeroData, type HeroGear, type Row } from '../types';
+import { getEquipDef } from '../data/equipment';
+import { isItemId, type ItemId } from '../data/items';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
@@ -184,6 +186,17 @@ export interface SaveData {
    *  since Extra only unlocks after the ending and re-fights each
    *  region's own boss on a harder curve. */
   extraProgress: number;
+  /** 素材 (data/items.ts) held, by id: 経験値素材 and 装備強化素材. */
+  items: Record<string, number>;
+  /** Equipment not worn by anyone (a worn piece lives on its hero, HeroData.gear). */
+  equipment: EquipmentItem[];
+  /** プレミアムパス. `expiresAt` is epoch ms (0 = never bought); `dailyDay` is the
+   *  local day ("2026-10-30") its 魔晶石 was last taken. */
+  premium: { expiresAt: number; dailyDay: string };
+  /** ログインボーナス of the month in `month` ("2026-10"): the day numbers already claimed. */
+  loginBonus: { month: string; claimed: number[] };
+  /** 放置報酬: epoch ms it has been piling up from, and today's count of ads watched to speed it. */
+  idle: { lastClaimAt: number; adDay: string; adCount: number };
 }
 
 export interface InfiniteModeRunResult {
@@ -204,8 +217,12 @@ export interface HeroPullOutcome {
 
 const STORAGE_KEY = 'abyrus_save_v1';
 
+/** EXP from `level` to the next. It climbs steeply (x1.22 a level) up to level 30,
+ *  then gently (x1.05) so that the level cap of 100 is a long road, not an
+ *  impossible one. */
 export function expToNextLevel(level: number): number {
-  return Math.round(80 * Math.pow(1.22, level - 1));
+  const steep = Math.min(level, 30);
+  return Math.round(80 * Math.pow(1.22, steep - 1) * Math.pow(1.05, Math.max(0, level - 30)));
 }
 
 /** Coerces whatever a save holds into a well-formed deck: right slot counts,
@@ -243,6 +260,48 @@ function dropRepeatedCharacters(deck: Deck, heroes: HeroData[]): Deck {
     return id;
   };
   return { ...deck, front: deck.front.map(keep), back: deck.back.map(keep) };
+}
+
+/** A piece of equipment as saved, or null if it is malformed or its kind no longer exists. */
+function cleanItem(raw: unknown): EquipmentItem | null {
+  const item = raw as Partial<EquipmentItem> | null;
+  if (!item || typeof item.id !== 'string' || typeof item.defId !== 'string' || typeof item.level !== 'number') return null;
+  const def = getEquipDef(item.defId);
+  return def ? { id: item.id, defId: item.defId, level: Math.max(1, Math.min(Math.floor(item.level), 99)) } : null;
+}
+
+/** Brings the parts of a loaded save that came after the first release up to shape:
+ *  素材, equipment (held and worn), プレミアムパス, ログインボーナス, 放置報酬. */
+function restoreInventory(merged: SaveData, parsed: Partial<SaveData>): void {
+  const items: Record<string, number> = {};
+  for (const [id, n] of Object.entries(parsed.items ?? {})) if (isItemId(id) && typeof n === 'number' && n > 0) items[id] = Math.floor(n);
+  merged.items = items;
+  merged.equipment = Array.isArray(parsed.equipment) ? parsed.equipment.map(cleanItem).filter((i): i is EquipmentItem => i !== null) : [];
+  merged.heroes = merged.heroes.map((hero) => {
+    const gear: HeroGear = emptyGear();
+    for (const slot of EQUIP_SLOTS) {
+      const item = cleanItem(hero.gear?.[slot]);
+      // A piece only fits the slot its kind belongs to.
+      if (item && getEquipDef(item.defId)?.slot === slot) gear[slot] = item;
+    }
+    return { ...hero, gear };
+  });
+  const premium = parsed.premium;
+  merged.premium = {
+    expiresAt: typeof premium?.expiresAt === 'number' && Number.isFinite(premium.expiresAt) ? premium.expiresAt : 0,
+    dailyDay: typeof premium?.dailyDay === 'string' ? premium.dailyDay : '',
+  };
+  const login = parsed.loginBonus;
+  merged.loginBonus = {
+    month: typeof login?.month === 'string' ? login.month : '',
+    claimed: Array.isArray(login?.claimed) ? login.claimed.filter((d): d is number => Number.isInteger(d)) : [],
+  };
+  const idle = parsed.idle;
+  merged.idle = {
+    lastClaimAt: typeof idle?.lastClaimAt === 'number' && Number.isFinite(idle.lastClaimAt) ? idle.lastClaimAt : Date.now(),
+    adDay: typeof idle?.adDay === 'string' ? idle.adDay : '',
+    adCount: typeof idle?.adCount === 'number' ? Math.max(0, Math.floor(idle.adCount)) : 0,
+  };
 }
 
 /** Keeps a saved social state, filling in anything missing (an older save, or
@@ -302,6 +361,11 @@ export const SaveSystem = {
         ending: false,
       },
       extraProgress: 0,
+      items: {},
+      equipment: [],
+      premium: { expiresAt: 0, dailyDay: '' },
+      loginBonus: { month: '', claimed: [] },
+      idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
     };
   },
 
@@ -323,8 +387,16 @@ export const SaveSystem = {
       if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
       merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
       // A hero saved before phase / skills existed lacks those fields.
-      merged.heroes = merged.heroes.map((hero) => ({ ...hero, phase: hero.phase ?? 1, skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1) }));
+      merged.heroes = merged.heroes.map((hero) => ({
+        ...hero,
+        phase: hero.phase ?? 1,
+        skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1),
+        // A save from before the level cap may hold a level above it.
+        level: Math.min(hero.level, MAX_LEVEL),
+        exp: hero.level >= MAX_LEVEL ? 0 : hero.exp,
+      }));
       merged.decks = merged.decks.map((deck) => dropRepeatedCharacters(deck, merged.heroes));
+      restoreInventory(merged, parsed);
       delete merged.party;
       // Replaced by values derived from the real inbox (InboxSystem.getUnread).
       delete merged.unread;
@@ -349,6 +421,29 @@ export const SaveSystem = {
 
   addGold(data: SaveData, amount: BigNumber): void {
     data.gold = this.getGold(data).add(amount).toJSON();
+  },
+
+  getItem(data: SaveData, id: ItemId): number {
+    return data.items[id] ?? 0;
+  },
+
+  addItem(data: SaveData, id: ItemId, amount: number): void {
+    data.items[id] = this.getItem(data, id) + amount;
+  },
+
+  /** False (and nothing taken) if there is not that much. */
+  spendItem(data: SaveData, id: ItemId, amount: number): boolean {
+    if (this.getItem(data, id) < amount) return false;
+    data.items[id] = this.getItem(data, id) - amount;
+    return true;
+  },
+
+  addGems(data: SaveData, amount: number): void {
+    data.gems += amount;
+  },
+
+  addPhaseMaterials(data: SaveData, amount: number): void {
+    data.phaseMaterials += amount;
   },
 
   spendGems(data: SaveData, amount: number): boolean {
@@ -452,6 +547,11 @@ export const SaveSystem = {
     const base = this.getHero(data, baseId);
     const material = this.getHero(data, materialId);
     if (!base || !material || base.id === material.id || base.heroId !== material.heroId || base.phase >= MAX_PHASE) return false;
+    // What the copy was wearing goes back to the bag rather than vanishing with it.
+    for (const slot of EQUIP_SLOTS) {
+      const worn = material.gear[slot];
+      if (worn) data.equipment.push(worn);
+    }
     data.heroes = data.heroes.filter((h) => h.id !== material.id);
     for (const deck of data.decks) {
       const hasBase = deck.front.includes(base.id) || deck.back.includes(base.id);
@@ -545,12 +645,13 @@ export const SaveSystem = {
 
   grantExp(data: SaveData, heroId: string, exp: number): void {
     const hero = this.getHero(data, heroId);
-    if (!hero) return;
+    if (!hero || hero.level >= MAX_LEVEL) return;
     hero.exp += exp;
-    while (hero.exp >= expToNextLevel(hero.level)) {
+    while (hero.level < MAX_LEVEL && hero.exp >= expToNextLevel(hero.level)) {
       hero.exp -= expToNextLevel(hero.level);
       hero.level += 1;
     }
+    if (hero.level >= MAX_LEVEL) hero.exp = 0;
   },
 
   clearStage(data: SaveData, stageIndex: number): void {

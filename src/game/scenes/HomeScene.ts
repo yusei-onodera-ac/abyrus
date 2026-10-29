@@ -1,5 +1,9 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import { IdleSystem } from '../systems/IdleSystem';
+import { LoginBonusSystem } from '../systems/LoginBonusSystem';
+import { PremiumSystem } from '../systems/PremiumSystem';
+import { calendarIcon, crownIcon, hourglassIcon, swordBadgeIcon } from '../ui/ItemIcons';
 import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
@@ -52,6 +56,7 @@ export class HomeScene extends Phaser.Scene {
     this.buildCornerButtons(save);
     this.buildBanners();
     new BottomNavBar(this, 720, 1280, 'home');
+    this.maybeShowLoginBonus(save);
   }
 
   private getSave(): SaveData {
@@ -163,18 +168,36 @@ export class HomeScene extends Phaser.Scene {
    *  notice, claimable gift, unread mail). */
   private buildCornerButtons(save: SaveData): void {
     const size = 72;
-    const x = 656;
-    const startY = 176;
     const spacing = 92;
+    const startY = 176;
     const unread = InboxSystem.getUnread(save);
-    const items: { texture: string; scene: string; unread: boolean }[] = [
+    type Item = { texture: string; scene: string; unread: boolean };
+    // Right column: the inbox and settings. Beside it: the daily things and the shop-like screens.
+    const inbox: Item[] = [
       { texture: notificationIcon(this, size), scene: 'Notice', unread: unread.notification },
       { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
       { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
       { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
     ];
-    const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item));
+    const extras: Item[] = [
+      { texture: calendarIcon(this, size), scene: 'LoginBonus', unread: LoginBonusSystem.canClaim(save) },
+      { texture: hourglassIcon(this, size), scene: 'Idle', unread: IdleSystem.hasReward(save) },
+      { texture: swordBadgeIcon(this, size), scene: 'Equipment', unread: false },
+      { texture: crownIcon(this, size), scene: 'Premium', unread: PremiumSystem.canClaimDaily(save) },
+    ];
+    const buttons = [
+      ...inbox.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item)),
+      ...extras.map((item, i) => this.buildCornerButton(564, startY + i * spacing, size, item)),
+    ];
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
+  }
+
+  /** The first time Home is shown on a day the login bonus has not been taken,
+   *  its calendar opens (once per session, so 戻る does not bring it back). */
+  private maybeShowLoginBonus(save: SaveData): void {
+    if (this.game.registry.get('loginBonusShown') || !LoginBonusSystem.canClaim(save)) return;
+    this.game.registry.set('loginBonusShown', true);
+    this.time.delayedCall(450, () => this.scene.start('LoginBonus'));
   }
 
   private buildCornerButton(

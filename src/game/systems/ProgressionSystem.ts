@@ -1,4 +1,5 @@
 import { BigNumber } from './BigNumber';
+import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
 import { REGION_COUNT, getRegion, pickFeralName, type RegionDef } from '../data/regions';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
@@ -278,14 +279,17 @@ export const ProgressionSystem = {
     const base = CLASS_BASE[hero.heroClass];
     const rarityMul = RARITY_STAT_MUL[hero.rarity];
     const growth = BigNumber.pow(1.07, hero.level - 1);
-    return {
-      maxHp: BigNumber.from(60 * base.hp * rarityMul).mul(growth),
-      atk: BigNumber.from(12 * base.atk * rarityMul).mul(growth),
-      spd: base.spd,
-      def: base.def + hero.rarity * 2,
-      critRate: 0.1 + hero.rarity * 0.02,
-      critMul: 1.8,
-    };
+    return applyGear(
+      {
+        maxHp: BigNumber.from(60 * base.hp * rarityMul).mul(growth),
+        atk: BigNumber.from(12 * base.atk * rarityMul).mul(growth),
+        spd: base.spd,
+        def: base.def + hero.rarity * 2,
+        critRate: 0.1 + hero.rarity * 0.02,
+        critMul: 1.8,
+      },
+      hero.gear,
+    );
   },
 
   /** 総合力: one number for comparing heroes and decks at a glance. Display

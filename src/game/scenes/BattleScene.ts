@@ -13,18 +13,25 @@ import {
 import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
 import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { nextQuestStage, questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
+import { StageRewardSystem } from '../systems/StageRewardSystem';
+import { SoundSystem } from '../systems/SoundSystem';
 import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
-import { BattleSystem, BattleEngine, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
+import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
+import { AutoSkillToggle } from '../ui/AutoSkillToggle';
+import { SpeedToggle } from '../ui/SpeedToggle';
 import { Button } from '../ui/Button';
 import { openConfirm } from '../ui/Dialogs';
+import { buildRewardGrid, type RewardTile } from '../ui/RewardTiles';
 import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { applyBattleBackground } from '../ui/Background';
-import { subheading, caption, heading, numeric, COLORS } from '../ui/theme';
+import { subheading, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
+
+const INK = '#1c130a';
 
 interface UnitView {
   unit: UnitInstance;
@@ -53,6 +60,8 @@ export class BattleScene extends Phaser.Scene {
   private engine!: BattleEngine;
   private views = new Map<string, UnitView>();
   private resultOverlay?: Phaser.GameObjects.Container;
+  private autoSkill?: AutoSkillToggle;
+  private speed?: SpeedToggle;
   private modal?: ModalHandle;
 
   private currentStageDef?: StageDef;
@@ -71,6 +80,8 @@ export class BattleScene extends Phaser.Scene {
     this.mode = data.mode;
     this.views.clear();
     this.resultOverlay = undefined;
+    this.autoSkill = undefined;
+    this.speed = undefined;
     this.modal = undefined;
     this.currentStageDef = undefined;
     this.finalStage = undefined;
@@ -109,13 +120,20 @@ export class BattleScene extends Phaser.Scene {
       this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
     }
 
-    const titleText = subheading(this, 360, 40, title, { fontSize: '22px' }).setOrigin(0.5);
-    enter(this, titleText, { dy: -14, duration: 300 });
-
-    const backBtn = new Button(this, 115, 53, 190, 66, '撤退', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
-    enter(this, backBtn, { duration: 260 });
+    // A wood-and-brass strip across the top: 撤退 and the stage's name.
+    const hud = this.add.container(0, 0).setDepth(30);
+    hud.add(createPanel(this, 360, 62, 696, 92, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
+    hud.add(new Button(this, 104, 62, 160, 62, '撤退', () => this.scene.start('Home'), { variant: 'wood', fontSize: '26px' }));
+    const titleText = subheading(this, 408, 62, title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    if (titleText.width > 470) titleText.setScale(470 / titleText.width);
+    hud.add(titleText);
+    enter(this, hud, { dy: -20, duration: 260 });
 
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);
+    this.autoSkill = new AutoSkillToggle(this, this.save);
+    this.speed = new SpeedToggle(this, this.save);
+    this.tweens.timeScale = 1;
+    this.time.timeScale = 1;
     if (pFront.length + pBack.length === 0) {
       caption(this, 360, 640, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
       return;
@@ -208,9 +226,22 @@ export class BattleScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.engine || this.engine.isOver()) return;
-    const events = this.engine.update(delta);
+    // 2倍速: the fight and every animation in it run faster together.
+    const speed = this.speed?.factor() ?? 1;
+    this.tweens.timeScale = speed;
+    this.time.timeScale = speed;
+    const events = this.engine.update(delta * speed);
     this.handleEvents(events);
+    if (this.autoSkill?.isOn()) this.castReadySkills();
     this.refreshBars();
+  }
+
+  /** オート: every hero whose gauge is full casts its next skill right away. */
+  private castReadySkills(): void {
+    for (const unit of this.engine.playerUnits) {
+      if (this.engine.isOver()) return;
+      if (unit.alive && unit.ultGauge >= ULT_MAX && unit.skills.length > 0) this.handleEvents(this.engine.triggerUlt(unit.id));
+    }
   }
 
   private refreshBars(): void {
@@ -252,10 +283,15 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onAttack(event: Extract<BattleEvent, { kind: 'attack' }>): void {
+    SoundSystem.play(this, event.crit ? 'crit' : 'hit');
     const attackerView = this.views.get(event.attackerId);
     const targetView = this.views.get(event.targetId);
     if (!attackerView || !targetView) return;
     this.anim.attack(attackerView.sprite, attackerView.unit.isPlayer);
+    if (event.blocked) {
+      this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { label: '無敵' });
+      return;
+    }
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
@@ -266,6 +302,7 @@ export class BattleScene extends Phaser.Scene {
    *  whose view was already torn down by onDefeated - that last case
    *  rebuilds the view from scratch instead of animating a destroyed one. */
   private onSkillCast(event: Extract<BattleEvent, { kind: 'skillCast' }>): void {
+    SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
     if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
 
@@ -295,6 +332,9 @@ export class BattleScene extends Phaser.Scene {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      } else if (result.invincible) {
+        this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, BigNumber.ZERO, { label: '無敵' });
       }
     }
   }
@@ -382,45 +422,75 @@ export class BattleScene extends Phaser.Scene {
 
   private onBattleEnd(victory: boolean): void {
     if (this.resultOverlay) return;
+    SoundSystem.play(this, victory ? 'victory' : 'defeat');
     const next = victory ? this.nextStageOffer() : null;
-    // With a next stage on offer the panel grows to hold its button and a row of ways out.
-    const top = next ? 440 : 470;
-    const panelH = next ? 420 : 320;
+
+    // The clear is settled first: what it pays decides how tall the panel is.
+    let tiles: RewardTile[] = [];
+    if (victory) {
+      const stage: QuestStage = { kind: this.mode ?? 'main', index: this.stageIndex };
+      // First-clear status has to be read before the progress counters move.
+      const bonus = StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage));
+      SaveSystem.addGold(this.save, this.rewardGold);
+      SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
+      StageRewardSystem.grant(this.save, bonus);
+      for (const unit of this.engine.playerUnits) {
+        SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
+      }
+      this.applyProgressionOnVictory();
+      SaveSystem.save(this.save);
+
+      tiles = [
+        { kind: 'gold', amount: `+${this.rewardGold.toString()}` },
+        { kind: 'exp', amount: `+${this.rewardExp}` },
+        { kind: 'essence', amount: `+${this.rewardSkillEssence}` },
+      ];
+      if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
+      if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: 'ドロップ' });
+      for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: 'ドロップ' });
+    }
+    const grid = victory ? buildRewardGrid(this, tiles, 600) : undefined;
+
+    // Title, the reward tiles, then the buttons (and, with a next stage on offer, a row of ways out).
+    const gridH = grid?.height ?? 0;
+    const buttonsH = !victory ? 90 : next ? 230 : 120;
+    const panelH = (victory ? 112 : 170) + gridH + buttonsH;
+    const top = 640 - panelH / 2;
+    const gridTop = top + 112;
+    const buttonsTop = victory ? gridTop + gridH + 22 : top + 150;
     const container = this.add.container(0, 0);
     this.resultOverlay = container;
     const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
     container.add(overlay);
     this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 220 });
 
-    const panel = createPanel(this, 360, top + panelH / 2, 560, panelH, {
-      fillColor: COLORS.panelFill,
-      borderColor: victory ? COLORS.gold : COLORS.danger,
-      glowColor: victory ? COLORS.gold : COLORS.danger,
-      radius: 22,
+    const panel = createPanel(this, 360, 640, 640, panelH, {
+      fillColor: CHROME.woodFill,
+      fillAlpha: 1,
+      borderColor: victory ? CHROME.brass : 0xb84f4f,
+      glowColor: victory ? CHROME.brassBright : COLORS.danger,
+      radius: 20,
+      rarity: victory ? 5 : undefined,
+      gradient: false,
     });
     container.add(panel);
     panel.setScale(0.85);
     popIn(this, panel, { duration: 320, delay: 100 });
 
-    const title = heading(this, 360, top + 70, victory ? '勝利!' : '敗北…', {
-      fontSize: '40px',
-      color: victory ? '#ffd23f' : '#ff6b6b',
+    const title = heading(this, 360, top + (victory ? 58 : 84), victory ? '勝利!' : '敗北…', {
+      fontSize: '46px',
+      color: victory ? '#ffe9b8' : '#ff9a8a',
+      stroke: INK,
+      strokeThickness: 7,
     }).setOrigin(0.5);
     container.add(title);
     title.setScale(0);
     popIn(this, title, { duration: 360, delay: 180 });
 
-    if (victory) {
-      SaveSystem.addGold(this.save, this.rewardGold);
-      SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
-      for (const unit of this.engine.playerUnits) {
-        SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
-      }
-      this.applyProgressionOnVictory();
-      SaveSystem.save(this.save);
-      const rewardText = numeric(this, 360, top + 130, `+${this.rewardGold.toString()} G   +${this.rewardExp} EXP   +${this.rewardSkillEssence} 技素`, { fontSize: '18px' }).setOrigin(0.5);
-      container.add(rewardText);
-      enter(this, rewardText, { dy: 12, delay: 320 });
+    if (grid) {
+      grid.container.setPosition(360 - 300, gridTop);
+      container.add(grid.container);
+      enter(this, grid.container, { dy: 14, delay: 320 });
     }
 
     const buttons: Button[] = [];
@@ -429,18 +499,19 @@ export class BattleScene extends Phaser.Scene {
       StaminaSystem.refresh(this.save);
       const enough = StaminaSystem.canAfford(this.save, cost);
       buttons.push(
-        new Button(this, 360, top + 222, 460, 76, '次のステージへ', () => this.goToNextStage(next), {
+        new Button(this, 360, buttonsTop + 43, 560, 86, '次のステージへ', () => this.goToNextStage(next), {
           variant: 'gold',
-          fontSize: '26px',
+          fontSize: '30px',
           subLabel: `${questStageName(next)}　スタミナ ${cost}${enough ? '' : '（不足）'}`,
         }),
-        new Button(this, 230, top + 330, 220, 60, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '22px' }),
-        new Button(this, 490, top + 330, 220, 60, 'クエスト一覧', () => this.scene.start('StageSelect', this.mode === 'extra' ? { initialTab: 'extra' } : undefined), { variant: 'wood', fontSize: '22px' }),
+        new Button(this, 215, buttonsTop + 150, 270, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '24px' }),
+        new Button(this, 505, buttonsTop + 150, 270, 66, 'クエスト一覧', () => this.scene.start('StageSelect', this.mode === 'extra' ? { initialTab: 'extra' } : undefined), { variant: 'wood', fontSize: '24px' }),
       );
     } else {
       buttons.push(
-        new Button(this, 360, top + 230, 220, 60, victory ? this.continueLabel() : 'ホームへ戻る', () => this.onContinue(victory), {
-          variant: victory ? 'primary' : 'secondary',
+        new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : 'ホームへ戻る', () => this.onContinue(victory), {
+          variant: victory ? 'gold' : 'wood',
+          fontSize: '28px',
         }),
       );
     }

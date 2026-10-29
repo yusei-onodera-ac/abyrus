@@ -11,6 +11,11 @@ export interface GachaBannerEntry {
    *  "11/11 23:59まで", and the gacha drops off the list once it passes.
    *  Omit for a permanent gacha. */
   endsAt?: string;
+  /** 'equipment' pulls equipment (EQUIP_GACHA_RATES, its own prices); the default pulls heroes. */
+  kind?: 'hero' | 'equipment';
+  /** With no banner art, the card draws a banner in this colour (with `emblem` on it) instead of 準備中. */
+  accent?: number;
+  emblem?: string;
 }
 
 /**
@@ -29,6 +34,15 @@ export const GACHA_BANNERS: GachaBannerEntry[] = [
     image: 'new_gacha.jpg',
     description: '新キャラクター登場！',
     endsAt: '2026-11-11T23:59:00',
+  },
+  {
+    id: 'equip-standard',
+    kind: 'equipment',
+    title: '装備ガチャ',
+    image: 'equip_standard.jpg',
+    description: '武器・防具・装飾が手に入る',
+    accent: 0x2f7a8a,
+    emblem: '装',
   },
   {
     id: 'standard',

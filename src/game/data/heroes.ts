@@ -1,4 +1,4 @@
-import type { HeroClass, HeroData, Rarity } from '../types';
+import { emptyGear, type HeroClass, type HeroData, type Rarity } from '../types';
 import { MAX_SKILL_SLOTS } from './skills';
 
 /** A roster slot: one fixed character with its own portrait, name and class.
@@ -101,6 +101,7 @@ export function createHeroInstance(heroId: string, instanceId: string, level = 1
     level,
     exp,
     phase: 1,
+    gear: emptyGear(),
     skillLevels: Array(MAX_SKILL_SLOTS).fill(1),
   };
 }

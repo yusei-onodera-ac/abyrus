@@ -11,7 +11,9 @@ import { buildInfoPanel } from '../ui/InfoPanel';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
-import { CLASS_LABELS, MAX_PHASE, RARITY_COLORS, hex, type HeroData } from '../types';
+import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, RARITY_COLORS, hex, type HeroData } from '../types';
+import { EXP_ITEMS, ITEMS, type ItemId } from '../data/items';
+import { itemIcon } from '../ui/ItemIcons';
 import { InboxScene, type InboxCard } from './InboxScene';
 
 interface EnhanceData {
@@ -63,7 +65,7 @@ export class EnhanceScene extends InboxScene {
       this.time.delayedCall(0, () => this.scene.start(this.target.from));
       return [];
     }
-    return [this.heroCard(hero), this.levelCard(hero), this.phaseCard(hero), this.fuseCard(hero)];
+    return [this.heroCard(hero), this.levelCard(hero), this.expCard(hero), this.phaseCard(hero), this.fuseCard(hero)];
   }
 
   // --- cards ------------------------------------------------------------
@@ -82,10 +84,11 @@ export class EnhanceScene extends InboxScene {
     container.add(caption(this, x, 64, CLASS_LABELS[hero.heroClass], { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const needed = expToNextLevel(hero.level);
+    const atMax = hero.level >= MAX_LEVEL;
     container.add(body(this, x, 104, `Lv.${hero.level}`, { fontSize: '34px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(caption(this, right, 110, `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    container.add(caption(this, right, 110, atMax ? 'レベル最大' : `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '20px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     const barW = right - x;
-    const ratio = Phaser.Math.Clamp(hero.exp / needed, 0, 1);
+    const ratio = atMax ? 1 : Phaser.Math.Clamp(hero.exp / needed, 0, 1);
     const bar = this.add.graphics();
     bar.fillStyle(0x0d0905, 1);
     bar.fillRoundedRect(x, 134, barW, 14, 7);
@@ -99,6 +102,12 @@ export class EnhanceScene extends InboxScene {
 
   /** レベル強化: pay ゴールド for +1 or +5 levels, with HP / 攻撃 before → after. */
   private levelCard(hero: HeroData): InboxCard {
+    const left = EnhanceSystem.levelsLeft(hero);
+    if (left === 0) {
+      const panel = buildInfoPanel(this, CARD_WIDTH, 80, 'レベル強化', 0xc7701c);
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 40, `レベルは最大（Lv.${MAX_LEVEL}）です。`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      return { container: panel.container, height: panel.height };
+    }
     const now = ProgressionSystem.computeHeroStats(hero);
     const bodyH = 288;
     const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, 'レベル強化', 0xc7701c);
@@ -121,18 +130,45 @@ export class EnhanceScene extends InboxScene {
 
     const guard = () => this.scroll.isTap();
     const w = (CARD_WIDTH - PAD * 2 - 14) / 2;
-    LEVEL_STEPS.forEach((levels, i) => {
+    LEVEL_STEPS.forEach((step, i) => {
+      // Close to the cap a step buys only what is left; a step that would repeat the one before is off.
+      const levels = Math.min(step, left);
+      const repeats = i > 0 && levels === Math.min(LEVEL_STEPS[i - 1], left);
       const cost = EnhanceSystem.levelUpCost(hero, levels);
       const affordable = EnhanceSystem.canAfford(this.save, cost);
       const x = PAD + w / 2 + i * (w + 14);
-      panel.container.add(
-        new Button(this, x, top + bodyH - 62, w, 92, `+${levels} レベル`, () => this.levelUp(hero, levels), {
-          variant: i === 0 ? 'gold' : 'wood',
-          fontSize: '28px',
-          subLabel: `${cost.toLocaleString('ja-JP')} G${affordable ? '' : '（不足）'}`,
-          guard,
-        }),
-      );
+      const button = new Button(this, x, top + bodyH - 62, w, 92, `+${levels} レベル`, () => this.levelUp(hero, levels), {
+        variant: i === 0 ? 'gold' : 'wood',
+        fontSize: '28px',
+        subLabel: `${cost.toLocaleString('ja-JP')} G${affordable ? '' : '（不足）'}`,
+        guard,
+      });
+      if (repeats) button.setEnabled(false);
+      panel.container.add(button);
+    });
+    return { container: panel.container, height: panel.height };
+  }
+
+  /** 経験値素材: each of the four sizes with how many are held and a button to use one or ten. */
+  private expCard(hero: HeroData): InboxCard {
+    const guard = () => this.scroll.isTap();
+    const rowH = 96;
+    const panel = buildInfoPanel(this, CARD_WIDTH, EXP_ITEMS.length * rowH + 14, '経験値素材', 0x3a7fd6);
+    const atMax = hero.level >= MAX_LEVEL;
+    EXP_ITEMS.forEach((id, i) => {
+      const def = ITEMS[id];
+      const have = SaveSystem.getItem(this.save, id);
+      const y = panel.bodyTop + 8 + i * rowH + rowH / 2;
+      panel.container.add(this.add.image(PAD + 34, y, itemIcon(this, id, 56)));
+      panel.container.add(body(this, PAD + 76, y - 17, def.name, { fontSize: '22px', fontStyle: 'bold', color: def.color, stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 76, y + 15, `EXP +${(def.exp ?? 0).toLocaleString('ja-JP')}　所持 ${have.toLocaleString('ja-JP')}`, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      [1, 10].forEach((count, k) => {
+        // ×10 sits at the right edge, ×1 just left of it.
+        const x = CARD_WIDTH - PAD - 52 - (1 - k) * 114;
+        const button = new Button(this, x, y, 104, 62, `×${count}`, () => this.useExp(hero, id, count), { variant: k === 0 ? 'gold' : 'wood', fontSize: '24px', guard });
+        button.setEnabled(have > 0 && !atMax);
+        panel.container.add(button);
+      });
     });
     return { container: panel.container, height: panel.height };
   }
@@ -261,6 +297,15 @@ export class EnhanceScene extends InboxScene {
     SaveSystem.save(this.save);
     this.refreshResources();
     showToast(this, `Lv.${before} → Lv.${hero.level} になりました`);
+    this.queueRender();
+  }
+
+  private useExp(hero: HeroData, id: ItemId, count: number): void {
+    const before = hero.level;
+    const result = EnhanceSystem.useExpItem(this.save, hero.id, id, count);
+    if (result.used === 0) return;
+    SaveSystem.save(this.save);
+    showToast(this, hero.level > before ? `Lv.${before} → Lv.${hero.level} になりました` : `経験値 +${result.gained.toLocaleString('ja-JP')}`);
     this.queueRender();
   }
 

@@ -3,15 +3,19 @@ import { SaveSystem, type SaveData, type InfiniteModeRunResult } from '../system
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
+import { BigNumber } from '../systems/BigNumber';
+import { AutoSkillToggle } from '../ui/AutoSkillToggle';
+import { SpeedToggle } from '../ui/SpeedToggle';
 import { Button } from '../ui/Button';
 import { createPanel } from '../ui/Panel';
 import { applyBattleBackground } from '../ui/Background';
 import { heading, body, caption, CHROME, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
 import { InfiniteRunEngine, type InfiniteBattleEvent, type EnemySlotPosition } from '../systems/InfiniteModeSystem';
-import type { UnitInstance } from '../systems/BattleSystem';
+import { ULT_MAX, type UnitInstance } from '../systems/BattleSystem';
 import { LeaderboardSystem } from '../systems/LeaderboardSystem';
 import { formatSurvival } from '../ui/format';
+import { SoundSystem } from '../systems/SoundSystem';
 
 type SceneState = 'running' | 'result';
 
@@ -72,6 +76,8 @@ export class InfiniteModeScene extends Phaser.Scene {
   private stateToken = 0;
   private stateContainer?: Phaser.GameObjects.Container;
   private hud?: RunningHud;
+  private autoSkill?: AutoSkillToggle;
+  private speed?: SpeedToggle;
 
   constructor() {
     super('InfiniteRun');
@@ -88,6 +94,8 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.stateToken = 0;
     this.stateContainer = undefined;
     this.hud = undefined;
+    this.autoSkill = undefined;
+    this.speed = undefined;
 
     this.cameras.main.setBackgroundColor('#10121c');
     applyBattleBackground(this, 'infinite', ARENA_TINT);
@@ -98,14 +106,33 @@ export class InfiniteModeScene extends Phaser.Scene {
       this.scene.start('InfiniteMode');
       return;
     }
+    this.autoSkill = new AutoSkillToggle(this, this.save);
+    this.speed = new SpeedToggle(this, this.save);
+    this.tweens.timeScale = 1;
+    this.time.timeScale = 1;
     this.startRun();
   }
 
   update(_time: number, delta: number): void {
     if (this.state !== 'running' || !this.engine) return;
-    this.handleEvents(this.engine.update(delta));
+    // 2倍速: the run and every animation in it go faster together.
+    const speed = this.speed?.factor() ?? 1;
+    this.tweens.timeScale = speed;
+    this.time.timeScale = speed;
+    this.handleEvents(this.engine.update(delta * speed));
+    if (this.autoSkill?.isOn()) this.castReadySkills();
     this.refreshBars();
     this.refreshHud();
+  }
+
+  /** オート: every hero whose gauge is full casts its next skill right away. */
+  private castReadySkills(): void {
+    const engine = this.engine;
+    if (!engine) return;
+    for (const unit of engine.playerUnits) {
+      if (engine.isOver()) return;
+      if (unit.alive && unit.ultGauge >= ULT_MAX && unit.skills.length > 0) this.handleEvents(engine.triggerUlt(unit.id));
+    }
   }
 
   private enterState(state: SceneState): void {
@@ -241,10 +268,15 @@ export class InfiniteModeScene extends Phaser.Scene {
   }
 
   private onAttack(event: Extract<InfiniteBattleEvent, { kind: 'attack' }>): void {
+    SoundSystem.play(this, event.crit ? 'crit' : 'hit');
     const attackerView = this.views.get(event.attackerId);
     const targetView = this.views.get(event.targetId);
     if (!attackerView || !targetView) return;
     this.anim.attack(attackerView.sprite, attackerView.unit.isPlayer);
+    if (event.blocked) {
+      this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { label: '無敵' });
+      return;
+    }
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
@@ -255,6 +287,7 @@ export class InfiniteModeScene extends Phaser.Scene {
    *  onDefeated already tore down (and, here, removed from `views`
    *  entirely) - that case rebuilds the view instead of animating nothing. */
   private onSkillCast(event: Extract<InfiniteBattleEvent, { kind: 'skillCast' }>): void {
+    SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
     if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
 
@@ -284,6 +317,9 @@ export class InfiniteModeScene extends Phaser.Scene {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      } else if (result.invincible) {
+        this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, BigNumber.ZERO, { label: '無敵' });
       }
     }
   }
@@ -356,6 +392,7 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean, skillEssenceGained: number): void {
     this.enterState('result');
+    SoundSystem.play(this, isNewLocalBest ? 'victory' : 'confirm');
     const container = this.add.container(0, 0);
     this.stateContainer = container;
     const token = this.stateToken;

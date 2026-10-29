@@ -26,6 +26,11 @@ export function isStunned(unit: UnitInstance, nowMs: number): boolean {
   return nowMs < unit.stunnedUntil;
 }
 
+/** True while a 無敵 skill protects the unit: every hit on it deals nothing. */
+export function isInvincible(unit: UnitInstance, nowMs: number): boolean {
+  return nowMs < unit.invincibleUntil;
+}
+
 function rollDamage(attacker: UnitInstance, target: UnitInstance, nowMs: number, potencyMul: number, bonusCritChance: number): { damage: BigNumber; crit: boolean } {
   const variance = 0.9 + Math.random() * 0.2;
   const crit = Math.random() < attacker.critRate + bonusCritChance;
@@ -69,6 +74,7 @@ export interface SkillTargetResult {
   debuffAtk?: boolean;
   debuffDef?: boolean;
   stunned?: boolean;
+  invincible?: boolean;
 }
 
 export interface SkillCastOutcome {
@@ -169,6 +175,11 @@ export function castSkill(
         target.stunnedUntil = nowMs + effect.durationMs;
         results.push({ targetId: target.id, stunned: true });
       }
+      break;
+    }
+    case 'invincible': {
+      caster.invincibleUntil = nowMs + effect.durationMs;
+      results.push({ targetId: caster.id, invincible: true });
       break;
     }
     case 'heal_single': {

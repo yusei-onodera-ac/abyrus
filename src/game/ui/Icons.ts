@@ -29,7 +29,7 @@ const ICON_MAIL = 'icon_mail';
 
 export type StageNodeState = 'locked' | 'unlocked' | 'cleared';
 
-function ensureTexture(scene: Phaser.Scene, key: string, size: number, draw: (g: Phaser.GameObjects.Graphics, radius: number) => void): string {
+export function ensureTexture(scene: Phaser.Scene, key: string, size: number, draw: (g: Phaser.GameObjects.Graphics, radius: number) => void): string {
   if (scene.textures.exists(key)) return key;
   const g = scene.add.graphics();
   draw(g, size / 2);
@@ -153,7 +153,7 @@ export function stageNodeIcon(scene: Phaser.Scene, state: StageNodeState, size =
 /** Shared circular badge body used by every nav icon: a filled disc with a
  *  ring and a soft rim-light, so the three nav glyphs read as one family of
  *  round buttons rather than unrelated shapes. */
-function drawNavBadge(g: Phaser.GameObjects.Graphics, c: number, fill: number, ring: number): void {
+export function drawNavBadge(g: Phaser.GameObjects.Graphics, c: number, fill: number, ring: number): void {
   g.fillStyle(ring, 0.14);
   g.fillCircle(c, c, c);
   g.fillStyle(fill, 1);
@@ -354,9 +354,9 @@ export function shopTabIcon(scene: Phaser.Scene, size = 72): string {
 // tone instead of each getting its own saturated color, per direction -
 // they read as one simple, consistent family; only the unread dot (drawn
 // by the caller) gets to be a loud color.
-const CORNER_BADGE_FILL = 0x262840;
-const CORNER_BADGE_RING = 0xaaa4c2;
-const CORNER_GLYPH = 0xe9e6f2;
+export const CORNER_BADGE_FILL = 0x262840;
+export const CORNER_BADGE_RING = 0xaaa4c2;
+export const CORNER_GLYPH = 0xe9e6f2;
 
 /** Notification-bell icon for the home screen's corner button row. */
 export function notificationIcon(scene: Phaser.Scene, size = 72): string {

@@ -40,7 +40,7 @@ const PHASE_CHIP: Record<EventPhase, { text: string; fill: number; color: string
 
 /** The banner when there is no image: the event's color shading from dark to
  *  bright, its emblem as a huge faint glyph, and its title across the middle. */
-function drawBanner(scene: Phaser.Scene, entry: EventEntry, x: number, y: number, w: number, h: number): Phaser.GameObjects.GameObject[] {
+export function drawBanner(scene: Phaser.Scene, entry: { title: string; accent: number; emblem?: string }, x: number, y: number, w: number, h: number): Phaser.GameObjects.GameObject[] {
   const g = scene.add.graphics();
   const dark = mixColor(entry.accent, 0x000000, 0.7);
   const light = mixColor(entry.accent, 0x000000, 0.25);

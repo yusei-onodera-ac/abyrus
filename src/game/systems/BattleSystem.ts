@@ -1,6 +1,6 @@
 import { BigNumber } from './BigNumber';
 import { ProgressionSystem, type EnemyUnitDef } from './ProgressionSystem';
-import { castSkill, effectiveAtk, effectiveDef, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
+import { castSkill, effectiveAtk, effectiveDef, isInvincible, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
 import { getUnlockedSkillsForHero, type UnlockedSkill } from '../data/skills';
 import type { HeroClass, HeroData, Rarity, Row } from '../types';
 
@@ -38,10 +38,12 @@ export interface UnitInstance {
   defStatusUntil: number;
   /** Set by a stun skill; the unit skips its turn while `now < this`. */
   stunnedUntil: number;
+  /** Set by a 無敵 skill; hits on the unit deal nothing while `now < this`. */
+  invincibleUntil: number;
 }
 
 export type BattleEvent =
-  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean }
+  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean; blocked?: boolean }
   | { kind: 'skillCast'; casterId: string; skillName: string; effectKind: string; results: SkillTargetResult[] }
   | { kind: 'ultCharged'; unitId: string }
   | { kind: 'defeated'; unitId: string }
@@ -87,6 +89,7 @@ export const BattleSystem = {
       defStatusMul: 1,
       defStatusUntil: 0,
       stunnedUntil: 0,
+      invincibleUntil: 0,
     };
   },
 
@@ -119,6 +122,7 @@ export const BattleSystem = {
       defStatusMul: 1,
       defStatusUntil: 0,
       stunnedUntil: 0,
+      invincibleUntil: 0,
     };
   },
 };
@@ -219,6 +223,8 @@ export class BattleEngine {
     let damage = effectiveAtk(attacker, this.clockMs).mul(variance);
     if (crit) damage = damage.mul(attacker.critMul);
     damage = damage.mul(100 / (100 + effectiveDef(target, this.clockMs)));
+    const blocked = isInvincible(target, this.clockMs);
+    if (blocked) damage = BigNumber.ZERO;
 
     target.hp = target.hp.sub(damage);
     let defeated = false;
@@ -228,7 +234,7 @@ export class BattleEngine {
       defeated = true;
     }
 
-    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit });
+    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit, blocked });
     if (defeated) events.push({ kind: 'defeated', unitId: target.id });
 
     if (attacker.isPlayer) {

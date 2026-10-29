@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { formatGachaEnd, FRIEND_GACHA_IMAGE, type GachaBannerEntry } from '../data/gachaBanners';
-import { SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { EQUIP_SINGLE_COST, EQUIP_TEN_COST, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { drawBanner } from './EventPanels';
 import { Button } from './Button';
 import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
@@ -90,6 +91,8 @@ export function buildGachaBannerCard(
     const frame = scene.textures.get(key).getSourceImage();
     bannerH = Math.round((innerW * frame.height) / frame.width);
     container.add(scene.add.image(w / 2, y + bannerH / 2, key).setDisplaySize(innerW, bannerH));
+  } else if (entry.accent !== undefined) {
+    container.add(drawBanner(scene, { title: entry.title, accent: entry.accent, emblem: entry.emblem }, PAD, y, innerW, bannerH));
   } else {
     container.add(createPanel(scene, w / 2, y + bannerH / 2, innerW, bannerH, { fillColor: 0x241810, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 8, gradient: false }));
     container.add(caption(scene, w / 2, y + bannerH / 2 - 14, 'バナー準備中', { fontSize: '24px', color: '#9a8a6a' }).setOrigin(0.5));
@@ -117,7 +120,7 @@ export function buildGachaBannerCard(
     new Button(scene, PAD + ctaW / 2, y + ctaH / 2, ctaW, ctaH, 'シングルガチャ', handlers.onSingle, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${SINGLE_PULL_COST} 魔晶石`,
+      subLabel: `${entry.kind === 'equipment' ? EQUIP_SINGLE_COST : SINGLE_PULL_COST} 魔晶石`,
       guard: handlers.guard,
     }),
   );
@@ -125,7 +128,7 @@ export function buildGachaBannerCard(
     new Button(scene, PAD + ctaW + 14 + ctaW / 2, y + ctaH / 2, ctaW, ctaH, '10連ガチャ', handlers.onTen, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${TEN_PULL_COST} 魔晶石`,
+      subLabel: `${entry.kind === 'equipment' ? EQUIP_TEN_COST : TEN_PULL_COST} 魔晶石`,
       guard: handlers.guard,
     }),
   );

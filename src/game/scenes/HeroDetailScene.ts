@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { SaveSystem, expToNextLevel, type SaveData } from '../systems/SaveSystem';
+import { describeEquip, getEquipDef } from '../data/equipment';
+import { equipIcon } from '../ui/ItemIcons';
 import { MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillUpgradeCost, type SkillDefinition } from '../data/skills';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
@@ -15,7 +17,7 @@ import { createPanel, createDivider } from '../ui/Panel';
 import { buildStoneStage } from '../ui/StoneStage';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { enter } from '../ui/Transitions';
-import { CLASS_LABELS, RARITY_COLORS, MAX_PHASE, hex, type HeroData } from '../types';
+import { CLASS_LABELS, EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, MAX_LEVEL, MAX_PHASE, hex, type EquipSlot, type HeroData } from '../types';
 
 interface HeroDetailData {
   heroId: string;
@@ -67,6 +69,7 @@ export class HeroDetailScene extends Phaser.Scene {
     this.buildHeaderBar();
     this.buildStageLabels(hero);
     this.buildSkillChips(hero);
+    this.buildGearChips(hero);
 
     let y = STAGE_H + 10;
     y += this.buildStatusBlock(hero, generator, y) + GAP;
@@ -152,17 +155,19 @@ export class HeroDetailScene extends Phaser.Scene {
     block.add(this.add.text(right, 26, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(color), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
 
     const needed = expToNextLevel(hero.level);
+    const atMax = hero.level >= MAX_LEVEL;
     block.add(body(this, x, 68, `Lv.${hero.level}`, { fontSize: '34px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    block.add(caption(this, right, 74, `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    block.add(caption(this, right, 74, atMax ? 'レベル最大' : `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '21px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
 
     const barW = right - x;
     const bar = this.add.graphics();
     bar.fillStyle(0x0d0905, 1);
     bar.fillRoundedRect(x, 96, barW, 14, 7);
     bar.fillStyle(0xe0822a, 1);
-    bar.fillRoundedRect(x, 96, Math.max(10, barW * Phaser.Math.Clamp(hero.exp / needed, 0, 1)), 14, 7);
+    const ratio = atMax ? 1 : Phaser.Math.Clamp(hero.exp / needed, 0, 1);
+    bar.fillRoundedRect(x, 96, Math.max(10, barW * ratio), 14, 7);
     bar.fillStyle(0xffffff, 0.25);
-    bar.fillRoundedRect(x + 2, 98, Math.max(6, barW * Phaser.Math.Clamp(hero.exp / needed, 0, 1)) - 4, 5, 3);
+    bar.fillRoundedRect(x + 2, 98, Math.max(6, barW * ratio) - 4, 5, 3);
     bar.lineStyle(2, CHROME.brassDark, 1);
     bar.strokeRoundedRect(x, 96, barW, 14, 7);
     block.add(bar);
@@ -221,6 +226,45 @@ export class HeroDetailScene extends Phaser.Scene {
     panel.container.setPosition(PANEL_X, y);
     enter(this, panel.container, { dy: 24, duration: 340, delay: 220 });
     return panel.height;
+  }
+
+  // --- equipment --------------------------------------------------------
+
+  /** What the hero wears, three tags down the stage's left edge (opposite the
+   *  skills). Tapping one opens the list to change that slot. */
+  private buildGearChips(hero: HeroData): void {
+    const w = 168;
+    const h = 62;
+    const gap = 8;
+    const x = 12;
+    const top = 112;
+    const container = this.add.container(0, 0);
+    container.add(caption(this, x + w / 2, top - 8, '装備', { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
+    EQUIP_SLOTS.forEach((slot: EquipSlot, i) => {
+      const item = hero.gear[slot];
+      const def = item ? getEquipDef(item.defId) : undefined;
+      const y = top + i * (h + gap);
+      const g = this.add.graphics();
+      g.fillStyle(0x0d0905, 0.86);
+      g.fillRoundedRect(x, y, w, h, 10);
+      g.lineStyle(2, def ? RARITY_COLORS[def.rarity] : CHROME.brassDark, def ? 1 : 0.6);
+      g.strokeRoundedRect(x, y, w, h, 10);
+      container.add(g);
+      if (item && def) {
+        container.add(this.add.image(x + 32, y + h / 2, equipIcon(this, slot, def.rarity, 46)));
+        const name = body(this, x + 60, y + 19, def.name, { fontSize: '17px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+        if (name.width > w - 66) name.setScale((w - 66) / name.width);
+        container.add(name);
+        container.add(caption(this, x + 60, y + 43, `Lv.${item.level} ${describeEquip(item).split(' ')[1] ?? ''}`, { fontSize: '15px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      } else {
+        container.add(caption(this, x + 14, y + h / 2, `${EQUIP_SLOT_LABELS[slot]}　なし`, { fontSize: '19px', color: '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      }
+      const hit = this.add.zone(x + w / 2, y + h / 2, w, h).setOrigin(0.5);
+      hit.setInteractive({ useHandCursor: true });
+      hit.on('pointerup', () => this.scene.start('GearPick', { heroId: hero.id, slot, from: this.detailData.from }));
+      container.add(hit);
+    });
+    enter(this, container, { dx: -30, dy: 0, delay: 240 });
   }
 
   // --- skills -----------------------------------------------------------

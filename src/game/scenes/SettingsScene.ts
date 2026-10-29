@@ -19,6 +19,7 @@ import {
   type VolumeKind,
 } from '../systems/SettingsSystem';
 import { formatPlayerId } from '../systems/SocialSystem';
+import { SoundSystem } from '../systems/SoundSystem';
 import { Button } from '../ui/Button';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { openConfirm, openMessageForm, openTextPrompt } from '../ui/Dialogs';
@@ -420,6 +421,7 @@ export class SettingsScene extends InboxScene {
   private setVolume(kind: VolumeKind, steps: number): void {
     SettingsSystem.setVolume(this.save, kind, steps);
     this.store();
+    if (kind === 'se') SoundSystem.play(this, 'confirm');
   }
 
   private toggleNotification(kind: NotificationKind): void {

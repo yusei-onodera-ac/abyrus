@@ -23,6 +23,10 @@ export interface SettingsState {
   twitter: string;
   audio: Record<VolumeKind, number>;
   notifications: Record<NotificationKind, boolean>;
+  /** オート: a hero's skill is cast the moment its gauge is full (see AutoSkillToggle). */
+  autoSkill: boolean;
+  /** 2倍速 (プレミアムパス): run fights at double speed. Only has an effect while the pass is active. */
+  speed2x: boolean;
 }
 
 export type ReportKind = 'inquiry' | 'bug';
@@ -90,6 +94,8 @@ export const SettingsSystem = {
       twitter: '',
       audio: { bgm: VOLUME_DEFAULT, se: VOLUME_DEFAULT },
       notifications: { news: true, stamina: true, social: true },
+      autoSkill: false,
+      speed2x: false,
     };
   },
 
@@ -106,6 +112,8 @@ export const SettingsSystem = {
         stamina: raw.notifications?.stamina !== false,
         social: raw.notifications?.social !== false,
       },
+      autoSkill: raw.autoSkill === true,
+      speed2x: raw.speed2x === true,
     };
   },
 
@@ -119,6 +127,22 @@ export const SettingsSystem = {
   /** 0..1, for the audio code to multiply into what it plays. */
   getVolume(save: SaveData, kind: VolumeKind): number {
     return save.settings.audio[kind] / VOLUME_STEPS;
+  },
+
+  getAutoSkill(save: SaveData): boolean {
+    return save.settings.autoSkill;
+  },
+
+  setAutoSkill(save: SaveData, on: boolean): void {
+    save.settings.autoSkill = on;
+  },
+
+  getSpeed2x(save: SaveData): boolean {
+    return save.settings.speed2x;
+  },
+
+  setSpeed2x(save: SaveData, on: boolean): void {
+    save.settings.speed2x = on;
   },
 
   setVolume(save: SaveData, kind: VolumeKind, steps: number): void {

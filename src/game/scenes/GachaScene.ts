@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData, type HeroPullOutcome } from '../systems/SaveSystem';
-import { GachaSystem, GACHA_RATES, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { SoundSystem } from '../systems/SoundSystem';
+import { GachaSystem, GACHA_RATES, EQUIP_GACHA_RATES, EQUIP_SINGLE_COST, EQUIP_TEN_COST, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { showRewardModal } from '../ui/RewardModal';
+import { tilesForEquipment } from '../ui/RewardTiles';
 import { getActiveGachaBanners, type GachaBannerEntry } from '../data/gachaBanners';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ResourceBar } from '../ui/ResourceBar';
@@ -75,8 +78,8 @@ export class GachaScene extends Phaser.Scene {
     for (const entry of banners) {
       const card = buildGachaBannerCard(this, entry, {
         onDetail: () => this.showDetail(entry),
-        onSingle: () => this.doPull(1, SINGLE_PULL_COST),
-        onTen: () => this.doPull(10, TEN_PULL_COST),
+        onSingle: () => (entry.kind === 'equipment' ? this.doEquipPull(1, EQUIP_SINGLE_COST) : this.doPull(1, SINGLE_PULL_COST)),
+        onTen: () => (entry.kind === 'equipment' ? this.doEquipPull(10, EQUIP_TEN_COST) : this.doPull(10, TEN_PULL_COST)),
         guard,
       });
       card.container.setPosition(left, y);
@@ -113,7 +116,8 @@ export class GachaScene extends Phaser.Scene {
     const modal = this.openModal(0.7, true);
     const w = 580;
     const rowH = 54;
-    const h = 150 + GACHA_RATES.length * rowH + 100;
+    const rates = entry.kind === 'equipment' ? EQUIP_GACHA_RATES : GACHA_RATES;
+    const h = 150 + rates.length * rowH + 100;
     const cy = 620;
     const top = cy - h / 2;
 
@@ -126,7 +130,7 @@ export class GachaScene extends Phaser.Scene {
     modal.add(caption(this, 360, top + 94, entry.title, { fontSize: '18px', color: '#d8c49a' }).setOrigin(0.5));
 
     let y = top + 150 + rowH / 2;
-    for (const rate of GACHA_RATES) {
+    for (const rate of rates) {
       modal.add(this.add.text(360 - w / 2 + 60, y, '★'.repeat(rate.rarity), { fontSize: '24px', color: hex(RARITY_COLORS[rate.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       modal.add(body(this, 360 + w / 2 - 60, y, `${(rate.rate * 100).toFixed(1)}%`, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
       y += rowH;
@@ -148,7 +152,24 @@ export class GachaScene extends Phaser.Scene {
     this.showResults(outcomes);
   }
 
+  /** 装備ガチャ: the pieces go to the bag and are shown as tiles. */
+  private doEquipPull(count: number, cost: number): void {
+    const save = this.getSave();
+    if (!SaveSystem.spendGems(save, cost)) {
+      showToast(this, '魔晶石が足りません', '#ff8a8a');
+      return;
+    }
+    const items = GachaSystem.pullEquipmentMany(count);
+    save.equipment.push(...items);
+    SaveSystem.save(save);
+    this.refreshResources();
+    SoundSystem.play(this, items.some((i) => i.defId.split('-')[1] >= '4') ? 'reveal' : 'confirm');
+    this.closeModal();
+    this.modal = showRewardModal(this, this.scroll, { title: '装備ガチャ', tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）' });
+  }
+
   private showResults(outcomes: HeroPullOutcome[]): void {
+    SoundSystem.play(this, outcomes.some((o) => o.hero.rarity >= 4) ? 'reveal' : 'confirm');
     const container = this.openModal(0.78);
 
     const cols = Math.min(5, outcomes.length);

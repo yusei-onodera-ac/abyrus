@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { createPanel, type PanelOptions } from './Panel';
 import { buttonLabel, buttonSubLabel, COLORS, CHROME } from './theme';
 import { hasButtonAsset, buttonAssetKeys } from './ButtonAssets';
+import { SoundSystem } from '../systems/SoundSystem';
 
 /** primary/secondary/ghost/danger are the original purple-palette set.
  *  gold = main call-to-action on wood/brass screens; wood = the muted
@@ -129,6 +130,7 @@ export class Button extends Phaser.GameObjects.Container {
       if (this.disabled) return;
       this.animateTo(1.04, 90);
       if (opts.guard && !opts.guard()) return;
+      SoundSystem.play(scene, 'tap');
       onClick();
     });
 

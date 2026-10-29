@@ -34,15 +34,16 @@ export class DamagePopupPool {
     }
   }
 
-  pop(x: number, y: number, amount: BigNumber, opts: { crit?: boolean; heal?: boolean } = {}): void {
+  /** `label` shows that text instead of the number (e.g. 無敵 on a blocked hit). */
+  pop(x: number, y: number, amount: BigNumber, opts: { crit?: boolean; heal?: boolean; label?: string } = {}): void {
     const entry = this.pool.find((e) => !e.inUse) ?? this.pool[0];
     entry.inUse = true;
     const { text } = entry;
     const crit = !!opts.crit;
     const heal = !!opts.heal;
 
-    text.setText((heal ? '+' : '') + amount.toString());
-    text.setColor(heal ? Phaser.Display.Color.ValueToColor(COLORS.heal).rgba : crit ? Phaser.Display.Color.ValueToColor(COLORS.gold).rgba : '#ffffff');
+    text.setText(opts.label ?? (heal ? '+' : '') + amount.toString());
+    text.setColor(opts.label ? '#9fe0ff' : heal ? Phaser.Display.Color.ValueToColor(COLORS.heal).rgba : crit ? Phaser.Display.Color.ValueToColor(COLORS.gold).rgba : '#ffffff');
     text.setFontSize(crit ? 40 : 24);
     text.setPosition(x + Phaser.Math.Between(-10, 10), y);
     text.setRotation(Phaser.Math.DegToRad(Phaser.Math.Between(-6, 6)));

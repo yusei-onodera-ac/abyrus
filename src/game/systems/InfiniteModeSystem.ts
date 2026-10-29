@@ -1,6 +1,6 @@
 import { BigNumber } from './BigNumber';
 import { BattleSystem, ULT_GAIN, ULT_MAX, type UnitInstance } from './BattleSystem';
-import { castSkill, effectiveAtk, effectiveDef, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
+import { castSkill, effectiveAtk, effectiveDef, isInvincible, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
 import { ENEMY_CLASSES, NAME_P1, NAME_P2, type EnemyUnitDef } from './ProgressionSystem';
 import type { HeroData, Rarity, Row } from '../types';
 
@@ -83,7 +83,7 @@ export interface InfiniteRunSnapshot {
 }
 
 export type InfiniteBattleEvent =
-  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean }
+  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean; blocked?: boolean }
   | { kind: 'skillCast'; casterId: string; skillName: string; effectKind: string; results: SkillTargetResult[] }
   | { kind: 'ultCharged'; unitId: string }
   | { kind: 'defeated'; unitId: string; isPlayer: boolean }
@@ -228,6 +228,8 @@ export class InfiniteRunEngine {
     let damage = effectiveAtk(attacker, this.elapsedMs).mul(variance);
     if (crit) damage = damage.mul(attacker.critMul);
     damage = damage.mul(100 / (100 + effectiveDef(target, this.elapsedMs)));
+    const blocked = isInvincible(target, this.elapsedMs);
+    if (blocked) damage = BigNumber.ZERO;
 
     target.hp = target.hp.sub(damage);
     let defeated = false;
@@ -237,7 +239,7 @@ export class InfiniteRunEngine {
       defeated = true;
     }
 
-    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit });
+    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit, blocked });
     if (defeated) {
       events.push({ kind: 'defeated', unitId: target.id, isPlayer: target.isPlayer });
       if (!target.isPlayer) {

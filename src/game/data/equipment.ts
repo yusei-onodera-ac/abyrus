@@ -1,0 +1,163 @@
+import { EQUIP_SLOTS, type CombatStats, type EquipSlot, type EquipmentItem, type HeroGear, type Rarity } from '../types';
+
+/**
+ * 装備の一覧と数値。装備を足す/調整するときはここだけ編集する。数字は仮のバランス。
+ *
+ * 装備は 武器 / 防具 / 装飾 の3部位で、キャラごとに1つずつ着けられる。1つの装備は
+ * 1つの能力を上げる(武器=攻撃力、防具=HPか防御、装飾=会心率か素早さ)。効果は
+ * レアリティで決まる基礎値に、レベルごとの伸びを足したもの。
+ */
+export type EquipStat = 'atkPct' | 'hpPct' | 'defFlat' | 'critRate' | 'spdFlat';
+
+export const EQUIP_STAT_LABEL: Record<EquipStat, string> = {
+  atkPct: '攻撃力',
+  hpPct: 'HP',
+  defFlat: '防御力',
+  critRate: '会心率',
+  spdFlat: '素早さ',
+};
+
+export interface EquipDef {
+  id: string;
+  name: string;
+  slot: EquipSlot;
+  rarity: Rarity;
+  stat: EquipStat;
+}
+
+/** Effect of a level-1 piece: percent for atk/hp/crit, points for def/spd. */
+const STAT_BASE: Record<EquipStat, Record<Rarity, number>> = {
+  atkPct: { 1: 3, 2: 6, 3: 9, 4: 12, 5: 15 },
+  hpPct: { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20 },
+  defFlat: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10 },
+  critRate: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 },
+  spdFlat: { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5 },
+};
+
+/** Each level adds this fraction of the base effect. */
+const LEVEL_GROWTH = 0.1;
+
+/** Highest level a piece of each rarity can be raised to. */
+export const EQUIP_MAX_LEVEL: Record<Rarity, number> = { 1: 10, 2: 15, 3: 20, 4: 30, 5: 40 };
+
+/** 装備強化素材 for raising a piece from level L to L+1 is `UP_BASE[rarity] * L`. */
+const UP_BASE: Record<Rarity, number> = { 1: 3, 2: 6, 3: 15, 4: 40, 5: 100 };
+
+/** 装備強化素材 a piece is worth when 分解d (before the levels put into it come back). */
+const DISMANTLE_BASE: Record<Rarity, number> = { 1: 10, 2: 30, 3: 100, 4: 300, 5: 1000 };
+
+/** Share of the 素材 spent on levels that 分解 gives back. */
+const REFUND_RATE = 0.5;
+
+// slot, rarity, stat, name - two pieces per slot per rarity.
+const TABLE: [EquipSlot, Rarity, EquipStat, string][] = [
+  ['weapon', 1, 'atkPct', '木の棍棒'],
+  ['weapon', 1, 'atkPct', '錆びた短剣'],
+  ['weapon', 2, 'atkPct', '鉄の剣'],
+  ['weapon', 2, 'atkPct', '狩人の短弓'],
+  ['weapon', 3, 'atkPct', '銀の長剣'],
+  ['weapon', 3, 'atkPct', '賢者の杖'],
+  ['weapon', 4, 'atkPct', '魔剣グラム'],
+  ['weapon', 4, 'atkPct', '竜牙の槍'],
+  ['weapon', 5, 'atkPct', '神剣アビス'],
+  ['weapon', 5, 'atkPct', '星砕きの大弓'],
+  ['armor', 1, 'hpPct', '布の服'],
+  ['armor', 1, 'defFlat', '木の盾'],
+  ['armor', 2, 'hpPct', '革の鎧'],
+  ['armor', 2, 'defFlat', '鉄の盾'],
+  ['armor', 3, 'hpPct', '鋼の鎧'],
+  ['armor', 3, 'defFlat', '騎士の大盾'],
+  ['armor', 4, 'hpPct', '竜鱗の鎧'],
+  ['armor', 4, 'defFlat', '聖騎士の盾'],
+  ['armor', 5, 'hpPct', '星屑の聖鎧'],
+  ['armor', 5, 'defFlat', '世界樹の盾'],
+  ['accessory', 1, 'critRate', '銅の指輪'],
+  ['accessory', 1, 'spdFlat', '革の靴'],
+  ['accessory', 2, 'critRate', '銀の指輪'],
+  ['accessory', 2, 'spdFlat', '疾風の腕輪'],
+  ['accessory', 3, 'critRate', '会心のペンダント'],
+  ['accessory', 3, 'spdFlat', '風切りのブーツ'],
+  ['accessory', 4, 'critRate', '鷹の目の首飾り'],
+  ['accessory', 4, 'spdFlat', '迅雷のアンクレット'],
+  ['accessory', 5, 'critRate', '王者の冠'],
+  ['accessory', 5, 'spdFlat', '天翔ける翼飾り'],
+];
+
+export const EQUIP_DEFS: EquipDef[] = TABLE.map(([slot, rarity, stat, name], i) => ({ id: `${slot}-${rarity}-${i % 2}`, name, slot, rarity, stat }));
+
+const BY_ID = new Map(EQUIP_DEFS.map((d) => [d.id, d]));
+
+export function getEquipDef(defId: string): EquipDef | undefined {
+  return BY_ID.get(defId);
+}
+
+export function equipDefsOfRarity(rarity: Rarity): EquipDef[] {
+  return EQUIP_DEFS.filter((d) => d.rarity === rarity);
+}
+
+/** The effect of `def` at `level`, in the stat's own unit (percent, or points). */
+export function equipValue(def: EquipDef, level: number): number {
+  return STAT_BASE[def.stat][def.rarity] * (1 + (Math.max(1, level) - 1) * LEVEL_GROWTH);
+}
+
+/** "攻撃力 +12.0%" / "防御力 +8" for a piece as it is now. */
+export function describeEquip(item: EquipmentItem): string {
+  const def = getEquipDef(item.defId);
+  if (!def) return '';
+  const value = equipValue(def, item.level);
+  const percent = def.stat === 'atkPct' || def.stat === 'hpPct' || def.stat === 'critRate';
+  return `${EQUIP_STAT_LABEL[def.stat]} +${percent ? value.toFixed(1) : Math.round(value)}${percent ? '%' : ''}`;
+}
+
+export function equipMaxLevel(item: EquipmentItem): number {
+  const def = getEquipDef(item.defId);
+  return def ? EQUIP_MAX_LEVEL[def.rarity] : 1;
+}
+
+/** 装備強化素材 to raise the piece one level, or null at its top level. */
+export function equipLevelUpCost(item: EquipmentItem): number | null {
+  const def = getEquipDef(item.defId);
+  if (!def || item.level >= EQUIP_MAX_LEVEL[def.rarity]) return null;
+  return Math.round(UP_BASE[def.rarity] * item.level);
+}
+
+/** 装備強化素材 that 分解ing the piece gives: its base worth plus half of what was spent levelling it. */
+export function dismantleValue(item: EquipmentItem): number {
+  const def = getEquipDef(item.defId);
+  if (!def) return 0;
+  let spent = 0;
+  for (let level = 1; level < item.level; level++) spent += Math.round(UP_BASE[def.rarity] * level);
+  return DISMANTLE_BASE[def.rarity] + Math.round(spent * REFUND_RATE);
+}
+
+export interface GearBonus {
+  atkPct: number;
+  hpPct: number;
+  defFlat: number;
+  critRate: number;
+  spdFlat: number;
+}
+
+export function gearBonus(gear: HeroGear | undefined): GearBonus {
+  const total: GearBonus = { atkPct: 0, hpPct: 0, defFlat: 0, critRate: 0, spdFlat: 0 };
+  if (!gear) return total;
+  for (const slot of EQUIP_SLOTS) {
+    const item = gear[slot];
+    const def = item ? getEquipDef(item.defId) : undefined;
+    if (item && def) total[def.stat] += equipValue(def, item.level);
+  }
+  return total;
+}
+
+/** A hero's stats with the equipment on them folded in. */
+export function applyGear(stats: CombatStats, gear: HeroGear | undefined): CombatStats {
+  const bonus = gearBonus(gear);
+  return {
+    ...stats,
+    maxHp: stats.maxHp.mul(1 + bonus.hpPct / 100),
+    atk: stats.atk.mul(1 + bonus.atkPct / 100),
+    def: stats.def + Math.round(bonus.defFlat),
+    spd: stats.spd + Math.round(bonus.spdFlat),
+    critRate: Math.min(1, stats.critRate + bonus.critRate / 100),
+  };
+}

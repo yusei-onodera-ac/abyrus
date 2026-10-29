@@ -25,6 +25,7 @@ export type SkillEffectKind =
   | 'debuff_atk'
   | 'debuff_def'
   | 'stun'
+  | 'invincible'
   | 'heal_single'
   | 'heal_aoe'
   | 'revive';
@@ -38,6 +39,7 @@ export const SKILL_KIND_LABELS: Record<SkillEffectKind, string> = {
   debuff_atk: '攻撃低下',
   debuff_def: '防御低下',
   stun: '行動封じ',
+  invincible: '無敵',
   heal_single: '単体回復',
   heal_aoe: '範囲回復',
   revive: '復活',
@@ -87,6 +89,8 @@ const KIND_BASE_TUNING: Record<SkillEffectKind, SkillTuning> = {
   debuff_atk: { basePotency: 16, potencyPerLevel: 1.4, baseDurationMs: 2400, durationPerLevelMs: 100 },
   debuff_def: { basePotency: 18, potencyPerLevel: 1.5, baseDurationMs: 2400, durationPerLevelMs: 100 },
   stun: { basePotency: 0, potencyPerLevel: 0, baseDurationMs: 900, durationPerLevelMs: 60 },
+  // The caster takes no damage for this long (1.8s at level 1, 2.9s at level 10).
+  invincible: { basePotency: 0, potencyPerLevel: 0, baseDurationMs: 1800, durationPerLevelMs: 120 },
   heal_single: { basePotency: 28, potencyPerLevel: 2.4 },
   heal_aoe: { basePotency: 16, potencyPerLevel: 1.3 },
   revive: { basePotency: 30, potencyPerLevel: 2 },
@@ -168,6 +172,7 @@ export function formatSkillEffectSummary(def: SkillDefinition, level: number): s
     case 'debuff_def':
       return `-${Math.round(effect.potency)}% / ${(effect.durationMs / 1000).toFixed(1)}秒`;
     case 'stun':
+    case 'invincible':
       return `${(effect.durationMs / 1000).toFixed(1)}秒`;
     case 'heal_single':
     case 'heal_aoe':
@@ -189,7 +194,7 @@ export function formatSkillEffectSummary(def: SkillDefinition, level: number): s
 export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
   // --- ★5 : full 4-skill kits -------------------------------------------
   gauss: [
-    defineSkill(5, 'buff_def', '絶対防御の算', '味方全体の防御力を算盤の結界で引き上げる。'),
+    defineSkill(5, 'invincible', '絶対防御の算', '算盤の結界で身を包み、しばらくあらゆる攻撃を無効にする。'),
     defineSkill(5, 'debuff_atk', '減算の重圧', '敵単体に重みを演算し、攻撃力を押し潰す。'),
     defineSkill(5, 'stun', '封算の一手', '敵単体の動きを演算停止に陥れ、束の間行動を封じる。'),
     defineSkill(5, 'nuke_aoe', '無限桁演算陣', '算盤王の全演算力を解放し、戦場の敵全てを圧殺する。'),
@@ -237,7 +242,7 @@ export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
     defineSkill(4, 'nuke_single', '百矢・極', '百矢の精髄を一点に束ね、敵単体を貫く。'),
   ],
   baron: [
-    defineSkill(4, 'buff_def', '守壁の号令', '味方全体に鉄壁の守りを布く。'),
+    defineSkill(4, 'invincible', '不動の城壁', '城壁のごとく立ちはだかり、しばらく一切の攻撃を受け付けない。'),
     defineSkill(4, 'stun', '盾撃', '大盾を打ち付け、敵単体の動きを止める。'),
     defineSkill(4, 'nuke_single', '守壁反撃', '守りを固めた末、敵単体へ全力の反撃を放つ。'),
   ],
@@ -264,7 +269,7 @@ export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
   ignis: [
     defineSkill(4, 'nuke_aoe', '溶岩噴出', '足元から溶岩を噴き上げ、敵全体を焼く。'),
     defineSkill(4, 'debuff_def', '灼熱侵食', '灼熱が敵単体の鎧を融かし、防御力を奪う。'),
-    defineSkill(4, 'buff_def', '熔鎧の加護', '溶岩で鎧を鍛え、味方全体の防御力を高める。'),
+    defineSkill(4, 'invincible', '熔鎧の不壊', '溶岩で鍛えた鎧が、しばらくあらゆる攻撃を弾き返す。'),
   ],
   seira: [
     defineSkill(4, 'nuke_aoe', '氷波乱舞', '氷の波を放ち、敵全体を凍らせ撃つ。'),
