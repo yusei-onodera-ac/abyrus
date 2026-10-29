@@ -25,12 +25,13 @@ export function hex(color: number): string {
 }
 
 /** Phase caps at 10. Separate from rarity (fixed at the pull) and level
- *  (exp-driven): phase only rises by fusing a duplicate pull into this copy
- *  or spending phase materials, both player-initiated. */
+ *  (exp-driven): phase only rises by 合成 (fusing another copy of the same
+ *  character into this one) or spending phase materials, both player-initiated. */
 export const MAX_PHASE = 10;
 
 export interface HeroData {
-  /** Unique id of this owned copy (distinct pulls of the same hero differ). */
+  /** Unique id of this owned copy (distinct pulls of the same hero differ,
+   *  and each repeat pull is kept as its own copy until fused). */
   id: string;
   /** Which HERO_ROSTER entry this copy is; drives name/class/rarity/portrait. */
   heroId: string;
@@ -42,6 +43,10 @@ export interface HeroData {
   exp: number;
   /** 1..MAX_PHASE. */
   phase: number;
+  /** Per-skill level (1-10), indexed by skill slot (0-3). Always length 4
+   *  regardless of how many slots this hero's rarity actually grants - see
+   *  RARITY_SKILL_SLOTS in data/skills.ts for which indices are in play. */
+  skillLevels: number[];
 }
 
 export interface CombatStats {

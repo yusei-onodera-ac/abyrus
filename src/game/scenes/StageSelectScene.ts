@@ -1,37 +1,53 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT, ProgressionSystem } from '../systems/ProgressionSystem';
-import { StaminaSystem, stageStaminaCost, type StageKind } from '../systems/StaminaSystem';
-import { REGIONS, REGION_COUNT } from '../data/regions';
-import { getRegionIntroScript, getFinalIntroScript, getExtraIntroScript } from '../data/storyScript';
-import { Button } from '../ui/Button';
+import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT } from '../systems/ProgressionSystem';
+import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
+import { questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
+import { REGIONS, REGION_COUNT, type RegionDef } from '../data/regions';
+import { BackButton } from '../ui/BackButton';
+import { BottomNavBar } from '../ui/BottomNavBar';
 import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
 import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
-import { ScrollView } from '../ui/ScrollView';
+import { ResourceBar } from '../ui/ResourceBar';
+import type { ScrollView } from '../ui/ScrollView';
+import { buildFramedScrollView, buildTitlePlate, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { applyBackground } from '../ui/Background';
-import { stageNodeIcon, type StageNodeState } from '../ui/Icons';
-import { heading, sectionLabel, caption, COLORS } from '../ui/theme';
+import type { StageNodeState } from '../ui/Icons';
+import { buildRegionBackdrop, drawPadlock, drawRoad, mixColor, stageMedallion, type MedallionKind, type RoadPoint } from '../ui/StageMap';
+import { showToast } from '../ui/Toast';
+import { body, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 
 /** 0-4 = a region's 30-stage page (region 4's page also carries the final
  *  battle node); 'extra' = the post-ending Extra page. */
 type TabKey = number | 'extra';
 
-const NODE_SIZE = 64;
-const FINAL_NODE_SIZE = 100;
+/** Height of the pinned tab row at the top of the map frame, and the gap under it. */
+const TAB_H = 64;
+const TAB_GAP = 10;
+const INK = '#1c130a';
 
-/** Full-screen stage/quest picker, split out of HomeScene so the home
- *  screen itself can stay a character-first hub. Rebuilt as a 5-region
- *  map (plus the post-ending Extra page) for the Quest campaign: a tab row
- *  across the top switches pages, each page is a scrollable node grid
- *  (ScrollView - same component the Gacha screen's list uses), and tapping
- *  an unread region's first node (or the final battle / an Extra group's
- *  first node) routes through StoryScene before Battle instead of
- *  straight into it. Switching tabs restarts the scene (`initialTab` comes
- *  back through init()) rather than tearing down/rebuilding a ScrollView
- *  by hand - ScrollView's own cleanup only runs on scene shutdown, so this
- *  sidesteps leaking its content/scrollbar graphics across tab switches. */
+/** Where the map's nodes sit (content coordinates, relative to the scroll view). */
+const HEADER_H = 132;
+const MAP_TOP = 190;
+const COLS = 5;
+const ROW_H = 150;
+const MARGIN_X = 72;
+
+const SIZE = { normal: 64, goal: 76, boss: 84, final: 104 } as const;
+
+/** Full-screen quest map, split out of HomeScene so the home screen itself can
+ *  stay a character-first hub. A tab row across the top (the five regions, then
+ *  the post-ending Extra) switches pages; a region's page is one winding road of
+ *  30 stages over that region's scenery (RegionDef.look, or its own artwork),
+ *  scrolled to the stage to play next. Tapping an unread region's first node
+ *  (or the final battle / an Extra group's first node) routes through
+ *  StoryScene before Battle instead of straight into it. Switching tabs
+ *  restarts the scene (`initialTab` comes back through init()) rather than
+ *  tearing down/rebuilding a ScrollView by hand - ScrollView's own cleanup only
+ *  runs on scene shutdown, so this sidesteps leaking its content/scrollbar
+ *  graphics across tab switches. */
 export class StageSelectScene extends Phaser.Scene {
   private activeTab: TabKey = 0;
   private view!: ScrollView;
@@ -42,7 +58,9 @@ export class StageSelectScene extends Phaser.Scene {
   }
 
   init(data: { initialTab?: TabKey } = {}): void {
-    this.activeTab = data.initialTab ?? 0;
+    // Without a tab asked for, open the region the next stage to play is in.
+    const save: SaveData = this.game.registry.get('save');
+    this.activeTab = data.initialTab ?? Math.min(REGION_COUNT - 1, Math.floor(save.stageProgress / STAGES_PER_REGION));
     this.modal = undefined;
   }
 
@@ -51,22 +69,22 @@ export class StageSelectScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'stage_select');
 
-    const title = heading(this, 360, 56, 'クエスト', { fontSize: '28px' }).setOrigin(0.5);
-    enter(this, title, { dy: -14, duration: 340 });
+    const resourceBar = new ResourceBar(this, 0, 0, 720);
+    resourceBar.update(save);
+    enter(this, resourceBar, { dy: -20, duration: 280 });
 
-    this.buildBackButton();
+    buildTitlePlate(this, 'クエスト');
+    this.view = buildFramedScrollView(this, TAB_H + TAB_GAP);
     this.buildTabs(save);
-    this.buildHeaderInfo(save);
-    this.buildNodeGrid(save);
+    if (this.activeTab === 'extra') this.buildExtraPage(save);
+    else this.buildRegionPage(this.activeTab, save);
+
+    new BottomNavBar(this, 720, 1280, null);
+    enter(this, new BackButton(this, () => this.scene.start('Home')), { dx: -40, dy: 0, duration: 300, delay: 250 });
   }
 
   private getSave(): SaveData {
     return this.game.registry.get('save');
-  }
-
-  private buildBackButton(): void {
-    const btn = new Button(this, 115, 56, 190, 60, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '15px' });
-    enter(this, btn, { duration: 260 });
   }
 
   // --------------------------------------------------------------- tabs --
@@ -79,223 +97,225 @@ export class StageSelectScene extends Phaser.Scene {
     return save.storyFlags.ending;
   }
 
+  /** Stages of region `r` cleared so far (0..30). */
+  private clearedIn(r: number, save: SaveData): number {
+    return Math.max(0, Math.min(STAGES_PER_REGION, save.stageProgress - r * STAGES_PER_REGION));
+  }
+
   private buildTabs(save: SaveData): void {
     const keys: TabKey[] = [0, 1, 2, 3, 4, 'extra'];
-    const tabWidth = 104;
-    const totalWidth = tabWidth * keys.length;
-    const startX = 360 - totalWidth / 2 + tabWidth / 2;
-    const y = 118;
+    const gap = 6;
+    const w = (SCREEN_VIEW.w - gap * (keys.length - 1)) / keys.length;
 
-    const containers = keys.map((key, i) => {
-      const x = startX + i * tabWidth;
+    const tabs = keys.map((key, i) => {
       const unlocked = key === 'extra' ? this.isExtraUnlocked(save) : this.isRegionUnlocked(key, save);
       const active = key === this.activeTab;
       const accent = key === 'extra' ? COLORS.gold : REGIONS[key].themeColor;
+      const container = this.add.container(SCREEN_VIEW.x + i * (w + gap) + w / 2, SCREEN_VIEW.y + TAB_H / 2);
 
-      const container = this.add.container(x, y);
-      const panel = createPanel(this, 0, 0, tabWidth - 8, 56, {
-        fillColor: active ? 0x2a2c3d : unlocked ? COLORS.panelFill : 0x14151e,
-        fillAlpha: unlocked ? (active ? 1 : 0.85) : 0.55,
-        borderColor: unlocked ? accent : COLORS.border,
-        glowColor: unlocked ? accent : COLORS.border,
-        borderWidth: active ? 3 : 2,
-        radius: 10,
-        gradient: false,
-      });
-      container.add(panel);
+      const g = this.add.graphics();
+      g.fillStyle(0x000000, 0.3);
+      g.fillRoundedRect(-w / 2, -TAB_H / 2 + 3, w, TAB_H, 10);
+      g.fillStyle(active ? mixColor(CHROME.woodFill, accent, 0.4) : unlocked ? CHROME.woodFill : CHROME.woodGrain, 1);
+      g.fillRoundedRect(-w / 2, -TAB_H / 2, w, TAB_H, 10);
+      g.fillStyle(accent, unlocked ? 1 : 0.25);
+      g.fillRoundedRect(-w / 2 + 8, TAB_H / 2 - 9, w - 16, 5, 2);
+      g.lineStyle(active ? 3 : 2, unlocked ? (active ? CHROME.brassBright : CHROME.brass) : CHROME.brassDark, unlocked ? 1 : 0.5);
+      g.strokeRoundedRect(-w / 2, -TAB_H / 2, w, TAB_H, 10);
+      if (!unlocked) drawPadlock(g, w / 2 - 15, -TAB_H / 2 + 15, 0.9, CHROME.brassDark);
+      container.add(g);
 
-      const label = key === 'extra' ? 'EX' : REGIONS[key].name;
-      const text = caption(this, 0, 0, unlocked ? label : 'ロック', {
-        fontSize: key === 'extra' ? '15px' : '12px',
-        color: unlocked ? (active ? '#ffe9b8' : '#f0ecff') : '#60627a',
-        fontStyle: 'bold',
-        align: 'center',
-        wordWrap: { width: tabWidth - 16, useAdvancedWrap: true },
-      }).setOrigin(0.5);
-      container.add(text);
+      const name = key === 'extra' ? 'EX' : REGIONS[key].name;
+      const count = key === 'extra' ? `${save.extraProgress}/${EXTRA_STAGE_COUNT}` : `${this.clearedIn(key, save)}/${STAGES_PER_REGION}`;
+      const labelColor = unlocked ? (active ? '#ffe9b8' : '#e8dcc0') : '#7a6a4a';
+      container.add(body(this, 0, unlocked ? -9 : -2, name, { fontSize: key === 'extra' ? '24px' : '18px', fontStyle: 'bold', color: labelColor, stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      if (unlocked) container.add(caption(this, 0, 13, count, { fontSize: '15px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
 
-      const hitZone = this.add.zone(0, 0, tabWidth - 8, 56).setOrigin(0.5);
-      hitZone.setInteractive({ useHandCursor: true });
-      hitZone.on('pointerup', () => {
+      const hit = this.add.zone(0, 0, w, TAB_H).setOrigin(0.5);
+      hit.setInteractive({ useHandCursor: true });
+      hit.on('pointerup', () => {
         if (!unlocked) {
-          this.showToast(key === 'extra' ? 'エンディング後に解放されます' : '前の地方をクリアすると解放されます');
+          showToast(this, key === 'extra' ? 'エンディング後に解放されます' : '前の地方をクリアすると解放されます', '#ffd9a0');
           return;
         }
         if (key !== this.activeTab) this.scene.restart({ initialTab: key });
       });
-      container.add(hitZone);
-
+      container.add(hit);
       return container;
     });
 
-    enterStagger(this, containers, { dy: -10, duration: 260, delay: 80, stagger: 40 });
+    enterStagger(this, tabs, { dy: -10, duration: 260, delay: 80, stagger: 40 });
   }
 
-  // ------------------------------------------------------------- header --
+  // --------------------------------------------------------------- pages --
 
-  private buildHeaderInfo(save: SaveData): void {
-    if (this.activeTab === 'extra') {
-      const label = sectionLabel(this, 40, 188, 'エクストラ: 野に放たれた狂獣');
-      const desc = caption(this, 40, 210, 'エンディング後に挑戦できる、各地方の後日談。', { fontSize: '12px', color: '#9a93b8' });
-      const progress = caption(this, 680, 190, `${save.extraProgress}/${EXTRA_STAGE_COUNT}`, { fontSize: '13px' }).setOrigin(1, 0);
-      [label, desc, progress].forEach((t) => enter(this, t, { duration: 260 }));
-      return;
+  /** Name plate across the top of a page: title, how far along, and a line of flavor. */
+  private buildHeaderCard(title: string, description: string, done: number, total: number, accent: number): Phaser.GameObjects.GameObject[] {
+    const w = SCREEN_VIEW.w;
+    const top = 8;
+    const h = HEADER_H - 16;
+    const panel = createPanel(this, w / 2, top + h / 2, w - 16, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false });
+    const name = heading(this, 28, top + 28, title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
+    const progress = body(this, w - 28, top + 28, `${done} / ${total}`, { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5);
+    const desc = caption(this, 28, top + 62, description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 72, useAdvancedWrap: true } }).setOrigin(0, 0.5);
+
+    const barX = 28;
+    const barW = w - 56;
+    const barY = top + h - 22;
+    const bar = this.add.graphics();
+    bar.fillStyle(0x0d0905, 1);
+    bar.fillRoundedRect(barX, barY, barW, 12, 6);
+    if (done > 0) {
+      bar.fillStyle(accent, 1);
+      bar.fillRoundedRect(barX, barY, Math.max(12, barW * Math.min(1, done / total)), 12, 6);
     }
-
-    const region = REGIONS[this.activeTab];
-    const cleared = Math.max(0, Math.min(STAGES_PER_REGION, save.stageProgress - this.activeTab * STAGES_PER_REGION));
-    const label = sectionLabel(this, 40, 188, region.name);
-    const desc = caption(this, 40, 210, region.mapDescription, { fontSize: '12px', color: '#9a93b8', wordWrap: { width: 560, useAdvancedWrap: true } });
-    const progress = caption(this, 680, 190, `${cleared}/${STAGES_PER_REGION}`, { fontSize: '13px' }).setOrigin(1, 0);
-    [label, desc, progress].forEach((t) => enter(this, t, { duration: 260 }));
+    bar.lineStyle(2, CHROME.brassDark, 1);
+    bar.strokeRoundedRect(barX, barY, barW, 12, 6);
+    return [panel, name, progress, desc, bar];
   }
 
-  // --------------------------------------------------------------- grid --
-
-  private buildNodeGrid(save: SaveData): void {
-    const viewTop = 244;
-    const viewHeight = 1280 - viewTop - 36;
-    const view = new ScrollView(this, 30, viewTop, 660, viewHeight);
-    this.view = view;
-
-    if (this.activeTab === 'extra') this.buildExtraNodes(view, save);
-    else this.buildRegionNodes(view, this.activeTab, save);
+  private nodeState(index: number, progress: number): StageNodeState {
+    return index < progress ? 'cleared' : index === progress ? 'unlocked' : 'locked';
   }
 
-  private makeNode(size: number, state: StageNodeState, label: string, onTap: () => void): Phaser.GameObjects.Container {
-    const node = this.add.container(0, 0);
-    const icon = this.add.image(0, 0, stageNodeIcon(this, state, size));
-    const text = this.add.text(0, 0, label, { fontSize: size >= 90 ? '16px' : '15px', color: state === 'locked' ? '#60627a' : '#ffffff', fontStyle: 'bold', align: 'center' }).setOrigin(0.5);
-    node.add([icon, text]);
-    node.setSize(size, size);
+  /** One region: header, then a serpentine road of its 30 stages (plus the final
+   *  battle at the end of the last region), rows of five, over the region's scenery. */
+  private buildRegionPage(regionIndex: number, save: SaveData): void {
+    const region = REGIONS[regionIndex];
+    const view = this.view;
+    const w = SCREEN_VIEW.w;
+    const base = regionIndex * STAGES_PER_REGION;
+    const hasFinal = regionIndex === REGION_COUNT - 1;
+    const count = STAGES_PER_REGION + (hasFinal ? 1 : 0);
+    const rows = STAGES_PER_REGION / COLS;
+    const step = (w - MARGIN_X * 2) / (COLS - 1);
 
-    if (state !== 'locked') {
-      // See the hit-area note in the original stage grid: Container
-      // hit-testing adds displayOriginX/Y (half width/height) before
-      // testing the hit area shape, so the circle must be centered at
-      // (halfSize, halfSize) rather than the container's own local (0, 0).
-      const half = size / 2;
-      node.setInteractive(new Phaser.Geom.Circle(half, half, half), Phaser.Geom.Circle.Contains);
-      if (node.input) node.input.cursor = 'pointer';
-      node.on('pointerover', () => this.tweens.add({ targets: node, scale: 1.08, duration: 100 }));
-      node.on('pointerout', () => this.tweens.add({ targets: node, scale: 1, duration: 120 }));
-      node.on('pointerdown', () => this.tweens.add({ targets: node, scale: 0.92, duration: 60 }));
-      node.on('pointerup', onTap);
-    }
-    return node;
-  }
-
-  private buildRegionNodes(view: ScrollView, regionIndex: number, save: SaveData): void {
-    const perRow = 5;
-    const spacingX = 660 / perRow;
-    const spacingY = 128;
-    const nodes: Phaser.GameObjects.Container[] = [];
-    const linkLine = this.add.graphics();
-    view.content.add(linkLine);
-
-    const posFor = (local: number) => {
-      const col = local % perRow;
-      const row = Math.floor(local / perRow);
-      return { x: col * spacingX + spacingX / 2, y: row * spacingY + 70 };
-    };
-
-    for (let local = 0; local < STAGES_PER_REGION; local++) {
-      const globalIndex = regionIndex * STAGES_PER_REGION + local;
-      const { x, y } = posFor(local);
-      const unlocked = globalIndex <= save.stageProgress;
-      const cleared = globalIndex < save.stageProgress;
-      const state: StageNodeState = cleared ? 'cleared' : unlocked ? 'unlocked' : 'locked';
-
-      if (local > 0) {
-        const prev = posFor(local - 1);
-        linkLine.lineStyle(3, unlocked ? REGIONS[regionIndex].themeColor : COLORS.border, unlocked ? 0.6 : 0.4);
-        linkLine.beginPath();
-        linkLine.moveTo(prev.x, prev.y);
-        linkLine.lineTo(x, y);
-        linkLine.strokePath();
+    const points: RoadPoint[] = [];
+    for (let local = 0; local < count; local++) {
+      if (local === STAGES_PER_REGION) {
+        points.push({ x: w / 2, y: MAP_TOP + rows * ROW_H });
+        continue;
       }
+      const row = Math.floor(local / COLS);
+      const i = local % COLS;
+      const col = row % 2 === 0 ? i : COLS - 1 - i;
+      points.push({ x: MARGIN_X + col * step, y: MAP_TOP + row * ROW_H + Math.sin(local * 0.8) * 12 });
+    }
+    const contentHeight = points[count - 1].y + (hasFinal ? 100 : 90);
 
-      const node = this.makeNode(NODE_SIZE, state, `${local + 1}`, () => this.askToEnter('main', globalIndex, () => this.enterMainStage(globalIndex, regionIndex, local)));
-      node.setPosition(x, y);
-      view.content.add(node);
+    const progress = save.stageProgress - base;
+    const litUpTo = Math.max(0, Math.min(count - 1, progress));
+    const content = view.content;
+    // The scenery runs on under the 戻る button's room too, so scrolling to the end shows no bare strip.
+    content.add(buildRegionBackdrop(this, region, w, contentHeight + BackButton.ROOM));
+    content.add(drawRoad(this, points, region.themeColor, litUpTo));
+    content.add(this.buildHeaderCard(region.name, region.mapDescription, this.clearedIn(regionIndex, save), STAGES_PER_REGION, region.themeColor));
+
+    const nodes: Phaser.GameObjects.Container[] = [];
+    points.forEach((p, local) => {
+      const globalIndex = base + local;
+      const isFinal = local === STAGES_PER_REGION;
+      const kind: MedallionKind = isFinal ? 'final' : local === STAGES_PER_REGION - 1 ? 'goal' : 'normal';
+      const node = stageMedallion(this, {
+        state: this.nodeState(globalIndex, save.stageProgress),
+        size: SIZE[kind],
+        accent: isFinal ? COLORS.gold : region.themeColor,
+        kind,
+        label: isFinal ? '最終\n決戦' : `${local + 1}`,
+        guard: () => view.isTap(),
+        onTap: isFinal
+          ? () => this.askToEnter({ kind: 'final', index: FINAL_STAGE_INDEX })
+          : () => this.askToEnter({ kind: 'main', index: globalIndex }),
+      });
+      node.setPosition(p.x, p.y);
+      content.add(node);
       nodes.push(node);
-    }
-
-    let contentHeight = Math.ceil(STAGES_PER_REGION / perRow) * spacingY + 40;
-
-    if (regionIndex === REGION_COUNT - 1) {
-      const finalRow = Math.ceil(STAGES_PER_REGION / perRow);
-      const fx = 330;
-      const fy = finalRow * spacingY + 90;
-      const unlocked = save.stageProgress >= FINAL_STAGE_INDEX;
-      const cleared = save.stageProgress > FINAL_STAGE_INDEX;
-      const state: StageNodeState = cleared ? 'cleared' : unlocked ? 'unlocked' : 'locked';
-
-      const lastMain = posFor(STAGES_PER_REGION - 1);
-      linkLine.lineStyle(3, unlocked ? COLORS.gold : COLORS.border, unlocked ? 0.7 : 0.4);
-      linkLine.beginPath();
-      linkLine.moveTo(lastMain.x, lastMain.y);
-      linkLine.lineTo(fx, fy);
-      linkLine.strokePath();
-
-      const finalNode = this.makeNode(FINAL_NODE_SIZE, state, '最終決戦', () => this.askToEnter('final', FINAL_STAGE_INDEX, () => this.enterFinalStage()));
-      finalNode.setPosition(fx, fy);
-      view.content.add(finalNode);
-      nodes.push(finalNode);
-      contentHeight = fy + FINAL_NODE_SIZE / 2 + 40;
-    }
+    });
 
     view.setContentHeight(contentHeight);
+    // Open on the stage to play next (a region already finished opens at its top).
+    if (progress >= 0 && progress < count) view.scrollTo(points[progress].y - 300);
     enterStagger(this, nodes, { dy: 14, duration: 280, delay: 100, stagger: 14 });
   }
 
-  private buildExtraNodes(view: ScrollView, save: SaveData): void {
-    const nodeSpacingX = 100;
-    const groupHeight = 128;
+  /** Extra: the five regions' six-stage after-stories, one road each, the sixth a boss. */
+  private buildExtraPage(save: SaveData): void {
+    const view = this.view;
+    const w = SCREEN_VIEW.w;
+    const bannerH = 50;
+    const groupH = 230;
+    const top = HEADER_H;
+    const content = view.content;
+    const contentHeight = top + REGION_COUNT * groupH + 10;
+
+    const base = this.add.graphics();
+    base.fillGradientStyle(0x120a1c, 0x120a1c, 0x2a1030, 0x2a1030, 1);
+    base.fillRect(0, 0, w, contentHeight + BackButton.ROOM);
+    content.add(base);
+    content.add(this.buildHeaderCard('エクストラ: 野に放たれた狂獣', 'エンディング後に挑戦できる、各地方の後日談。', save.extraProgress, EXTRA_STAGE_COUNT, COLORS.gold));
+
     const nodes: Phaser.GameObjects.Container[] = [];
-    let y = 26;
+    REGIONS.forEach((region: RegionDef, r) => {
+      const groupTop = top + r * groupH;
+      const backdrop = buildRegionBackdrop(this, region, w, groupH - 10, false);
+      backdrop.setPosition(0, groupTop + 5);
+      content.add(backdrop);
+      const dim = this.add.graphics();
+      dim.fillStyle(0x000000, 0.32);
+      dim.fillRect(0, groupTop + 5, w, groupH - 10);
+      content.add(dim);
 
-    for (let r = 0; r < REGION_COUNT; r++) {
-      const region = REGIONS[r];
-      const label = sectionLabel(this, 10, y, region.name, { fontSize: '13px' });
-      view.content.add(label);
-      const rowY = y + 48;
+      const banner = this.add.graphics();
+      banner.fillStyle(CHROME.woodFill, 0.95);
+      banner.fillRect(0, groupTop + 5, w, bannerH);
+      banner.fillStyle(region.themeColor, 1);
+      banner.fillRect(0, groupTop + 5, 8, bannerH);
+      banner.lineStyle(2, CHROME.brassDark, 1);
+      banner.lineBetween(0, groupTop + 5 + bannerH, w, groupTop + 5 + bannerH);
+      content.add(banner);
+      content.add(body(this, 24, groupTop + 5 + bannerH / 2, `${region.name}（特別）`, { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      const done = Math.max(0, Math.min(EXTRA_STAGES_PER_REGION, save.extraProgress - r * EXTRA_STAGES_PER_REGION));
+      content.add(body(this, w - 20, groupTop + 5 + bannerH / 2, `${done} / ${EXTRA_STAGES_PER_REGION}`, { fontSize: '20px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
 
-      for (let c = 0; c < EXTRA_STAGES_PER_REGION; c++) {
+      const step = (w - 64 * 2) / (EXTRA_STAGES_PER_REGION - 1);
+      const points: RoadPoint[] = Array.from({ length: EXTRA_STAGES_PER_REGION }, (_, c) => ({ x: 64 + c * step, y: groupTop + bannerH + 105 + Math.sin(c * 1.3 + r) * 12 }));
+      content.add(drawRoad(this, points, region.themeColor, done));
+
+      points.forEach((p, c) => {
         const idx = r * EXTRA_STAGES_PER_REGION + c;
         const isBoss = c === EXTRA_STAGES_PER_REGION - 1;
-        const unlocked = idx <= save.extraProgress;
-        const cleared = idx < save.extraProgress;
-        const state: StageNodeState = cleared ? 'cleared' : unlocked ? 'unlocked' : 'locked';
-        const size = isBoss ? 76 : NODE_SIZE;
-
-        const node = this.makeNode(size, state, isBoss ? '★' : `${c + 1}`, () => this.askToEnter('extra', idx, () => this.enterExtraStage(idx, r)));
-        node.setPosition(30 + c * nodeSpacingX, rowY);
-        view.content.add(node);
+        const node = stageMedallion(this, {
+          state: this.nodeState(idx, save.extraProgress),
+          size: isBoss ? SIZE.boss : SIZE.normal,
+          accent: region.themeColor,
+          kind: isBoss ? 'boss' : 'normal',
+          label: isBoss ? '★' : `${c + 1}`,
+          guard: () => view.isTap(),
+          onTap: () => this.askToEnter({ kind: 'extra', index: idx }),
+        });
+        node.setPosition(p.x, p.y);
+        content.add(node);
         nodes.push(node);
-      }
-      y += groupHeight;
-    }
+      });
+    });
 
-    view.setContentHeight(y + 20);
+    view.setContentHeight(contentHeight);
+    // Open on the group holding the stage to play next (all cleared: at the top).
+    const nextGroup = Math.floor(save.extraProgress / EXTRA_STAGES_PER_REGION);
+    view.scrollTo(nextGroup === 0 || nextGroup >= REGION_COUNT ? 0 : top + nextGroup * groupH - 40);
     enterStagger(this, nodes, { dy: 14, duration: 280, delay: 100, stagger: 10 });
   }
 
   // ------------------------------------------------------------- routes --
 
-  private stageName(kind: StageKind, index: number): string {
-    if (kind === 'final') return ProgressionSystem.getFinalStage().name;
-    return (kind === 'extra' ? ProgressionSystem.getExtraStage(index) : ProgressionSystem.getStage(index)).name;
-  }
-
   /** Tapping a stage never spends anything by itself: it opens a popup showing
-   *  the stamina cost, and only 出撃 takes it and then runs `go` (the story
-   *  scene or the battle). Without enough stamina (or a formation) it says so
+   *  the stamina cost, and only 出撃 takes it and then goes on (to the story
+   *  scene or the battle, see questRoute). Without enough stamina (or a formation) it says so
    *  and points at where to fix that instead. */
-  private askToEnter(kind: StageKind, index: number, go: () => void): void {
+  private askToEnter(stage: QuestStage): void {
     if (this.modal?.container.active) return;
     const save = this.getSave();
-    const cost = stageStaminaCost(kind, index);
+    const cost = stageStaminaCost(stage.kind, stage.index);
 
     const party = SaveSystem.getPartyHeroes(save);
     if (party.front.length + party.back.length === 0) {
@@ -309,7 +329,7 @@ export class StageSelectScene extends Phaser.Scene {
       return;
     }
 
-    const name = this.stageName(kind, index);
+    const name = questStageName(stage);
     if (!StaminaSystem.canAfford(save, cost)) {
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(save, cost));
       this.openDialog({
@@ -331,55 +351,13 @@ export class StageSelectScene extends Phaser.Scene {
       onConfirm: () => {
         if (!StaminaSystem.spend(save, cost)) return;
         SaveSystem.save(save);
-        go();
+        const route = questRoute(save, stage);
+        this.scene.start(route.scene, route.data);
       },
     });
   }
 
   private openDialog(opts: ConfirmOptions): void {
     this.modal = openConfirm(this, this.view, opts);
-  }
-
-  private enterMainStage(globalIndex: number, regionIndex: number, stageInRegion: number): void {
-    const save = this.getSave();
-    if (stageInRegion === 0 && !save.storyFlags.regionIntro[regionIndex]) {
-      this.scene.start('Story', {
-        lines: getRegionIntroScript(regionIndex).lines,
-        next: { scene: 'Battle', data: { stageIndex: globalIndex } },
-        markSeen: { kind: 'regionIntro', regionIndex },
-      });
-      return;
-    }
-    this.scene.start('Battle', { stageIndex: globalIndex });
-  }
-
-  private enterFinalStage(): void {
-    const save = this.getSave();
-    if (!save.storyFlags.finalIntro) {
-      this.scene.start('Story', {
-        lines: getFinalIntroScript().lines,
-        next: { scene: 'Battle', data: { stageIndex: FINAL_STAGE_INDEX, mode: 'final' } },
-        markSeen: { kind: 'finalIntro' },
-      });
-      return;
-    }
-    this.scene.start('Battle', { stageIndex: FINAL_STAGE_INDEX, mode: 'final' });
-  }
-
-  private enterExtraStage(extraIndex: number, regionIndex: number): void {
-    const isGroupStart = extraIndex % EXTRA_STAGES_PER_REGION === 0;
-    if (isGroupStart) {
-      this.scene.start('Story', {
-        lines: getExtraIntroScript(regionIndex).lines,
-        next: { scene: 'Battle', data: { stageIndex: extraIndex, mode: 'extra' } },
-      });
-      return;
-    }
-    this.scene.start('Battle', { stageIndex: extraIndex, mode: 'extra' });
-  }
-
-  private showToast(text: string): void {
-    const msg = caption(this, 360, 150, text, { fontSize: '14px', color: '#f0ecff' }).setOrigin(0.5).setDepth(50);
-    this.tweens.add({ targets: msg, alpha: 0, delay: 1100, duration: 400, onComplete: () => msg.destroy() });
   }
 }

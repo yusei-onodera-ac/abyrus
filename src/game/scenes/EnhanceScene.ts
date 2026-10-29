@@ -6,7 +6,7 @@ import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { Button } from '../ui/Button';
 import { buildCardPanel } from '../ui/CardParts';
 import { openConfirm } from '../ui/Dialogs';
-import { HeroSlot } from '../ui/HeroSlot';
+import { HeroSlot, HERO_SLOT_SIZE } from '../ui/HeroSlot';
 import { buildInfoPanel } from '../ui/InfoPanel';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, CHROME } from '../ui/theme';
@@ -25,7 +25,8 @@ const INK = '#1c130a';
 
 /** 強化: the screen the hero detail's 強化する button opens. Two ways to make a
  *  hero stronger - ゴールドでレベルアップ (1 or 5 levels at a time, showing what
- *  HP / 攻撃 become) and フェーズ素材でフェーズ強化 (+1 phase per material).
+ *  HP / 攻撃 become), フェーズ素材でフェーズ強化 (+1 phase per material) and
+ *  合成 (+1 phase per same-character copy used up).
  *  戻る goes back to that hero's detail. */
 export class EnhanceScene extends InboxScene {
   protected readonly screenTitle = '強化';
@@ -62,7 +63,7 @@ export class EnhanceScene extends InboxScene {
       this.time.delayedCall(0, () => this.scene.start(this.target.from));
       return [];
     }
-    return [this.heroCard(hero), this.levelCard(hero), this.phaseCard(hero)];
+    return [this.heroCard(hero), this.levelCard(hero), this.phaseCard(hero), this.fuseCard(hero)];
   }
 
   // --- cards ------------------------------------------------------------
@@ -156,7 +157,7 @@ export class EnhanceScene extends InboxScene {
     }
     panel.container.add(body(this, CARD_WIDTH - PAD - 4, top + 28, `${hero.phase} / ${MAX_PHASE}`, { fontSize: '30px', fontStyle: 'bold', color: '#d9c2ff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
     panel.container.add(caption(this, PAD + 4, top + 74, '素材を1つ使うと、フェーズが1上がります。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    panel.container.add(caption(this, PAD + 4, top + 104, '同じ英雄をガチャで引いても上がります。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, PAD + 4, top + 104, '同じキャラを合成しても上がります。（下の「合成」）', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const guard = () => this.scroll.isTap();
     const button = new Button(this, CARD_WIDTH / 2, top + bodyH - 44, CARD_WIDTH - PAD * 2, 70, maxed ? 'フェーズ最大' : 'フェーズ素材で強化', () => this.raisePhase(hero), {
@@ -170,7 +171,84 @@ export class EnhanceScene extends InboxScene {
     return { container: panel.container, height: panel.height };
   }
 
+  /** 合成: fuse another copy of this character (a repeat pull) into this one for
+   *  +1 phase each. Tap a copy to use just it, or まとめて合成 for every copy
+   *  that isn't standing in a deck. The copies used up are gone. */
+  private fuseCard(hero: HeroData): InboxCard {
+    const maxed = hero.phase >= MAX_PHASE;
+    const materials = maxed ? [] : SaveSystem.fusionMaterials(this.save, hero);
+    const bulk = materials.filter((m) => !SaveSystem.isInAnyDeck(this.save, m.id)).slice(0, MAX_PHASE - hero.phase);
+    const guard = () => this.scroll.isTap();
+    const lines = maxed
+      ? ['フェーズが最大のため、合成できません。']
+      : materials.length === 0
+        ? ['同じキャラのかぶりを持っていません。', 'ガチャで同じキャラが出ると、ここで合成できます。']
+        : ['素材にする個体をタップ → フェーズが1上がります。', '素材にした個体は消えます。', '編成中の個体を使うと、この個体が代わりに入ります。'];
+
+    let bodyH = 24 + lines.length * 30;
+    const size = HERO_SLOT_SIZE;
+    const cols = 5;
+    const gapX = (CARD_WIDTH - PAD * 2 - cols * size) / (cols - 1);
+    const gridGap = 12;
+    const rows = Math.ceil(materials.length / cols);
+    if (materials.length > 0) bodyH += 16 + rows * size + (rows - 1) * gridGap + 16 + 70 + 16;
+
+    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, '合成', 0x2f8f7a);
+    const top = panel.bodyTop;
+    lines.forEach((text, i) => {
+      panel.container.add(caption(this, PAD + 4, top + 22 + i * 30, text, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    });
+    if (materials.length === 0) return { container: panel.container, height: panel.height };
+
+    const gridTop = top + 24 + lines.length * 30 + 16;
+    materials.forEach((material, i) => {
+      const x = PAD + size / 2 + (i % cols) * (size + gapX);
+      const y = gridTop + size / 2 + Math.floor(i / cols) * (size + gridGap);
+      panel.container.add(
+        new HeroSlot(this, x, y, { hero: material, generator: this.generator, inDeck: SaveSystem.isInAnyDeck(this.save, material.id), onTap: () => this.askFuse(hero, [material]), guard }),
+      );
+    });
+    const buttonY = gridTop + rows * size + (rows - 1) * gridGap + 16 + 35;
+    const all = new Button(this, CARD_WIDTH / 2, buttonY, CARD_WIDTH - PAD * 2, 70, 'まとめて合成', () => this.askFuse(hero, bulk), {
+      variant: 'gold',
+      fontSize: '28px',
+      subLabel: bulk.length > 0 ? `${bulk.length}体を使用（編成中は除く）` : '編成中以外のかぶりがありません',
+      guard,
+    });
+    all.setEnabled(bulk.length > 0);
+    panel.container.add(all);
+    return { container: panel.container, height: panel.height };
+  }
+
   // --- actions ----------------------------------------------------------
+
+  /** Confirms before using up copies: they can't be got back. */
+  private askFuse(hero: HeroData, materials: HeroData[]): void {
+    if (materials.length === 0) return;
+    const after = Math.min(MAX_PHASE, hero.phase + materials.length);
+    const what =
+      materials.length === 1
+        ? `Lv.${materials[0].level} の${materials[0].name}を素材にして、`
+        : `${materials.length}体を素材にして、`;
+    const inDeck = materials.some((m) => SaveSystem.isInAnyDeck(this.save, m.id));
+    this.modal?.close();
+    this.modal = openConfirm(this, this.scroll, {
+      title: '合成しますか？',
+      message: `${what}\nフェーズ ${hero.phase} → ${after} に上げます。\n素材にした個体は消えます。${inDeck ? '\n（編成中の枠は、この個体に入れ替わります）' : ''}`,
+      confirmLabel: '合成する',
+      confirmVariant: 'gold',
+      onConfirm: () => this.fuse(hero, materials),
+    });
+  }
+
+  private fuse(hero: HeroData, materials: HeroData[]): void {
+    let used = 0;
+    for (const material of materials) if (SaveSystem.fuseHero(this.save, hero.id, material.id)) used++;
+    if (used === 0) return;
+    SaveSystem.save(this.save);
+    showToast(this, `合成しました　フェーズ ${hero.phase} になりました`);
+    this.queueRender();
+  }
 
   private levelUp(hero: HeroData, levels: number): void {
     const cost = EnhanceSystem.levelUpCost(hero, levels);

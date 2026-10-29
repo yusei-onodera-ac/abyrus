@@ -38,3 +38,9 @@ export function formatRemaining(msLeft: number): string {
   if (minutes >= 60) return `あと${Math.floor(minutes / 60)}時間`;
   return `あと${minutes}分`;
 }
+
+/** "3:07" - a run's length in minutes and seconds. */
+export function formatSurvival(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+}

@@ -53,6 +53,22 @@ export const STORY_BACKGROUNDS: Record<string, { top: number; bottom: number }> 
   dawn: { top: 0x2a2440, bottom: 0x8a6a7a },
 };
 
+/** Which region's scenery (RegionDef.look) is drawn over a background's
+ *  gradient. A key left out gets the gradient with a plain ridge. Real art
+ *  replaces all of it: drop `public/assets/backgrounds/story_<key>.jpg`. */
+export const STORY_BACKGROUND_REGION: Record<string, string> = {
+  forest_day: 'forest',
+  forest_mist: 'forest',
+  wasteland: 'wasteland',
+  frostpeak: 'frostpeak',
+  frostpeak_lab: 'frostpeak',
+  ruins: 'ruins',
+  ruins_miasma: 'ruins',
+  twilight_city: 'twilight',
+  twilight_tower: 'twilight',
+  tower_summit: 'twilight',
+};
+
 // --- 地方1: 迷いの森 -------------------------------------------------------
 
 const FOREST_INTRO: StoryScript = {

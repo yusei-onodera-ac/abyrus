@@ -1,5 +1,6 @@
 import { BigNumber } from './BigNumber';
-import { BattleSystem, ULT_GAIN, ULT_MAX, ULT_MULTIPLIER, type UnitInstance } from './BattleSystem';
+import { BattleSystem, ULT_GAIN, ULT_MAX, type UnitInstance } from './BattleSystem';
+import { castSkill, effectiveAtk, effectiveDef, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
 import { ENEMY_CLASSES, NAME_P1, NAME_P2, type EnemyUnitDef } from './ProgressionSystem';
 import type { HeroData, Rarity, Row } from '../types';
 
@@ -62,15 +63,12 @@ function pickEnemyDef(difficultyIndex: number): EnemyUnitDef {
 }
 
 // --- Scoring --------------------------------------------------------------
-// Rewards all three of survival time, kill count, and the difficulty those
-// kills happened at - not just whichever is easiest to farm. A long but
-// passive run scores steadily from the survival term; a run that pushes
-// through many kills at high difficulty scores much more from the kill
-// term, since each kill is worth more the deeper the run has gone.
-const SURVIVAL_POINTS_PER_SEC = 8;
+// The score comes from the enemies defeated, and only from them - surviving
+// longer pays off only through the kills it allows. Each kill is worth more
+// the deeper the run has gone (enemies grow stronger with time), so pushing on
+// against tougher enemies beats farming weak ones.
 const KILL_BASE_POINTS = 40;
 const KILL_DIFFICULTY_WEIGHT = 0.6;
-const DIFFICULTY_REACHED_POINTS = 120;
 
 function killPoints(difficultyIndex: number): number {
   return KILL_BASE_POINTS * (1 + difficultyIndex * KILL_DIFFICULTY_WEIGHT);
@@ -85,7 +83,8 @@ export interface InfiniteRunSnapshot {
 }
 
 export type InfiniteBattleEvent =
-  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean; isUlt: boolean }
+  | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean }
+  | { kind: 'skillCast'; casterId: string; skillName: string; effectKind: string; results: SkillTargetResult[] }
   | { kind: 'ultCharged'; unitId: string }
   | { kind: 'defeated'; unitId: string; isPlayer: boolean }
   | { kind: 'enemySpawned'; unit: UnitInstance; position: EnemySlotPosition }
@@ -95,12 +94,15 @@ export type InfiniteBattleEvent =
  * Drives one Infinite Mode run: a fixed player party against an endless,
  * ever-escalating stream of enemies. Modeled closely on BattleSystem's
  * BattleEngine (same UnitInstance shape, same attack-resolution formula -
- * variance, crit, def mitigation, ult gauge/multiplier), but written as its
- * own class rather than reusing BattleEngine directly: BattleEngine ends the
- * instant the enemy side is wiped, which is exactly what must *not* happen
- * here - enemies are expected to run out between spawns, every single slot
- * cooldown, for the entire run. The only way this run ends is the player's
- * party being wiped, or the player retreating.
+ * variance, crit, def mitigation, ult gauge -> skill cast), but written as
+ * its own class rather than reusing BattleEngine directly: BattleEngine ends
+ * the instant the enemy side is wiped, which is exactly what must *not*
+ * happen here - enemies are expected to run out between spawns, every
+ * single slot cooldown, for the entire run. The only way this run ends is
+ * the player's party being wiped, or the player retreating. Skill-casting
+ * itself (castSkill/effectiveAtk/effectiveDef/isStunned/pickFrontPreferred)
+ * is factored into SkillEngine precisely so that shared part doesn't drift
+ * between the two engines.
  */
 export class InfiniteRunEngine {
   readonly playerUnits: UnitInstance[];
@@ -127,7 +129,7 @@ export class InfiniteRunEngine {
   getSnapshot(): InfiniteRunSnapshot {
     const difficultyIndex = getDifficultyIndex(this.elapsedMs);
     const survivalSeconds = this.elapsedMs / 1000;
-    const score = Math.round(survivalSeconds * SURVIVAL_POINTS_PER_SEC + this.killPoints + difficultyIndex * DIFFICULTY_REACHED_POINTS);
+    const score = Math.round(this.killPoints);
     return { elapsedMs: this.elapsedMs, survivalSeconds, score, enemiesDefeated: this.enemiesDefeated, difficultyIndex };
   }
 
@@ -144,8 +146,22 @@ export class InfiniteRunEngine {
   triggerUlt(unitId: string): InfiniteBattleEvent[] {
     if (this.over) return [];
     const unit = this.playerUnits.find((u) => u.id === unitId);
-    if (!unit || !unit.alive || !unit.isPlayer || unit.ultGauge < ULT_MAX) return [];
-    return this.performAttack(unit, true);
+    if (!unit || !unit.alive || !unit.isPlayer || unit.ultGauge < ULT_MAX || unit.skills.length === 0) return [];
+
+    const skill = unit.skills[unit.nextSkillIndex % unit.skills.length];
+    unit.nextSkillIndex += 1;
+    unit.ultGauge = 0;
+
+    const outcome = castSkill(unit, skill.def, skill.level, this.playerUnits, this.activeEnemies(), this.elapsedMs);
+    const events: InfiniteBattleEvent[] = [
+      { kind: 'skillCast', casterId: unit.id, skillName: outcome.skillName, effectKind: outcome.effectKind, results: outcome.results },
+    ];
+    for (const id of outcome.defeatedIds) {
+      events.push({ kind: 'defeated', unitId: id, isPlayer: false });
+      this.enemiesDefeated += 1;
+      this.killPoints += killPoints(getDifficultyIndex(this.elapsedMs));
+    }
+    return events;
   }
 
   update(deltaMs: number): InfiniteBattleEvent[] {
@@ -155,11 +171,11 @@ export class InfiniteRunEngine {
 
     const allUnits: UnitInstance[] = [...this.playerUnits, ...this.activeEnemies()];
     for (const unit of allUnits) {
-      if (!unit.alive) continue;
+      if (!unit.alive || isStunned(unit, this.elapsedMs)) continue;
       unit.cooldown -= deltaMs * (unit.spd / 100);
       if (unit.cooldown <= 0) {
         unit.cooldown += unit.baseCooldown;
-        events.push(...this.performAttack(unit, false));
+        events.push(...this.performAttack(unit));
       }
     }
 
@@ -196,27 +212,22 @@ export class InfiniteRunEngine {
 
   private pickTarget(attacker: UnitInstance): UnitInstance | null {
     const opponents = attacker.isPlayer ? this.activeEnemies() : this.playerUnits.filter((u) => u.alive);
-    if (opponents.length === 0) return null;
-    const front = opponents.filter((u) => u.row === 'front');
-    const pool = front.length > 0 ? front : opponents;
-    return pool[Math.floor(Math.random() * pool.length)];
+    return pickFrontPreferred(opponents);
   }
 
   // Mirrors BattleEngine's private performAttack formula exactly (variance,
-  // crit, def mitigation, ult multiplier, ult-gauge gain) - see the class
-  // doc comment for why this is a parallel implementation rather than a
-  // shared call.
-  private performAttack(attacker: UnitInstance, isUlt: boolean): InfiniteBattleEvent[] {
+  // crit, def mitigation, ult-gauge gain) - see the class doc comment for
+  // why this is a parallel implementation rather than a shared call.
+  private performAttack(attacker: UnitInstance): InfiniteBattleEvent[] {
     const target = this.pickTarget(attacker);
     if (!target) return [];
     const events: InfiniteBattleEvent[] = [];
 
     const variance = 0.9 + Math.random() * 0.2;
-    const crit = Math.random() < attacker.critRate + (isUlt ? 0.1 : 0);
-    let damage = attacker.atk.mul(variance);
-    if (isUlt) damage = damage.mul(ULT_MULTIPLIER);
+    const crit = Math.random() < attacker.critRate;
+    let damage = effectiveAtk(attacker, this.elapsedMs).mul(variance);
     if (crit) damage = damage.mul(attacker.critMul);
-    damage = damage.mul(100 / (100 + target.def));
+    damage = damage.mul(100 / (100 + effectiveDef(target, this.elapsedMs)));
 
     target.hp = target.hp.sub(damage);
     let defeated = false;
@@ -226,7 +237,7 @@ export class InfiniteRunEngine {
       defeated = true;
     }
 
-    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit, isUlt });
+    events.push({ kind: 'attack', attackerId: attacker.id, targetId: target.id, damage, crit });
     if (defeated) {
       events.push({ kind: 'defeated', unitId: target.id, isPlayer: target.isPlayer });
       if (!target.isPlayer) {
@@ -235,9 +246,7 @@ export class InfiniteRunEngine {
       }
     }
 
-    if (isUlt) {
-      attacker.ultGauge = 0;
-    } else if (attacker.isPlayer) {
+    if (attacker.isPlayer) {
       attacker.ultGauge = Math.min(ULT_MAX, attacker.ultGauge + ULT_GAIN);
       if (attacker.ultGauge >= ULT_MAX) events.push({ kind: 'ultCharged', unitId: attacker.id });
     }

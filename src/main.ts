@@ -14,6 +14,8 @@ import { HeroDetailScene } from './game/scenes/HeroDetailScene';
 import { EnhanceScene } from './game/scenes/EnhanceScene';
 import { StageSelectScene } from './game/scenes/StageSelectScene';
 import { StoryScene } from './game/scenes/StoryScene';
+import { EventScene } from './game/scenes/EventScene';
+import { InfiniteLobbyScene } from './game/scenes/InfiniteLobbyScene';
 import { InfiniteModeScene } from './game/scenes/InfiniteModeScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
@@ -46,6 +48,8 @@ const config: Phaser.Types.Core.GameConfig = {
     EnhanceScene,
     StageSelectScene,
     StoryScene,
+    EventScene,
+    InfiniteLobbyScene,
     InfiniteModeScene,
     ShopScene,
     SettingsScene,

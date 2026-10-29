@@ -76,6 +76,14 @@ export class AnimationController {
     });
   }
 
+  /** Generic non-damage status pulse (heal/buff/debuff/stun) - same
+   *  tint-and-clear beat as hitFlash but without the hit-impact squash,
+   *  since nothing was struck. */
+  statusFlash(sprite: Phaser.GameObjects.Sprite, color: number): void {
+    sprite.setTintFill(color);
+    this.scene.time.delayedCall(180, () => sprite.clearTint());
+  }
+
   death(sprite: Phaser.GameObjects.Sprite, onComplete: () => void): void {
     this.scene.tweens.add({
       targets: sprite,

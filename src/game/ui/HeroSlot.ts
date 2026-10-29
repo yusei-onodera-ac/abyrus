@@ -18,6 +18,9 @@ export interface HeroSlotOptions {
   generator: CharacterGenerator;
   /** Already in the deck: dims the portrait and adds a 編成中 ribbon. */
   inDeck?: boolean;
+  /** Another copy of this hero's character is already in the deck (a deck holds
+   *  one of each): dims the portrait and adds a 同キャラ ribbon. */
+  twinInDeck?: boolean;
   /** Pulsing ring, for the slot/hero the next tap will act on. */
   selected?: boolean;
   onTap?: () => void;
@@ -48,6 +51,7 @@ export class HeroSlot extends Phaser.GameObjects.Container {
     if (hero) {
       const portrait = addPortrait(scene, hero, opts.generator, size);
       if (opts.inDeck) portrait.setAlpha(0.4);
+      else if (opts.twinInDeck) portrait.setAlpha(0.55);
       this.add(portrait);
     } else {
       this.add(silhouette(scene, size));
@@ -77,12 +81,13 @@ export class HeroSlot extends Phaser.GameObjects.Container {
       );
     }
 
-    if (opts.inDeck) {
+    const ribbon = opts.inDeck ? { text: '編成中', color: hex(CHROME.brassBright) } : opts.twinInDeck ? { text: '同キャラ', color: '#c9b6ff' } : null;
+    if (ribbon) {
       const strip = scene.add.rectangle(0, 0, size - 6, 32, 0x000000, 0.72);
       this.add(strip);
       this.add(
         scene.add
-          .text(0, 0, '編成中', { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '19px', fontStyle: 'bold', color: hex(CHROME.brassBright), stroke: INK, strokeThickness: 3 })
+          .text(0, 0, ribbon.text, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '19px', fontStyle: 'bold', color: ribbon.color, stroke: INK, strokeThickness: 3 })
           .setOrigin(0.5),
       );
     }

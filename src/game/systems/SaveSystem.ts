@@ -8,6 +8,7 @@ import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 import { StaminaSystem } from './StaminaSystem';
+import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
 
 export interface PartyFormation {
   front: (string | null)[];
@@ -116,6 +117,13 @@ export interface SaveData {
   version: number;
   gold: [number, number];
   gems: number;
+  /** Spent to raise a hero's individual skill level (1-10); earned from
+   *  stage clears and Infinite Mode runs. Kept separate from `gems`/`gold`
+   *  (and from the concurrently-in-progress `phaseMaterials` currency) so
+   *  skill progression - a per-hero, level-gated investment - has its own
+   *  economy rather than competing with gacha pulls or phase fusion for
+   *  the same pool. */
+  skillEssence: number;
   heroes: HeroData[];
   /** 1 to MAX_DECKS saved formations. */
   decks: Deck[];
@@ -187,8 +195,10 @@ export interface InfiniteModeRunResult {
 
 export interface HeroPullOutcome {
   hero: HeroData;
-  /** True if this hero was already owned: no copy was added, gold instead. */
-  duplicate: boolean;
+  /** 'new': first of this character. 'copy': a repeat, kept in the roster as
+   *  material for 合成. 'gold': a repeat nothing could use any more (the owned
+   *  copies already reach MAX_PHASE), paid out as `duplicateGold` instead. */
+  kind: 'new' | 'copy' | 'gold';
   duplicateGold: BigNumber;
 }
 
@@ -220,6 +230,21 @@ function restoreDecks(parsed: Partial<SaveData> & { party?: PartyFormation }, fa
   return fallback;
 }
 
+/** A deck may hold one copy of each character: keeps the first slot that
+ *  names a character and empties any later slot holding another copy of it.
+ *  (Saves from before copies could be kept never have such a deck.) */
+function dropRepeatedCharacters(deck: Deck, heroes: HeroData[]): Deck {
+  const seen = new Set<string>();
+  const keep = (id: string | null): string | null => {
+    const character = id === null ? undefined : heroes.find((h) => h.id === id)?.heroId;
+    if (character === undefined) return id;
+    if (seen.has(character)) return null;
+    seen.add(character);
+    return id;
+  };
+  return { ...deck, front: deck.front.map(keep), back: deck.back.map(keep) };
+}
+
 /** Keeps a saved social state, filling in anything missing (an older save, or
  *  one from before 軍団 existed) and making sure the player has a valid ID. */
 function restoreSocial(raw: Partial<SocialState> | undefined, fallback: SocialState): SocialState {
@@ -249,6 +274,7 @@ export const SaveSystem = {
       version: 1,
       gold: BigNumber.from(500).toJSON(),
       gems: 1500,
+      skillEssence: 300,
       heroes,
       decks: [{ name: 'デッキ1', front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] }],
       activeDeck: 0,
@@ -296,8 +322,9 @@ export const SaveSystem = {
       merged.reports = SettingsSystem.restoreReports(parsed.reports);
       if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
       merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
-      // A save from before phase existed has heroes with no `phase` field.
-      merged.heroes = merged.heroes.map((hero) => ({ ...hero, phase: hero.phase ?? 1 }));
+      // A hero saved before phase / skills existed lacks those fields.
+      merged.heroes = merged.heroes.map((hero) => ({ ...hero, phase: hero.phase ?? 1, skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1) }));
+      merged.decks = merged.decks.map((deck) => dropRepeatedCharacters(deck, merged.heroes));
       delete merged.party;
       // Replaced by values derived from the real inbox (InboxSystem.getUnread).
       delete merged.unread;
@@ -359,19 +386,81 @@ export const SaveSystem = {
     return fresh;
   },
 
-  /** Adds a newly pulled hero. A duplicate is fused into the owned copy
-   *  instead - gold same as before, plus +1 phase (capped at MAX_PHASE)
-   *  rather than a second copy sitting in the roster doing nothing. */
+  addSkillEssence(data: SaveData, amount: number): void {
+    data.skillEssence += amount;
+  },
+
+  /** Spends skillEssence to raise one hero's skill (by slot index) one
+   *  level, if that slot is unlocked, not already maxed, and affordable.
+   *  Returns false (no state changed) otherwise. */
+  upgradeHeroSkill(data: SaveData, heroId: string, slotIndex: number): boolean {
+    const hero = this.getHero(data, heroId);
+    if (!hero) return false;
+    if (!isSkillSlotUnlocked(slotIndex, hero.level)) return false;
+    const currentLevel = hero.skillLevels[slotIndex] ?? 1;
+    if (currentLevel >= MAX_SKILL_LEVEL) return false;
+    const cost = skillUpgradeCost(currentLevel);
+    if (data.skillEssence < cost) return false;
+    data.skillEssence -= cost;
+    hero.skillLevels[slotIndex] = currentLevel + 1;
+    return true;
+  },
+
+  /** Adds a newly pulled hero. A repeat of an owned character is kept as its
+   *  own copy, to be fused (fuseHero) into another copy for +1 phase - unless
+   *  the copies held already cover what's left to MAX_PHASE, in which case it
+   *  pays gold instead of piling up in the roster. */
   addHero(data: SaveData, hero: HeroData): HeroPullOutcome {
-    const existing = data.heroes.find((h) => h.heroId === hero.heroId);
-    if (existing) {
-      const duplicateGold = BigNumber.from(DUPLICATE_GOLD_REWARD[hero.rarity]);
-      this.addGold(data, duplicateGold);
-      existing.phase = Math.min(MAX_PHASE, existing.phase + 1);
-      return { hero, duplicate: true, duplicateGold };
+    const copies = this.getCopies(data, hero);
+    if (copies.length === 0) {
+      data.heroes.push(hero);
+      return { hero, kind: 'new', duplicateGold: BigNumber.ZERO };
     }
-    data.heroes.push(hero);
-    return { hero, duplicate: false, duplicateGold: BigNumber.ZERO };
+    const bestPhase = Math.max(...copies.map((c) => c.phase));
+    if (bestPhase + (copies.length - 1) < MAX_PHASE) {
+      data.heroes.push(hero);
+      return { hero, kind: 'copy', duplicateGold: BigNumber.ZERO };
+    }
+    const duplicateGold = BigNumber.from(DUPLICATE_GOLD_REWARD[hero.rarity]);
+    this.addGold(data, duplicateGold);
+    return { hero, kind: 'gold', duplicateGold };
+  },
+
+  /** Every owned copy of the same character as `hero` (itself included). */
+  getCopies(data: SaveData, hero: HeroData): HeroData[] {
+    return data.heroes.filter((h) => h.heroId === hero.heroId);
+  },
+
+  isInAnyDeck(data: SaveData, id: string): boolean {
+    return data.decks.some((deck) => deck.front.includes(id) || deck.back.includes(id));
+  },
+
+  /** The other copies of `hero`'s character that could be fused into it,
+   *  cheapest to lose first: ones standing in no deck, then the lowest level. */
+  fusionMaterials(data: SaveData, hero: HeroData): HeroData[] {
+    const spare = (h: HeroData) => (this.isInAnyDeck(data, h.id) ? 1 : 0);
+    return this.getCopies(data, hero)
+      .filter((h) => h.id !== hero.id)
+      .sort((a, b) => spare(a) - spare(b) || a.level - b.level || a.exp - b.exp);
+  },
+
+  /** 合成: consumes the copy `materialId` to raise `baseId` by 1 phase. Both
+   *  must be copies of the same character, and the base not yet at MAX_PHASE.
+   *  A deck that had the material standing in it gets the base there instead
+   *  (it can't hold both). False (no change) when any of that doesn't hold. */
+  fuseHero(data: SaveData, baseId: string, materialId: string): boolean {
+    const base = this.getHero(data, baseId);
+    const material = this.getHero(data, materialId);
+    if (!base || !material || base.id === material.id || base.heroId !== material.heroId || base.phase >= MAX_PHASE) return false;
+    data.heroes = data.heroes.filter((h) => h.id !== material.id);
+    for (const deck of data.decks) {
+      const hasBase = deck.front.includes(base.id) || deck.back.includes(base.id);
+      const swap = (id: string | null) => (id === material.id ? (hasBase ? null : base.id) : id);
+      deck.front = deck.front.map(swap);
+      deck.back = deck.back.map(swap);
+    }
+    base.phase += 1;
+    return true;
   },
 
   /** Spends one phase material to raise a hero's phase by 1 (capped at
@@ -407,12 +496,15 @@ export const SaveSystem = {
     return front.length + back.length;
   },
 
-  /** Puts a hero in (or, with null, empties) a slot of one deck. A hero can
-   *  only stand in one slot per deck, so it leaves any other slot it held. */
+  /** Puts a hero in (or, with null, empties) a slot of one deck. A deck holds
+   *  one copy of each character, so the slot a copy of the same character
+   *  stood in (this very hero included) is emptied. */
   setDeckSlot(data: SaveData, deckIndex: number, row: Row, slot: number, heroId: string | null): void {
     const deck = data.decks[deckIndex];
+    const character = heroId === null ? undefined : this.getHero(data, heroId)?.heroId;
+    const sameCharacter = (id: string | null): boolean => id !== null && (id === heroId || (character !== undefined && this.getHero(data, id)?.heroId === character));
     for (const r of ['front', 'back'] as const) {
-      deck[r] = deck[r].map((id, i) => (r === row && i === slot ? id : id !== null && id === heroId ? null : id));
+      deck[r] = deck[r].map((id, i) => (r === row && i === slot ? id : sameCharacter(id) ? null : id));
     }
     deck[row][slot] = heroId;
   },

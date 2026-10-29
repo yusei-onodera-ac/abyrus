@@ -5,15 +5,19 @@ import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { Button } from '../ui/Button';
 import { createPanel } from '../ui/Panel';
-import { BottomNavBar } from '../ui/BottomNavBar';
-import { applyBackground } from '../ui/Background';
-import { heading, subheading, body, caption, sectionLabel, numeric, statLabel, COLORS } from '../ui/theme';
+import { applyBattleBackground } from '../ui/Background';
+import { heading, body, caption, CHROME, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
 import { InfiniteRunEngine, type InfiniteBattleEvent, type EnemySlotPosition } from '../systems/InfiniteModeSystem';
 import type { UnitInstance } from '../systems/BattleSystem';
 import { LeaderboardSystem } from '../systems/LeaderboardSystem';
+import { formatSurvival } from '../ui/format';
 
-type SceneState = 'ready' | 'running' | 'result';
+type SceneState = 'running' | 'result';
+
+const INK = '#1c130a';
+/** The shared battle backdrop is tinted this violet for the arena (or replaced by public/assets/backgrounds/battle_infinite.jpg). */
+const ARENA_TINT = 0xa890e0;
 
 interface UnitView {
   unit: UnitInstance;
@@ -43,24 +47,15 @@ const ENEMY_SLOT_XY: Record<string, { x: number; y: number }> = {
   'back-1': { x: 435, y: 280 },
 };
 
-function formatTime(totalSeconds: number): string {
-  const s = Math.max(0, Math.floor(totalSeconds));
-  const mm = Math.floor(s / 60);
-  const ss = s % 60;
-  return `${mm}:${ss.toString().padStart(2, '0')}`;
-}
-
 /**
- * Event tab: Infinite Mode (無限モード). The player's current party fights
- * an endless, ever-escalating stream of enemies (InfiniteRunEngine) and
- * tries to survive as long as possible; the run produces a score that's
- * recorded locally (SaveSystem) and submitted to the global leaderboard
- * (LeaderboardSystem) when one is configured. Cycles through three
- * internal states without ever restarting the scene itself, since this is
- * a persistent bottom-nav tab like every other main screen:
- *   ready   - personal best + leaderboard preview, "挑戦開始" to start
- *   running - the fight itself (mirrors BattleScene's unit-view handling)
- *   result  - final score + leaderboard submission, retry or go home
+ * The 無限モード run itself (the lobby, InfiniteLobbyScene, starts it). The
+ * player's current party fights an endless, ever-escalating stream of enemies
+ * (InfiniteRunEngine) and tries to survive as long as possible; the run
+ * produces a score that's recorded locally (SaveSystem) and submitted to the
+ * global leaderboard (LeaderboardSystem) when one is configured. Two states
+ * without ever restarting the scene itself:
+ *   running - the fight (mirrors BattleScene's unit-view handling)
+ *   result  - final score + leaderboard submission, retry or back to the lobby
  */
 export class InfiniteModeScene extends Phaser.Scene {
   private save!: SaveData;
@@ -69,7 +64,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private popups!: DamagePopupPool;
   private engine?: InfiniteRunEngine;
   private views = new Map<string, UnitView>();
-  private state: SceneState = 'ready';
+  private state: SceneState = 'running';
   // Bumped on every state change; async callbacks (leaderboard fetch/submit)
   // capture the token beforehand and bail out if it no longer matches,
   // instead of touching game objects a later state transition may have
@@ -79,7 +74,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private hud?: RunningHud;
 
   constructor() {
-    super('Event');
+    super('InfiniteRun');
   }
 
   create(): void {
@@ -89,16 +84,21 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.popups = new DamagePopupPool(this);
     this.views.clear();
     this.engine = undefined;
-    this.state = 'ready';
+    this.state = 'running';
     this.stateToken = 0;
     this.stateContainer = undefined;
     this.hud = undefined;
 
     this.cameras.main.setBackgroundColor('#10121c');
-    applyBackground(this, 'event');
-    new BottomNavBar(this, 720, 1280, 'event');
+    applyBattleBackground(this, 'infinite', ARENA_TINT);
 
-    this.showReady();
+    const { front, back } = SaveSystem.getPartyHeroes(this.save);
+    // Only reachable from the lobby, which won't start an empty party; this is for a stale link.
+    if (front.length + back.length === 0) {
+      this.scene.start('InfiniteMode');
+      return;
+    }
+    this.startRun();
   }
 
   update(_time: number, delta: number): void {
@@ -114,88 +114,6 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.stateContainer?.destroy();
     this.stateContainer = undefined;
     this.clearCombatViews();
-  }
-
-  // ------------------------------------------------------------- ready --
-
-  private showReady(): void {
-    this.enterState('ready');
-    const container = this.add.container(0, 0);
-    this.stateContainer = container;
-    const token = this.stateToken;
-
-    const title = heading(this, 360, 150, '無限モード', { fontSize: '30px' }).setOrigin(0.5);
-    const sub = body(this, 360, 196, 'どこまで耐えられるか', { fontSize: '15px', color: '#9a93b8' }).setOrigin(0.5);
-    container.add([title, sub]);
-    enter(this, title, { dy: -14, duration: 320 });
-    enter(this, sub, { dy: -8, duration: 300, delay: 60 });
-
-    const best = this.save.infiniteMode;
-    const bestPanel = createPanel(this, 360, 300, 600, 130, {
-      fillColor: COLORS.panelFill,
-      borderColor: COLORS.border,
-      glowColor: COLORS.accent,
-      radius: 18,
-    });
-    container.add(bestPanel);
-    const bestLabel = sectionLabel(this, 100, 254, '自己ベスト');
-    const bestScore = numeric(this, 100, 284, `スコア ${best.bestScore.toLocaleString('ja-JP')}`, { fontSize: '18px' });
-    const bestSurvival = caption(this, 100, 312, `生存 ${formatTime(best.bestSurvivalSeconds)} / 撃破 ${best.bestEnemiesDefeated}体`, { fontSize: '13px' });
-    const bestRuns = caption(this, 100, 334, `挑戦回数 ${best.totalRuns}`, { fontSize: '12px' });
-    container.add([bestLabel, bestScore, bestSurvival, bestRuns]);
-
-    const leaderboardTitle = sectionLabel(this, 360, 400, 'グローバルランキング').setOrigin(0.5, 0);
-    const leaderboardStatus = caption(this, 360, 430, '読み込み中…', { fontSize: '13px' }).setOrigin(0.5, 0);
-    container.add([leaderboardTitle, leaderboardStatus]);
-    void this.loadLeaderboardPreview(token, leaderboardStatus, container);
-
-    const { front, back } = SaveSystem.getPartyHeroes(this.save);
-    const hasParty = front.length + back.length > 0;
-
-    const startBtn = new Button(
-      this,
-      360,
-      1000,
-      320,
-      70,
-      hasParty ? '挑戦開始' : '編成が空です',
-      () => {
-        if (hasParty) this.startRun();
-      },
-      { variant: hasParty ? 'primary' : 'ghost' },
-    );
-    if (!hasParty) startBtn.setEnabled(false);
-    container.add(startBtn);
-    enter(this, startBtn, { dy: 16, delay: 160 });
-
-    if (!hasParty) {
-      const hint = caption(this, 360, 1050, '編成が空です。名鑑でパーティを編成してください。', { fontSize: '13px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
-      container.add(hint);
-    }
-  }
-
-  private async loadLeaderboardPreview(token: number, statusText: Phaser.GameObjects.Text, container: Phaser.GameObjects.Container): Promise<void> {
-    const result = await LeaderboardSystem.fetchTopScores(5);
-    if (token !== this.stateToken) return;
-
-    if (result.status === 'not_configured') {
-      statusText.setText('ランキング準備中(この端末のベストのみ記録されます)');
-      return;
-    }
-    if (result.status === 'error') {
-      statusText.setText('ランキングの取得に失敗しました');
-      return;
-    }
-    if (result.data.length === 0) {
-      statusText.setText('まだ記録がありません。最初の挑戦者になろう!');
-      return;
-    }
-
-    statusText.setText('');
-    result.data.forEach((entry, i) => {
-      const row = body(this, 360, 430 + i * 30, `${i + 1}. ${entry.playerName}  ${entry.score.toLocaleString('ja-JP')}`, { fontSize: '14px' }).setOrigin(0.5, 0);
-      container.add(row);
-    });
   }
 
   // ------------------------------------------------------------ running --
@@ -217,19 +135,23 @@ export class InfiniteModeScene extends Phaser.Scene {
     units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, true));
   }
 
+  /** A wood-and-brass strip across the top: リタイア, then survival time and
+   *  score on the left, 難易度 and 撃破 on the right. */
   private buildRunningHud(): void {
     const container = this.add.container(0, 0);
     this.stateContainer = container;
 
-    const retreatBtn = new Button(this, 115, 53, 190, 66, 'リタイア', () => this.retreat(), { variant: 'ghost', fontSize: '15px' });
+    container.add(createPanel(this, 360, 72, 696, 116, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
+    const retreatBtn = new Button(this, 104, 72, 160, 64, 'リタイア', () => this.retreat(), { variant: 'wood', fontSize: '24px' });
     container.add(retreatBtn);
-    enter(this, retreatBtn, { duration: 260 });
 
-    const timeText = subheading(this, 360, 44, '0:00', { fontSize: '22px' }).setOrigin(0.5);
-    const diffText = statLabel(this, 230, 80, '難易度 Lv.1', { fontSize: '14px' }).setOrigin(0.5);
-    const killText = statLabel(this, 490, 80, '撃破 0体', { fontSize: '14px' }).setOrigin(0.5);
-    const scoreText = numeric(this, 360, 108, 'スコア 0', { fontSize: '17px' }).setOrigin(0.5);
+    const style = (size: number, color: string) => ({ fontSize: `${size}px`, fontStyle: 'bold', color, stroke: INK, strokeThickness: 5 });
+    const timeText = body(this, 330, 50, '0:00', style(36, '#ffe9b8')).setOrigin(0.5);
+    const scoreText = body(this, 330, 92, 'スコア 0', style(24, '#fff4dc')).setOrigin(0.5);
+    const diffText = body(this, 694, 50, '難易度 Lv.1', style(24, '#ffd9a0')).setOrigin(1, 0.5);
+    const killText = body(this, 694, 92, '撃破 0体', style(24, '#fff4dc')).setOrigin(1, 0.5);
     container.add([timeText, diffText, killText, scoreText]);
+    enter(this, container, { dy: -20, duration: 260 });
 
     this.hud = { timeText, scoreText, diffText, killText };
   }
@@ -237,7 +159,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private refreshHud(): void {
     if (!this.hud || !this.engine) return;
     const snap = this.engine.getSnapshot();
-    this.hud.timeText.setText(formatTime(snap.survivalSeconds));
+    this.hud.timeText.setText(formatSurvival(snap.survivalSeconds));
     this.hud.diffText.setText(`難易度 Lv.${Math.floor(snap.difficultyIndex) + 1}`);
     this.hud.killText.setText(`撃破 ${snap.enemiesDefeated}体`);
     this.hud.scoreText.setText(`スコア ${snap.score.toLocaleString('ja-JP')}`);
@@ -311,6 +233,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private handleEvents(events: InfiniteBattleEvent[]): void {
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
+      else if (event.kind === 'skillCast') this.onSkillCast(event);
       else if (event.kind === 'defeated') this.onDefeated(event.unitId);
       else if (event.kind === 'enemySpawned') this.onEnemySpawned(event.unit, event.position);
       else if (event.kind === 'runOver') this.endRun();
@@ -325,6 +248,52 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
+  }
+
+  /** Mirrors BattleScene's onSkillCast: a hero's unlocked skill firing can
+   *  hit every enemy, land on allies, or revive a party member whose view
+   *  onDefeated already tore down (and, here, removed from `views`
+   *  entirely) - that case rebuilds the view instead of animating nothing. */
+  private onSkillCast(event: Extract<InfiniteBattleEvent, { kind: 'skillCast' }>): void {
+    const casterView = this.views.get(event.casterId);
+    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+
+    for (const result of event.results) {
+      if (result.revived) {
+        const unit = this.engine?.playerUnits.find((u) => u.id === result.targetId);
+        if (!unit) continue;
+        const pos = this.computePlayerUnitPosition(unit);
+        this.createUnitView(unit, pos.x, pos.y, true);
+        const view = this.views.get(unit.id);
+        if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
+        continue;
+      }
+
+      const targetView = this.views.get(result.targetId);
+      if (!targetView) continue;
+      if (result.damage) {
+        this.anim.hitFlash(targetView.sprite, !!result.crit);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
+        if (result.crit) this.anim.critShake(this.cameras.main);
+      } else if (result.heal) {
+        this.anim.statusFlash(targetView.sprite, COLORS.heal);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+      } else if (result.buffAtk || result.buffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.gold);
+      } else if (result.debuffAtk || result.debuffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.danger);
+      } else if (result.stunned) {
+        this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      }
+    }
+  }
+
+  private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
+    const rowUnits = (this.engine?.playerUnits ?? []).filter((u) => u.row === unit.row);
+    const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
+    const spacing = 150;
+    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
+    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
   }
 
   private onEnemySpawned(unit: UnitInstance, position: EnemySlotPosition): void {
@@ -379,56 +348,61 @@ export class InfiniteModeScene extends Phaser.Scene {
 
     const previousBestScore = this.save.infiniteMode.bestScore;
     SaveSystem.recordInfiniteModeResult(this.save, result);
+    const skillEssenceGained = Math.round(result.score / 40);
+    SaveSystem.addSkillEssence(this.save, skillEssenceGained);
     SaveSystem.save(this.save);
-    this.showResult(result, result.score > previousBestScore);
+    this.showResult(result, result.score > previousBestScore, skillEssenceGained);
   }
 
-  private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean): void {
+  private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean, skillEssenceGained: number): void {
     this.enterState('result');
     const container = this.add.container(0, 0);
     this.stateContainer = container;
     const token = this.stateToken;
 
-    const overlay = this.add.rectangle(360, 578, 720, 1156, 0x000000, 0).setInteractive();
+    const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
     container.add(overlay);
     this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 220 });
 
-    const panel = createPanel(this, 360, 540, 600, 460, { fillColor: COLORS.panelFill, borderColor: COLORS.gold, glowColor: COLORS.gold, radius: 22 });
+    const panelH = 620;
+    const top = 640 - panelH / 2;
+    const panel = createPanel(this, 360, 640, 640, panelH, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 20, rarity: 5, gradient: false });
     container.add(panel);
     panel.setScale(0.9);
     popIn(this, panel, { duration: 320, delay: 80 });
 
-    const title = heading(this, 360, 360, 'ランアウト', { fontSize: '32px', color: '#ffd23f' }).setOrigin(0.5);
+    const title = heading(this, 360, top + 62, 'ランアウト', { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     container.add(title);
     title.setScale(0);
     popIn(this, title, { duration: 340, delay: 160 });
 
-    const statsText = caption(
-      this,
-      360,
-      430,
-      `生存時間 ${formatTime(result.survivalSeconds)}\n撃破数 ${result.enemiesDefeated}体\n到達難易度 Lv.${Math.floor(result.difficultyReached) + 1}`,
-      { fontSize: '15px', align: 'center', color: '#f0ecff' },
-    ).setOrigin(0.5);
-    container.add(statsText);
-
-    const scoreText = numeric(this, 360, 530, `スコア ${result.score.toLocaleString('ja-JP')}`, { fontSize: '26px' }).setOrigin(0.5);
+    const scoreText = body(this, 360, top + 148, `スコア ${result.score.toLocaleString('ja-JP')}`, { fontSize: '44px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     container.add(scoreText);
     enter(this, scoreText, { dy: 12, delay: 300 });
 
-    if (isNewLocalBest) {
-      const bestBadge = caption(this, 360, 566, '自己ベスト更新!', { fontSize: '14px', color: '#ffd23f' }).setOrigin(0.5);
-      container.add(bestBadge);
-    }
+    const rows: [string, string][] = [
+      ['生存時間', formatSurvival(result.survivalSeconds)],
+      ['撃破数', `${result.enemiesDefeated.toLocaleString('ja-JP')}体`],
+      ['到達難易度', `Lv.${Math.floor(result.difficultyReached) + 1}`],
+      ['獲得', `${skillEssenceGained.toLocaleString('ja-JP')} 技素`],
+    ];
+    rows.forEach(([label, value], i) => {
+      const y = top + 222 + i * 48;
+      container.add(caption(this, 90, y, label, { fontSize: '23px', color: '#cdbb94', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      container.add(body(this, 630, y, value, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+    });
 
-    const rankText = caption(this, 360, 600, '送信中…', { fontSize: '14px', color: '#9a93b8' }).setOrigin(0.5);
+    if (isNewLocalBest) {
+      container.add(body(this, 360, top + 430, '自己ベスト更新！', { fontSize: '26px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    }
+    const rankText = caption(this, 360, top + 476, '送信中…', { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
     container.add(rankText);
     void this.submitResult(token, result, rankText);
 
-    const retryBtn = new Button(this, 250, 690, 220, 60, 'もう一度', () => this.showReady(), { variant: 'primary' });
-    const homeBtn = new Button(this, 480, 690, 200, 60, 'ホームへ', () => this.scene.start('Home'), { variant: 'secondary' });
-    container.add([retryBtn, homeBtn]);
-    [retryBtn, homeBtn].forEach((btn) => {
+    const retryBtn = new Button(this, 218, top + panelH - 60, 270, 76, 'もう一度', () => this.scene.restart(), { variant: 'gold', fontSize: '28px' });
+    const lobbyBtn = new Button(this, 502, top + panelH - 60, 270, 76, 'ロビーへ', () => this.scene.start('InfiniteMode'), { variant: 'wood', fontSize: '28px' });
+    container.add([retryBtn, lobbyBtn]);
+    [retryBtn, lobbyBtn].forEach((btn) => {
       btn.setScale(0);
       this.tweens.add({ targets: btn, scale: 1, duration: 280, delay: 380, ease: 'Back.easeOut' });
     });

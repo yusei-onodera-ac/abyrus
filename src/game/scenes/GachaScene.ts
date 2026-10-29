@@ -167,9 +167,10 @@ export class GachaScene extends Phaser.Scene {
       const card = new HeroCard(this, x, y, hero, this.generator, 110);
       card.setScale(0);
       container.add(card);
-      if (outcome.duplicate) {
-        const dupLabel = caption(this, x, y + 70, `ダブり → +${outcome.duplicateGold.toString()}G`, { fontSize: '12px', color: '#ffd23f' }).setOrigin(0.5);
-        container.add(dupLabel);
+      if (outcome.kind !== 'new') {
+        const text = outcome.kind === 'copy' ? '合成素材に追加' : `上限のため +${outcome.duplicateGold.toString()}G`;
+        const color = outcome.kind === 'copy' ? '#9fe39f' : '#ffd23f';
+        container.add(caption(this, x, y + 70, text, { fontSize: '15px', color, stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5));
       }
       this.tweens.add({
         targets: card,

@@ -1,9 +1,12 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { STORY_BACKGROUNDS, type StoryLine, type RuriPortrait } from '../data/storyScript';
+import { STORY_BACKGROUNDS, STORY_BACKGROUND_REGION, type StoryLine, type RuriPortrait } from '../data/storyScript';
+import { REGIONS } from '../data/regions';
 import { Button } from '../ui/Button';
+import { wrapToWidth } from '../ui/CardParts';
 import { createPanel } from '../ui/Panel';
-import { CHROME, COLORS, subheading, caption } from '../ui/theme';
+import { drawScenery } from '../ui/StageMap';
+import { CHROME, COLORS, body, subheading } from '../ui/theme';
 import { enter } from '../ui/Transitions';
 
 /** What flag (if any) to persist once the player reaches the end of this
@@ -19,14 +22,18 @@ export interface StoryIntent {
   markSeen?: StoryMarkSeen;
 }
 
-const PANEL_Y = 1080;
-const PANEL_WIDTH = 680;
-const PANEL_HEIGHT = 340;
+const INK = '#1c130a';
+const PANEL_Y = 1068;
+const PANEL_WIDTH = 690;
+const PANEL_HEIGHT = 330;
 const MS_PER_CHAR = 28;
+const TEXT_SIZE = 25;
+const TEXT_STROKE = 4;
 
 /**
- * Novel-game-style story player: full-bleed placeholder gradient backdrop,
- * a wood/brass dialogue panel matching the rest of the game's chrome
+ * Novel-game-style story player: a full-bleed backdrop (the region's
+ * scenery over the story background's gradient, or story_<key>.jpg when
+ * supplied), a wood/brass dialogue panel matching the rest of the game's chrome
  * (Panel.ts / theme.ts conventions), a speaker nameplate, a tiny
  * procedurally-drawn portrait (Ruri gets a handful of mood variants; every
  * other speaker gets one generic silhouette bust - no cutscene art exists
@@ -111,23 +118,15 @@ export class StoryScene extends Phaser.Scene {
       rarity: 4,
     }).setDepth(2);
 
-    this.bodyText = this.add
-      .text(360 - PANEL_WIDTH / 2 + 32, PANEL_Y - PANEL_HEIGHT / 2 + 54, '', {
-        fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
-        fontSize: '18px',
-        color: '#fff0cc',
-        lineSpacing: 10,
-        // Phaser's default word wrap only breaks on whitespace, which
-        // Japanese text doesn't use between words - useAdvancedWrap makes
-        // it break by measured width instead, which is what CJK text needs.
-        wordWrap: { width: PANEL_WIDTH - 64, useAdvancedWrap: true },
-      })
-      .setDepth(3);
+    this.bodyText = body(this, 360 - PANEL_WIDTH / 2 + 34, PANEL_Y - PANEL_HEIGHT / 2 + 46, '', {
+      fontSize: `${TEXT_SIZE}px`,
+      color: '#fff0cc',
+      stroke: INK,
+      strokeThickness: TEXT_STROKE,
+      lineSpacing: 12,
+    }).setDepth(3);
 
-    this.advanceHint = caption(this, 360 + PANEL_WIDTH / 2 - 34, PANEL_Y + PANEL_HEIGHT / 2 - 28, '▼', {
-      fontSize: '16px',
-      color: '#ffe9b8',
-    })
+    this.advanceHint = body(this, 360 + PANEL_WIDTH / 2 - 38, PANEL_Y + PANEL_HEIGHT / 2 - 30, '▼', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 3 })
       .setOrigin(0.5)
       .setDepth(3)
       .setVisible(false);
@@ -137,7 +136,7 @@ export class StoryScene extends Phaser.Scene {
   }
 
   private buildSkipButton(): void {
-    const btn = new Button(this, 648, 56, 120, 50, 'スキップ', () => this.finish(), { variant: 'ghost', fontSize: '13px' });
+    const btn = new Button(this, 626, 62, 158, 60, 'スキップ', () => this.finish(), { variant: 'wood', fontSize: '24px' });
     btn.setDepth(6);
     enter(this, btn, { duration: 240 });
   }
@@ -164,7 +163,7 @@ export class StoryScene extends Phaser.Scene {
     this.lineIndex = index;
     const line = this.lines[index];
 
-    this.fullText = line.text;
+    this.fullText = wrapToWidth(line.text, PANEL_WIDTH - 68, TEXT_SIZE, TEXT_STROKE);
     this.charIndex = 0;
     this.charTimer = 0;
     this.lineDone = false;
@@ -206,29 +205,39 @@ export class StoryScene extends Phaser.Scene {
     const container = this.add.container(0, 0).setDepth(-10);
     container.setAlpha(0);
 
-    const g = this.add.graphics();
-    g.fillGradientStyle(palette.top, palette.top, palette.bottom, palette.bottom, 1);
-    g.fillRect(0, 0, 720, 1280);
-    container.add(g);
+    const artKey = `story_${key}`;
+    const region = REGIONS.find((r) => r.id === STORY_BACKGROUND_REGION[key]);
+    if (this.textures.exists(artKey)) {
+      const frame = this.textures.get(artKey).getSourceImage();
+      container.add(this.add.image(360, 640, artKey).setScale(Math.max(720 / frame.width, 1280 / frame.height)));
+    } else {
+      const g = this.add.graphics();
+      if (region) {
+        // The region's scenery over this scene's own mood colors.
+        drawScenery(g, { ...region.look, skyTop: palette.top, skyBottom: palette.bottom }, 720, 1280, 500 + key.length * 31);
+      } else {
+        g.fillGradientStyle(palette.top, palette.top, palette.bottom, palette.bottom, 1);
+        g.fillRect(0, 0, 720, 1280);
+      }
+      container.add(g);
 
-    // A simple dark silhouette band standing in for foreground scenery
-    // (treeline/ridge/rooftops - whatever the key implies) - just enough
-    // depth to read as "a place" rather than a flat color card.
-    const silhouette = this.add.graphics();
-    silhouette.fillStyle(0x000000, 0.4);
-    const baseY = 980;
-    silhouette.beginPath();
-    silhouette.moveTo(0, 1280);
-    silhouette.lineTo(0, baseY + 60);
-    for (let x = 0; x <= 720; x += 60) {
-      const bump = 30 + 40 * Math.abs(Math.sin(x * 0.013 + key.length));
-      silhouette.lineTo(x, baseY - bump);
+      // A dark ridge along the bottom, under the dialogue panel, grounds the scene.
+      const silhouette = this.add.graphics();
+      silhouette.fillStyle(0x000000, 0.4);
+      const baseY = 900;
+      silhouette.beginPath();
+      silhouette.moveTo(0, 1280);
+      silhouette.lineTo(0, baseY + 60);
+      for (let x = 0; x <= 720; x += 60) {
+        const bump = 30 + 40 * Math.abs(Math.sin(x * 0.013 + key.length));
+        silhouette.lineTo(x, baseY - bump);
+      }
+      silhouette.lineTo(720, baseY + 60);
+      silhouette.lineTo(720, 1280);
+      silhouette.closePath();
+      silhouette.fillPath();
+      container.add(silhouette);
     }
-    silhouette.lineTo(720, baseY + 60);
-    silhouette.lineTo(720, 1280);
-    silhouette.closePath();
-    silhouette.fillPath();
-    container.add(silhouette);
 
     const vignette = this.add.graphics();
     vignette.fillStyle(0x05060a, 0.3);
@@ -257,7 +266,7 @@ export class StoryScene extends Phaser.Scene {
     const top = PANEL_Y - PANEL_HEIGHT / 2;
 
     if (speaker) {
-      const plate = createPanel(this, left + 90, top - 6, 160, 44, {
+      const plate = createPanel(this, left + 220, top - 6, 230, 56, {
         fillColor: CHROME.woodFill,
         fillAlpha: 1,
         borderColor: CHROME.brass,
@@ -265,12 +274,12 @@ export class StoryScene extends Phaser.Scene {
         radius: 10,
         gradient: false,
       }).setDepth(4);
-      const text = subheading(this, left + 90, top - 6, speaker, { fontSize: '16px', color: '#ffe9b8' }).setOrigin(0.5).setDepth(4);
+      const text = subheading(this, left + 220, top - 6, speaker, { fontSize: '27px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5).setDepth(4);
       this.nameplate = this.add.container(0, 0, [plate, text]).setDepth(4);
       enter(this, this.nameplate, { duration: 180, dy: 0, dx: -10 });
 
       const badgeKey = speaker === 'ルリ' ? this.ruriTexture(portrait ?? 'normal') : this.silhouetteTexture();
-      const badge = this.add.image(left + 10, top - 60, badgeKey).setOrigin(0.5).setDepth(4);
+      const badge = this.add.image(left + 66, top - 66, badgeKey).setOrigin(0.5).setScale(1.3).setDepth(4);
       this.portrait = this.add.container(0, 0, [badge]).setDepth(4);
       enter(this, this.portrait, { duration: 220, dy: 12 });
     }

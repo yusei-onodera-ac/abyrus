@@ -33,12 +33,19 @@ export function cleanDeckName(raw: string, fallback: string): string {
  *  classes go there and the squishy damage/support classes behind them. */
 const FRONT_PRIORITY: Record<HeroClass, number> = { tank: 0, warrior: 1, archer: 2, healer: 3, mage: 4 };
 
-/** お任せ編成: the five highest-power heroes owned, arranged by class so the
- *  sturdiest stand in front. With fewer than five heroes it fills what it can. */
+/** お任せ編成: the five highest-power characters owned (a character's strongest
+ *  copy - a deck holds one of each), arranged by class so the sturdiest stand
+ *  in front. With fewer than five it fills what it can. */
 export function autoFormation(heroes: HeroData[]): Pick<Deck, 'front' | 'back'> {
+  const seen = new Set<string>();
   const ranked = heroes
     .map((hero) => ({ hero, power: ProgressionSystem.computeHeroPower(hero) }))
     .sort((a, b) => b.power.compare(a.power) || b.hero.rarity - a.hero.rarity)
+    .filter(({ hero }) => {
+      if (seen.has(hero.heroId)) return false;
+      seen.add(hero.heroId);
+      return true;
+    })
     .slice(0, FRONT_SLOTS + BACK_SLOTS);
   ranked.sort((a, b) => FRONT_PRIORITY[a.hero.heroClass] - FRONT_PRIORITY[b.hero.heroClass] || b.power.compare(a.power));
   const ids = ranked.map((r) => r.hero.id);

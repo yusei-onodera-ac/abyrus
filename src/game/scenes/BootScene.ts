@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SaveSystem } from '../systems/SaveSystem';
+import { applyMockFromUrl } from '../systems/MockSave';
 import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
@@ -10,6 +11,8 @@ import { BANNERS } from '../data/banners';
 import { preloadGachaArt } from '../ui/GachaPanels';
 import { GACHA_BANNERS } from '../data/gachaBanners';
 import { preloadNoticeArt } from './NoticeScene';
+import { preloadEventArt } from '../ui/EventPanels';
+import { EVENTS } from '../data/events';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -42,10 +45,12 @@ export class BootScene extends Phaser.Scene {
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);
+    preloadEventArt(this, EVENTS);
   }
 
   create(): void {
     const save = SaveSystem.load();
+    applyMockFromUrl(save);
     this.game.registry.set('save', save);
     // Opened from someone's share link (...?friend=ID): go straight to the
     // 追加 tab with their ID filled in, and tidy the address bar so a reload

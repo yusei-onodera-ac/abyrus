@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SaveSystem, expToNextLevel, type SaveData } from '../systems/SaveSystem';
+import { MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillUpgradeCost, type SkillDefinition } from '../data/skills';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { Button } from '../ui/Button';
@@ -9,6 +10,8 @@ import { applyBackground } from '../ui/Background';
 import { buildCardPanel } from '../ui/CardParts';
 import { HeroSlot } from '../ui/HeroSlot';
 import { buildInfoPanel } from '../ui/InfoPanel';
+import { openModal, type ModalHandle } from '../ui/Modal';
+import { createPanel, createDivider } from '../ui/Panel';
 import { buildStoneStage } from '../ui/StoneStage';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { enter } from '../ui/Transitions';
@@ -33,6 +36,9 @@ const GAP = 8;
  *  screen. Opened by tapping a hero in the roster. */
 export class HeroDetailScene extends Phaser.Scene {
   private detailData!: HeroDetailData;
+  private save!: SaveData;
+  private modal?: ModalHandle;
+  private chips?: Phaser.GameObjects.Container;
 
   constructor() {
     super('HeroDetail');
@@ -40,10 +46,13 @@ export class HeroDetailScene extends Phaser.Scene {
 
   init(data: HeroDetailData): void {
     this.detailData = data;
+    this.modal = undefined;
+    this.chips = undefined;
   }
 
   create(): void {
     const save: SaveData = this.game.registry.get('save');
+    this.save = save;
     const hero = SaveSystem.getHero(save, this.detailData.heroId);
     if (!hero) {
       this.scene.start(this.detailData.from);
@@ -57,6 +66,7 @@ export class HeroDetailScene extends Phaser.Scene {
     this.buildStage(hero, generator, accent);
     this.buildHeaderBar();
     this.buildStageLabels(hero);
+    this.buildSkillChips(hero);
 
     let y = STAGE_H + 10;
     y += this.buildStatusBlock(hero, generator, y) + GAP;
@@ -185,7 +195,7 @@ export class HeroDetailScene extends Phaser.Scene {
       panel.container.add(g);
     }
     panel.container.add(body(this, PANEL_W - 18, top + 28, `${hero.phase} / ${MAX_PHASE}`, { fontSize: '30px', fontStyle: 'bold', color: '#d9c2ff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
-    panel.container.add(caption(this, 18, top + 64, '同じ英雄を引くか、フェーズ素材を使うと上がります', { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, 18, top + 64, '同じキャラを合成するか、フェーズ素材を使うと上がります', { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     panel.container.setPosition(PANEL_X, y);
     enter(this, panel.container, { dy: 24, duration: 340, delay: 170 });
     return panel.height;
@@ -211,6 +221,127 @@ export class HeroDetailScene extends Phaser.Scene {
     panel.container.setPosition(PANEL_X, y);
     enter(this, panel.container, { dy: 24, duration: 340, delay: 220 });
     return panel.height;
+  }
+
+  // --- skills -----------------------------------------------------------
+
+  /** The hero's skills as a column of tags down the stage's right edge: name, and
+   *  Lv (or the level that unlocks it). Tapping one opens the full list, where
+   *  they can be levelled up. */
+  private buildSkillChips(hero: HeroData): void {
+    this.chips?.destroy();
+    const loadout = getHeroSkillLoadout(hero.heroId);
+    const slotCount = getSkillSlotCount(hero.rarity);
+    const w = 168;
+    const h = 62;
+    const gap = 8;
+    const x = 720 - 12 - w;
+    const top = 112;
+    const container = this.add.container(0, 0);
+    this.chips = container;
+
+    container.add(caption(this, x + w / 2, top - 8, 'スキル', { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
+    let shown = 0;
+    for (let slot = 0; slot < slotCount; slot++) {
+      const def = loadout[slot];
+      if (!def) continue;
+      const unlocked = isSkillSlotUnlocked(slot, hero.level);
+      const y = top + shown * (h + gap);
+      shown++;
+      const g = this.add.graphics();
+      g.fillStyle(0x0d0905, 0.86);
+      g.fillRoundedRect(x, y, w, h, 10);
+      g.lineStyle(2, unlocked ? CHROME.brass : CHROME.brassDark, unlocked ? 1 : 0.6);
+      g.strokeRoundedRect(x, y, w, h, 10);
+      container.add(g);
+      container.add(body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      const sub = unlocked ? `Lv.${hero.skillLevels[slot] ?? 1}` : `Lv.${SKILL_SLOT_UNLOCK_LEVEL[slot]}で解放`;
+      container.add(caption(this, x + 10, y + 44, sub, { fontSize: '17px', color: unlocked ? '#ffd9a0' : '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      if (unlocked) container.add(caption(this, x + w - 10, y + 44, SKILL_KIND_LABELS[def.kind], { fontSize: '14px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    }
+    const listH = shown * (h + gap) - gap;
+    const hit = this.add.zone(x + w / 2, top + listH / 2, w, listH).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => this.openSkillModal(hero));
+    container.add(hit);
+    enter(this, container, { dx: 30, dy: 0, delay: 240 });
+  }
+
+  /** The full skill list: each slot with its effect at the current level, and a
+   *  強化 button that spends 技素. Rebuilt after every upgrade. */
+  private openSkillModal(hero: HeroData): void {
+    this.modal?.close();
+    this.modal = openModal(this, { setEnabled: () => {} }, 0.78, true);
+    const modal = this.modal.container;
+    const loadout = getHeroSkillLoadout(hero.heroId);
+    const slotCount = getSkillSlotCount(hero.rarity);
+
+    const w = 640;
+    const rowH = 148;
+    const headH = 128;
+    const footH = 100;
+    const h = headH + slotCount * rowH + footH;
+    const cy = 640;
+    const top = cy - h / 2;
+    const left = 360 - w / 2;
+
+    const panel = createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: hero.rarity, gradient: false });
+    // Swallows taps so touching the panel itself doesn't dismiss the popup.
+    const block = this.add.zone(360, cy, w, h).setInteractive();
+    modal.add([panel, block]);
+
+    modal.add(body(this, 360, top + 40, `${hero.name} のスキル`, { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(caption(this, 360, top + 86, `所持 技素：${this.save.skillEssence.toLocaleString('ja-JP')}`, { fontSize: '22px', color: '#ffd9a0', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+
+    let row = 0;
+    for (let slot = 0; slot < slotCount; slot++) {
+      const def = loadout[slot];
+      if (!def) continue;
+      const rowTop = top + headH + row * rowH;
+      row++;
+      modal.add(createDivider(this, 360, rowTop, w - 48, CHROME.brassDark));
+      this.buildSkillRow(modal, hero, def, slot, left + 28, rowTop + 14, w - 56, rowH - 28);
+    }
+
+    modal.add(new Button(this, 360, top + h - footH / 2, 260, 68, '閉じる', () => this.closeSkillModal(), { variant: 'wood', fontSize: '26px' }));
+  }
+
+  private buildSkillRow(modal: Phaser.GameObjects.Container, hero: HeroData, def: SkillDefinition, slot: number, x: number, y: number, w: number, h: number): void {
+    const unlocked = isSkillSlotUnlocked(slot, hero.level);
+    modal.add(body(this, x, y + 20, def.name, { fontSize: '27px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    modal.add(caption(this, x + w, y + 20, SKILL_KIND_LABELS[def.kind], { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    modal.add(caption(this, x, y + 56, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0.5));
+
+    if (!unlocked) {
+      modal.add(caption(this, x, y + h - 14, `キャラ Lv.${SKILL_SLOT_UNLOCK_LEVEL[slot]} で解放`, { fontSize: '21px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      return;
+    }
+
+    const level = hero.skillLevels[slot] ?? 1;
+    modal.add(body(this, x, y + h - 14, `Lv.${level} / ${MAX_SKILL_LEVEL}`, { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    modal.add(caption(this, x + 150, y + h - 14, formatSkillEffectSummary(def, level), { fontSize: '19px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+
+    const maxed = level >= MAX_SKILL_LEVEL;
+    const cost = maxed ? 0 : skillUpgradeCost(level);
+    const button = new Button(this, x + w - 80, y + h - 27, 160, 58, maxed ? 'MAX' : '強化', () => this.upgradeSkill(hero, slot), {
+      variant: 'gold',
+      fontSize: '26px',
+      subLabel: maxed ? undefined : `${cost.toLocaleString('ja-JP')} 技素`,
+    });
+    button.setEnabled(!maxed && this.save.skillEssence >= cost);
+    modal.add(button);
+  }
+
+  private upgradeSkill(hero: HeroData, slot: number): void {
+    if (!SaveSystem.upgradeHeroSkill(this.save, hero.id, slot)) return;
+    SaveSystem.save(this.save);
+    this.buildSkillChips(hero);
+    this.openSkillModal(hero);
+  }
+
+  private closeSkillModal(): void {
+    this.modal?.close();
+    this.modal = undefined;
   }
 
   /** 強化する (to the 強化 screen), and 編成にセット when we came from the roster. */

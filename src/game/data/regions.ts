@@ -13,6 +13,26 @@ import type { HeroClass } from '../types';
  * adding `assets/characters/<id>.png` files keyed off names derived from
  * this file - no scene code needs to change.
  */
+/** What the scenery scattered along a region's quest-map road is made of. */
+export type RegionMotif = 'pine' | 'dune' | 'peak' | 'pillar' | 'tower';
+
+/** How a region looks, on the quest map and in battle. Pure design data: change
+ *  a color or motif here and both screens follow. Real artwork needs no code
+ *  either - drop `public/assets/backgrounds/region_<id>.jpg` (the map page) and
+ *  `battle_<id>.jpg` (the fights) in and it replaces what is drawn from this. */
+export interface RegionLook {
+  /** The map page's sky/ground gradient, top and bottom. */
+  skyTop: number;
+  skyBottom: number;
+  motif: RegionMotif;
+  /** Scenery colors: far (dark) and near (light). */
+  motifDark: number;
+  motifLight: number;
+  /** Multiplied over the shared battle backdrop, so each region's fights read
+   *  differently until it has artwork of its own. 0xffffff leaves it as is. */
+  battleTint: number;
+}
+
 export interface RegionDef {
   id: string;
   /** 0-4, matches its position in REGIONS and its slice of the 150 main stages. */
@@ -31,7 +51,11 @@ export interface RegionDef {
    *  the 6th (final) stage of this region's 6-stage Extra dungeon. */
   bossName: string;
   bossClass: HeroClass;
+  look: RegionLook;
 }
+
+/** The final battle's own battle-backdrop tint (blood red over the shared backdrop). */
+export const FINAL_BATTLE_TINT = 0xc05a5a;
 
 /** Shared "what's wrong with it" adjectives, combined with each region's
  *  own `feralAnimals` list to generate that region's rank-and-file enemies
@@ -53,6 +77,7 @@ export const REGIONS: RegionDef[] = [
     feralAnimals: ['鹿', '狼', '熊', '兎', '狐', '猿', '烏', '猪'],
     bossName: '紅角の大鹿・ガルムード',
     bossClass: 'tank',
+    look: { skyTop: 0x0f2418, skyBottom: 0x2f5230, motif: 'pine', motifDark: 0x16361f, motifLight: 0x3f8043, battleTint: 0xffffff },
   },
   {
     id: 'wasteland',
@@ -63,6 +88,7 @@ export const REGIONS: RegionDef[] = [
     feralAnimals: ['隼', '蠍', '禿鷲', '砂蜥蜴', '野犬', '毒蛇', '駱駝', '山猫'],
     bossName: '砂塵の女王蠍・アラクネア',
     bossClass: 'archer',
+    look: { skyTop: 0x3a2410, skyBottom: 0x8f5d28, motif: 'dune', motifDark: 0x5c3a18, motifLight: 0xd09a45, battleTint: 0xf0b878 },
   },
   {
     id: 'frostpeak',
@@ -73,6 +99,7 @@ export const REGIONS: RegionDef[] = [
     feralAnimals: ['白虎', '雪豹', '巨角羊', '氷狼', '白鷲', '穴熊', '雪猿', '樹氷鹿'],
     bossName: '白銀の山王虎・コンゴウ',
     bossClass: 'warrior',
+    look: { skyTop: 0x10283a, skyBottom: 0x4f819c, motif: 'peak', motifDark: 0x2a4a62, motifLight: 0xd4ecf8, battleTint: 0x9fd4f0 },
   },
   {
     id: 'ruins',
@@ -83,6 +110,7 @@ export const REGIONS: RegionDef[] = [
     feralAnimals: ['骸蝙蝠', '瘴狼', '古骨竜', '穢獣', '腐肉犀', '瘴猿', '墓場烏', '呪蛇'],
     bossName: '古骨の竜・ネクロドラコ',
     bossClass: 'mage',
+    look: { skyTop: 0x1c1030, skyBottom: 0x4c3375, motif: 'pillar', motifDark: 0x2a1a44, motifLight: 0x9a5fe0, battleTint: 0xb090e0 },
   },
   {
     id: 'twilight',
@@ -93,6 +121,7 @@ export const REGIONS: RegionDef[] = [
     feralAnimals: ['野良犬', '軍鳩', '下水鼠', '野良猫', '暴走馬', '闇猫', '逃亡鷹', '見世物熊'],
     bossName: '闇走りの大狼・クロガネ',
     bossClass: 'warrior',
+    look: { skyTop: 0x2a1020, skyBottom: 0x80345a, motif: 'tower', motifDark: 0x2a1220, motifLight: 0xe0608a, battleTint: 0xe890a8 },
   },
 ];
 

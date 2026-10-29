@@ -385,9 +385,17 @@ export class RosterScene extends Phaser.Scene {
     const w = CARD_WIDTH;
     const innerW = w - PAD * 2;
     const guard = () => this.scroll.isTap();
-    const heroes = [...this.save.heroes].sort((a, b) => b.rarity - a.rarity || b.level - a.level);
-    // Only while editing: which heroes already stand in the deck being edited.
-    const inDeck = new Set(this.editingDeck === null ? [] : this.deckHeroes(this.editingDeck).map((h) => h.id));
+    // Copies of one character sit together, the character with the highest level first.
+    const bestLevel = new Map<string, number>();
+    for (const h of this.save.heroes) bestLevel.set(h.heroId, Math.max(bestLevel.get(h.heroId) ?? 0, h.level));
+    const heroes = [...this.save.heroes].sort(
+      (a, b) => b.rarity - a.rarity || bestLevel.get(b.heroId)! - bestLevel.get(a.heroId)! || a.heroId.localeCompare(b.heroId) || b.level - a.level,
+    );
+    // Only while editing: which heroes already stand in the deck being edited,
+    // and which characters they are (a deck holds one copy of each).
+    const inDeckHeroes = this.editingDeck === null ? [] : this.deckHeroes(this.editingDeck);
+    const inDeck = new Set(inDeckHeroes.map((h) => h.id));
+    const inDeckCharacters = new Set(inDeckHeroes.map((h) => h.heroId));
     let y = PAD;
 
     const headerH = 48;
@@ -406,6 +414,7 @@ export class RosterScene extends Phaser.Scene {
           hero,
           generator: this.generator,
           inDeck: inDeck.has(hero.id),
+          twinInDeck: !inDeck.has(hero.id) && inDeckCharacters.has(hero.heroId),
           selected: hero.id === this.armedHeroId,
           onTap: () => this.onHeroTap(hero),
           guard,
@@ -442,6 +451,14 @@ export class RosterScene extends Phaser.Scene {
     return DECK_SLOTS.find((ref) => this.save.decks[index][ref.row][ref.slot] === heroId);
   }
 
+  /** Where another copy of `hero`'s character stands in the deck, if one does. */
+  private findTwinInDeck(index: number, hero: HeroData): SlotRef | undefined {
+    return DECK_SLOTS.find((ref) => {
+      const other = this.heroAt(index, ref);
+      return other !== undefined && other.id !== hero.id && other.heroId === hero.heroId;
+    });
+  }
+
   private onHeroTap(hero: HeroData): void {
     const index = this.editingDeck;
     if (index === null) {
@@ -460,6 +477,12 @@ export class RosterScene extends Phaser.Scene {
     }
     if (this.targetSlot) {
       this.place(hero.id, this.targetSlot);
+      return;
+    }
+    // A deck holds one of each character: another copy takes over that copy's slot.
+    const twin = this.findTwinInDeck(index, hero);
+    if (twin) {
+      this.place(hero.id, twin);
       return;
     }
     const empty = DECK_SLOTS.find((ref) => !this.save.decks[index][ref.row][ref.slot]);
@@ -494,8 +517,14 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private place(heroId: string, ref: SlotRef): void {
-    SaveSystem.setDeckSlot(this.save, this.editingDeck!, ref.row, ref.slot, heroId);
+    const index = this.editingDeck!;
+    const hero = SaveSystem.getHero(this.save, heroId);
+    const twin = hero ? this.findTwinInDeck(index, hero) : undefined;
+    SaveSystem.setDeckSlot(this.save, index, ref.row, ref.slot, heroId);
     SaveSystem.save(this.save);
+    if (twin && (twin.row !== ref.row || twin.slot !== ref.slot)) {
+      showToast(this, '同じキャラは編成に1体までです。前の枠から移しました', '#ffd9a0');
+    }
     this.armedHeroId = null;
     this.targetSlot = null;
     this.queueRender();

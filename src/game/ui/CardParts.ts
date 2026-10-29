@@ -63,6 +63,14 @@ function wrapJapanese(text: string, font: string, width: number, hangAllowance: 
     .join(NEWLINE);
 }
 
+/** `text` with line breaks put in so no line is wider than `width` px at
+ *  `fontSize` (Japanese line-breaking rules, as wrappedText). Explicit breaks
+ *  are kept. For text that is revealed gradually, where the Text object itself
+ *  can't be left to wrap. */
+export function wrapToWidth(text: string, width: number, fontSize: number, strokeThickness = 0, fontStyle = 'normal'): string {
+  return wrapJapanese(text, `${fontStyle} ${fontSize}px ${FONT}`, width - strokeThickness - fontSize, fontSize);
+}
+
 /** Text that wraps at `width` with Japanese line-breaking rules (Phaser's own
  *  wrap only breaks at spaces). */
 export function wrappedText(

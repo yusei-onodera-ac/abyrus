@@ -4,19 +4,25 @@ import { BigNumber } from '../systems/BigNumber';
 import {
   ProgressionSystem,
   STAGES_PER_REGION,
+  EXTRA_STAGES_PER_REGION,
   FINAL_STAGE_INDEX,
   type EnemyUnitDef,
   type StageDef,
   type FinalStageDef,
 } from '../systems/ProgressionSystem';
 import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
+import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
+import { nextQuestStage, questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
+import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { Button } from '../ui/Button';
+import { openConfirm } from '../ui/Dialogs';
+import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
-import { applyBackground } from '../ui/Background';
+import { applyBattleBackground } from '../ui/Background';
 import { subheading, caption, heading, numeric, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
 
@@ -47,12 +53,14 @@ export class BattleScene extends Phaser.Scene {
   private engine!: BattleEngine;
   private views = new Map<string, UnitView>();
   private resultOverlay?: Phaser.GameObjects.Container;
+  private modal?: ModalHandle;
 
   private currentStageDef?: StageDef;
   private finalStage?: FinalStageDef;
   private waveIndex = 0;
   private rewardGold = BigNumber.ZERO;
   private rewardExp = 0;
+  private rewardSkillEssence = 0;
 
   constructor() {
     super('Battle');
@@ -63,11 +71,13 @@ export class BattleScene extends Phaser.Scene {
     this.mode = data.mode;
     this.views.clear();
     this.resultOverlay = undefined;
+    this.modal = undefined;
     this.currentStageDef = undefined;
     this.finalStage = undefined;
     this.waveIndex = 0;
     this.rewardGold = BigNumber.ZERO;
     this.rewardExp = 0;
+    this.rewardSkillEssence = 0;
   }
 
   create(): void {
@@ -76,7 +86,7 @@ export class BattleScene extends Phaser.Scene {
     this.anim = new AnimationController(this);
     this.popups = new DamagePopupPool(this);
     this.cameras.main.setBackgroundColor('#0c0e18');
-    applyBackground(this, 'battle');
+    this.applyBackdrop();
 
     let title: string;
     if (this.mode === 'final') {
@@ -84,16 +94,19 @@ export class BattleScene extends Phaser.Scene {
       title = this.finalStage.name;
       this.rewardGold = this.finalStage.rewardGold;
       this.rewardExp = this.finalStage.rewardExp;
+      this.rewardSkillEssence = this.finalStage.rewardSkillEssence;
     } else if (this.mode === 'extra') {
       this.currentStageDef = ProgressionSystem.getExtraStage(this.stageIndex);
       title = this.currentStageDef.name;
       this.rewardGold = this.currentStageDef.rewardGold;
       this.rewardExp = this.currentStageDef.rewardExp;
+      this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
     } else {
       this.currentStageDef = ProgressionSystem.getStage(this.stageIndex);
       title = this.currentStageDef.name;
       this.rewardGold = this.currentStageDef.rewardGold;
       this.rewardExp = this.currentStageDef.rewardExp;
+      this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
     }
 
     const titleText = subheading(this, 360, 40, title, { fontSize: '22px' }).setOrigin(0.5);
@@ -126,6 +139,17 @@ export class BattleScene extends Phaser.Scene {
       this.engine = new BattleEngine(playerUnits, enemyUnits);
       this.layoutUnits(enemyUnits, false);
     }
+  }
+
+  /** Each region's fights get that region's backdrop; the final battle its own. */
+  private applyBackdrop(): void {
+    if (this.mode === 'final') {
+      applyBattleBackground(this, 'final', FINAL_BATTLE_TINT);
+      return;
+    }
+    const perRegion = this.mode === 'extra' ? EXTRA_STAGES_PER_REGION : STAGES_PER_REGION;
+    const region = getRegion(Math.floor(this.stageIndex / perRegion));
+    applyBattleBackground(this, region.id, region.look.battleTint);
   }
 
   private buildEnemyUnits(defs: EnemyUnitDef[], difficulty: number): UnitInstance[] {
@@ -220,6 +244,7 @@ export class BattleScene extends Phaser.Scene {
   private handleEvents(events: BattleEvent[]): void {
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
+      else if (event.kind === 'skillCast') this.onSkillCast(event);
       else if (event.kind === 'defeated') this.onDefeated(event.unitId);
       else if (event.kind === 'victory') this.onWaveOrBattleVictory();
       else if (event.kind === 'defeat') this.onBattleEnd(false);
@@ -234,6 +259,56 @@ export class BattleScene extends Phaser.Scene {
     this.anim.hitFlash(targetView.sprite, event.crit);
     this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
     if (event.crit) this.anim.critShake(this.cameras.main);
+  }
+
+  /** A hero's unlocked skill firing: unlike a plain attack this can hit
+   *  every enemy (AoE), land on allies (heals/buffs), or revive a unit
+   *  whose view was already torn down by onDefeated - that last case
+   *  rebuilds the view from scratch instead of animating a destroyed one. */
+  private onSkillCast(event: Extract<BattleEvent, { kind: 'skillCast' }>): void {
+    const casterView = this.views.get(event.casterId);
+    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+
+    for (const result of event.results) {
+      if (result.revived) {
+        const unit = this.engine.units.find((u) => u.id === result.targetId);
+        if (!unit) continue;
+        const pos = this.computePlayerUnitPosition(unit);
+        this.createUnitView(unit, pos.x, pos.y, true);
+        const view = this.views.get(unit.id);
+        if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
+        continue;
+      }
+
+      const targetView = this.views.get(result.targetId);
+      if (!targetView) continue;
+      if (result.damage) {
+        this.anim.hitFlash(targetView.sprite, !!result.crit);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
+        if (result.crit) this.anim.critShake(this.cameras.main);
+      } else if (result.heal) {
+        this.anim.statusFlash(targetView.sprite, COLORS.heal);
+        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+      } else if (result.buffAtk || result.buffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.gold);
+      } else if (result.debuffAtk || result.debuffDef) {
+        this.anim.statusFlash(targetView.sprite, COLORS.danger);
+      } else if (result.stunned) {
+        this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+      }
+    }
+  }
+
+  /** Recomputes a player unit's on-screen slot from its row/position among
+   *  the party, the same layout formula layoutUnits/placeRow used when the
+   *  battle started - needed to rebuild a revived unit's view, since its
+   *  original one was already destroyed by onDefeated. */
+  private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
+    const rowUnits = this.engine.playerUnits.filter((u) => u.row === unit.row);
+    const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
+    const spacing = 150;
+    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
+    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
   }
 
   private onDefeated(unitId: string): void {
@@ -307,13 +382,17 @@ export class BattleScene extends Phaser.Scene {
 
   private onBattleEnd(victory: boolean): void {
     if (this.resultOverlay) return;
+    const next = victory ? this.nextStageOffer() : null;
+    // With a next stage on offer the panel grows to hold its button and a row of ways out.
+    const top = next ? 440 : 470;
+    const panelH = next ? 420 : 320;
     const container = this.add.container(0, 0);
     this.resultOverlay = container;
     const overlay = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
     container.add(overlay);
     this.tweens.add({ targets: overlay, fillAlpha: 0.82, duration: 220 });
 
-    const panel = createPanel(this, 360, 630, 560, 320, {
+    const panel = createPanel(this, 360, top + panelH / 2, 560, panelH, {
       fillColor: COLORS.panelFill,
       borderColor: victory ? COLORS.gold : COLORS.danger,
       glowColor: victory ? COLORS.gold : COLORS.danger,
@@ -323,7 +402,7 @@ export class BattleScene extends Phaser.Scene {
     panel.setScale(0.85);
     popIn(this, panel, { duration: 320, delay: 100 });
 
-    const title = heading(this, 360, 540, victory ? '勝利!' : '敗北…', {
+    const title = heading(this, 360, top + 70, victory ? '勝利!' : '敗北…', {
       fontSize: '40px',
       color: victory ? '#ffd23f' : '#ff6b6b',
     }).setOrigin(0.5);
@@ -333,22 +412,89 @@ export class BattleScene extends Phaser.Scene {
 
     if (victory) {
       SaveSystem.addGold(this.save, this.rewardGold);
+      SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
       for (const unit of this.engine.playerUnits) {
         SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
       }
       this.applyProgressionOnVictory();
       SaveSystem.save(this.save);
-      const rewardText = numeric(this, 360, 600, `+${this.rewardGold.toString()} G   +${this.rewardExp} EXP`, { fontSize: '18px' }).setOrigin(0.5);
+      const rewardText = numeric(this, 360, top + 130, `+${this.rewardGold.toString()} G   +${this.rewardExp} EXP   +${this.rewardSkillEssence} 技素`, { fontSize: '18px' }).setOrigin(0.5);
       container.add(rewardText);
       enter(this, rewardText, { dy: 12, delay: 320 });
     }
 
-    const btn = new Button(this, 360, 700, 220, 60, victory ? '次へ進む' : 'ホームへ戻る', () => this.onContinue(victory), {
-      variant: victory ? 'primary' : 'secondary',
+    const buttons: Button[] = [];
+    if (next) {
+      const cost = stageStaminaCost(next.kind, next.index);
+      StaminaSystem.refresh(this.save);
+      const enough = StaminaSystem.canAfford(this.save, cost);
+      buttons.push(
+        new Button(this, 360, top + 222, 460, 76, '次のステージへ', () => this.goToNextStage(next), {
+          variant: 'gold',
+          fontSize: '26px',
+          subLabel: `${questStageName(next)}　スタミナ ${cost}${enough ? '' : '（不足）'}`,
+        }),
+        new Button(this, 230, top + 330, 220, 60, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '22px' }),
+        new Button(this, 490, top + 330, 220, 60, 'クエスト一覧', () => this.scene.start('StageSelect', this.mode === 'extra' ? { initialTab: 'extra' } : undefined), { variant: 'wood', fontSize: '22px' }),
+      );
+    } else {
+      buttons.push(
+        new Button(this, 360, top + 230, 220, 60, victory ? this.continueLabel() : 'ホームへ戻る', () => this.onContinue(victory), {
+          variant: victory ? 'primary' : 'secondary',
+        }),
+      );
+    }
+    buttons.forEach((btn, i) => {
+      container.add(btn);
+      btn.setScale(0);
+      this.tweens.add({ targets: btn, scale: 1, duration: 280, delay: 380 + i * 60, ease: 'Back.easeOut' });
     });
-    container.add(btn);
-    btn.setScale(0);
-    this.tweens.add({ targets: btn, scale: 1, duration: 280, delay: 380, ease: 'Back.easeOut' });
+  }
+
+  /** The stage the result screen offers to go straight on to, or null when the
+   *  clear leads somewhere else first: a story still to read (a region's last
+   *  stage, the final battle's ending) or the end of the Extra stages. */
+  private nextStageOffer(): QuestStage | null {
+    if (this.mode === 'final') return null;
+    if (this.mode !== 'extra' && this.storyAfterClear()) return null;
+    return nextQuestStage({ kind: this.mode === 'extra' ? 'extra' : 'main', index: this.stageIndex });
+  }
+
+  /** True when clearing a region's last main stage still owes its closing story. */
+  private storyAfterClear(): boolean {
+    const regionIndex = Math.floor(this.stageIndex / STAGES_PER_REGION);
+    return this.stageIndex % STAGES_PER_REGION === STAGES_PER_REGION - 1 && !this.save.storyFlags.regionOutro[regionIndex];
+  }
+
+  private continueLabel(): string {
+    if (this.mode === 'final') return 'エンディングへ';
+    if (this.mode === 'extra') return 'クエスト一覧へ';
+    return 'ストーリーへ';
+  }
+
+  /** 次のステージへ: costs that stage's stamina, like entering it from the map.
+   *  Short of it, offers the shop instead. */
+  private goToNextStage(next: QuestStage): void {
+    if (this.modal?.container.active) return;
+    const cost = stageStaminaCost(next.kind, next.index);
+    if (!StaminaSystem.canAfford(this.save, cost)) {
+      const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));
+      // The popup's own dim layer blocks the result panel; there is no list to freeze.
+      this.modal = openConfirm(this, { setEnabled: () => {} }, {
+        title: 'スタミナが足りません',
+        message: `${questStageName(next)}はスタミナ ${cost} 必要です。（現在 ${this.save.stamina[0]}）
+回復まで あと ${wait}
+ショップでスタミナを回復しますか？`,
+        confirmLabel: 'ショップへ',
+        confirmVariant: 'gold',
+        onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
+      });
+      return;
+    }
+    if (!StaminaSystem.spend(this.save, cost)) return;
+    SaveSystem.save(this.save);
+    const route = questRoute(this.save, next);
+    this.scene.start(route.scene, route.data);
   }
 
   private applyProgressionOnVictory(): void {

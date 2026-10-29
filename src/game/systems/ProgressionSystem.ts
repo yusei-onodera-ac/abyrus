@@ -51,6 +51,8 @@ export interface StageDef {
   difficulty: number;
   rewardGold: BigNumber;
   rewardExp: number;
+  /** 技素, spent on raising skill levels (see data/skills.ts). */
+  rewardSkillEssence: number;
   /** Set on Extra-mode stages only, true on the 6th (region boss) stage. */
   isBossStage?: boolean;
 }
@@ -67,6 +69,7 @@ export interface FinalStageDef {
   waves: WaveDef[];
   rewardGold: BigNumber;
   rewardExp: number;
+  rewardSkillEssence: number;
 }
 
 /** Sum of every hero in a deck, for the formation screen's 詳細 popup. */
@@ -103,24 +106,31 @@ export const EXTRA_STAGE_COUNT = REGION_COUNT * EXTRA_STAGES_PER_REGION; // 30
 // boundary - only the enemy name pool and rarity tier (tied to region
 // index, see getStage()) change there, by design, same as the original
 // curve's own per-tier rarity steps.
-const MAIN_DIFFICULTY_SPAN = 46;
+//
+// Raised a little (2026-10-29): the first stage now starts at difficulty 0.3
+// instead of 0, and the last main stage ends at 47.5 instead of 46 - about +4%
+// enemy HP/attack at the start, growing to about +20% at the end. (Enemy HP and
+// attack both compound, so even this much is felt: a party that beat a stage
+// nine times in ten before now wins roughly three in four to nine in ten.)
+const MAIN_DIFFICULTY_START = 0.3;
+const MAIN_DIFFICULTY_END = 47.5;
 
 function mainDifficulty(index: number): number {
-  return (index / (MAIN_STAGE_COUNT - 1)) * MAIN_DIFFICULTY_SPAN;
+  return MAIN_DIFFICULTY_START + (index / (MAIN_STAGE_COUNT - 1)) * (MAIN_DIFFICULTY_END - MAIN_DIFFICULTY_START);
 }
 
 /** Final battle's waves continue just past the main campaign's ceiling,
  *  stepping up slightly wave-to-wave so the fight itself has a visible
  *  escalation leading into its climax. */
 function finalDifficulty(waveOffset: number): number {
-  return MAIN_DIFFICULTY_SPAN + 2 + waveOffset;
+  return MAIN_DIFFICULTY_END + 2 + waveOffset;
 }
 
 /** Extra is explicitly post-game: it starts beyond the final battle and
  *  keeps climbing across its own 30 stages, so "strongest feral of each
  *  region" is a genuine capstone challenge rather than a victory lap. */
 function extraDifficulty(extraIndex: number): number {
-  return MAIN_DIFFICULTY_SPAN + 4 + extraIndex * 1.4;
+  return MAIN_DIFFICULTY_END + 4 + extraIndex * 1.4;
 }
 
 /** Enemy squad size: grows with the global stage index (never reset per
@@ -173,6 +183,7 @@ export const ProgressionSystem = {
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
       rewardExp: Math.round(25 * Math.pow(1.11, difficulty)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
     };
   },
 
@@ -221,6 +232,7 @@ export const ProgressionSystem = {
       waves,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, rewardDifficulty)),
       rewardExp: Math.round(25 * Math.pow(1.11, rewardDifficulty)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, rewardDifficulty)),
     };
   },
 
@@ -257,6 +269,7 @@ export const ProgressionSystem = {
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
       rewardExp: Math.round(25 * Math.pow(1.11, difficulty)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
       isBossStage,
     };
   },

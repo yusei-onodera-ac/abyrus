@@ -15,8 +15,9 @@ export const GACHA_RATES: { rarity: Rarity; rate: number }[] = [
 export const SINGLE_PULL_COST = 100;
 export const TEN_PULL_COST = 900;
 
-/** Gold awarded instead of a new copy when a pull lands on a hero already
- *  owned, scaled so a duplicate still feels worth something at any rarity. */
+/** Gold awarded instead of a new copy when a pull lands on a hero whose owned
+ *  copies already cover every phase left to MAX_PHASE (see SaveSystem.addHero),
+ *  scaled so it still feels worth something at any rarity. */
 export const DUPLICATE_GOLD_REWARD: Record<Rarity, number> = {
   1: 20,
   2: 60,
