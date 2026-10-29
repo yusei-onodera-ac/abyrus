@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import { StaminaSystem } from '../systems/StaminaSystem';
 import { createPanel } from './Panel';
 import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
 import { COLORS, CHROME } from './theme';
@@ -37,6 +38,8 @@ export class ResourceBar extends Phaser.GameObjects.Container {
   private goldText: Phaser.GameObjects.Text;
   private gemText: Phaser.GameObjects.Text;
   private staminaText?: Phaser.GameObjects.Text;
+  private save?: SaveData;
+  private ticker?: Phaser.Time.TimerEvent;
   private levelText?: Phaser.GameObjects.Text;
   private nameText?: Phaser.GameObjects.Text;
   /** True when the real topbar artwork is in use, so callers (HomeScene's
@@ -197,6 +200,22 @@ export class ResourceBar extends Phaser.GameObjects.Container {
     this.gemText.setText(this.hasArt ? save.gems.toLocaleString('ja-JP') : `${save.gems.toLocaleString('ja-JP')} 魔晶石`);
     this.levelText?.setText(`Lv${save.playerLevel}`);
     this.nameText?.setText(save.playerName);
-    this.staminaText?.setText(`${save.stamina[0]}/${save.stamina[1]}`);
+    this.save = save;
+    this.showStamina();
+    this.startTicker();
+  }
+
+  /** Stamina comes back over time, so the readout is brought up to date on
+   *  every update and then once a second while the screen is open. */
+  private showStamina(): void {
+    if (!this.save) return;
+    StaminaSystem.refresh(this.save);
+    this.staminaText?.setText(`${this.save.stamina[0]}/${this.save.stamina[1]}`);
+  }
+
+  private startTicker(): void {
+    if (this.ticker || !this.staminaText) return;
+    this.ticker = this.scene.time.addEvent({ delay: 1000, loop: true, callback: () => this.showStamina() });
+    this.once(Phaser.GameObjects.Events.DESTROY, () => this.ticker?.remove());
   }
 }

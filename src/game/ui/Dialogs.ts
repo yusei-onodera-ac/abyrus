@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { Button, type ButtonVariant } from './Button';
-import { openModal, type ModalHandle } from './Modal';
+import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { createPanel } from './Panel';
-import type { ScrollView } from './ScrollView';
 import { body, heading, CHROME } from './theme';
 
 const INK = '#1c130a';
@@ -40,7 +39,7 @@ export interface TextPromptOptions {
  *  selected, so pressing OK straight away keeps the suggested text. Needs
  *  `dom.createContainer` in the game config, and style.css pinning that
  *  container to the canvas. */
-export function openTextPrompt(scene: Phaser.Scene, scroll: ScrollView, opts: TextPromptOptions): ModalHandle {
+export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: TextPromptOptions): ModalHandle {
   const modal = openModal(scene, scroll, 0.75, false);
   // Sits in the upper half so a phone's keyboard doesn't cover it.
   const cy = 470;
@@ -121,7 +120,7 @@ export interface ConfirmOptions {
 }
 
 /** Popup asking the player to confirm something destructive. */
-export function openConfirm(scene: Phaser.Scene, scroll: ScrollView, opts: ConfirmOptions): ModalHandle {
+export function openConfirm(scene: Phaser.Scene, scroll: ModalLock, opts: ConfirmOptions): ModalHandle {
   const modal = openModal(scene, scroll, 0.75, false);
   const cy = 600;
   const w = 600;
@@ -170,7 +169,7 @@ export interface MessageFormOptions {
  *  multi-line text box with a live character count, キャンセル/送信. Like
  *  openTextPrompt the box is a real DOM element (<textarea>) over the canvas, so
  *  keyboards and Japanese IME work. Sends nothing for an empty message. */
-export function openMessageForm(scene: Phaser.Scene, scroll: ScrollView, opts: MessageFormOptions): ModalHandle {
+export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: MessageFormOptions): ModalHandle {
   const modal = openModal(scene, scroll, 0.75, false);
   // Sits high so a phone's keyboard doesn't cover the box.
   const cy = 520;

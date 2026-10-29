@@ -6,6 +6,7 @@ import { MAX_PHASE, type HeroData, type Row } from '../types';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
+import { StaminaSystem } from './StaminaSystem';
 
 export interface PartyFormation {
   front: (string | null)[];
@@ -124,10 +125,12 @@ export interface SaveData {
   updatedAt: number;
   playerName: string;
   playerLevel: number;
-  /** [current, max]. No stamina-gated feature consumes this yet - it's
-   *  surfaced on the top bar ahead of that system so the HUD reads as
-   *  complete. */
+  /** [current, max]. Starting a stage spends it and it recovers over time -
+   *  always go through StaminaSystem, which brings it up to date first. */
   stamina: [number, number];
+  /** Epoch ms from which the next point of stamina is being counted (see
+   *  StaminaSystem.refresh). */
+  staminaAt: number;
   gifts: Gift[];
   mails: Mail[];
   /** Ids of operator gifts/mails (data/gifts.ts, data/mails.ts) already sent
@@ -236,6 +239,7 @@ export const SaveSystem = {
       playerName: 'プレイヤー',
       playerLevel: 1,
       stamina: [50, 50],
+      staminaAt: Date.now(),
       gifts: [],
       mails: [],
       deliveredInboxIds: [],
@@ -265,6 +269,7 @@ export const SaveSystem = {
       merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
       merged.settings = SettingsSystem.restore(parsed.settings);
       merged.reports = SettingsSystem.restoreReports(parsed.reports);
+      if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
       merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
       // A save from before phase existed has heroes with no `phase` field.
       merged.heroes = merged.heroes.map((hero) => ({ ...hero, phase: hero.phase ?? 1 }));
@@ -309,6 +314,7 @@ export const SaveSystem = {
 
   /** Restores stamina up to its max (never above). Returns how much it actually added. */
   recoverStamina(data: SaveData, amount: number): number {
+    StaminaSystem.refresh(data);
     const [current, max] = data.stamina;
     const next = Math.min(max, current + amount);
     data.stamina = [next, max];

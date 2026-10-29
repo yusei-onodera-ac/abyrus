@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
-import type { SaveData } from '../systems/SaveSystem';
+import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { BackButton } from '../ui/BackButton';
+import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
+import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { applyBackground } from '../ui/Background';
 import { stageNodeIcon, type StageNodeState } from '../ui/Icons';
@@ -13,8 +16,14 @@ import { enter, enterStagger } from '../ui/Transitions';
  *  grid - matching how commercial gacha-RPG home screens separate "go on
  *  an adventure" from the hub itself. */
 export class StageSelectScene extends Phaser.Scene {
+  private modal?: ModalHandle;
+
   constructor() {
     super('StageSelect');
+  }
+
+  init(): void {
+    this.modal = undefined;
   }
 
   create(): void {
@@ -99,10 +108,65 @@ export class StageSelectScene extends Phaser.Scene {
         node.on('pointerover', () => this.tweens.add({ targets: node, scale: 1.1, duration: 100 }));
         node.on('pointerout', () => this.tweens.add({ targets: node, scale: 1, duration: 120 }));
         node.on('pointerdown', () => this.tweens.add({ targets: node, scale: 0.92, duration: 60 }));
-        node.on('pointerup', () => this.scene.start('Battle', { stageIndex: i }));
+        node.on('pointerup', () => this.askToEnter(i));
       }
     }
 
     enterStagger(this, nodes, { dy: 14, duration: 280, delay: 100, stagger: 18 });
+  }
+
+  /** Tapping a stage never spends anything by itself: it opens a popup showing
+   *  the stamina cost, and only 出撃 takes it. Without enough stamina (or a
+   *  formation) it says so and points at where to fix that instead. */
+  private askToEnter(stageIndex: number): void {
+    if (this.modal?.container.active) return;
+    const save = this.getSave();
+    const stage = ProgressionSystem.getStage(stageIndex);
+    const cost = stageStaminaCost(stageIndex);
+
+    const party = SaveSystem.getPartyHeroes(save);
+    if (party.front.length + party.back.length === 0) {
+      this.openDialog({
+        title: '編成が空です',
+        message: 'パーティが空のため出撃できません。\n名鑑で編成しますか？',
+        confirmLabel: '名鑑へ',
+        confirmVariant: 'gold',
+        onConfirm: () => this.scene.start('Roster'),
+      });
+      return;
+    }
+
+    if (!StaminaSystem.canAfford(save, cost)) {
+      const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(save, cost));
+      this.openDialog({
+        title: 'スタミナが足りません',
+        message: `${stage.name}はスタミナ ${cost} 必要です。（現在 ${save.stamina[0]}）\n回復まで あと ${wait}\nショップでスタミナを回復しますか？`,
+        confirmLabel: 'ショップへ',
+        confirmVariant: 'gold',
+        onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
+      });
+      return;
+    }
+
+    const have = save.stamina[0];
+    this.openDialog({
+      title: stage.name,
+      message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
+      confirmLabel: '出撃',
+      confirmVariant: 'gold',
+      onConfirm: () => this.launch(stageIndex, cost),
+    });
+  }
+
+  private openDialog(opts: ConfirmOptions): void {
+    // This screen has no list to freeze; the popup's own dim layer blocks the map.
+    this.modal = openConfirm(this, { setEnabled: () => {} }, opts);
+  }
+
+  private launch(stageIndex: number, cost: number): void {
+    const save = this.getSave();
+    if (!StaminaSystem.spend(save, cost)) return;
+    SaveSystem.save(save);
+    this.scene.start('Battle', { stageIndex });
   }
 }
