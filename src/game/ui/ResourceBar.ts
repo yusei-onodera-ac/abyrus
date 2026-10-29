@@ -2,9 +2,20 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { createPanel } from './Panel';
 import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
-import { COLORS } from './theme';
+import { COLORS, CHROME } from './theme';
+import type { ShopFocus } from '../data/shop';
 
 const INK = '#2a1608';
+
+/** Radius of the round + buttons beside the three readouts. */
+const PLUS_RADIUS = 15;
+/** How far right of a readout's own anchor its + button sits (the number needs the room before it). */
+const PLUS_OFFSET = 86;
+
+export interface ResourceBarOptions {
+  /** What a tap on a + button does. Defaults to opening the shop at that spot. */
+  onPlus?: (focus: ShopFocus) => void;
+}
 
 /** Prefers the supplied currency illustration (coin/gem/stamina) over the
  *  procedural badge icon, scaled to fit `size` while preserving its own
@@ -32,9 +43,10 @@ export class ResourceBar extends Phaser.GameObjects.Container {
    *  separate "ABYRUS" wordmark) can skip anything the art already shows. */
   readonly hasArt: boolean;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, width: number) {
+  constructor(scene: Phaser.Scene, x: number, y: number, width: number, opts: ResourceBarOptions = {}) {
     super(scene, x, y);
     this.hasArt = scene.textures.exists('topbar');
+    const onPlus = opts.onPlus ?? ((focus: ShopFocus) => scene.scene.start('Shop', { focus }));
 
     let height: number;
     let goldPos: { x: number; y: number };
@@ -87,9 +99,11 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       // row's y205), so the plank is open the whole way from the shield's
       // right edge (~x460) to the bar's right edge - spread across that
       // full width instead of bunching against the right edge.
-      goldPos = art(720, 205);
-      gemPos = art(1215, 205);
-      staminaPos = art(1710, 205);
+      // The three slots sit a little left of where the plank's middle would
+      // put them, to leave room for a + button after each readout.
+      goldPos = art(648, 205);
+      gemPos = art(1143, 205);
+      staminaPos = art(1638, 205);
     } else {
       height = 64;
       const panel = createPanel(scene, width / 2, height / 2, width, height, {
@@ -122,10 +136,13 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       this.gemText = scene.add.text(gemPos.x + 2, gemPos.y, '', statStyle('#bfeaff')).setOrigin(0, 0.5);
       this.add([goldIcon, this.goldText, gemIconImg, this.gemText]);
 
+      this.add(this.buildPlus(goldPos.x + PLUS_OFFSET, goldPos.y, 'gold', onPlus));
+      this.add(this.buildPlus(gemPos.x + PLUS_OFFSET, gemPos.y, 'gems', onPlus));
       if (staminaPos) {
         const staminaIconImg = statIcon(scene, 'currency_stamina', staminaIcon(scene, 32), staminaPos.x - 17, staminaPos.y, 38);
         this.staminaText = scene.add.text(staminaPos.x + 2, staminaPos.y, '', statStyle('#ffd9a0')).setOrigin(0, 0.5);
         this.add([staminaIconImg, this.staminaText]);
+        this.add(this.buildPlus(staminaPos.x + PLUS_OFFSET, staminaPos.y, 'stamina', onPlus));
       }
     } else {
       const goldIcon = statIcon(scene, 'currency_coin', coinIcon(scene, 26), goldPos.x, goldPos.y, 30);
@@ -137,9 +154,41 @@ export class ResourceBar extends Phaser.GameObjects.Container {
         .text(gemPos.x + 20, gemPos.y, '', { fontFamily: 'Arial, sans-serif', fontSize: '14px', color: '#bfeaff' })
         .setOrigin(0, 0.5);
       this.add([goldIcon, gemIconImg, this.goldText, this.gemText]);
+      this.add(this.buildPlus(width - 34, goldPos.y, 'gold', onPlus));
+      this.add(this.buildPlus(width - 34, gemPos.y, 'gems', onPlus));
     }
 
     scene.add.existing(this);
+  }
+
+  /** A round brass-and-orange + that opens the shop at the part selling what it sits beside. */
+  private buildPlus(x: number, y: number, focus: ShopFocus, onPlus: (focus: ShopFocus) => void): Phaser.GameObjects.Container {
+    const scene = this.scene;
+    const r = PLUS_RADIUS;
+    const g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.35);
+    g.fillCircle(0, 2, r);
+    g.fillStyle(0xe0822a, 1);
+    g.fillCircle(0, 0, r);
+    g.fillStyle(0xffffff, 0.22);
+    g.fillEllipse(0, -r * 0.4, r * 1.3, r * 0.7);
+    g.lineStyle(2, CHROME.brassBright, 1);
+    g.strokeCircle(0, 0, r);
+    g.fillStyle(0xffffff, 1);
+    g.fillRoundedRect(-r * 0.55, -r * 0.14, r * 1.1, r * 0.28, 2);
+    g.fillRoundedRect(-r * 0.14, -r * 0.55, r * 0.28, r * 1.1, 2);
+    const button = scene.add.container(x, y, [g]);
+    const hit = scene.add.zone(0, 0, 46, 46).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerover', () => scene.tweens.add({ targets: button, scale: 1.12, duration: 110, ease: 'Sine.easeOut' }));
+    hit.on('pointerout', () => scene.tweens.add({ targets: button, scale: 1, duration: 140, ease: 'Sine.easeOut' }));
+    hit.on('pointerdown', () => scene.tweens.add({ targets: button, scale: 0.9, duration: 70, ease: 'Sine.easeOut' }));
+    hit.on('pointerup', () => {
+      scene.tweens.add({ targets: button, scale: 1.12, duration: 90, ease: 'Sine.easeOut' });
+      onPlus(focus);
+    });
+    button.add(hit);
+    return button;
   }
 
   update(save: SaveData): void {

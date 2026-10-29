@@ -24,6 +24,11 @@ export function hex(color: number): string {
   return '#' + color.toString(16).padStart(6, '0');
 }
 
+/** Phase caps at 10. Separate from rarity (fixed at the pull) and level
+ *  (exp-driven): phase only rises by fusing a duplicate pull into this copy
+ *  or spending phase materials, both player-initiated. */
+export const MAX_PHASE = 10;
+
 export interface HeroData {
   /** Unique id of this owned copy (distinct pulls of the same hero differ). */
   id: string;
@@ -35,6 +40,8 @@ export interface HeroData {
   name: string;
   level: number;
   exp: number;
+  /** 1..MAX_PHASE. */
+  phase: number;
 }
 
 export interface CombatStats {

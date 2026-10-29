@@ -3,9 +3,10 @@ import { formatGachaEnd, FRIEND_GACHA_IMAGE, type GachaBannerEntry } from '../da
 import { SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
 import { Button } from './Button';
 import { createPanel } from './Panel';
+import { CARD_WIDTH } from './ScreenFrame';
 import { body, caption, CHROME } from './theme';
 
-export const GACHA_CARD_WIDTH = 640;
+export const GACHA_CARD_WIDTH = CARD_WIDTH;
 const PAD = 12;
 const INK = '#1c130a';
 const FRIEND_ROW_HEIGHT = 92;
@@ -131,6 +132,6 @@ export function buildGachaBannerCard(
   y += ctaH + PAD;
 
   // Card body goes in last, once the height is known, then sinks to the back.
-  container.addAt(createPanel(scene, w / 2, y / 2, w, y, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14 }), 0);
+  container.addAt(createPanel(scene, w / 2, y / 2, w, y, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }), 0);
   return { container, height: y };
 }

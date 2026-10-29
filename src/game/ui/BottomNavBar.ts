@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { createPanel, createDivider } from './Panel';
-import { eventTabIcon, legionTabIcon, homeTabIcon, profileTabIcon, settingsTabIcon } from './Icons';
+import { eventTabIcon, friendTabIcon, homeTabIcon, messageTabIcon, shopTabIcon } from './Icons';
 import { CHROME } from './theme';
 
 // Sampled from the topbar artwork (see CHROME in theme.ts), so this
@@ -11,33 +11,33 @@ const BRASS_DARK = CHROME.brassDark;
 const BRASS = CHROME.brass;
 const BRASS_BRIGHT = CHROME.brassBright;
 
-export type NavTab = 'event' | 'legion' | 'home' | 'profile' | 'settings';
+export type NavTab = 'event' | 'friend' | 'home' | 'message' | 'shop';
 
 const TAB_LABELS: Record<NavTab, string> = {
   event: 'イベント',
-  legion: '軍団',
+  friend: 'フレンド',
   home: 'ホーム',
-  profile: 'プロフィール',
-  settings: '設定',
+  message: 'メッセージ',
+  shop: 'ショップ',
 };
 
 const TAB_SCENE: Record<NavTab, string> = {
   event: 'Event',
-  legion: 'Legion',
+  friend: 'Friend',
   home: 'Home',
-  profile: 'Profile',
-  settings: 'Settings',
+  message: 'Message',
+  shop: 'Shop',
 };
 
 const TAB_ICON: Record<NavTab, (scene: Phaser.Scene, size?: number) => string> = {
   event: eventTabIcon,
-  legion: legionTabIcon,
+  friend: friendTabIcon,
   home: homeTabIcon,
-  profile: profileTabIcon,
-  settings: settingsTabIcon,
+  message: messageTabIcon,
+  shop: shopTabIcon,
 };
 
-const TABS: NavTab[] = ['event', 'legion', 'home', 'profile', 'settings'];
+const TABS: NavTab[] = ['event', 'friend', 'home', 'message', 'shop'];
 
 const BAR_HEIGHT = 124;
 

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import type { SaveData } from '../systems/SaveSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
-import { Button } from '../ui/Button';
+import { BackButton } from '../ui/BackButton';
 import { createPanel } from '../ui/Panel';
 import { applyBackground } from '../ui/Background';
 import { stageNodeIcon, type StageNodeState } from '../ui/Icons';
@@ -34,8 +34,7 @@ export class StageSelectScene extends Phaser.Scene {
   }
 
   private buildBackButton(): void {
-    const btn = new Button(this, 115, 60, 190, 66, '戻る', () => this.scene.start('Home'), { variant: 'ghost', fontSize: '16px' });
-    enter(this, btn, { duration: 260 });
+    enter(this, new BackButton(this, () => this.scene.start('Home')), { dx: -40, dy: 0, duration: 300, delay: 150 });
   }
 
   private buildStageMap(save: SaveData): void {

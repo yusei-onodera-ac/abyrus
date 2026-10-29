@@ -8,8 +8,9 @@ export type BackgroundScreen =
   | 'hero_detail'
   | 'stage_select'
   | 'event'
-  | 'legion'
-  | 'profile'
+  | 'friend'
+  | 'message'
+  | 'shop'
   | 'settings';
 
 const BACKGROUND_SCREENS: BackgroundScreen[] = [
@@ -20,8 +21,9 @@ const BACKGROUND_SCREENS: BackgroundScreen[] = [
   'hero_detail',
   'stage_select',
   'event',
-  'legion',
-  'profile',
+  'friend',
+  'message',
+  'shop',
   'settings',
 ];
 

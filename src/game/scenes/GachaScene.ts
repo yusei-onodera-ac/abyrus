@@ -5,10 +5,14 @@ import { getActiveGachaBanners, type GachaBannerEntry } from '../data/gachaBanne
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ResourceBar } from '../ui/ResourceBar';
 import { BottomNavBar } from '../ui/BottomNavBar';
+import { BackButton } from '../ui/BackButton';
 import { HeroCard } from '../ui/HeroCard';
 import { Button } from '../ui/Button';
-import { ScrollView } from '../ui/ScrollView';
-import { buildFriendGachaRow, buildGachaBannerCard, GACHA_CARD_WIDTH } from '../ui/GachaPanels';
+import type { ScrollView } from '../ui/ScrollView';
+import { buildFriendGachaRow, buildGachaBannerCard } from '../ui/GachaPanels';
+import { buildTitlePlate, buildFramedScrollView, CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
+import { showToast } from '../ui/Toast';
+import { openModal, type ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { applyBackground } from '../ui/Background';
 import { heading, caption, body, CHROME } from '../ui/theme';
@@ -17,12 +21,6 @@ import { RARITY_COLORS, hex } from '../types';
 
 const INK = '#1c130a';
 
-// Frame around the scrolling list, between the top bar (126px tall) and the
-// bottom nav bar (starts at y1156).
-const FRAME = { x: 12, y: 206, w: 696, h: 940 };
-// The list itself, inset from the frame; the scrollbar sits in the gap on
-// its right (see ScrollView).
-const VIEW = { x: 24, y: 218, w: 660, h: 916 };
 const LIST_GAP = 14;
 
 /** Gacha hub: a scrolling list of the currently running gachas, each with its
@@ -32,8 +30,7 @@ export class GachaScene extends Phaser.Scene {
   private generator!: CharacterGenerator;
   private resourceBar!: ResourceBar;
   private scroll!: ScrollView;
-  private modal?: Phaser.GameObjects.Container;
-  private toast?: Phaser.GameObjects.Container;
+  private modal?: ModalHandle;
 
   constructor() {
     super('Gacha');
@@ -48,9 +45,10 @@ export class GachaScene extends Phaser.Scene {
     this.refreshResources();
     enter(this, this.resourceBar, { dy: -20, duration: 280 });
 
-    this.buildTitlePlate();
+    buildTitlePlate(this, 'ガチャ');
     this.buildList();
     new BottomNavBar(this, 720, 1280, null);
+    enter(this, new BackButton(this, () => this.scene.start('Home')), { dx: -40, dy: 0, duration: 300, delay: 250 });
   }
 
   private getSave(): SaveData {
@@ -61,50 +59,14 @@ export class GachaScene extends Phaser.Scene {
     this.resourceBar.update(this.getSave());
   }
 
-  /** Dark slanted plate under the top bar carrying the screen name. */
-  private buildTitlePlate(): void {
-    const y = 138;
-    const w = 440;
-    const h = 56;
-    const slant = 36;
-    const plate = this.add.graphics();
-    plate.fillStyle(CHROME.woodFill, 0.96);
-    plate.fillPoints([new Phaser.Math.Vector2(0, y), new Phaser.Math.Vector2(w, y), new Phaser.Math.Vector2(w - slant, y + h), new Phaser.Math.Vector2(0, y + h)], true);
-    plate.lineStyle(3, CHROME.brass, 1);
-    plate.beginPath();
-    plate.moveTo(0, y + h);
-    plate.lineTo(w - slant, y + h);
-    plate.lineTo(w, y);
-    plate.strokePath();
-    plate.lineStyle(1, CHROME.brassBright, 0.7);
-    plate.beginPath();
-    plate.moveTo(0, y + h - 5);
-    plate.lineTo(w - slant - 3, y + h - 5);
-    plate.strokePath();
-
-    const title = heading(this, 30, y + h / 2, 'ガチャ', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
-    enter(this, plate, { dx: -30, dy: 0, duration: 320, delay: 60 });
-    enter(this, title, { dx: -30, dy: 0, duration: 320, delay: 100 });
-  }
-
   private buildList(): void {
-    const frame = createPanel(this, FRAME.x + FRAME.w / 2, FRAME.y + FRAME.h / 2, FRAME.w, FRAME.h, {
-      fillColor: CHROME.woodGrain,
-      fillAlpha: 0.9,
-      borderColor: CHROME.brassDark,
-      glowColor: CHROME.brass,
-      radius: 16,
-      gradient: false,
-    });
-    enter(this, frame, { dy: 14, duration: 300, delay: 120 });
-
-    this.scroll = new ScrollView(this, VIEW.x, VIEW.y, VIEW.w, VIEW.h);
+    this.scroll = buildFramedScrollView(this);
     const guard = () => this.scroll.isTap();
-    const left = (VIEW.w - GACHA_CARD_WIDTH) / 2;
+    const left = (SCREEN_VIEW.w - CARD_WIDTH) / 2;
     const rows: Phaser.GameObjects.Container[] = [];
     let y = left;
 
-    const friend = buildFriendGachaRow(this, () => this.showToast('フレンドガチャ: 準備中です'), guard);
+    const friend = buildFriendGachaRow(this, () => showToast(this, 'フレンドガチャ: 準備中です'), guard);
     friend.container.setPosition(left, y);
     rows.push(friend.container);
     y += friend.height + LIST_GAP;
@@ -123,7 +85,7 @@ export class GachaScene extends Phaser.Scene {
     }
 
     if (banners.length === 0) {
-      this.scroll.content.add(caption(this, VIEW.w / 2, y + 60, '開催中のガチャはありません', { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
+      this.scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 60, '開催中のガチャはありません', { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
       y += 120;
     }
 
@@ -132,31 +94,23 @@ export class GachaScene extends Phaser.Scene {
     enterStagger(this, rows, { dy: 24, duration: 320, delay: 160, stagger: 70 });
   }
 
-  /** Dim layer + container for a popup. Everything drawn on top of the list
-   *  and bars (depth above the nav bar's 100) goes in the returned container. */
-  private openModal(dimAlpha: number, onDimTap?: () => void): Phaser.GameObjects.Container {
+  /** Opens a popup layer (see ui/Modal) and returns the container to fill. */
+  private openModal(dimAlpha: number, dismissOnDimTap = false): Phaser.GameObjects.Container {
     this.closeModal();
-    this.scroll.setEnabled(false);
-    const container = this.add.container(0, 0).setDepth(200);
-    this.modal = container;
-    const dim = this.add.rectangle(360, 640, 720, 1280, 0x000000, 0).setInteractive();
-    if (onDimTap) dim.on('pointerup', onDimTap);
-    container.add(dim);
-    this.tweens.add({ targets: dim, fillAlpha: dimAlpha, duration: 220 });
-    return container;
+    this.modal = openModal(this, this.scroll, dimAlpha, dismissOnDimTap);
+    return this.modal.container;
   }
 
   private closeModal(): void {
-    this.modal?.destroy();
+    this.modal?.close();
     this.modal = undefined;
-    this.scroll.setEnabled(true);
   }
 
   /** The odds popup behind each card's 詳細 button. Rates come straight from
    *  GACHA_RATES - the same table the pull itself rolls against - since
    *  disclosing them is required (Japan's 景品表示法). */
   private showDetail(entry: GachaBannerEntry): void {
-    const modal = this.openModal(0.7, () => this.closeModal());
+    const modal = this.openModal(0.7, true);
     const w = 580;
     const rowH = 54;
     const h = 150 + GACHA_RATES.length * rowH + 100;
@@ -184,7 +138,7 @@ export class GachaScene extends Phaser.Scene {
   private doPull(count: number, cost: number): void {
     const save = this.getSave();
     if (!SaveSystem.spendGems(save, cost)) {
-      this.showToast('魔晶石が足りません', '#ff8a8a');
+      showToast(this, '魔晶石が足りません', '#ff8a8a');
       return;
     }
     const results = GachaSystem.pullMany(count);
@@ -192,32 +146,6 @@ export class GachaScene extends Phaser.Scene {
     SaveSystem.save(save);
     this.refreshResources();
     this.showResults(outcomes);
-  }
-
-  /** Short-lived pill above the bottom bar, for feedback that doesn't
-   *  deserve a popup (not enough gems, unbuilt feature). */
-  private showToast(text: string, color = '#f0ecff'): void {
-    this.toast?.destroy();
-    const label = this.add.text(0, 0, text, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '20px', fontStyle: 'bold', color, stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
-    const pillW = label.width + 56;
-    const pillH = 52;
-    const pill = this.add.graphics();
-    pill.fillStyle(CHROME.woodGrain, 0.95);
-    pill.fillRoundedRect(-pillW / 2, -pillH / 2, pillW, pillH, pillH / 2);
-    pill.lineStyle(2, CHROME.brass, 0.9);
-    pill.strokeRoundedRect(-pillW / 2, -pillH / 2, pillW, pillH, pillH / 2);
-    const toast = this.add.container(360, 1100, [pill, label]).setDepth(150);
-    this.toast = toast;
-    this.tweens.add({
-      targets: toast,
-      alpha: 0,
-      delay: 1100,
-      duration: 400,
-      onComplete: () => {
-        toast.destroy();
-        if (this.toast === toast) this.toast = undefined;
-      },
-    });
   }
 
   private showResults(outcomes: HeroPullOutcome[]): void {

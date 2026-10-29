@@ -40,6 +40,15 @@ export interface StageDef {
   rewardExp: number;
 }
 
+/** Sum of every hero in a deck, for the formation screen's 詳細 popup. */
+export interface DeckTotals {
+  power: BigNumber;
+  maxHp: BigNumber;
+  atk: BigNumber;
+  def: number;
+  spd: number;
+}
+
 export const ProgressionSystem = {
   STAGE_COUNT: 40,
 
@@ -78,6 +87,26 @@ export const ProgressionSystem = {
       critRate: 0.1 + hero.rarity * 0.02,
       critMul: 1.8,
     };
+  },
+
+  /** 総合力: one number for comparing heroes and decks at a glance. Display
+   *  only - nothing in combat reads it. */
+  computeHeroPower(hero: HeroData): BigNumber {
+    const stats = ProgressionSystem.computeHeroStats(hero);
+    return stats.maxHp.add(stats.atk.mul(5));
+  },
+
+  computeDeckTotals(heroes: HeroData[]): DeckTotals {
+    const totals: DeckTotals = { power: BigNumber.ZERO, maxHp: BigNumber.ZERO, atk: BigNumber.ZERO, def: 0, spd: 0 };
+    for (const hero of heroes) {
+      const stats = ProgressionSystem.computeHeroStats(hero);
+      totals.power = totals.power.add(ProgressionSystem.computeHeroPower(hero));
+      totals.maxHp = totals.maxHp.add(stats.maxHp);
+      totals.atk = totals.atk.add(stats.atk);
+      totals.def += stats.def;
+      totals.spd += stats.spd;
+    }
+    return totals;
   },
 
   computeEnemyStats(def: EnemyUnitDef, stageIndex: number): CombatStats {

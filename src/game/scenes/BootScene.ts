@@ -1,13 +1,15 @@
 import Phaser from 'phaser';
 import { SaveSystem } from '../systems/SaveSystem';
+import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { preloadIconAssets } from '../ui/IconAssets';
-import { preloadBanners } from '../ui/BannerStack';
+import { preloadBanners } from '../ui/BannerCarousel';
 import { BANNERS } from '../data/banners';
 import { preloadGachaArt } from '../ui/GachaPanels';
 import { GACHA_BANNERS } from '../data/gachaBanners';
+import { preloadNoticeArt } from './NoticeScene';
 import { heading, caption, COLORS } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -31,7 +33,7 @@ export class BootScene extends Phaser.Scene {
     preloadButtonAssets(this);
     preloadIconAssets(this);
     this.load.image('topbar', '/assets/ui/topbar.png');
-    for (const tab of ['event', 'legion', 'home', 'profile', 'settings']) {
+    for (const tab of ['event', 'friend', 'home', 'message', 'shop']) {
       this.load.image(`tab_${tab}`, `/assets/ui/tab_${tab}.png`);
     }
     this.load.image('currency_coin', '/assets/ui/coin.png');
@@ -39,12 +41,20 @@ export class BootScene extends Phaser.Scene {
     this.load.image('currency_stamina', '/assets/ui/stamina.png');
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
+    preloadNoticeArt(this);
   }
 
   create(): void {
     const save = SaveSystem.load();
     this.game.registry.set('save', save);
-    this.scene.start('Home');
+    // Opened from someone's share link (...?friend=ID): go straight to the
+    // 追加 tab with their ID filled in, and tidy the address bar so a reload
+    // doesn't offer it again.
+    const code = new URLSearchParams(location.search).get('friend');
+    const friendId = code ? parseFriendInput(code) : null;
+    if (code) history.replaceState(null, '', location.pathname);
+    if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
+    else this.scene.start('Home');
   }
 
   private buildLoadingUi(): void {

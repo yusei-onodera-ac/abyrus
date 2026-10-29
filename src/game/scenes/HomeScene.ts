@@ -1,14 +1,15 @@
 import Phaser from 'phaser';
-import type { SaveData } from '../systems/SaveSystem';
+import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { applyBackground } from '../ui/Background';
-import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon } from '../ui/Icons';
+import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, settingsIcon } from '../ui/Icons';
 import { caption } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
-import { buildBannerStack } from '../ui/BannerStack';
+import { buildBannerCarousel } from '../ui/BannerCarousel';
 import { BANNERS } from '../data/banners';
 import { RARITY_COLORS, type HeroData } from '../types';
 
@@ -16,6 +17,10 @@ import { RARITY_COLORS, type HeroData } from '../types';
  *  hero layered over the background, with a round icon-cluster nav
  *  underneath instead of a stage-select grid (that lives in
  *  StageSelectScene now) or a stack of long rectangle menu buttons. */
+/** Promo banner frame, top-left under the resource bar. The quest/roster
+ *  diamonds line their left edge up with this one's. */
+const BANNER = { x: 28, y: 138, w: 336, h: 188 };
+
 export class HomeScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
 
@@ -25,6 +30,8 @@ export class HomeScene extends Phaser.Scene {
 
   create(): void {
     const save = this.getSave();
+    // Hand over any gifts/mails the operator has added since the last visit.
+    if (InboxSystem.deliver(save)) SaveSystem.save(save);
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'home');
 
@@ -131,38 +138,40 @@ export class HomeScene extends Phaser.Scene {
    *  the two with diagonal overlap on both sides. */
   private buildNav(): void {
     // clusterX is set so the diamond's left-most point (clusterX - size/2)
-    // lines up with the banner stack's own left edge (bannerX - 100).
-    const clusterX = 195;
+    // lines up with the banner's own left edge.
     const size = 300;
+    const clusterX = BANNER.x + size / 2;
     const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
     const gacha = new IconNavButton(this, 400, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
     const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 
-  /** Vertical stack of promo banners in the top-left corner, under the
-   *  resource bar - gacha pushes, event announcements, limited packs. Pure
-   *  content: see data/banners.ts to add/swap one without touching this
-   *  scene. */
+  /** The promo banner in the top-left corner, under the resource bar - gacha
+   *  pushes, event announcements, limited packs. One banner shows at a time;
+   *  swipe or wait 3 seconds for the next. Pure content: see data/banners.ts to
+   *  add/swap one without touching this scene. */
   private buildBanners(): void {
-    const cards = buildBannerStack(this, 145, 190, BANNERS);
-    enterStagger(this, cards, { dx: -18, dy: 0, duration: 280, delay: 220, stagger: 70 });
+    const carousel = buildBannerCarousel(this, BANNER.x, BANNER.y, BANNERS, BANNER.w, BANNER.h);
+    // Fade only: the carousel clips to a fixed on-screen frame, so it can't slide in.
+    enter(this, carousel, { dx: 0, dy: 0, duration: 400, delay: 220 });
   }
 
   /** Small round utility buttons stacked in the top-right corner, under the
-   *  resource bar: notifications / present box / mail. None of those
-   *  features exist yet, so tapping one just surfaces a placeholder toast
-   *  instead of a real inbox - same "show the chrome before the system
-   *  behind it exists" approach the stamina meter and legion crest use. */
+   *  resource bar: お知らせ / プレゼントBOX / メール / 設定. Each opens its
+   *  screen, and the red dot shows while that one has something new (unread
+   *  notice, claimable gift, unread mail). */
   private buildCornerButtons(save: SaveData): void {
     const size = 72;
     const x = 656;
     const startY = 176;
     const spacing = 92;
-    const items: { texture: string; label: string; unread: boolean }[] = [
-      { texture: notificationIcon(this, size), label: 'お知らせ', unread: save.unread.notification },
-      { texture: giftBoxIcon(this, size), label: 'プレゼントBOX', unread: save.unread.giftBox },
-      { texture: mailIcon(this, size), label: 'メール', unread: save.unread.mail },
+    const unread = InboxSystem.getUnread(save);
+    const items: { texture: string; scene: string; unread: boolean }[] = [
+      { texture: notificationIcon(this, size), scene: 'Notice', unread: unread.notification },
+      { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
+      { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
+      { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
     ];
     const buttons = items.map((item, i) => this.buildCornerButton(x, startY + i * spacing, size, item));
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
@@ -172,7 +181,7 @@ export class HomeScene extends Phaser.Scene {
     x: number,
     y: number,
     size: number,
-    item: { texture: string; label: string; unread: boolean },
+    item: { texture: string; scene: string; unread: boolean },
   ): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
     const icon = this.add.image(0, 0, item.texture).setDisplaySize(size, size);
@@ -194,14 +203,9 @@ export class HomeScene extends Phaser.Scene {
     hitZone.on('pointerdown', () => this.tweens.add({ targets: container, scale: 0.92, duration: 70, ease: 'Sine.easeOut' }));
     hitZone.on('pointerup', () => {
       this.tweens.add({ targets: container, scale: 1.08, duration: 90, ease: 'Sine.easeOut' });
-      this.showToast(`${item.label}: 準備中です`);
+      this.scene.start(item.scene);
     });
     container.add(hitZone);
     return container;
-  }
-
-  private showToast(text: string): void {
-    const msg = caption(this, 360, 145, text, { fontSize: '14px', color: '#f0ecff' }).setOrigin(0.5);
-    this.tweens.add({ targets: msg, alpha: 0, delay: 900, duration: 400, onComplete: () => msg.destroy() });
   }
 }

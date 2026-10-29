@@ -12,15 +12,28 @@ body {
   overflow: hidden;
 }
 
+/* Phaser centers the canvas itself (scale.autoCenter, via margins), so #app
+   stays a plain block. Flex-centering it as well shifted the whole game
+   off-center in any window wider than the game. */
 #app {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Keeps the canvas' own top margin (Phaser's letterbox centering) from
+     collapsing out through #app and shifting the whole box down with it. */
+  display: flow-root;
 }
 
 #app canvas {
+  display: block;
   max-width: 100%;
   max-height: 100%;
+}
+
+/* Phaser's overlay for real DOM elements (the deck-name <input>) is absolutely
+   positioned, then scaled and offset by Phaser to sit on the canvas. Pin its
+   origin to the same corner the canvas starts from so the two line up. */
+#app > div {
+  top: 0;
+  left: 0;
 }

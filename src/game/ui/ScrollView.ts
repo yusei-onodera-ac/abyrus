@@ -24,6 +24,8 @@ export class ScrollView {
   private readonly scrollbar: Phaser.GameObjects.Graphics;
 
   private contentHeight = 0;
+  /** Extra scrollable room after the content (e.g. for a button floating over the bottom corner). */
+  private bottomInset = 0;
   private scrollY = 0;
   /** px per ms, positive = scrolling down the list. */
   private velocity = 0;
@@ -64,6 +66,30 @@ export class ScrollView {
     this.setScroll(this.scrollY);
   }
 
+  /** Raises the whole view (content and scrollbar) above other objects - for a
+   *  list inside a popup, which sits at depth 200. */
+  setDepth(depth: number): void {
+    this.content.setDepth(depth);
+    this.scrollbar.setDepth(depth);
+  }
+
+  /** Jump to the very end of the content (a chat log showing its newest line). */
+  scrollToEnd(): void {
+    this.velocity = 0;
+    this.setScroll(this.maxScroll());
+  }
+
+  getScroll(): number {
+    return this.scrollY;
+  }
+
+  /** Jump to an offset (clamped), e.g. to keep the place after rebuilding
+   *  the content. */
+  scrollTo(y: number): void {
+    this.velocity = 0;
+    this.setScroll(y);
+  }
+
   /** Turn dragging/wheel off while a modal sits on top of the list. */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
@@ -83,8 +109,13 @@ export class ScrollView {
     return pointer.x >= this.left && pointer.x <= this.left + this.width && pointer.y >= this.top && pointer.y <= this.top + this.height;
   }
 
+  setBottomInset(px: number): void {
+    this.bottomInset = px;
+    this.setScroll(this.scrollY);
+  }
+
   private maxScroll(): number {
-    return Math.max(0, this.contentHeight - this.height);
+    return Math.max(0, this.contentHeight + this.bottomInset - this.height);
   }
 
   private setScroll(value: number): void {
@@ -102,7 +133,7 @@ export class ScrollView {
     const x = this.left + this.width + 12;
     this.scrollbar.fillStyle(CHROME.woodGrain, 0.9);
     this.scrollbar.fillRoundedRect(x - SCROLLBAR_WIDTH / 2, this.top, SCROLLBAR_WIDTH, this.height, SCROLLBAR_WIDTH / 2);
-    const thumbH = Math.max(44, (this.height / this.contentHeight) * this.height);
+    const thumbH = Math.max(44, (this.height / (this.contentHeight + this.bottomInset)) * this.height);
     const thumbY = this.top + (this.scrollY / max) * (this.height - thumbH);
     this.scrollbar.fillStyle(CHROME.brass, 1);
     this.scrollbar.fillRoundedRect(x - SCROLLBAR_WIDTH / 2, thumbY, SCROLLBAR_WIDTH, thumbH, SCROLLBAR_WIDTH / 2);
@@ -164,5 +195,8 @@ export class ScrollView {
     input.off(Phaser.Input.Events.POINTER_WHEEL, this.onWheel, this);
     events.off(Phaser.Scenes.Events.UPDATE, this.onUpdate, this);
     this.maskShape.destroy();
+    // Safe if the scene is already tearing these down (destroy is idempotent).
+    this.content.destroy();
+    this.scrollbar.destroy();
   }
 }

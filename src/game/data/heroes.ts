@@ -99,5 +99,6 @@ export function createHeroInstance(heroId: string, instanceId: string, level = 1
     name: def.name,
     level,
     exp,
+    phase: 1,
   };
 }

@@ -17,10 +17,12 @@ const ICON_NAV_QUEST = 'icon_nav_quest';
 const ICON_NAV_GACHA = 'icon_nav_gacha';
 const ICON_NAV_ROSTER = 'icon_nav_roster';
 const ICON_TAB_EVENT = 'icon_tab_event';
-const ICON_TAB_LEGION = 'icon_tab_legion';
+const ICON_TAB_FRIEND = 'icon_tab_friend';
 const ICON_TAB_HOME = 'icon_tab_home';
-const ICON_TAB_PROFILE = 'icon_tab_profile';
-const ICON_TAB_SETTINGS = 'icon_tab_settings';
+const ICON_TAB_MESSAGE = 'icon_tab_message';
+const ICON_TAB_SHOP = 'icon_tab_shop';
+const ICON_SETTINGS = 'icon_settings';
+const ICON_PHASE_MATERIAL = 'icon_phase_material';
 const ICON_NOTIFICATION = 'icon_notification';
 const ICON_GIFT_BOX = 'icon_gift_box';
 const ICON_MAIL = 'icon_mail';
@@ -262,27 +264,18 @@ export function eventTabIcon(scene: Phaser.Scene, size = 72): string {
   });
 }
 
-/** Legion tab: crossed blades behind a small round shield, for "allies /
- *  guild". */
-export function legionTabIcon(scene: Phaser.Scene, size = 72): string {
-  return ensureTexture(scene, `${ICON_TAB_LEGION}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0x3a3d52, 0xc9c3dd);
-    g.lineStyle(c * 0.14, 0xd8dbe6, 1);
-    g.beginPath();
-    g.moveTo(c - c * 0.55, c - c * 0.55);
-    g.lineTo(c + c * 0.55, c + c * 0.55);
-    g.strokePath();
-    g.beginPath();
-    g.moveTo(c + c * 0.55, c - c * 0.55);
-    g.lineTo(c - c * 0.55, c + c * 0.55);
-    g.strokePath();
-    g.fillStyle(0x8a6100, 1);
-    g.fillCircle(c - c * 0.55, c - c * 0.55, c * 0.09);
-    g.fillCircle(c + c * 0.55, c - c * 0.55, c * 0.09);
-    g.fillStyle(0xb8420f, 1);
-    g.fillCircle(c, c, c * 0.24);
-    g.lineStyle(1.5, 0xffd23f, 0.9);
-    g.strokeCircle(c, c, c * 0.24);
+/** Friend tab: two people side by side, for "the players you know". */
+export function friendTabIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_TAB_FRIEND}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x2f5a46, 0xbdf2cf);
+    const person = (cx: number, cy: number, scale: number, body: number, head: number): void => {
+      g.fillStyle(body, 1);
+      g.fillEllipse(cx, cy + c * 0.5 * scale, c * 0.86 * scale, c * 0.66 * scale);
+      g.fillStyle(head, 1);
+      g.fillCircle(cx, cy - c * 0.02 * scale, c * 0.22 * scale);
+    };
+    person(c + c * 0.3, c - c * 0.02, 0.82, 0x4b7a5c, 0xcfe9d6);
+    person(c - c * 0.22, c + c * 0.04, 1, 0x6fae84, 0xf4f1e6);
   });
 }
 
@@ -320,48 +313,40 @@ export function homeTabIcon(scene: Phaser.Scene, size = 72): string {
   });
 }
 
-/** Profile tab: a plumed helmet silhouette, standing in for "your
- *  character". */
-export function profileTabIcon(scene: Phaser.Scene, size = 72): string {
-  return ensureTexture(scene, `${ICON_TAB_PROFILE}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0x4a3d52, 0xd9b8ff);
-    g.fillStyle(0xb8420f, 1);
-    g.fillTriangle(c, c - c * 0.75, c - c * 0.12, c - c * 0.1, c + c * 0.12, c - c * 0.1);
-    g.fillStyle(0x9aa4bf, 1);
-    g.fillEllipse(c, c - c * 0.02, c * 0.78, c * 0.68);
-    g.fillStyle(0x6b7291, 1);
-    g.fillRoundedRect(c - c * 0.4, c + c * 0.18, c * 0.8, c * 0.3, 6);
-    g.fillStyle(0x3a3d52, 1);
-    g.fillRect(c - c * 0.06, c - c * 0.3, c * 0.12, c * 0.5);
-    g.lineStyle(1.5, 0xd9b8ff, 0.8);
-    g.strokeEllipse(c, c - c * 0.02, c * 0.78, c * 0.68);
+/** Message tab: a speech bubble with three dots. */
+export function messageTabIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_TAB_MESSAGE}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x2f4f7a, 0xbfe0ff);
+    g.fillStyle(0xf4f1e6, 1);
+    g.fillRoundedRect(c - c * 0.6, c - c * 0.46, c * 1.2, c * 0.82, 9);
+    g.fillTriangle(c - c * 0.3, c + c * 0.3, c - c * 0.06, c + c * 0.3, c - c * 0.4, c + c * 0.62);
+    g.fillStyle(0x2f4f7a, 1);
+    for (let i = -1; i <= 1; i++) g.fillCircle(c + i * c * 0.28, c - c * 0.06, Math.max(2, c * 0.085));
   });
 }
 
-/** Settings tab: a gear - a ringed hub with radial teeth. */
-export function settingsTabIcon(scene: Phaser.Scene, size = 72): string {
-  return ensureTexture(scene, `${ICON_TAB_SETTINGS}_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, 0x3a3d52, 0xc9c3dd);
-    const teeth = 8;
-    const outer = c * 0.62;
-    const toothLen = c * 0.16;
-    g.fillStyle(0x9aa0a6, 1);
-    for (let i = 0; i < teeth; i++) {
-      const angle = (Math.PI * 2 * i) / teeth;
-      const tx = c + Math.cos(angle) * outer;
-      const ty = c + Math.sin(angle) * outer;
-      g.save();
-      g.translateCanvas(tx, ty);
-      g.rotateCanvas(angle);
-      g.fillRect(-toothLen * 0.4, -toothLen * 0.5, toothLen, toothLen);
-      g.restore();
-    }
-    g.fillStyle(0xc3c8cf, 1);
-    g.fillCircle(c, c, c * 0.46);
-    g.lineStyle(1.5, 0x6b6f78, 0.9);
-    g.strokeCircle(c, c, c * 0.46);
-    g.fillStyle(0x4a2d6e, 1);
-    g.fillCircle(c, c, c * 0.18);
+/** Shop tab: a tied money pouch with a coin on it, for "spend what you have". */
+export function shopTabIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_TAB_SHOP}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x6b4a1f, 0xffd23f);
+    g.fillStyle(0xb98a3f, 1);
+    g.fillEllipse(c, c + c * 0.2, c * 1.08, c * 0.98);
+    g.fillStyle(0xd9a94e, 1);
+    g.fillEllipse(c - c * 0.12, c + c * 0.12, c * 0.7, c * 0.62);
+    g.lineStyle(1.5, 0x6b4a1f, 0.9);
+    g.strokeEllipse(c, c + c * 0.2, c * 1.08, c * 0.98);
+    g.fillStyle(0xb98a3f, 1);
+    g.fillTriangle(c - c * 0.26, c - c * 0.26, c + c * 0.26, c - c * 0.26, c, c + c * 0.02);
+    g.fillStyle(0xe8cb8a, 1);
+    g.fillRoundedRect(c - c * 0.3, c - c * 0.4, c * 0.6, c * 0.16, 4);
+    g.lineStyle(1.2, 0x6b4a1f, 0.9);
+    g.strokeRoundedRect(c - c * 0.3, c - c * 0.4, c * 0.6, c * 0.16, 4);
+    g.fillStyle(0xffd23f, 1);
+    g.fillCircle(c, c + c * 0.24, c * 0.27);
+    g.lineStyle(1.5, 0x8a6100, 0.95);
+    g.strokeCircle(c, c + c * 0.24, c * 0.27);
+    g.fillStyle(0x8a6100, 0.9);
+    g.fillRect(c - c * 0.1, c + c * 0.22, c * 0.2, 3);
   });
 }
 
@@ -424,5 +409,49 @@ export function mailIcon(scene: Phaser.Scene, size = 72): string {
     g.lineTo(c, top + h * 0.56);
     g.lineTo(left + w, top);
     g.strokePath();
+  });
+}
+
+/** Gear for the home screen's corner button row (same neutral badge family
+ *  as the bell, present and envelope above). */
+export function settingsIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_SETTINGS}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    const teeth = 8;
+    const outer = c * 0.5;
+    const toothLen = c * 0.2;
+    g.fillStyle(CORNER_GLYPH, 1);
+    for (let i = 0; i < teeth; i++) {
+      const angle = (Math.PI * 2 * i) / teeth;
+      g.save();
+      g.translateCanvas(c + Math.cos(angle) * outer, c + Math.sin(angle) * outer);
+      g.rotateCanvas(angle);
+      g.fillRect(-toothLen * 0.4, -toothLen * 0.5, toothLen, toothLen);
+      g.restore();
+    }
+    g.fillCircle(c, c, c * 0.42);
+    g.fillStyle(CORNER_BADGE_FILL, 1);
+    g.fillCircle(c, c, c * 0.17);
+  });
+}
+
+/** フェーズ素材: a violet crystal shard, in the gem's family but not its colour. */
+export function phaseMaterialIcon(scene: Phaser.Scene, size = 28): string {
+  return ensureTexture(scene, `${ICON_PHASE_MATERIAL}_${size}`, size, (g, c) => {
+    const top = c * 0.1;
+    const bottom = size - c * 0.1;
+    const waist = c * 0.78;
+    g.fillStyle(0x5a2f98, 1);
+    g.fillTriangle(c, top, size - 3, waist, c, bottom);
+    g.fillTriangle(c, top, 3, waist, c, bottom);
+    g.fillStyle(0xa97bff, 1);
+    g.fillTriangle(c, top, size - 3, waist, c, c * 1.1);
+    g.fillStyle(0xe6d6ff, 0.85);
+    g.fillTriangle(c, top, c * 0.52, c * 0.8, c, c * 0.98);
+    g.lineStyle(1.2, 0x34185e, 0.9);
+    g.strokeTriangle(c, top, size - 3, waist, c, bottom);
+    g.strokeTriangle(c, top, 3, waist, c, bottom);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(c * 1.45, c * 0.5, Math.max(1.2, c * 0.07));
   });
 }

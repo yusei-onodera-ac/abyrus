@@ -1,11 +1,113 @@
 import { BigNumber } from './BigNumber';
 import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
 import { createHeroInstance } from '../data/heroes';
-import type { HeroData, Row } from '../types';
+import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emptyDeck } from './DeckSystem';
+import { MAX_PHASE, type HeroData, type Row } from '../types';
+import { ChatSystem } from './ChatSystem';
+import { SocialSystem, generatePlayerId } from './SocialSystem';
+import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 
 export interface PartyFormation {
   front: (string | null)[];
   back: (string | null)[];
+}
+
+/** A named, saved formation. Heroes may appear in several decks, but only
+ *  once within one. */
+export interface Deck extends PartyFormation {
+  name: string;
+}
+
+/** What a gift pays out. Gems and gold only for now. */
+export interface GiftReward {
+  type: 'gems' | 'gold';
+  amount: number;
+}
+
+/** An item in the player's プレゼントBOX. Claimed or expired ones can be
+ *  deleted; an unclaimed, unexpired one can't (so it can't be lost by tapping
+ *  the wrong button). */
+export interface Gift {
+  id: string;
+  title: string;
+  message: string;
+  reward: GiftReward;
+  receivedAt: number;
+  /** Epoch ms. After this it can no longer be claimed. */
+  expiresAt: number;
+  claimed: boolean;
+}
+
+/** An item in the player's メールBOX. Only a read mail can be deleted. */
+export interface Mail {
+  id: string;
+  title: string;
+  body: string;
+  sentAt: number;
+  read: boolean;
+}
+
+/** Someone on the player's friend list. Other players aren't reachable yet
+ *  (no server), so for now this is whatever the save holds. */
+export interface Friend {
+  /** The friend's 8-character player ID. */
+  id: string;
+  name: string;
+  level: number;
+  addedAt: number;
+  lastLoginAt: number;
+  favorite: boolean;
+}
+
+/** A friend request waiting for an answer. `name` is empty for one the
+ *  player sent by ID before the other side has said who they are. */
+export interface FriendRequest {
+  id: string;
+  name: string;
+  level: number;
+  sentAt: number;
+}
+
+/** A 軍団: a chat group the player made out of their friends (the player
+ *  themself is always in it, so `memberIds` holds only friends). */
+export interface Group {
+  id: string;
+  name: string;
+  memberIds: string[];
+  createdAt: number;
+}
+
+export interface SocialState {
+  /** This player's own ID, the one friends add them by. */
+  playerId: string;
+  friends: Friend[];
+  incoming: FriendRequest[];
+  outgoing: FriendRequest[];
+  groups: Group[];
+  /** friend id -> local day ("2026-10-28") a present was last sent them. */
+  giftSentDay: Record<string, string>;
+}
+
+/** One line of chat. `channel` is 'global', `dm:<friendId>` or `group:<groupId>`. */
+export interface ChatMessage {
+  id: string;
+  channel: string;
+  /** 'self', 'system' (the operator), or the sender's player ID. */
+  senderId: string;
+  senderName: string;
+  text: string;
+  sentAt: number;
+}
+
+export interface ChatState {
+  messages: ChatMessage[];
+}
+
+/** How often each shop product has been bought in the current limit period
+ *  (see PurchaseLimit in data/shop.ts). `period` is the key of the period the
+ *  count belongs to; a count from an earlier period no longer applies. */
+export interface ShopState {
+  purchases: Record<string, { period: string; count: number }>;
 }
 
 export interface SaveData {
@@ -13,7 +115,11 @@ export interface SaveData {
   gold: [number, number];
   gems: number;
   heroes: HeroData[];
-  party: PartyFormation;
+  /** 1 to MAX_DECKS saved formations. */
+  decks: Deck[];
+  /** Index into `decks` of the one that fights - stage battles and Infinite
+   *  Mode both read it through getPartyHeroes(). Never points at an empty deck. */
+  activeDeck: number;
   stageProgress: number;
   updatedAt: number;
   playerName: string;
@@ -22,10 +128,19 @@ export interface SaveData {
    *  surfaced on the top bar ahead of that system so the HUD reads as
    *  complete. */
   stamina: [number, number];
-  /** Whether each home-screen corner button has something unread. No
-   *  notification/gift/mail system exists yet - these just drive the red
-   *  dot badge ahead of that system existing. */
-  unread: { notification: boolean; giftBox: boolean; mail: boolean };
+  gifts: Gift[];
+  mails: Mail[];
+  /** Ids of operator gifts/mails (data/gifts.ts, data/mails.ts) already sent
+   *  to this save, so one the player deleted is never sent again. */
+  deliveredInboxIds: string[];
+  /** Ids of お知らせ (data/notices.ts) the player has opened. */
+  readNotices: string[];
+  social: SocialState;
+  chat: ChatState;
+  shop: ShopState;
+  settings: SettingsState;
+  /** お問い合わせ / バグ報告 waiting for a server to take them. */
+  reports: Report[];
   /** This device's own best Infinite Mode (Event tab) run. Kept locally so
    *  the Event tab still shows a meaningful personal best even before the
    *  global leaderboard call resolves, or when the backend isn't configured. */
@@ -36,6 +151,10 @@ export interface SaveData {
     bestDifficultyReached: number;
     totalRuns: number;
   };
+  /** Spent one at a time to raise a hero's phase directly (see MAX_PHASE in
+   *  types.ts) - no source grants these yet (no stage-reward wiring), so
+   *  this is just a starter stash to make the mechanic testable/usable now. */
+  phaseMaterials: number;
 }
 
 export interface InfiniteModeRunResult {
@@ -58,6 +177,42 @@ export function expToNextLevel(level: number): number {
   return Math.round(80 * Math.pow(1.22, level - 1));
 }
 
+/** Coerces whatever a save holds into a well-formed deck: right slot counts,
+ *  string ids only, a usable name. */
+function normalizeDeck(raw: Partial<Deck> | undefined, fallbackName: string): Deck {
+  const fit = (ids: unknown, size: number): (string | null)[] =>
+    Array.from({ length: size }, (_, i) => (Array.isArray(ids) && typeof ids[i] === 'string' ? (ids[i] as string) : null));
+  return {
+    name: typeof raw?.name === 'string' ? cleanDeckName(raw.name, fallbackName) : fallbackName,
+    front: fit(raw?.front, FRONT_SLOTS),
+    back: fit(raw?.back, BACK_SLOTS),
+  };
+}
+
+/** Loads `decks`, or - for a save from before decks existed - turns its single
+ *  `party` into デッキ1, so an old save keeps its formation. */
+function restoreDecks(parsed: Partial<SaveData> & { party?: PartyFormation }, fallback: Deck[]): Deck[] {
+  if (Array.isArray(parsed.decks) && parsed.decks.length > 0) {
+    return parsed.decks.slice(0, MAX_DECKS).map((deck, i) => normalizeDeck(deck, `デッキ${i + 1}`));
+  }
+  if (parsed.party) return [normalizeDeck(parsed.party as Partial<Deck>, 'デッキ1')];
+  return fallback;
+}
+
+/** Keeps a saved social state, filling in anything missing (an older save, or
+ *  one from before 軍団 existed) and making sure the player has a valid ID. */
+function restoreSocial(raw: Partial<SocialState> | undefined, fallback: SocialState): SocialState {
+  if (!raw || !Array.isArray(raw.friends)) return fallback;
+  return {
+    playerId: typeof raw.playerId === 'string' && raw.playerId.length === 8 ? raw.playerId : generatePlayerId(),
+    friends: raw.friends,
+    incoming: Array.isArray(raw.incoming) ? raw.incoming : [],
+    outgoing: Array.isArray(raw.outgoing) ? raw.outgoing : [],
+    groups: Array.isArray(raw.groups) ? raw.groups : [],
+    giftSentDay: raw.giftSentDay && typeof raw.giftSentDay === 'object' ? raw.giftSentDay : {},
+  };
+}
+
 export const SaveSystem = {
   createDefault(): SaveData {
     // Starters are drawn from the illustrated roster, not the un-illustrated
@@ -74,14 +229,24 @@ export const SaveSystem = {
       gold: BigNumber.from(500).toJSON(),
       gems: 1500,
       heroes,
-      party: { front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] },
+      decks: [{ name: 'デッキ1', front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] }],
+      activeDeck: 0,
       stageProgress: 0,
       updatedAt: Date.now(),
       playerName: 'プレイヤー',
       playerLevel: 1,
       stamina: [50, 50],
-      unread: { notification: true, giftBox: true, mail: false },
+      gifts: [],
+      mails: [],
+      deliveredInboxIds: [],
+      readNotices: [],
+      social: SocialSystem.createDefaultState(Date.now()),
+      chat: ChatSystem.createDefaultState(Date.now()),
+      shop: { purchases: {} },
+      settings: SettingsSystem.createDefaultState(),
+      reports: [],
       infiniteMode: { bestScore: 0, bestSurvivalSeconds: 0, bestEnemiesDefeated: 0, bestDifficultyReached: 0, totalRuns: 0 },
+      phaseMaterials: 5,
     };
   },
 
@@ -89,11 +254,24 @@ export const SaveSystem = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return this.createDefault();
-      const parsed = JSON.parse(raw) as SaveData;
+      const parsed = JSON.parse(raw) as Partial<SaveData> & { party?: PartyFormation };
       if (!parsed.version) return this.createDefault();
       // Spread over a fresh default so a save written before a field (like
       // playerName) existed still gets a sane value instead of undefined.
-      return { ...this.createDefault(), ...parsed };
+      const merged = { ...this.createDefault(), ...parsed } as SaveData & { party?: PartyFormation; unread?: unknown };
+      merged.decks = restoreDecks(parsed, merged.decks);
+      merged.social = restoreSocial(parsed.social, merged.social);
+      merged.chat = Array.isArray(parsed.chat?.messages) ? { messages: parsed.chat.messages } : merged.chat;
+      merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
+      merged.settings = SettingsSystem.restore(parsed.settings);
+      merged.reports = SettingsSystem.restoreReports(parsed.reports);
+      merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
+      // A save from before phase existed has heroes with no `phase` field.
+      merged.heroes = merged.heroes.map((hero) => ({ ...hero, phase: hero.phase ?? 1 }));
+      delete merged.party;
+      // Replaced by values derived from the real inbox (InboxSystem.getUnread).
+      delete merged.unread;
+      return merged;
     } catch {
       return this.createDefault();
     }
@@ -122,35 +300,124 @@ export const SaveSystem = {
     return true;
   },
 
-  /** Adds a newly pulled hero, or converts it to gold if already owned. */
+  spendGold(data: SaveData, amount: BigNumber): boolean {
+    const have = this.getGold(data);
+    if (have.lt(amount)) return false;
+    data.gold = have.sub(amount).toJSON();
+    return true;
+  },
+
+  /** Restores stamina up to its max (never above). Returns how much it actually added. */
+  recoverStamina(data: SaveData, amount: number): number {
+    const [current, max] = data.stamina;
+    const next = Math.min(max, current + amount);
+    data.stamina = [next, max];
+    return Math.max(0, next - current);
+  },
+
+  /** Wipes this device's save and starts over with a brand-new one (new player
+   *  ID included). Returns the fresh save, already stored. */
+  reset(): SaveData {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // Nothing stored, or storage is unavailable: the fresh default below is all there is.
+    }
+    const fresh = this.createDefault();
+    this.save(fresh);
+    return fresh;
+  },
+
+  /** Adds a newly pulled hero. A duplicate is fused into the owned copy
+   *  instead - gold same as before, plus +1 phase (capped at MAX_PHASE)
+   *  rather than a second copy sitting in the roster doing nothing. */
   addHero(data: SaveData, hero: HeroData): HeroPullOutcome {
-    const owned = data.heroes.some((h) => h.heroId === hero.heroId);
-    if (owned) {
+    const existing = data.heroes.find((h) => h.heroId === hero.heroId);
+    if (existing) {
       const duplicateGold = BigNumber.from(DUPLICATE_GOLD_REWARD[hero.rarity]);
       this.addGold(data, duplicateGold);
+      existing.phase = Math.min(MAX_PHASE, existing.phase + 1);
       return { hero, duplicate: true, duplicateGold };
     }
     data.heroes.push(hero);
     return { hero, duplicate: false, duplicateGold: BigNumber.ZERO };
   },
 
+  /** Spends one phase material to raise a hero's phase by 1 (capped at
+   *  MAX_PHASE). False (no change) if out of materials or already maxed. */
+  usePhaseMaterial(data: SaveData, heroId: string): boolean {
+    const hero = this.getHero(data, heroId);
+    if (!hero || hero.phase >= MAX_PHASE || data.phaseMaterials <= 0) return false;
+    data.phaseMaterials -= 1;
+    hero.phase += 1;
+    return true;
+  },
+
   getHero(data: SaveData, id: string): HeroData | undefined {
     return data.heroes.find((h) => h.id === id);
   },
 
-  getPartyHeroes(data: SaveData): { front: HeroData[]; back: HeroData[] } {
+  getDeckHeroes(data: SaveData, deckIndex: number): { front: HeroData[]; back: HeroData[] } {
+    const deck = data.decks[deckIndex];
     const resolve = (id: string | null) => (id ? this.getHero(data, id) : undefined);
     return {
-      front: data.party.front.map(resolve).filter((h): h is HeroData => !!h),
-      back: data.party.back.map(resolve).filter((h): h is HeroData => !!h),
+      front: deck.front.map(resolve).filter((h): h is HeroData => !!h),
+      back: deck.back.map(resolve).filter((h): h is HeroData => !!h),
     };
   },
 
-  setPartySlot(data: SaveData, row: Row, slot: number, heroId: string | null): void {
+  /** The deck that fights: what stage battles and Infinite Mode field. */
+  getPartyHeroes(data: SaveData): { front: HeroData[]; back: HeroData[] } {
+    return this.getDeckHeroes(data, data.activeDeck);
+  },
+
+  countDeckHeroes(data: SaveData, deckIndex: number): number {
+    const { front, back } = this.getDeckHeroes(data, deckIndex);
+    return front.length + back.length;
+  },
+
+  /** Puts a hero in (or, with null, empties) a slot of one deck. A hero can
+   *  only stand in one slot per deck, so it leaves any other slot it held. */
+  setDeckSlot(data: SaveData, deckIndex: number, row: Row, slot: number, heroId: string | null): void {
+    const deck = data.decks[deckIndex];
     for (const r of ['front', 'back'] as const) {
-      data.party[r] = data.party[r].map((id, i) => (r === row && i === slot ? id : id === heroId ? null : id));
+      deck[r] = deck[r].map((id, i) => (r === row && i === slot ? id : id !== null && id === heroId ? null : id));
     }
-    data.party[row][slot] = heroId;
+    deck[row][slot] = heroId;
+  },
+
+  setDeckFormation(data: SaveData, deckIndex: number, formation: Pick<Deck, 'front' | 'back'>): void {
+    const deck = data.decks[deckIndex];
+    deck.front = [...formation.front];
+    deck.back = [...formation.back];
+  },
+
+  /** Appends an empty deck and returns its index, or null at the cap. */
+  addDeck(data: SaveData, name: string): number | null {
+    if (data.decks.length >= MAX_DECKS) return null;
+    data.decks.push(emptyDeck(cleanDeckName(name, defaultDeckName(data.decks))));
+    return data.decks.length - 1;
+  },
+
+  renameDeck(data: SaveData, deckIndex: number, name: string): void {
+    const deck = data.decks[deckIndex];
+    deck.name = cleanDeckName(name, deck.name);
+  },
+
+  /** False (and no change) for an empty deck: it couldn't fight. */
+  setActiveDeck(data: SaveData, deckIndex: number): boolean {
+    if (!data.decks[deckIndex] || this.countDeckHeroes(data, deckIndex) === 0) return false;
+    data.activeDeck = deckIndex;
+    return true;
+  },
+
+  /** False (and no change) for the deck in use - which also means the last
+   *  remaining deck can never be removed. */
+  removeDeck(data: SaveData, deckIndex: number): boolean {
+    if (!data.decks[deckIndex] || deckIndex === data.activeDeck) return false;
+    data.decks.splice(deckIndex, 1);
+    if (deckIndex < data.activeDeck) data.activeDeck -= 1;
+    return true;
   },
 
   grantExp(data: SaveData, heroId: string, exp: number): void {
