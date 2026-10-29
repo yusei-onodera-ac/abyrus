@@ -1,8 +1,11 @@
 import Phaser from 'phaser';
 import { COMMERCE_NOTICE, FUNDS_NOTICE } from '../data/legal';
-import { GEM_PRODUCTS, GOLD_PRODUCTS, ITEM_PRODUCTS, PACKS, type Good, type Price, type ShopFocus, type ShopProduct } from '../data/shop';
+import { isItemId } from '../data/items';
+import { GEM_PRODUCTS, GOLD_PRODUCTS, ITEM_PRODUCTS, PACKS, type Good, type GoodType, type Price, type ShopFocus, type ShopProduct } from '../data/shop';
 import { PaymentSystem } from '../systems/PaymentSystem';
-import { SaveSystem } from '../systems/SaveSystem';
+import { PREMIUM } from '../data/premium';
+import { PremiumSystem } from '../systems/PremiumSystem';
+import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { describeLimit, ShopSystem, type BlockReason } from '../systems/ShopSystem';
 import type { NavTab } from '../ui/BottomNavBar';
 import { Button } from '../ui/Button';
@@ -13,6 +16,7 @@ import { formatDateTime, formatRemaining } from '../ui/format';
 import { openModal } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { addGoodIcon, GOOD_COLOR, GOOD_LABEL } from '../ui/RewardIcon';
+import { askBuyPremium, buildPremiumActionCard, buildPremiumBenefitsCard, buildPremiumPackCard, claimPremiumDaily } from '../ui/PremiumPanels';
 import { CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, heading, CHROME } from '../ui/theme';
@@ -39,11 +43,20 @@ const BLOCK_TEXT: Record<BlockReason, string> = {
 };
 
 /** Which tab and which section a top-bar + button lands on. */
-const FOCUS_TAB: Record<ShopFocus, ShopTab> = { packs: 'gems', gems: 'gems', gold: 'gems', stamina: 'items', materials: 'items' };
+const FOCUS_TAB: Record<ShopFocus, ShopTab> = { premium: 'gems', packs: 'gems', gems: 'gems', gold: 'gems', stamina: 'items', materials: 'items' };
 
 const yen = (n: number): string => `¥${n.toLocaleString('ja-JP')}`;
 
 /** A product's contents, one good per line: "魔晶石 ×300". */
+/** How many of a good the player holds, as a line for its card. */
+function heldLine(save: SaveData, type: GoodType): string {
+  if (type === 'stamina') return `スタミナ ${save.stamina[0]} / ${save.stamina[1]}`;
+  if (type === 'phaseMaterials') return `所持 ${save.phaseMaterials.toLocaleString('ja-JP')}個`;
+  if (type === 'skillEssence') return `所持 ${save.skillEssence.toLocaleString('ja-JP')}`;
+  if (isItemId(type)) return `所持 ${SaveSystem.getItem(save, type).toLocaleString('ja-JP')}個`;
+  return '';
+}
+
 function goodLines(goods: Good[]): string[] {
   return goods.map((g) => `${GOOD_LABEL[g.type]} ×${g.amount.toLocaleString('ja-JP')}`);
 }
@@ -138,6 +151,10 @@ export class ShopScene extends InboxScene {
     };
 
     if (this.tab === 'gems') {
+      add(this.sectionCard('プレミアムパス', PremiumSystem.isActive(this.save) ? `加入中（あと${PremiumSystem.daysLeft(this.save)}日）` : `月額 ${yen(PREMIUM.yen)}`), 'premium');
+      add(buildPremiumBenefitsCard(this));
+      add(buildPremiumPackCard(this));
+      add(buildPremiumActionCard(this, this.save, { guard: () => this.scroll.isTap(), onBuy: () => this.buyPremium(), onClaimDaily: () => this.claimPremiumDaily() }));
       const packs = ShopSystem.visible(PACKS, now);
       if (packs.length > 0) {
         add(this.sectionCard('お得パック', '円・魔晶石で購入'), 'packs');
@@ -152,13 +169,35 @@ export class ShopScene extends InboxScene {
       const { stamina } = this.save;
       add(this.sectionCard('スタミナ回復', `スタミナ ${stamina[0]} / ${stamina[1]}`), 'stamina');
       for (const item of ShopSystem.visible(ITEM_PRODUCTS, now).filter((p) => p.category === 'stamina')) add(this.itemCard(item, now));
-      add(this.sectionCard('育成素材', `フェーズ素材 ${this.save.phaseMaterials}個`), 'materials');
+      add(this.sectionCard('育成素材', `フェーズ素材 ${this.save.phaseMaterials}個　技素 ${this.save.skillEssence.toLocaleString('ja-JP')}`), 'materials');
       for (const item of ShopSystem.visible(ITEM_PRODUCTS, now).filter((p) => p.category === 'material')) add(this.itemCard(item, now));
     }
     return cards;
   }
 
   // --- cards ------------------------------------------------------------
+
+  private buyPremium(): void {
+    if (this.modal?.container.active) return;
+    askBuyPremium(this, this.scroll, this.save, {
+      setModal: (handle) => {
+        this.modal?.close();
+        this.modal = handle;
+      },
+      onPaid: () => this.refreshResources(),
+      onClosed: () => this.queueRender(),
+      isBusy: () => this.paying,
+      setBusy: (busy) => {
+        this.paying = busy;
+      },
+    });
+  }
+
+  private claimPremiumDaily(): void {
+    if (!claimPremiumDaily(this, this.save)) return;
+    this.refreshResources();
+    this.queueRender();
+  }
 
   private shell(height: number, highlight = false): InboxCard {
     const container = this.add.container(0, 0);
@@ -262,8 +301,7 @@ export class ShopScene extends InboxScene {
     };
     place(wrappedText(this, textX, y, product.name, textW, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', strokeThickness: 4 }), 4);
     if (product.description) place(wrappedText(this, textX, y, product.description, textW, { fontSize: '18px', color: '#d8c49a' }), 6);
-    const held = good.type === 'stamina' ? `スタミナ ${this.save.stamina[0]} / ${this.save.stamina[1]}` : `所持 ${this.save.phaseMaterials}個`;
-    place(wrappedText(this, textX, y, held, textW, { fontSize: '18px', fontStyle: 'bold', color: GOOD_COLOR[good.type] }), 4);
+    place(wrappedText(this, textX, y, heldLine(this.save, good.type), textW, { fontSize: '18px', fontStyle: 'bold', color: GOOD_COLOR[good.type] }), 4);
     const note = this.limitLine(product, now);
     if (note) place(wrappedText(this, textX, y, note.text, textW, { fontSize: '16px', color: note.color }), 0);
 

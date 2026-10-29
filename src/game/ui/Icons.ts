@@ -20,6 +20,7 @@ const ICON_TAB_EVENT = 'icon_tab_event';
 const ICON_TAB_FRIEND = 'icon_tab_friend';
 const ICON_TAB_HOME = 'icon_tab_home';
 const ICON_TAB_MESSAGE = 'icon_tab_message';
+const ICON_TAB_ENHANCE = 'icon_tab_enhance';
 const ICON_TAB_SHOP = 'icon_tab_shop';
 const ICON_SETTINGS = 'icon_settings';
 const ICON_PHASE_MATERIAL = 'icon_phase_material';
@@ -322,6 +323,30 @@ export function messageTabIcon(scene: Phaser.Scene, size = 72): string {
     g.fillTriangle(c - c * 0.3, c + c * 0.3, c - c * 0.06, c + c * 0.3, c - c * 0.4, c + c * 0.62);
     g.fillStyle(0x2f4f7a, 1);
     for (let i = -1; i <= 1; i++) g.fillCircle(c + i * c * 0.28, c - c * 0.06, Math.max(2, c * 0.085));
+  });
+}
+
+/** 強化 tab: a bold up-arrow with a spark, for "make them stronger". (Drop
+ *  public/assets/ui/tab_enhance.png in to replace it with illustrated art.) */
+export function enhanceTabIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `${ICON_TAB_ENHANCE}_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x7a3f1f, 0xffd9a0);
+    g.fillStyle(0xfff0cc, 1);
+    g.fillTriangle(c, c - c * 0.6, c + c * 0.52, c + c * 0.02, c - c * 0.52, c + c * 0.02);
+    g.fillRect(c - c * 0.2, c, c * 0.4, c * 0.52);
+    g.lineStyle(1.5, 0x6b3a14, 0.9);
+    g.strokeTriangle(c, c - c * 0.6, c + c * 0.52, c + c * 0.02, c - c * 0.52, c + c * 0.02);
+    g.fillStyle(0xe0822a, 1);
+    g.fillRect(c - c * 0.2, c + c * 0.2, c * 0.4, c * 0.1);
+    g.fillStyle(0xffffff, 1);
+    const sx = c + c * 0.5;
+    const sy = c - c * 0.46;
+    const r = c * 0.2;
+    const t = c * 0.05;
+    g.fillTriangle(sx, sy - r, sx + t, sy, sx - t, sy);
+    g.fillTriangle(sx, sy + r, sx + t, sy, sx - t, sy);
+    g.fillTriangle(sx - r, sy, sx, sy - t, sx, sy + t);
+    g.fillTriangle(sx + r, sy, sx, sy - t, sx, sy + t);
   });
 }
 

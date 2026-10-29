@@ -19,6 +19,8 @@ export interface EventEntry {
   accent: number;
   /** A big faint glyph behind the title on a drawn banner; defaults to the title's first character. */
   emblem?: string;
+  /** The card's button when it can be opened (default イベントへ). */
+  actionLabel?: string;
   /** Local start time, e.g. "2026-12-01T00:00:00". Before it, the event shows
    *  as 開催予定 and cannot be opened. Omit for an event already running. */
   startsAt?: string;
@@ -46,6 +48,7 @@ export const EVENTS: EventEntry[] = [
   {
     id: 'premium',
     kind: 'premium',
+    actionLabel: '詳細・購入',
     title: 'プレミアムパス',
     description: '毎日魔晶石がもらえて、戦闘2倍速・放置報酬の上限アップも。',
     accent: 0xc79a2a,

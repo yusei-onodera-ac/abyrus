@@ -81,7 +81,7 @@ export class IdleScene extends InboxScene {
     if (preview.skillEssence > 0) tiles.push({ kind: 'essence', amount: `+${preview.skillEssence.toLocaleString('ja-JP')}` });
     for (const { item, amount } of preview.items) tiles.push({ kind: 'item', item, amount: `+${amount.toLocaleString('ja-JP')}` });
     if (preview.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${preview.phaseMaterials}` });
-    if (preview.equipment > 0) tiles.push({ kind: 'equipment', equip: { slot: 'weapon', rarity: 2, name: '装備' }, amount: `×${preview.equipment}` });
+    if (preview.equipment > 0) tiles.push({ kind: 'equipment', equip: { glyph: 'sword', rarity: 2, name: '装備' }, amount: `×${preview.equipment}` });
 
     const grid = buildRewardGrid(this, tiles, CARD_WIDTH - PAD * 2);
     const height = 70 + grid.height + 24;

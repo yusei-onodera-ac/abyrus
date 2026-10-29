@@ -1,6 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import type { Good, LimitPeriod, ShopProduct } from '../data/shop';
+import { isItemId } from '../data/items';
 
 /** Why a product can't be bought right now. */
 export type BlockReason = 'not_started' | 'ended' | 'sold_out' | 'stamina_full';
@@ -97,6 +98,8 @@ export const ShopSystem = {
       if (good.type === 'gems') save.gems += good.amount;
       else if (good.type === 'gold') SaveSystem.addGold(save, BigNumber.from(good.amount));
       else if (good.type === 'phaseMaterials') save.phaseMaterials += good.amount;
+      else if (good.type === 'skillEssence') SaveSystem.addSkillEssence(save, good.amount);
+      else if (isItemId(good.type)) SaveSystem.addItem(save, good.type, good.amount);
       else SaveSystem.recoverStamina(save, good.amount);
     }
   },

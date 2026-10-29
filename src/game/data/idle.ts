@@ -20,14 +20,22 @@ export const IDLE_ESSENCE_CLEARS_PER_HOUR = 2;
 /** フェーズ素材 per hour. */
 export const IDLE_PHASE_PER_HOUR = 0.2;
 
-/** Per hour, by region reached (index 0 = 迷いの森 ... 4 = 黄昏の都). */
-export const IDLE_ITEM_PER_HOUR: Record<ItemId, number[]> = {
-  exp_s: [8, 6, 4, 2, 0],
-  exp_m: [0, 2, 3, 3, 2],
-  exp_l: [0, 0, 0.5, 1, 1.5],
-  exp_xl: [0, 0, 0, 0.1, 0.3],
-  equip_essence: [2, 4, 6, 8, 10],
-};
+/** An idle hour is worth this many levels of EXP to the level the player is at (measured
+ *  from the last stage cleared, never below IDLE_EXP_MIN_LEVEL), paid as 経験値素材. */
+export const IDLE_EXP_LEVELS_PER_HOUR = 0.4;
+export const IDLE_EXP_MIN_LEVEL = 12;
+
+/** Which 経験値素材 that EXP is paid in, by region reached (index 0 = 迷いの森 ... 4 = 黄昏の都): shares add up to 1. */
+export const IDLE_EXP_SPLIT: { item: ItemId; share: number }[][] = [
+  [{ item: 'exp_s', share: 1 }],
+  [{ item: 'exp_s', share: 0.4 }, { item: 'exp_m', share: 0.6 }],
+  [{ item: 'exp_m', share: 0.7 }, { item: 'exp_l', share: 0.3 }],
+  [{ item: 'exp_m', share: 0.3 }, { item: 'exp_l', share: 0.7 }],
+  [{ item: 'exp_l', share: 0.6 }, { item: 'exp_xl', share: 0.4 }],
+];
+
+/** 装備強化素材 per hour, by region reached. */
+export const IDLE_EQUIP_ESSENCE_PER_HOUR: number[] = [2, 4, 6, 8, 10];
 
 /** Pieces of equipment per hour, and which rarities they are: weights for ★1, ★2, ★3 by region. Low-level gear only. */
 export const IDLE_EQUIP_PER_HOUR = 0.6;

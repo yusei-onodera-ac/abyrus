@@ -111,7 +111,7 @@ export function buildEventCard(
   y += 34;
 
   const canOpen = phase === 'live' && entry.kind !== undefined;
-  const label = canOpen ? 'イベントへ' : phase === 'upcoming' ? '開催予定' : '準備中';
+  const label = canOpen ? (entry.actionLabel ?? 'イベントへ') : phase === 'upcoming' ? '開催予定' : '準備中';
   const button = new Button(scene, w / 2, y + 36, innerW, 72, label, handlers.onOpen, { variant: canOpen ? 'gold' : 'wood', fontSize: '28px', guard: handlers.guard });
   if (!canOpen) button.setEnabled(false);
   container.add(button);

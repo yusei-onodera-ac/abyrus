@@ -36,7 +36,7 @@ export class BootScene extends Phaser.Scene {
     preloadButtonAssets(this);
     preloadIconAssets(this);
     this.load.image('topbar', '/assets/ui/topbar.png');
-    for (const tab of ['event', 'friend', 'home', 'message', 'shop']) {
+    for (const tab of ['event', 'friend', 'home', 'enhance', 'shop']) {
       this.load.image(`tab_${tab}`, `/assets/ui/tab_${tab}.png`);
     }
     this.load.image('currency_coin', '/assets/ui/coin.png');

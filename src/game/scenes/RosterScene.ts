@@ -17,7 +17,9 @@ import { showToast } from '../ui/Toast';
 import { openModal, type ModalHandle } from '../ui/Modal';
 import { openConfirm, openTextPrompt } from '../ui/Dialogs';
 import { enter, enterStagger } from '../ui/Transitions';
-import type { HeroData, Row } from '../types';
+import { describeEquip, equipMaxLevel, getEquipDef } from '../data/equipment';
+import { equipIcon } from '../ui/ItemIcons';
+import { EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, hex, type EquipSlot, type HeroData, type Row } from '../types';
 
 interface RosterSceneData {
   /** Hero id to arrive with, ready to drop into a slot of the deck in use -
@@ -231,8 +233,9 @@ export class RosterScene extends Phaser.Scene {
       const selected = editing && this.targetSlot?.row === ref.row && this.targetSlot.slot === ref.slot;
       container.add(new HeroSlot(this, xs[i], slotY, { hero, generator: this.generator, selected, onTap: () => this.onDeckSlotTap(index, ref), guard }));
       if (editing && hero) container.add(this.buildRemoveBadge(xs[i] + size / 2 - 4, slotY - size / 2 + 4, ref, guard));
+      if (hero) container.add(this.buildGearStrip(hero, xs[i], slotY + size / 2 + 24, guard));
     });
-    y += size + 12;
+    y += size + 50;
 
     if (editing) {
       container.add(caption(this, w / 2, y + 8, this.editHint(), { fontSize: '17px', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
@@ -300,6 +303,84 @@ export class RosterScene extends Phaser.Scene {
     if (this.armedHeroId) return '編成する枠を上からタップしてください';
     if (this.targetSlot) return '入れ替えるキャラを下から選んでください';
     return '下のキャラをタップで編成　枠をタップで入れ替え先を選択';
+  }
+
+  /** The hero's three pieces of equipment as small icons (an empty ring where nothing
+   *  is worn), under their slot. Tapping them opens that hero's equipment in full. */
+  private buildGearStrip(hero: HeroData, cx: number, cy: number, guard: () => boolean): Phaser.GameObjects.Container {
+    const strip = this.add.container(cx, cy);
+    const icon = 28;
+    const gap = 4;
+    const total = EQUIP_SLOTS.length * icon + (EQUIP_SLOTS.length - 1) * gap;
+    EQUIP_SLOTS.forEach((slot, i) => {
+      const x = -total / 2 + icon / 2 + i * (icon + gap);
+      const item = hero.gear[slot];
+      const def = item ? getEquipDef(item.defId) : undefined;
+      if (def) {
+        strip.add(this.add.image(x, 0, equipIcon(this, def.glyph, def.rarity, icon)));
+      } else {
+        const g = this.add.graphics();
+        g.fillStyle(0x0d0905, 0.8);
+        g.fillCircle(x, 0, icon / 2 - 1);
+        g.lineStyle(2, CHROME.brass, 0.55);
+        g.strokeCircle(x, 0, icon / 2 - 1);
+        strip.add(g);
+      }
+    });
+    const hit = this.add.zone(0, 0, total + 10, icon + 8).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => {
+      if (guard()) this.showGearModal(hero);
+    });
+    strip.add(hit);
+    return strip;
+  }
+
+  /** One hero's equipment in full: each part's name, rarity, level and what it adds, with 変更 for each. */
+  private showGearModal(hero: HeroData): void {
+    this.modal?.close();
+    this.modal = openModal(this, this.scroll, 0.75, true);
+    const modal = this.modal.container;
+    const w = 620;
+    const rowH = 118;
+    const h = 150 + EQUIP_SLOTS.length * rowH + 100;
+    const cy = 640;
+    const top = cy - h / 2;
+    const left = 360 - w / 2;
+
+    modal.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: hero.rarity, gradient: false }));
+    // Swallows taps so touching the panel itself doesn't dismiss the popup.
+    modal.add(this.add.zone(360, cy, w, h).setInteractive());
+    modal.add(heading(this, 360, top + 48, `${hero.name} の装備`, { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(caption(this, 360, top + 92, `Lv.${hero.level}　総合力 ${ProgressionSystem.computeHeroPower(hero).toString()}`, { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+
+    EQUIP_SLOTS.forEach((slot: EquipSlot, i) => {
+      const rowTop = top + 130 + i * rowH;
+      modal.add(createDivider(this, 360, rowTop, w - 48, CHROME.brassDark));
+      const y = rowTop + rowH / 2;
+      const item = hero.gear[slot];
+      const def = item ? getEquipDef(item.defId) : undefined;
+      if (item && def) {
+        modal.add(this.add.image(left + 56, y, equipIcon(this, def.glyph, def.rarity, 76)));
+        const name = body(this, left + 112, y - 28, def.name, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+        if (name.width > 280) name.setScale(280 / name.width);
+        modal.add(name);
+        modal.add(this.add.text(left + 112, y + 2, '★'.repeat(def.rarity), { fontSize: '18px', color: hex(RARITY_COLORS[def.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        modal.add(caption(this, left + 112 + def.rarity * 20 + 12, y + 2, `${EQUIP_SLOT_LABELS[slot]}　Lv.${item.level}/${equipMaxLevel(item)}`, { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        modal.add(body(this, left + 112, y + 32, describeEquip(item), { fontSize: '22px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      } else {
+        const g = this.add.graphics();
+        g.fillStyle(0x0d0905, 0.8);
+        g.fillCircle(left + 56, y, 34);
+        g.lineStyle(3, CHROME.brassDark, 0.7);
+        g.strokeCircle(left + 56, y, 34);
+        modal.add(g);
+        modal.add(body(this, left + 112, y, `${EQUIP_SLOT_LABELS[slot]}　なし`, { fontSize: '24px', color: '#a89a78', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      }
+      modal.add(new Button(this, left + w - 36 - 70, y, 140, 60, item ? '変更' : 'つける', () => this.scene.start('GearPick', { heroId: hero.id, slot, from: 'Roster', direct: true }), { variant: item ? 'wood' : 'gold', fontSize: '24px' }));
+    });
+
+    modal.add(new Button(this, 360, top + h - 52, 240, 66, '閉じる', () => this.modal?.close(), { variant: 'wood', fontSize: '24px' }));
   }
 
   /** Red × on a filled slot while editing. */

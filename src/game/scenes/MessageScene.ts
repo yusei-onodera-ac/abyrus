@@ -82,7 +82,8 @@ export class MessageScene extends Phaser.Scene {
     buildTitlePlate(this, 'メッセージ');
     buildFrame(this);
     this.show();
-    new BottomNavBar(this, 720, 1280, 'message');
+    // No longer a tab of its own: reached from the Home screen's message box and the Friend screen.
+    new BottomNavBar(this, 720, 1280, null);
   }
 
   // --- view switching ------------------------------------------------------

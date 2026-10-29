@@ -52,7 +52,9 @@ export class EnhanceScene extends InboxScene {
   }
 
   protected goBack(): void {
-    this.scene.start('HeroDetail', this.target);
+    // Opened from the 強化 tab's list: back to it, not by way of the hero's detail.
+    if (this.target.from === 'EnhanceHub') this.scene.start('EnhanceHub');
+    else this.scene.start('HeroDetail', this.target);
   }
 
   private hero(): HeroData | undefined {

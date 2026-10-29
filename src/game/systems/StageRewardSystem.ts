@@ -1,5 +1,5 @@
 import { BOSS_DROP_MULTIPLIER, FINAL_ITEM_DROPS, STAGE_BONUS, STAGE_ITEM_DROPS, type ItemDrop, type StageTier } from '../data/stageRewards';
-import type { ItemId } from '../data/items';
+import { ITEMS, type ItemId } from '../data/items';
 import type { QuestStage } from './QuestRoute';
 import { EXTRA_STAGES_PER_REGION, FINAL_STAGE_INDEX, STAGES_PER_REGION } from './ProgressionSystem';
 import { SaveSystem, type SaveData } from './SaveSystem';
@@ -28,8 +28,9 @@ export const StageRewardSystem = {
     return stage.index >= save.stageProgress;
   },
 
-  /** Rolls the bonus for a clear (the drops are chances; the first-clear gems are certain). */
-  roll(stage: QuestStage, firstClear: boolean, rng: () => number = Math.random): StageBonus {
+  /** Rolls the bonus for a clear (the drops are chances; the first-clear gems are certain).
+   *  `expReward` is the EXP the clear itself pays each hero: 経験値素材 drops are sized from it. */
+  roll(stage: QuestStage, firstClear: boolean, expReward: number, rng: () => number = Math.random): StageBonus {
     const tier = stageTier(stage);
     const rule = STAGE_BONUS[tier];
     const perRegion = stage.kind === 'extra' ? EXTRA_STAGES_PER_REGION : STAGES_PER_REGION;
@@ -39,7 +40,8 @@ export const StageRewardSystem = {
     const items: { item: ItemId; amount: number }[] = [];
     for (const drop of table) {
       if (rng() >= drop.chance) continue;
-      items.push({ item: drop.item, amount: drop.amount * (boss ? BOSS_DROP_MULTIPLIER : 1) });
+      const base = drop.expShare !== undefined ? Math.max(1, Math.round((drop.expShare * expReward) / (ITEMS[drop.item].exp ?? 1))) : (drop.amount ?? 1);
+      items.push({ item: drop.item, amount: base * (boss ? BOSS_DROP_MULTIPLIER : 1) });
     }
     return {
       firstClear,

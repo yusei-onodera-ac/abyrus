@@ -11,6 +11,8 @@ interface GearPickData {
   slot: EquipSlot;
   /** The scene the hero detail was opened from (passed back when going back to it). */
   from: string;
+  /** Opened straight from `from` (the formation screen), not by way of the hero detail: 戻る goes back to `from`. */
+  direct?: boolean;
 }
 
 /** The list a hero's 武器 / 防具 / 装飾 slot opens: the piece worn now (with 外す) and
@@ -32,7 +34,8 @@ export class GearPickScene extends InboxScene {
   }
 
   protected goBack(): void {
-    this.scene.start('HeroDetail', { heroId: this.target.heroId, from: this.target.from });
+    if (this.target.direct) this.scene.start(this.target.from);
+    else this.scene.start('HeroDetail', { heroId: this.target.heroId, from: this.target.from });
   }
 
   protected buildCards(): InboxCard[] {

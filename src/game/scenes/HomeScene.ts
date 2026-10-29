@@ -3,7 +3,7 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
-import { hourglassIcon, swordBadgeIcon } from '../ui/ItemIcons';
+import { hourglassIcon } from '../ui/ItemIcons';
 import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
@@ -11,6 +11,8 @@ import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { applyBackground } from '../ui/Background';
 import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, settingsIcon } from '../ui/Icons';
 import { buildAvatar } from '../ui/CardParts';
+import { Button } from '../ui/Button';
+import { formatAgo } from '../ui/format';
 import { createPanel } from '../ui/Panel';
 import { addGoodIcon } from '../ui/RewardIcon';
 import { showToast } from '../ui/Toast';
@@ -183,22 +185,13 @@ export class HomeScene extends Phaser.Scene {
     const spacing = 92;
     const startY = 176;
     const unread = InboxSystem.getUnread(save);
-    type Item = { texture: string; scene: string; unread: boolean };
-    // Right column: the inbox and settings. Beside it: the daily things and the shop-like screens.
-    const inbox: Item[] = [
+    const items: { texture: string; scene: string; unread: boolean }[] = [
       { texture: notificationIcon(this, size), scene: 'Notice', unread: unread.notification },
       { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
       { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
       { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
     ];
-    const extras: Item[] = [
-      { texture: hourglassIcon(this, size), scene: 'Idle', unread: IdleSystem.hasReward(save) },
-      { texture: swordBadgeIcon(this, size), scene: 'Equipment', unread: false },
-    ];
-    const buttons = [
-      ...inbox.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item)),
-      ...extras.map((item, i) => this.buildCornerButton(564, startY + i * spacing, size, item)),
-    ];
+    const buttons = items.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item));
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
@@ -212,31 +205,47 @@ export class HomeScene extends Phaser.Scene {
     this.resourceBar.update(save);
   }
 
-  /** 放置報酬 claim box, pinned just under the promo banner: how long has
-   *  piled up and a one-tap 受け取る: the player doesn't have to visit Idle
-   *  just to cash in gold that's been sitting there. */
+  /** 放置報酬, pinned just under the promo banner: how long has piled up (with a
+   *  bar towards the cap) and a 受け取る button, so cashing in doesn't need a
+   *  trip to the Idle screen. The rest of the box opens that screen (ad boost,
+   *  the full list of what has piled up). */
   private buildIdleBox(save: SaveData): void {
     const x = BANNER.x;
-    const y = BANNER.y + BANNER.h + 14;
+    const y = BANNER.y + BANNER.h + 12;
     const w = BANNER.w;
-    const h = 92;
+    const h = 100;
     const box = this.add.container(x, y);
     box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
-    box.add(this.add.image(46, h / 2, hourglassIcon(this, 56)));
-    box.add(caption(this, 84, h / 2 - 20, '放置報酬', { fontSize: '17px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const preview = IdleSystem.preview(save);
-    const timeText = body(this, 84, h / 2 + 6, formatIdleHours(preview.hours), { fontSize: '22px', fontStyle: 'bold', color: preview.full ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5);
-    box.add(timeText);
-    box.add(addGoodIcon(this, 'gold', w - 118, h / 2, 34));
-    box.add(body(this, w - 96, h / 2, `+${preview.gold.toString()}`, { fontSize: '16px', fontStyle: 'bold', color: '#ffe79a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const claimable = preview.hours >= 1 / 60;
+    box.add(this.add.image(42, 38, hourglassIcon(this, 54)));
+    box.add(caption(this, 80, 20, '放置報酬', { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(body(this, 80, 46, formatIdleHours(preview.hours), { fontSize: '22px', fontStyle: 'bold', color: preview.full ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5));
 
-    // The whole box is tappable: a quick claim when there's something to
-    // take, else a jump to the full 放置報酬 screen (ad boost, totals breakdown).
+    // How full it is, as a thin bar along the bottom of the box.
+    const barX = 18;
+    const barW = w - 36;
+    const bar = this.add.graphics();
+    bar.fillStyle(0x0d0905, 1);
+    bar.fillRoundedRect(barX, 80, barW, 9, 4);
+    bar.fillStyle(preview.full ? 0xffd23f : 0xe0822a, 1);
+    bar.fillRoundedRect(barX, 80, Math.max(9, barW * Math.min(1, preview.hours / preview.capHours)), 9, 4);
+    bar.lineStyle(1.5, CHROME.brassDark, 1);
+    bar.strokeRoundedRect(barX, 80, barW, 9, 4);
+    box.add(bar);
+
+    // Tapping the box itself opens the full screen; the button on top claims.
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
     hit.setInteractive({ useHandCursor: true });
-    hit.on('pointerup', () => (preview.hours >= 1 / 60 ? this.claimIdle(save, box) : this.scene.start('Idle')));
+    hit.on('pointerup', () => this.scene.start('Idle'));
     box.add(hit);
+
+    box.add(addGoodIcon(this, 'gold', w - 124, 24, 24));
+    box.add(body(this, w - 108, 24, `+${preview.gold.toString()}`, { fontSize: '15px', fontStyle: 'bold', color: '#ffe79a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const claim = new Button(this, w - 74, 52, 124, 40, '受け取る', () => this.claimIdle(save, box), { variant: claimable ? 'gold' : 'wood', fontSize: '20px' });
+    claim.setEnabled(claimable);
+    box.add(claim);
 
     enter(this, box, { dy: 10, duration: 320, delay: 260 });
   }
@@ -247,31 +256,36 @@ export class HomeScene extends Phaser.Scene {
     SaveSystem.save(save);
     this.resourceBar.update(save);
     showToast(this, `放置報酬を受け取りました：+${result.preview.gold.toString()}`);
-    box.destroy();
-    this.buildIdleBox(save);
+    // Rebuilt after this tap has finished: the button being replaced is still handling it.
+    this.time.delayedCall(0, () => {
+      box.destroy();
+      this.buildIdleBox(save);
+    });
   }
 
-  /** Small always-on preview, bottom-right, of the single most recent メッセージ
-   *  across 全体/軍団/フレンド - tapping it opens the full thread. Rebuilt
-   *  fresh every time Home loads, so it always shows the latest one. */
+  /** The latest メッセージ (across 全体 / 軍団 / フレンド), bottom-right and always
+   *  there: who said it, how long ago, and as much of the line as fits. Tapping
+   *  it opens that conversation. Rebuilt every time Home loads. */
   private buildMessageWidget(save: SaveData): void {
-    const w = 300;
-    const h = 96;
-    const x = 720 - 16 - w;
-    const y = 1280 - BottomNavBar.totalHeight() - 14 - h;
+    const w = 330;
+    const h = 100;
+    const x = 720 - 14 - w;
+    const y = 1280 - BottomNavBar.totalHeight() - 12 - h;
     const box = this.add.container(x, y).setDepth(5);
     box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 16, gradient: false }));
 
     const latest = ChatSystem.latestMessage(save);
-    box.add(buildAvatar(this, 42, h / 2, 26, latest?.senderName ?? save.playerName));
-    box.add(caption(this, 78, 26, 'メッセージ', { fontSize: '15px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const textX = 84;
+    const textW = w - textX - 14;
+    box.add(buildAvatar(this, 44, h / 2 + 4, 27, latest?.senderName ?? save.playerName));
+    box.add(caption(this, textX, 20, 'メッセージ', { fontSize: '15px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
 
     if (latest) {
-      box.add(body(this, 78, 52, latest.senderName, { fontSize: '17px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-      const preview = Array.from(plainPreview(latest.text)).slice(0, 16).join('') + (Array.from(latest.text).length > 16 ? '…' : '');
-      box.add(caption(this, 78, 76, preview, { fontSize: '16px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(caption(this, w - 14, 20, formatAgo(latest.sentAt), { fontSize: '14px', color: '#a89a78', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(1, 0.5));
+      box.add(this.fitted(body(this, textX, 50, latest.senderName, { fontSize: '19px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
+      box.add(this.fitted(caption(this, textX, 78, plainPreview(latest.text), { fontSize: '17px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
     } else {
-      box.add(caption(this, 78, 58, 'まだメッセージがありません', { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0, 0.5));
+      box.add(caption(this, textX, 60, 'まだメッセージがありません', { fontSize: '17px', color: '#9a8a6a' }).setOrigin(0, 0.5));
     }
 
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
@@ -280,6 +294,17 @@ export class HomeScene extends Phaser.Scene {
     box.add(hit);
 
     enter(this, box, { dy: 10, duration: 320, delay: 300 });
+  }
+
+  /** Cuts a line of text down with … until it fits `maxWidth` px (Japanese has no spaces to wrap at). */
+  private fitted(text: Phaser.GameObjects.Text, maxWidth: number): Phaser.GameObjects.Text {
+    const full = Array.from(text.text);
+    let keep = full.length;
+    while (text.width > maxWidth && keep > 1) {
+      keep -= 1;
+      text.setText(full.slice(0, keep).join('') + '…');
+    }
+    return text;
   }
 
   private openLatestMessage(latest: ReturnType<typeof ChatSystem.latestMessage>): void {

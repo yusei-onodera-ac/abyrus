@@ -33,6 +33,10 @@ export class EquipmentScene extends InboxScene {
     this.filter = 'all';
   }
 
+  protected goBack(): void {
+    this.scene.start('EnhanceHub');
+  }
+
   protected buildCards(): InboxCard[] {
     const guard = () => this.scroll.isTap();
     const owned = EquipmentSystem.all(this.save).filter((o) => this.filter === 'all' || getEquipDef(o.item.defId)?.slot === this.filter);

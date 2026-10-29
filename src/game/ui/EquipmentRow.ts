@@ -35,7 +35,7 @@ export function buildEquipmentRow(scene: Phaser.Scene, item: EquipmentItem, opts
   container.add(buildCardPanel(scene, CARD_WIDTH, EQUIP_ROW_H, !!opts.wornBy));
   if (!def) return { container, height: EQUIP_ROW_H };
 
-  container.add(scene.add.image(PAD + 44, EQUIP_ROW_H / 2, equipIcon(scene, def.slot, def.rarity, 88)));
+  container.add(scene.add.image(PAD + 44, EQUIP_ROW_H / 2, equipIcon(scene, def.glyph, def.rarity, 88)));
   const x = PAD + 100;
   container.add(body(scene, x, 26, def.name, { fontSize: '26px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
   container.add(scene.add.text(x, 58, '★'.repeat(def.rarity), { fontSize: '19px', color: hex(RARITY_COLORS[def.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));

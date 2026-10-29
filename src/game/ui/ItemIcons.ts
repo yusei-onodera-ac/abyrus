@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { ItemId } from '../data/items';
-import { RARITY_COLORS, type EquipSlot, type Rarity } from '../types';
+import type { EquipGlyph } from '../data/equipment';
+import { RARITY_COLORS, type Rarity } from '../types';
 import { CORNER_BADGE_FILL, CORNER_BADGE_RING, CORNER_GLYPH, drawNavBadge, ensureTexture } from './Icons';
 
 /** Code-drawn icons for 素材, equipment and the home screen's new corner buttons. */
@@ -55,9 +56,32 @@ export function itemIcon(scene: Phaser.Scene, item: ItemId, size = 56): string {
   });
 }
 
-/** An equipment piece's glyph (sword / armour / ring) on a disc ringed in its rarity colour. */
-export function equipIcon(scene: Phaser.Scene, slot: EquipSlot, rarity: Rarity, size = 64): string {
-  return ensureTexture(scene, `icon_equip_${slot}_${rarity}_${size}`, size, (g, c) => {
+/** 技素: a green orb with a four-pointed spark. */
+export function skillEssenceIcon(scene: Phaser.Scene, size = 56): string {
+  return ensureTexture(scene, `icon_skill_essence_${size}`, size, (g, c) => {
+    g.fillStyle(0x000000, 0.3);
+    g.fillEllipse(c, c * 1.86, c * 1.0, c * 0.18);
+    g.fillStyle(0x1f6a3a, 1);
+    g.fillCircle(c, c, c * 0.9);
+    g.fillStyle(0x4fc07a, 1);
+    g.fillCircle(c, c, c * 0.78);
+    g.fillStyle(0xb8f0c8, 0.55);
+    g.fillEllipse(c * 0.78, c * 0.68, c * 0.5, c * 0.3);
+    g.fillStyle(0xffffff, 1);
+    const r = c * 0.5;
+    const t = c * 0.12;
+    g.fillTriangle(c, c - r, c + t, c, c - t, c);
+    g.fillTriangle(c, c + r, c + t, c, c - t, c);
+    g.fillTriangle(c - r, c, c, c - t, c, c + t);
+    g.fillTriangle(c + r, c, c, c - t, c, c + t);
+    g.lineStyle(2, 0xd8ffe4, 0.8);
+    g.strokeCircle(c, c, c * 0.9);
+  });
+}
+
+/** An equipment piece's shape on a disc ringed in its rarity colour. */
+export function equipIcon(scene: Phaser.Scene, glyph: EquipGlyph, rarity: Rarity, size = 64): string {
+  return ensureTexture(scene, `icon_equip_${glyph}_${rarity}_${size}`, size, (g, c) => {
     const ring = RARITY_COLORS[rarity];
     g.fillStyle(0x000000, 0.35);
     g.fillCircle(c, c + 2, c - 1);
@@ -67,66 +91,97 @@ export function equipIcon(scene: Phaser.Scene, slot: EquipSlot, rarity: Rarity, 
     g.fillCircle(c, c, c - 4);
     g.fillStyle(ring, 0.18);
     g.fillCircle(c, c, c - 4);
-    drawEquipGlyph(g, slot, c, 0xf5ecd8, ring);
+    drawEquipGlyph(g, glyph, c, 0xf5ecd8, ring);
   });
 }
 
-function drawEquipGlyph(g: Phaser.GameObjects.Graphics, slot: EquipSlot, c: number, color: number, accent: number): void {
-  g.fillStyle(color, 1);
-  g.lineStyle(c * 0.14, color, 1);
-  if (slot === 'weapon') {
+/** One shape per kind of piece, drawn inside a disc of radius c centred at (c, c): `color` for the body, `accent` for the detail. */
+function drawEquipGlyph(g: Phaser.GameObjects.Graphics, glyph: EquipGlyph, c: number, color: number, accent: number): void {
+  const line = (x1: number, y1: number, x2: number, y2: number, w: number, col: number): void => {
+    g.lineStyle(w, col, 1);
     g.beginPath();
-    g.moveTo(c - c * 0.34, c + c * 0.34);
-    g.lineTo(c + c * 0.38, c - c * 0.38);
+    g.moveTo(c + x1 * c, c + y1 * c);
+    g.lineTo(c + x2 * c, c + y2 * c);
     g.strokePath();
-    g.lineStyle(c * 0.12, accent, 1);
-    g.beginPath();
-    g.moveTo(c - c * 0.3, c - c * 0.02);
-    g.lineTo(c + c * 0.02, c + c * 0.3);
-    g.strokePath();
-    g.fillStyle(accent, 1);
-    g.fillCircle(c - c * 0.4, c + c * 0.4, c * 0.1);
-  } else if (slot === 'armor') {
-    const shield = [
-      new Phaser.Math.Vector2(c - c * 0.4, c - c * 0.36),
-      new Phaser.Math.Vector2(c + c * 0.4, c - c * 0.36),
-      new Phaser.Math.Vector2(c + c * 0.4, c + c * 0.1),
-      new Phaser.Math.Vector2(c, c + c * 0.52),
-      new Phaser.Math.Vector2(c - c * 0.4, c + c * 0.1),
-    ];
-    g.fillPoints(shield, true);
-    g.lineStyle(c * 0.09, accent, 1);
-    g.beginPath();
-    g.moveTo(c, c - c * 0.3);
-    g.lineTo(c, c + c * 0.38);
-    g.moveTo(c - c * 0.3, c - c * 0.06);
-    g.lineTo(c + c * 0.3, c - c * 0.06);
-    g.strokePath();
-  } else {
-    g.lineStyle(c * 0.15, color, 1);
-    g.strokeCircle(c, c + c * 0.12, c * 0.3);
-    g.fillStyle(accent, 1);
-    g.fillTriangle(c, c - c * 0.46, c + c * 0.17, c - c * 0.24, c - c * 0.17, c - c * 0.24);
-    g.fillTriangle(c, c - c * 0.1, c + c * 0.17, c - c * 0.24, c - c * 0.17, c - c * 0.24);
+  };
+  const poly = (pts: [number, number][], col: number): void => {
+    g.fillStyle(col, 1);
+    g.fillPoints(
+      pts.map(([x, y]) => new Phaser.Math.Vector2(c + x * c, c + y * c)),
+      true,
+    );
+  };
+  switch (glyph) {
+    case 'sword':
+      line(-0.34, 0.34, 0.38, -0.38, c * 0.14, color);
+      line(-0.3, -0.02, 0.02, 0.3, c * 0.12, accent);
+      g.fillStyle(accent, 1);
+      g.fillCircle(c - c * 0.4, c + c * 0.4, c * 0.1);
+      break;
+    case 'bow': {
+      g.lineStyle(c * 0.13, color, 1);
+      g.beginPath();
+      g.arc(c - c * 0.18, c, c * 0.5, -Math.PI / 2.6, Math.PI / 2.6, false);
+      g.strokePath();
+      line(0.12, -0.46, 0.12, 0.46, c * 0.05, accent);
+      line(-0.4, 0, 0.44, 0, c * 0.07, color);
+      poly([[0.44, 0], [0.28, -0.1], [0.28, 0.1]], accent);
+      break;
+    }
+    case 'staff':
+      line(-0.36, 0.44, 0.22, -0.2, c * 0.13, color);
+      g.fillStyle(accent, 1);
+      g.fillCircle(c + c * 0.3, c - c * 0.3, c * 0.2);
+      g.fillStyle(0xffffff, 0.7);
+      g.fillCircle(c + c * 0.25, c - c * 0.36, c * 0.06);
+      break;
+    case 'spear':
+      line(-0.4, 0.42, 0.28, -0.26, c * 0.1, color);
+      poly([[0.46, -0.46], [0.18, -0.34], [0.34, -0.18]], accent);
+      line(-0.1, 0.06, 0.1, 0.26, c * 0.1, accent);
+      break;
+    case 'axe':
+      line(-0.36, 0.4, 0.2, -0.2, c * 0.13, color);
+      poly([[0.1, -0.5], [0.46, -0.2], [0.22, 0.04], [0.12, -0.16]], accent);
+      break;
+    case 'armor':
+      poly([[-0.2, -0.46], [0.2, -0.46], [0.46, -0.26], [0.36, -0.04], [0.26, -0.1], [0.26, 0.46], [-0.26, 0.46], [-0.26, -0.1], [-0.36, -0.04], [-0.46, -0.26]], color);
+      line(0, -0.46, 0, 0.44, c * 0.07, accent);
+      line(-0.22, 0.2, 0.22, 0.2, c * 0.07, accent);
+      break;
+    case 'shield':
+      poly([[-0.4, -0.36], [0.4, -0.36], [0.4, 0.1], [0, 0.52], [-0.4, 0.1]], color);
+      line(0, -0.3, 0, 0.38, c * 0.09, accent);
+      line(-0.3, -0.06, 0.3, -0.06, c * 0.09, accent);
+      break;
+    case 'ring':
+      g.lineStyle(c * 0.15, color, 1);
+      g.strokeCircle(c, c + c * 0.12, c * 0.3);
+      poly([[0, -0.46], [0.17, -0.24], [0, -0.1], [-0.17, -0.24]], accent);
+      break;
+    case 'necklace': {
+      g.lineStyle(c * 0.09, color, 1);
+      g.beginPath();
+      g.arc(c, c - c * 0.28, c * 0.46, Math.PI * 0.12, Math.PI * 0.88, false);
+      g.strokePath();
+      poly([[0, 0.12], [0.16, 0.3], [0, 0.5], [-0.16, 0.3]], accent);
+      break;
+    }
+    case 'boots':
+      poly([[-0.28, -0.42], [0.1, -0.42], [0.1, 0.1], [0.46, 0.2], [0.46, 0.44], [-0.28, 0.44]], color);
+      line(-0.28, 0.3, 0.46, 0.3, c * 0.08, accent);
+      break;
+    case 'crown':
+      poly([[-0.46, 0.34], [-0.46, -0.26], [-0.22, 0], [0, -0.42], [0.22, 0], [0.46, -0.26], [0.46, 0.34]], color);
+      g.fillStyle(accent, 1);
+      g.fillCircle(c, c + c * 0.12, c * 0.1);
+      g.fillCircle(c - c * 0.26, c + c * 0.16, c * 0.07);
+      g.fillCircle(c + c * 0.26, c + c * 0.16, c * 0.07);
+      break;
   }
 }
 
 // --- home screen corner buttons (the same neutral badge as the bell and the gear) ---
-
-export function calendarIcon(scene: Phaser.Scene, size = 72): string {
-  return ensureTexture(scene, `icon_calendar_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
-    g.fillStyle(CORNER_GLYPH, 1);
-    g.fillRoundedRect(c - c * 0.5, c - c * 0.36, c, c * 0.88, 5);
-    g.fillStyle(0xd0453a, 1);
-    g.fillRoundedRect(c - c * 0.5, c - c * 0.36, c, c * 0.24, { tl: 5, tr: 5, bl: 0, br: 0 });
-    g.fillStyle(CORNER_GLYPH, 1);
-    g.fillRoundedRect(c - c * 0.3, c - c * 0.5, c * 0.12, c * 0.26, 3);
-    g.fillRoundedRect(c + c * 0.18, c - c * 0.5, c * 0.12, c * 0.26, 3);
-    g.fillStyle(CORNER_BADGE_FILL, 1);
-    for (let row = 0; row < 2; row++) for (let col = 0; col < 3; col++) g.fillRect(c - c * 0.34 + col * c * 0.28, c + c * 0.02 + row * c * 0.24, c * 0.16, c * 0.14);
-  });
-}
 
 export function hourglassIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `icon_hourglass_${size}`, size, (g, c) => {
@@ -145,7 +200,7 @@ export function hourglassIcon(scene: Phaser.Scene, size = 72): string {
 export function swordBadgeIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `icon_sword_badge_${size}`, size, (g, c) => {
     drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
-    drawEquipGlyph(g, 'weapon', c, CORNER_GLYPH, 0xffd23f);
+    drawEquipGlyph(g, 'sword', c, CORNER_GLYPH, 0xffd23f);
   });
 }
 

@@ -251,7 +251,7 @@ export class HeroDetailScene extends Phaser.Scene {
       g.strokeRoundedRect(x, y, w, h, 10);
       container.add(g);
       if (item && def) {
-        container.add(this.add.image(x + 32, y + h / 2, equipIcon(this, slot, def.rarity, 46)));
+        container.add(this.add.image(x + 32, y + h / 2, equipIcon(this, def.glyph, def.rarity, 46)));
         const name = body(this, x + 60, y + 19, def.name, { fontSize: '17px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
         if (name.width > w - 66) name.setScale((w - 66) / name.width);
         container.add(name);

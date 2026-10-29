@@ -10,11 +10,15 @@
  * 数字はどれも仮のバランス。実際の経済に合わせて調整すること。
  */
 
+import type { ItemId } from './items';
+
 /** Where the shop opens: the top bar's + buttons ask for the part of the shop
  *  that sells what they show. */
-export type ShopFocus = 'packs' | 'gems' | 'gold' | 'stamina' | 'materials';
+export type ShopFocus = 'premium' | 'packs' | 'gems' | 'gold' | 'stamina' | 'materials';
 
-export type GoodType = 'gems' | 'gold' | 'stamina' | 'phaseMaterials';
+/** Everything a product can hand over: the currencies, stamina, フェーズ素材, 技素, and the
+ *  素材 of data/items.ts (経験値素材 and 装備強化素材, named by their item id). */
+export type GoodType = 'gems' | 'gold' | 'stamina' | 'phaseMaterials' | 'skillEssence' | ItemId;
 
 /** One thing a product hands over. `stamina` restores that much (up to the max). */
 export interface Good {
@@ -178,6 +182,69 @@ export const ITEM_PRODUCTS: ShopProduct[] = [
     description: 'フェーズ素材のまとめ買い。',
     price: { currency: 'gems', amount: 100 },
     goods: [{ type: 'phaseMaterials', amount: 5 }],
+    category: 'material',
+  },
+  {
+    id: 'item-exp-m',
+    name: '経験値素材（中）×5',
+    description: '英雄に使って経験値+5,000。',
+    price: { currency: 'gems', amount: 50 },
+    goods: [{ type: 'exp_m', amount: 5 }],
+    limit: { period: 'day', count: 5 },
+    category: 'material',
+  },
+  {
+    id: 'item-exp-l',
+    name: '経験値素材（大）×3',
+    description: '英雄に使って経験値+30,000。',
+    price: { currency: 'gems', amount: 150 },
+    goods: [{ type: 'exp_l', amount: 3 }],
+    limit: { period: 'day', count: 3 },
+    category: 'material',
+  },
+  {
+    id: 'item-exp-xl',
+    name: '経験値素材（特大）',
+    description: '英雄に使って経験値+100,000。',
+    price: { currency: 'gems', amount: 300 },
+    goods: [{ type: 'exp_xl', amount: 1 }],
+    limit: { period: 'day', count: 3 },
+    category: 'material',
+  },
+  {
+    id: 'item-skill-s',
+    name: '技素 ×300',
+    description: 'スキルのレベルアップに使う素材。',
+    price: { currency: 'gold', amount: 3000 },
+    goods: [{ type: 'skillEssence', amount: 300 }],
+    limit: { period: 'day', count: 5 },
+    category: 'material',
+  },
+  {
+    id: 'item-skill-l',
+    name: '技素 ×1,000',
+    description: 'スキルのレベルアップに使う素材のまとめ買い。',
+    price: { currency: 'gems', amount: 50 },
+    goods: [{ type: 'skillEssence', amount: 1000 }],
+    limit: { period: 'day', count: 3 },
+    category: 'material',
+  },
+  {
+    id: 'item-equip-s',
+    name: '装備強化素材 ×100',
+    description: '装備のレベルアップに使う素材。',
+    price: { currency: 'gold', amount: 5000 },
+    goods: [{ type: 'equip_essence', amount: 100 }],
+    limit: { period: 'day', count: 5 },
+    category: 'material',
+  },
+  {
+    id: 'item-equip-l',
+    name: '装備強化素材 ×500',
+    description: '装備のレベルアップに使う素材のまとめ買い。',
+    price: { currency: 'gems', amount: 60 },
+    goods: [{ type: 'equip_essence', amount: 500 }],
+    limit: { period: 'day', count: 3 },
     category: 'material',
   },
 ];

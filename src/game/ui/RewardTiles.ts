@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { getEquipDef } from '../data/equipment';
+import { DEFAULT_GLYPH, getEquipDef, type EquipGlyph } from '../data/equipment';
 import { ITEMS, type ItemId } from '../data/items';
 import type { Reward } from '../data/rewards';
 import type { GrantedReward } from '../systems/RewardSystem';
-import type { EquipSlot, EquipmentItem, Rarity } from '../types';
+import type { EquipmentItem, Rarity } from '../types';
 import { buildChip } from './CardParts';
 import { equipIcon, itemIcon } from './ItemIcons';
 import { createPanel } from './Panel';
@@ -27,7 +27,7 @@ export interface RewardTile {
   /** For kind 'item'. */
   item?: ItemId;
   /** For kind 'equipment': the piece's slot, rarity and name. */
-  equip?: { slot: EquipSlot; rarity: Rarity; name: string };
+  equip?: { glyph: EquipGlyph; rarity: Rarity; name: string };
 }
 
 /** EXP and 技素 have no illustration of their own: a brass-ringed disc with a kanji. */
@@ -41,7 +41,7 @@ export function tilesForEquipment(pieces: EquipmentItem[]): RewardTile[] {
   const tiles: RewardTile[] = [];
   for (const piece of pieces) {
     const def = getEquipDef(piece.defId);
-    if (def) tiles.push({ kind: 'equipment', amount: '★'.repeat(def.rarity), equip: { slot: def.slot, rarity: def.rarity, name: def.name } });
+    if (def) tiles.push({ kind: 'equipment', amount: '★'.repeat(def.rarity), equip: { glyph: def.glyph, rarity: def.rarity, name: def.name } });
   }
   return tiles;
 }
@@ -83,7 +83,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
     return ITEMS[tile.item].short;
   }
   if (tile.kind === 'equipment' && tile.equip) {
-    container.add(scene.add.image(x, y, equipIcon(scene, tile.equip.slot, tile.equip.rarity, size)));
+    container.add(scene.add.image(x, y, equipIcon(scene, tile.equip.glyph, tile.equip.rarity, size)));
     return tile.equip.name;
   }
   const good = tile.kind as 'gems' | 'gold' | 'stamina' | 'phaseMaterials';
@@ -94,7 +94,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
 /** A tile for a reward that has not been handed over yet (a calendar day, a pack's contents). */
 export function tileForReward(r: Reward): RewardTile {
   const amount = `+${r.amount.toLocaleString('ja-JP')}`;
-  if (r.type === 'equipment') return { kind: 'equipment', amount: `×${r.amount}`, equip: { slot: 'weapon', rarity: r.rarity, name: `装備★${r.rarity}` } };
+  if (r.type === 'equipment') return { kind: 'equipment', amount: `×${r.amount}`, equip: { glyph: DEFAULT_GLYPH.weapon, rarity: r.rarity, name: `装備★${r.rarity}` } };
   if (r.type === 'item') return { kind: 'item', item: r.item, amount };
   if (r.type === 'skillEssence') return { kind: 'essence', amount };
   return { kind: r.type, amount };

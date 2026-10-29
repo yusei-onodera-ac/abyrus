@@ -3,6 +3,7 @@ import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
 import { REGION_COUNT, getRegion, pickFeralName, type RegionDef } from '../data/regions';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
+import { expToNextLevel } from './LevelCurve';
 
 interface ClassBase {
   hp: number;
@@ -134,6 +135,28 @@ function extraDifficulty(extraIndex: number): number {
   return MAIN_DIFFICULTY_END + 4 + extraIndex * 1.4;
 }
 
+// --- Rewards tied to the level the stage asks for ---------------------------------
+// Measured with the battle engine (a mid-strength party of ★3-4 heroes with
+// auto skills, 80% wins): stages 1-30 need nothing, then the level a stage asks
+// for rises by about 0.58 a stage, to about 84 at stage 150. The EXP a clear
+// pays is set from that, so that growth keeps up with the difficulty instead of
+// being a separate guess.
+const LEVEL_PER_STAGE = 0.58;
+const LEVEL_AT_ZERO = -6;
+/** Share of one level's EXP, times the levels asked per stage, that a clear pays each hero in the party; the rest comes from replays, drops and idle rewards. */
+const EXP_REWARD_SHARE = 0.5;
+
+/** The hero level that main stage `index` (0-based) asks for, as measured. */
+export function levelAskedByStage(index: number): number {
+  return Math.max(1, Math.min(99, LEVEL_PER_STAGE * (index + 1) + LEVEL_AT_ZERO));
+}
+
+/** EXP each party hero gets for clearing a stage that asks for `level`. */
+export function expRewardForLevel(level: number): number {
+  const clamped = Math.max(1, Math.min(99, Math.round(level)));
+  return Math.max(1, Math.round(EXP_REWARD_SHARE * LEVEL_PER_STAGE * expToNextLevel(clamped)));
+}
+
 /** Enemy squad size: grows with the global stage index (never reset per
  *  region) so it is monotonic with no boundary discontinuity, same
  *  reasoning as the difficulty curve above. Caps at 5 - the front-3/back-2
@@ -183,7 +206,7 @@ export const ProgressionSystem = {
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
-      rewardExp: Math.round(25 * Math.pow(1.11, difficulty)),
+      rewardExp: expRewardForLevel(levelAskedByStage(index)),
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
     };
   },
@@ -232,7 +255,8 @@ export const ProgressionSystem = {
       name: '狂化の塔 最奥決戦',
       waves,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, rewardDifficulty)),
-      rewardExp: Math.round(25 * Math.pow(1.11, rewardDifficulty)),
+      // The final battle pays three times the last main stage.
+      rewardExp: expRewardForLevel(levelAskedByStage(MAIN_STAGE_COUNT - 1)) * 3,
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, rewardDifficulty)),
     };
   },
@@ -269,7 +293,8 @@ export const ProgressionSystem = {
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
-      rewardExp: Math.round(25 * Math.pow(1.11, difficulty)),
+      // Extra goes on past the main campaign: each stage counts as four stages further on.
+      rewardExp: expRewardForLevel(levelAskedByStage(MAIN_STAGE_COUNT + index * 4)),
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
       isBossStage,
     };

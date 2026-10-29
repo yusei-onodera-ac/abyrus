@@ -17,12 +17,19 @@ export const EQUIP_STAT_LABEL: Record<EquipStat, string> = {
   spdFlat: '素早さ',
 };
 
+/** What a piece looks like (ui/ItemIcons.ts draws one shape for each). Looks only, no effect on stats. */
+export type EquipGlyph = 'sword' | 'bow' | 'staff' | 'spear' | 'axe' | 'armor' | 'shield' | 'ring' | 'necklace' | 'boots' | 'crown';
+
+/** The shape used where only the slot is known (a reward that is "some ★3 equipment"). */
+export const DEFAULT_GLYPH: Record<EquipSlot, EquipGlyph> = { weapon: 'sword', armor: 'armor', accessory: 'ring' };
+
 export interface EquipDef {
   id: string;
   name: string;
   slot: EquipSlot;
   rarity: Rarity;
   stat: EquipStat;
+  glyph: EquipGlyph;
 }
 
 /** Effect of a level-1 piece: percent for atk/hp/crit, points for def/spd. */
@@ -49,41 +56,31 @@ const DISMANTLE_BASE: Record<Rarity, number> = { 1: 10, 2: 30, 3: 100, 4: 300, 5
 /** Share of the 素材 spent on levels that 分解 gives back. */
 const REFUND_RATE = 0.5;
 
-// slot, rarity, stat, name - two pieces per slot per rarity.
-const TABLE: [EquipSlot, Rarity, EquipStat, string][] = [
-  ['weapon', 1, 'atkPct', '木の棍棒'],
-  ['weapon', 1, 'atkPct', '錆びた短剣'],
-  ['weapon', 2, 'atkPct', '鉄の剣'],
-  ['weapon', 2, 'atkPct', '狩人の短弓'],
-  ['weapon', 3, 'atkPct', '銀の長剣'],
-  ['weapon', 3, 'atkPct', '賢者の杖'],
-  ['weapon', 4, 'atkPct', '魔剣グラム'],
-  ['weapon', 4, 'atkPct', '竜牙の槍'],
-  ['weapon', 5, 'atkPct', '神剣アビス'],
-  ['weapon', 5, 'atkPct', '星砕きの大弓'],
-  ['armor', 1, 'hpPct', '布の服'],
-  ['armor', 1, 'defFlat', '木の盾'],
-  ['armor', 2, 'hpPct', '革の鎧'],
-  ['armor', 2, 'defFlat', '鉄の盾'],
-  ['armor', 3, 'hpPct', '鋼の鎧'],
-  ['armor', 3, 'defFlat', '騎士の大盾'],
-  ['armor', 4, 'hpPct', '竜鱗の鎧'],
-  ['armor', 4, 'defFlat', '聖騎士の盾'],
-  ['armor', 5, 'hpPct', '星屑の聖鎧'],
-  ['armor', 5, 'defFlat', '世界樹の盾'],
-  ['accessory', 1, 'critRate', '銅の指輪'],
-  ['accessory', 1, 'spdFlat', '革の靴'],
-  ['accessory', 2, 'critRate', '銀の指輪'],
-  ['accessory', 2, 'spdFlat', '疾風の腕輪'],
-  ['accessory', 3, 'critRate', '会心のペンダント'],
-  ['accessory', 3, 'spdFlat', '風切りのブーツ'],
-  ['accessory', 4, 'critRate', '鷹の目の首飾り'],
-  ['accessory', 4, 'spdFlat', '迅雷のアンクレット'],
-  ['accessory', 5, 'critRate', '王者の冠'],
-  ['accessory', 5, 'spdFlat', '天翔ける翼飾り'],
+// Three pieces for each slot and rarity. A piece's id is `<slot>-<rarity>-<n>`, n counting
+// within that group in the order below - so new pieces go at the END of their group,
+// never in front of existing ones (saves refer to these ids).
+type Row = [name: string, stat: EquipStat, glyph: EquipGlyph];
+const GROUPS: [EquipSlot, Rarity, Row[]][] = [
+  ['weapon', 1, [['木の棍棒', 'atkPct', 'staff'], ['錆びた短剣', 'atkPct', 'sword'], ['手斧', 'atkPct', 'axe']]],
+  ['weapon', 2, [['鉄の剣', 'atkPct', 'sword'], ['狩人の短弓', 'atkPct', 'bow'], ['鉄の槍', 'atkPct', 'spear']]],
+  ['weapon', 3, [['銀の長剣', 'atkPct', 'sword'], ['賢者の杖', 'atkPct', 'staff'], ['戦斧', 'atkPct', 'axe']]],
+  ['weapon', 4, [['魔剣グラム', 'atkPct', 'sword'], ['竜牙の槍', 'atkPct', 'spear'], ['紅蓮の大弓', 'atkPct', 'bow']]],
+  ['weapon', 5, [['神剣アビス', 'atkPct', 'sword'], ['星砕きの大弓', 'atkPct', 'bow'], ['世界樹の杖', 'atkPct', 'staff']]],
+  ['armor', 1, [['布の服', 'hpPct', 'armor'], ['木の盾', 'defFlat', 'shield'], ['旅人のマント', 'hpPct', 'armor']]],
+  ['armor', 2, [['革の鎧', 'hpPct', 'armor'], ['鉄の盾', 'defFlat', 'shield'], ['鎖かたびら', 'hpPct', 'armor']]],
+  ['armor', 3, [['鋼の鎧', 'hpPct', 'armor'], ['騎士の大盾', 'defFlat', 'shield'], ['守護の円盾', 'defFlat', 'shield']]],
+  ['armor', 4, [['竜鱗の鎧', 'hpPct', 'armor'], ['聖騎士の盾', 'defFlat', 'shield'], ['黒鉄の重鎧', 'hpPct', 'armor']]],
+  ['armor', 5, [['星屑の聖鎧', 'hpPct', 'armor'], ['世界樹の盾', 'defFlat', 'shield'], ['天空の守護盾', 'defFlat', 'shield']]],
+  ['accessory', 1, [['銅の指輪', 'critRate', 'ring'], ['革の靴', 'spdFlat', 'boots'], ['幸運のお守り', 'critRate', 'necklace']]],
+  ['accessory', 2, [['銀の指輪', 'critRate', 'ring'], ['疾風の腕輪', 'spdFlat', 'ring'], ['狩人のブーツ', 'spdFlat', 'boots']]],
+  ['accessory', 3, [['会心のペンダント', 'critRate', 'necklace'], ['風切りのブーツ', 'spdFlat', 'boots'], ['紅玉の指輪', 'critRate', 'ring']]],
+  ['accessory', 4, [['鷹の目の首飾り', 'critRate', 'necklace'], ['迅雷のアンクレット', 'spdFlat', 'boots'], ['瞬足の靴', 'spdFlat', 'boots']]],
+  ['accessory', 5, [['王者の冠', 'critRate', 'crown'], ['天翔ける翼飾り', 'spdFlat', 'necklace'], ['神速のブーツ', 'spdFlat', 'boots']]],
 ];
 
-export const EQUIP_DEFS: EquipDef[] = TABLE.map(([slot, rarity, stat, name], i) => ({ id: `${slot}-${rarity}-${i % 2}`, name, slot, rarity, stat }));
+export const EQUIP_DEFS: EquipDef[] = GROUPS.flatMap(([slot, rarity, rows]) =>
+  rows.map(([name, stat, glyph], n): EquipDef => ({ id: `${slot}-${rarity}-${n}`, name, slot, rarity, stat, glyph })),
+);
 
 const BY_ID = new Map(EQUIP_DEFS.map((d) => [d.id, d]));
 

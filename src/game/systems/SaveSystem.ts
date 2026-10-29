@@ -10,6 +10,7 @@ import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 import { StaminaSystem } from './StaminaSystem';
+import { expToNextLevel } from './LevelCurve';
 import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
 
 export interface PartyFormation {
@@ -217,13 +218,7 @@ export interface HeroPullOutcome {
 
 const STORAGE_KEY = 'abyrus_save_v1';
 
-/** EXP from `level` to the next. It climbs steeply (x1.22 a level) up to level 30,
- *  then gently (x1.05) so that the level cap of 100 is a long road, not an
- *  impossible one. */
-export function expToNextLevel(level: number): number {
-  const steep = Math.min(level, 30);
-  return Math.round(80 * Math.pow(1.22, steep - 1) * Math.pow(1.05, Math.max(0, level - 30)));
-}
+export { expToNextLevel };
 
 /** Coerces whatever a save holds into a well-formed deck: right slot counts,
  *  string ids only, a usable name. */

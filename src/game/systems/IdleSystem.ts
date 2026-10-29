@@ -6,7 +6,10 @@ import {
   IDLE_EQUIP_RARITY_WEIGHTS,
   IDLE_ESSENCE_CLEARS_PER_HOUR,
   IDLE_GOLD_CLEARS_PER_HOUR,
-  IDLE_ITEM_PER_HOUR,
+  IDLE_EQUIP_ESSENCE_PER_HOUR,
+  IDLE_EXP_LEVELS_PER_HOUR,
+  IDLE_EXP_MIN_LEVEL,
+  IDLE_EXP_SPLIT,
   IDLE_PHASE_PER_HOUR,
 } from '../data/idle';
 import { ITEMS, type ItemId } from '../data/items';
@@ -15,7 +18,8 @@ import type { EquipmentItem, Rarity } from '../types';
 import type { BigNumber } from './BigNumber';
 import { EquipmentSystem } from './EquipmentSystem';
 import { PremiumSystem } from './PremiumSystem';
-import { MAIN_STAGE_COUNT, STAGES_PER_REGION, ProgressionSystem } from './ProgressionSystem';
+import { MAIN_STAGE_COUNT, STAGES_PER_REGION, ProgressionSystem, levelAskedByStage } from './ProgressionSystem';
+import { expToNextLevel } from './LevelCurve';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import { periodKey } from './ShopSystem';
 
@@ -73,7 +77,12 @@ export const IdleSystem = {
     const { stageIndex, region } = progressReference(save);
     const stage = ProgressionSystem.getStage(stageIndex);
     const items = {} as Record<ItemId, number>;
-    for (const id of Object.keys(ITEMS) as ItemId[]) items[id] = IDLE_ITEM_PER_HOUR[id][region] ?? 0;
+    for (const id of Object.keys(ITEMS) as ItemId[]) items[id] = 0;
+    items.equip_essence = IDLE_EQUIP_ESSENCE_PER_HOUR[region] ?? 0;
+    // An hour of EXP, in the potion sizes of the region reached.
+    const level = Math.max(IDLE_EXP_MIN_LEVEL, Math.round(levelAskedByStage(stageIndex)));
+    const expPerHour = IDLE_EXP_LEVELS_PER_HOUR * expToNextLevel(level);
+    for (const { item, share } of IDLE_EXP_SPLIT[region] ?? []) items[item] += (expPerHour * share) / (ITEMS[item].exp ?? 1);
     return {
       gold: stage.rewardGold.mul(IDLE_GOLD_CLEARS_PER_HOUR),
       skillEssence: stage.rewardSkillEssence * IDLE_ESSENCE_CLEARS_PER_HOUR,

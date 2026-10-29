@@ -27,23 +27,26 @@ export const STAGE_BONUS: Record<StageTier, StageBonusRule> = {
   extraBoss: { firstClearGems: 50, phaseMaterialChance: 1, phaseMaterialAmount: 2 },
 };
 
-/** 素材 a clear can drop, by region (index 0 = 迷いの森 ... 4 = 黄昏の都). Each is rolled on its own. */
+/** 素材 a clear can drop, by region (index 0 = 迷いの森 ... 4 = 黄昏の都). Each is rolled on its own.
+ *  A 経験値素材 gives `expShare` times the EXP the clear itself pays each hero (so it keeps pace
+ *  with the stage); 装備強化素材 gives a fixed `amount`. */
 export interface ItemDrop {
   item: ItemId;
   chance: number;
-  amount: number;
+  amount?: number;
+  expShare?: number;
 }
 
 export const STAGE_ITEM_DROPS: ItemDrop[][] = [
-  [{ item: 'exp_s', chance: 0.7, amount: 3 }, { item: 'equip_essence', chance: 0.25, amount: 5 }],
-  [{ item: 'exp_s', chance: 0.5, amount: 4 }, { item: 'exp_m', chance: 0.4, amount: 1 }, { item: 'equip_essence', chance: 0.3, amount: 8 }],
-  [{ item: 'exp_m', chance: 0.6, amount: 2 }, { item: 'exp_l', chance: 0.1, amount: 1 }, { item: 'equip_essence', chance: 0.35, amount: 12 }],
-  [{ item: 'exp_m', chance: 0.6, amount: 3 }, { item: 'exp_l', chance: 0.25, amount: 1 }, { item: 'equip_essence', chance: 0.4, amount: 18 }],
-  [{ item: 'exp_l', chance: 0.5, amount: 1 }, { item: 'exp_xl', chance: 0.05, amount: 1 }, { item: 'equip_essence', chance: 0.45, amount: 25 }],
+  [{ item: 'exp_s', chance: 0.7, expShare: 1 }, { item: 'equip_essence', chance: 0.25, amount: 5 }],
+  [{ item: 'exp_s', chance: 0.5, expShare: 0.5 }, { item: 'exp_m', chance: 0.4, expShare: 0.5 }, { item: 'equip_essence', chance: 0.3, amount: 8 }],
+  [{ item: 'exp_m', chance: 0.6, expShare: 0.8 }, { item: 'exp_l', chance: 0.1, expShare: 0.4 }, { item: 'equip_essence', chance: 0.35, amount: 12 }],
+  [{ item: 'exp_m', chance: 0.5, expShare: 0.4 }, { item: 'exp_l', chance: 0.3, expShare: 0.7 }, { item: 'equip_essence', chance: 0.4, amount: 18 }],
+  [{ item: 'exp_l', chance: 0.5, expShare: 0.6 }, { item: 'exp_xl', chance: 0.1, expShare: 0.6 }, { item: 'equip_essence', chance: 0.45, amount: 25 }],
 ];
 
 /** The final battle always drops these. */
-export const FINAL_ITEM_DROPS: ItemDrop[] = [{ item: 'exp_xl', chance: 1, amount: 2 }, { item: 'equip_essence', chance: 1, amount: 100 }];
+export const FINAL_ITEM_DROPS: ItemDrop[] = [{ item: 'exp_xl', chance: 1, expShare: 1.5 }, { item: 'equip_essence', chance: 1, amount: 100 }];
 
 /** Bosses (a region's last stage, an Extra boss) drop their region's 素材 this many times over. */
 export const BOSS_DROP_MULTIPLIER = 3;

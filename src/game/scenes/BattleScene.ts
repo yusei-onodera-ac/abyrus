@@ -430,7 +430,7 @@ export class BattleScene extends Phaser.Scene {
     if (victory) {
       const stage: QuestStage = { kind: this.mode ?? 'main', index: this.stageIndex };
       // First-clear status has to be read before the progress counters move.
-      const bonus = StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage));
+      const bonus = StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage), this.rewardExp);
       SaveSystem.addGold(this.save, this.rewardGold);
       SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
       StageRewardSystem.grant(this.save, bonus);
