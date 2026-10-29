@@ -2,6 +2,7 @@ import { BigNumber } from './BigNumber';
 import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
 import { createHeroInstance } from '../data/heroes';
 import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emptyDeck } from './DeckSystem';
+import { REGION_COUNT } from '../data/regions';
 import { MAX_PHASE, type HeroData, type Row } from '../types';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
@@ -158,6 +159,23 @@ export interface SaveData {
    *  types.ts) - no source grants these yet (no stage-reward wiring), so
    *  this is just a starter stash to make the mechanic testable/usable now. */
   phaseMaterials: number;
+  /** Quest-mode story read-state, keyed by region index (0-4). regionIntro
+   *  gates whether entering a region's 1st stage plays its long-form story
+   *  first; regionOutro gates the same for the story after clearing a
+   *  region's 30th stage. Extra's own per-region one-liners are NOT
+   *  tracked here - they're short enough to just replay every time, same
+   *  as InfiniteModeScene's toasts. */
+  storyFlags: {
+    regionIntro: boolean[];
+    regionOutro: boolean[];
+    finalIntro: boolean;
+    ending: boolean;
+  };
+  /** Extra (野に放たれた狂獣) progress - a separate counter/index space
+   *  from `stageProgress` (the main 150-stage + final-battle campaign),
+   *  since Extra only unlocks after the ending and re-fights each
+   *  region's own boss on a harder curve. */
+  extraProgress: number;
 }
 
 export interface InfiniteModeRunResult {
@@ -251,6 +269,13 @@ export const SaveSystem = {
       reports: [],
       infiniteMode: { bestScore: 0, bestSurvivalSeconds: 0, bestEnemiesDefeated: 0, bestDifficultyReached: 0, totalRuns: 0 },
       phaseMaterials: 5,
+      storyFlags: {
+        regionIntro: Array(REGION_COUNT).fill(false),
+        regionOutro: Array(REGION_COUNT).fill(false),
+        finalIntro: false,
+        ending: false,
+      },
+      extraProgress: 0,
     };
   },
 
@@ -438,6 +463,28 @@ export const SaveSystem = {
 
   clearStage(data: SaveData, stageIndex: number): void {
     if (stageIndex >= data.stageProgress) data.stageProgress = stageIndex + 1;
+  },
+
+  /** Mirrors clearStage() but advances the separate Extra index space
+   *  instead of the main `stageProgress`. */
+  clearExtraStage(data: SaveData, extraIndex: number): void {
+    if (extraIndex >= data.extraProgress) data.extraProgress = extraIndex + 1;
+  },
+
+  markRegionIntroSeen(data: SaveData, regionIndex: number): void {
+    data.storyFlags.regionIntro[regionIndex] = true;
+  },
+
+  markRegionOutroSeen(data: SaveData, regionIndex: number): void {
+    data.storyFlags.regionOutro[regionIndex] = true;
+  },
+
+  markFinalIntroSeen(data: SaveData): void {
+    data.storyFlags.finalIntro = true;
+  },
+
+  markEndingSeen(data: SaveData): void {
+    data.storyFlags.ending = true;
   },
 
   /** Records an Infinite Mode run, bumping each personal-best field

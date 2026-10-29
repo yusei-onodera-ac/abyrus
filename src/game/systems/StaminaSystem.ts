@@ -4,9 +4,17 @@ import type { SaveData } from './SaveSystem';
 export const STAMINA_REGEN_SECONDS = 180;
 const REGEN_MS = STAMINA_REGEN_SECONDS * 1000;
 
-/** Stamina it costs to start a stage: 5, plus 1 for every 4 stages deeper. */
-export function stageStaminaCost(stageIndex: number): number {
-  return 5 + Math.floor(stageIndex / 4);
+/** Which of the quest's three index spaces a stage lives in (see
+ *  ProgressionSystem): the 150 main stages, the one final battle, and the
+ *  post-ending Extra stages. */
+export type StageKind = 'main' | 'final' | 'extra';
+
+/** Stamina it costs to start a stage. Placeholder balance: main stages climb
+ *  from 5 to 14 over the campaign, the final battle and Extra cost more. */
+export function stageStaminaCost(kind: StageKind, index: number): number {
+  if (kind === 'final') return 20;
+  if (kind === 'extra') return 12 + Math.floor(index / 6);
+  return 5 + Math.floor(index / 15);
 }
 
 /** Stamina is stored as the amount at the moment `staminaAt` says its timer
