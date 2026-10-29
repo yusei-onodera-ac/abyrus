@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { InboxSystem } from '../systems/InboxSystem';
 import { SaveSystem } from '../systems/SaveSystem';
 import { NOTICES, type NoticeEntry } from '../data/notices';
+import { buildLoginBonusCalendarCard } from '../ui/LoginBonusCalendar';
 import { Button } from '../ui/Button';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { openModal } from '../ui/Modal';
@@ -38,7 +39,7 @@ export class NoticeScene extends InboxScene {
   }
 
   protected buildCards(): InboxCard[] {
-    return NOTICES.map((notice) => this.buildNoticeCard(notice));
+    return [buildLoginBonusCalendarCard(this, this.save), ...NOTICES.map((notice) => this.buildNoticeCard(notice))];
   }
 
   private buildNoticeCard(notice: NoticeEntry): InboxCard {

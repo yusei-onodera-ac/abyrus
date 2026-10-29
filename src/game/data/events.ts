@@ -2,7 +2,7 @@ import { formatDateTime } from '../ui/format';
 
 /** What tapping a running event opens. Only the 無限モード screen exists so far;
  *  add a kind here (and a case in EventScene.open) when another mode is built. */
-export type EventKind = 'infinite';
+export type EventKind = 'infinite' | 'premium';
 
 export interface EventEntry {
   id: string;
@@ -42,6 +42,14 @@ export const EVENTS: EventEntry[] = [
     description: '編成したパーティで、どこまで耐えられるか。ランキングに挑め！',
     accent: 0xc7701c,
     emblem: '∞',
+  },
+  {
+    id: 'premium',
+    kind: 'premium',
+    title: 'プレミアムパス',
+    description: '毎日魔晶石がもらえて、戦闘2倍速・放置報酬の上限アップも。',
+    accent: 0xc79a2a,
+    emblem: '♛',
   },
   // Sample of an announced event (delete or replace it): it shows as 開催予定
   // until startsAt, then as 準備中 until it is given a `kind`.

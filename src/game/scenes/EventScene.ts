@@ -65,5 +65,6 @@ export class EventScene extends Phaser.Scene {
 
   private open(entry: EventEntry): void {
     if (entry.kind === 'infinite') this.scene.start('InfiniteMode');
+    else if (entry.kind === 'premium') this.scene.start('Premium');
   }
 }

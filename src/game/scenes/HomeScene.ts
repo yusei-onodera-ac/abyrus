@@ -2,15 +2,19 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
-import { PremiumSystem } from '../systems/PremiumSystem';
-import { calendarIcon, crownIcon, hourglassIcon, swordBadgeIcon } from '../ui/ItemIcons';
+import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
+import { hourglassIcon, swordBadgeIcon } from '../ui/ItemIcons';
 import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { applyBackground } from '../ui/Background';
 import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, settingsIcon } from '../ui/Icons';
-import { caption } from '../ui/theme';
+import { buildAvatar } from '../ui/CardParts';
+import { createPanel } from '../ui/Panel';
+import { addGoodIcon } from '../ui/RewardIcon';
+import { showToast } from '../ui/Toast';
+import { body, caption, CHROME } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { buildBannerCarousel } from '../ui/BannerCarousel';
@@ -24,6 +28,12 @@ import { RARITY_COLORS, type HeroData } from '../types';
 /** Promo banner frame, top-left under the resource bar. The quest/roster
  *  diamonds line their left edge up with this one's. */
 const BANNER = { x: 28, y: 138, w: 336, h: 188 };
+
+/** "2時間30分" - mirrors IdleScene's own formatter so the two read the same. */
+function formatIdleHours(hours: number): string {
+  const total = Math.floor(hours * 60);
+  return `${Math.floor(total / 60)}時間${String(total % 60).padStart(2, '0')}分`;
+}
 
 export class HomeScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
@@ -55,8 +65,10 @@ export class HomeScene extends Phaser.Scene {
     this.buildNav();
     this.buildCornerButtons(save);
     this.buildBanners();
+    this.buildIdleBox(save);
+    this.buildMessageWidget(save);
     new BottomNavBar(this, 720, 1280, 'home');
-    this.maybeShowLoginBonus(save);
+    this.maybeClaimLoginBonus(save);
   }
 
   private getSave(): SaveData {
@@ -180,10 +192,8 @@ export class HomeScene extends Phaser.Scene {
       { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
     ];
     const extras: Item[] = [
-      { texture: calendarIcon(this, size), scene: 'LoginBonus', unread: LoginBonusSystem.canClaim(save) },
       { texture: hourglassIcon(this, size), scene: 'Idle', unread: IdleSystem.hasReward(save) },
       { texture: swordBadgeIcon(this, size), scene: 'Equipment', unread: false },
-      { texture: crownIcon(this, size), scene: 'Premium', unread: PremiumSystem.canClaimDaily(save) },
     ];
     const buttons = [
       ...inbox.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item)),
@@ -192,12 +202,96 @@ export class HomeScene extends Phaser.Scene {
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
-  /** The first time Home is shown on a day the login bonus has not been taken,
-   *  its calendar opens (once per session, so 戻る does not bring it back). */
-  private maybeShowLoginBonus(save: SaveData): void {
-    if (this.game.registry.get('loginBonusShown') || !LoginBonusSystem.canClaim(save)) return;
-    this.game.registry.set('loginBonusShown', true);
-    this.time.delayedCall(450, () => this.scene.start('LoginBonus'));
+  /** ログインボーナス is handed over the moment Home is first shown on a new
+   *  day - no popup, no button to tap. お知らせ has the calendar of what each
+   *  day gives, for anyone curious what just arrived. */
+  private maybeClaimLoginBonus(save: SaveData): void {
+    if (!LoginBonusSystem.canClaim(save)) return;
+    if (!LoginBonusSystem.claim(save)) return;
+    SaveSystem.save(save);
+    this.resourceBar.update(save);
+  }
+
+  /** 放置報酬 claim box, pinned just under the promo banner: how long has
+   *  piled up and a one-tap 受け取る: the player doesn't have to visit Idle
+   *  just to cash in gold that's been sitting there. */
+  private buildIdleBox(save: SaveData): void {
+    const x = BANNER.x;
+    const y = BANNER.y + BANNER.h + 14;
+    const w = BANNER.w;
+    const h = 92;
+    const box = this.add.container(x, y);
+    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
+    box.add(this.add.image(46, h / 2, hourglassIcon(this, 56)));
+    box.add(caption(this, 84, h / 2 - 20, '放置報酬', { fontSize: '17px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+
+    const preview = IdleSystem.preview(save);
+    const timeText = body(this, 84, h / 2 + 6, formatIdleHours(preview.hours), { fontSize: '22px', fontStyle: 'bold', color: preview.full ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5);
+    box.add(timeText);
+    box.add(addGoodIcon(this, 'gold', w - 118, h / 2, 34));
+    box.add(body(this, w - 96, h / 2, `+${preview.gold.toString()}`, { fontSize: '16px', fontStyle: 'bold', color: '#ffe79a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+
+    // The whole box is tappable: a quick claim when there's something to
+    // take, else a jump to the full 放置報酬 screen (ad boost, totals breakdown).
+    const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => (preview.hours >= 1 / 60 ? this.claimIdle(save, box) : this.scene.start('Idle')));
+    box.add(hit);
+
+    enter(this, box, { dy: 10, duration: 320, delay: 260 });
+  }
+
+  /** Claims whatever 放置報酬 has piled up and rebuilds the box in place. */
+  private claimIdle(save: SaveData, box: Phaser.GameObjects.Container): void {
+    const result = IdleSystem.claim(save);
+    SaveSystem.save(save);
+    this.resourceBar.update(save);
+    showToast(this, `放置報酬を受け取りました：+${result.preview.gold.toString()}`);
+    box.destroy();
+    this.buildIdleBox(save);
+  }
+
+  /** Small always-on preview, bottom-right, of the single most recent メッセージ
+   *  across 全体/軍団/フレンド - tapping it opens the full thread. Rebuilt
+   *  fresh every time Home loads, so it always shows the latest one. */
+  private buildMessageWidget(save: SaveData): void {
+    const w = 300;
+    const h = 96;
+    const x = 720 - 16 - w;
+    const y = 1280 - BottomNavBar.totalHeight() - 14 - h;
+    const box = this.add.container(x, y).setDepth(5);
+    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 16, gradient: false }));
+
+    const latest = ChatSystem.latestMessage(save);
+    box.add(buildAvatar(this, 42, h / 2, 26, latest?.senderName ?? save.playerName));
+    box.add(caption(this, 78, 26, 'メッセージ', { fontSize: '15px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+
+    if (latest) {
+      box.add(body(this, 78, 52, latest.senderName, { fontSize: '17px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+      const preview = Array.from(plainPreview(latest.text)).slice(0, 16).join('') + (Array.from(latest.text).length > 16 ? '…' : '');
+      box.add(caption(this, 78, 76, preview, { fontSize: '16px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    } else {
+      box.add(caption(this, 78, 58, 'まだメッセージがありません', { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0, 0.5));
+    }
+
+    const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => this.openLatestMessage(latest));
+    box.add(hit);
+
+    enter(this, box, { dy: 10, duration: 320, delay: 300 });
+  }
+
+  private openLatestMessage(latest: ReturnType<typeof ChatSystem.latestMessage>): void {
+    if (!latest || latest.channel === GLOBAL_CHANNEL) {
+      this.scene.start('Message', { tab: 'global' });
+    } else if (latest.channel.startsWith('dm:')) {
+      this.scene.start('Message', { tab: 'friends', friendId: latest.channel.slice(3) });
+    } else if (latest.channel.startsWith('group:')) {
+      this.scene.start('Message', { tab: 'groups', groupId: latest.channel.slice(6) });
+    } else {
+      this.scene.start('Message');
+    }
   }
 
   private buildCornerButton(

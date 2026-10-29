@@ -81,6 +81,12 @@ export const ChatSystem = {
     return list[list.length - 1];
   },
 
+  /** The single most recent message across every channel (全体, every 軍団,
+   *  every friend DM) - for the Home screen's always-on preview. */
+  latestMessage(save: SaveData): ChatMessage | undefined {
+    return save.chat.messages.reduce<ChatMessage | undefined>((latest, m) => (!latest || m.sentAt > latest.sentAt ? m : latest), undefined);
+  },
+
   /** Appends a message from the player. Null (nothing sent) if it is empty
    *  once cleaned, or the channel isn't one the player can post in. */
   send(save: SaveData, channel: string, raw: string, now = Date.now()): ChatMessage | null {
