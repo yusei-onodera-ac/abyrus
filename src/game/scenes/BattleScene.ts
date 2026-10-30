@@ -22,6 +22,7 @@ import { SoundSystem } from '../systems/SoundSystem';
 import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { AutoSkillToggle } from '../ui/AutoSkillToggle';
@@ -184,22 +185,28 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private layoutUnits(units: UnitInstance[], isPlayer: boolean): void {
-    const frontY = isPlayer ? 760 : 420;
-    const backY = isPlayer ? 900 : 280;
+    const frontY = isPlayer ? 760 : ENEMY_ROW_Y.front;
+    const backY = isPlayer ? 900 : ENEMY_ROW_Y.back;
     this.placeRow(units.filter((u) => u.row === 'front'), frontY, isPlayer);
     this.placeRow(units.filter((u) => u.row === 'back'), backY, isPlayer);
   }
 
   private placeRow(units: UnitInstance[], y: number, isPlayer: boolean): void {
-    const spacing = 150;
+    const spacing = isPlayer ? 150 : ENEMY_SPACING;
     const startX = 360 - ((units.length - 1) * spacing) / 2;
     units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, isPlayer));
   }
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean): void {
-    const { textureKey, size } = this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
-    const sprite = this.add.sprite(x, y, textureKey).setDisplaySize(size * 0.9, size * 0.9);
-    if (!isPlayer) sprite.setFlipX(true);
+    // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
+    const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
+    const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
+    const textureKey = art?.key ?? generated?.textureKey ?? '';
+    const size = art ? art.height : (generated?.size ?? 96);
+    const sprite = this.add.sprite(x, y, textureKey);
+    if (art) sprite.setDisplaySize(art.width, art.height);
+    else sprite.setDisplaySize(size * 0.9, size * 0.9);
+    if (!isPlayer && !art) sprite.setFlipX(true);
 
     const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;

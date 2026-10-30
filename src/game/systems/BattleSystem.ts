@@ -15,6 +15,10 @@ export interface UnitInstance {
   seed: number;
   /** Roster hero id (player units only); lets the view use its illustration. */
   heroId?: string;
+  /** Enemy picture id (enemy units only), see EnemyUnitDef.art. */
+  art?: string;
+  /** A boss is drawn larger. */
+  isBoss?: boolean;
   maxHp: BigNumber;
   hp: BigNumber;
   atk: BigNumber;
@@ -104,6 +108,8 @@ export const BattleSystem = {
       heroClass: def.heroClass,
       rarity: def.rarity,
       seed: def.seed,
+      art: def.art,
+      isBoss: def.isBoss,
       maxHp: stats.maxHp,
       hp: stats.maxHp,
       atk: stats.atk,

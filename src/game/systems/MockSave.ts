@@ -36,3 +36,18 @@ export function applyMockFromUrl(save: SaveData): boolean {
   history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : ''));
   return true;
 }
+
+/** Development only: `?battle=65` goes straight into that main stage's fight (0-149); add
+ *  `&mode=extra` (0-29) or `&mode=final` for those, or use `?battle=infinite` for the endless
+ *  mode. For looking at a region's enemies and backdrop without playing up to it.
+ *  Production builds ignore it. */
+export function battleFromUrl(): { scene: string; data: Record<string, unknown> } | null {
+  if (!import.meta.env.DEV) return null;
+  const params = new URLSearchParams(location.search);
+  const raw = params.get('battle');
+  if (raw === 'infinite') return { scene: 'InfiniteRun', data: {} };
+  const stageIndex = raw === null ? NaN : Number(raw);
+  if (!Number.isInteger(stageIndex) || stageIndex < 0) return null;
+  const mode = params.get('mode');
+  return { scene: 'Battle', data: { stageIndex, mode: mode === 'extra' || mode === 'final' ? mode : undefined } };
+}

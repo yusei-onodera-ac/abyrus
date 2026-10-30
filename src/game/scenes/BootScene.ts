@@ -1,10 +1,12 @@
 import Phaser from 'phaser';
 import { SaveSystem } from '../systems/SaveSystem';
-import { applyMockFromUrl } from '../systems/MockSave';
+import { applyMockFromUrl, battleFromUrl } from '../systems/MockSave';
 import { openingRoute } from '../systems/QuestRoute';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
+import { ENEMY_ART_IDS } from '../data/regions';
+import { preloadEnemyArt } from '../characters/EnemyArt';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { preloadIconAssets } from '../ui/IconAssets';
@@ -44,6 +46,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('currency_coin', '/assets/ui/coin.png');
     this.load.image('currency_gem', '/assets/ui/gem.png');
     this.load.image('currency_stamina', '/assets/ui/stamina.png');
+    preloadEnemyArt(this, ENEMY_ART_IDS);
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);
@@ -63,7 +66,9 @@ export class BootScene extends Phaser.Scene {
     const friendId = code ? parseFriendInput(code) : null;
     if (code) history.replaceState(null, '', location.pathname);
     TutorialDirector.install(this.game);
-    if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
+    const battle = battleFromUrl();
+    if (battle) this.scene.start(battle.scene, battle.data);
+    else if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
     // The very first launch: the opening story, which ends at Home where the tutorial starts.
     else if (!save.tutorial.opening) {
       const route = openingRoute();

@@ -1,7 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
-import { REGION_COUNT, getRegion, pickFeralName, type RegionDef } from '../data/regions';
+import { REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
 import { expToNextLevel } from './LevelCurve';
 
@@ -23,18 +23,18 @@ const CLASS_BASE: Record<HeroClass, ClassBase> = {
 const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2 };
 
 // Exported so InfiniteModeSystem can generate its own continuously-scaling
-// enemy defs from the same name/class pools instead of duplicating them.
-// Also still used as the generic class pool for every quest-mode enemy
-// (region flavor only changes the displayed *name*, not the class spread).
+// enemy defs from the same class pool instead of duplicating it. It is the
+// generic class pool for every enemy (a region's flavor changes the *name* and
+// picture, not the class spread).
 export const ENEMY_CLASSES: HeroClass[] = ['warrior', 'mage', 'archer', 'tank', 'healer'];
-export const NAME_P1 = ['零', '虚', '影', '灰', '銀', '黒', '蝕', '綺', '幻', '棄'];
-export const NAME_P2 = ['算兵', '演算体', '断片', '残響', '執行者', '番人', '傀儡', '古算'];
 
 export interface EnemyUnitDef {
   seed: number;
   heroClass: HeroClass;
   rarity: Rarity;
   name: string;
+  /** Picture id (public/assets/enemies/<art>.png); a silhouette is drawn without one. */
+  art?: string;
   /** Single powerful unit (region Extra dungeon's 6th-stage guardian, the
    *  final battle's wave climax) rather than rank-and-file - gets a flat
    *  stat multiplier in computeEnemyStats instead of just a rarity bump. */
@@ -165,12 +165,13 @@ function enemyCountForIndex(index: number): number {
   return Math.min(5, 1 + Math.floor(index / 10));
 }
 
-function rollEnemy(region: RegionDef, rarity: Rarity, rng: () => number): EnemyUnitDef {
+/** A rank-and-file enemy of `region` (its name and picture come from the region's animals). */
+export function rollEnemy(region: RegionDef, rarity: Rarity, rng: () => number): EnemyUnitDef {
   return {
     seed: Math.floor(rng() * 2 ** 31),
     heroClass: ENEMY_CLASSES[Math.floor(rng() * ENEMY_CLASSES.length)],
     rarity,
-    name: pickFeralName(region, rng),
+    ...pickFeral(region, rng),
   };
 }
 
@@ -280,6 +281,7 @@ export const ProgressionSystem = {
             heroClass: region.bossClass,
             rarity: 5,
             name: region.bossName,
+            art: region.bossArt,
             isBoss: true,
           },
         ]

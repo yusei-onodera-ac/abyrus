@@ -5,14 +5,19 @@ import type { HeroClass } from '../types';
  * stages deep. Pure content: enemy flavor-name pools, theme colors, and
  * the named "region boss" fought at the end of that region's Extra
  * dungeon all live here so they can be tuned/expanded without touching
- * ProgressionSystem, StageSelectScene, or BattleScene. No monster
- * illustrations exist yet - CharacterGenerator's seed/class/rarity-driven
- * procedural silhouette is the placeholder appearance for every enemy
- * generated from this data, exactly like it already is for the old
- * flat-stage enemies. Swapping in real art later is purely a matter of
- * adding `assets/characters/<id>.png` files keyed off names derived from
- * this file - no scene code needs to change.
+ * ProgressionSystem, StageSelectScene, or BattleScene.
+ *
+ * Every animal names its picture: `art: 'wolf'` is `public/assets/enemies/wolf.png`
+ * (BootScene loads each one in use). An animal or boss without a picture - or whose file
+ * is missing - is drawn as CharacterGenerator's procedural silhouette instead, so a new
+ * animal needs only a line here, and its picture can follow later.
  */
+/** A kind of rank-and-file enemy: its name (after a FERAL_PREFIXES adjective) and its picture. */
+export interface FeralAnimal {
+  name: string;
+  art?: string;
+}
+
 /** What the scenery scattered along a region's quest-map road is made of. */
 export type RegionMotif = 'pine' | 'dune' | 'peak' | 'pillar' | 'tower';
 
@@ -42,15 +47,15 @@ export interface RegionDef {
   mapDescription: string;
   /** Accent color for this region's map tab/nodes/story backgrounds. */
   themeColor: number;
-  /** Adjectives describing the ferality itself, shared across all regions
-   *  and combined with `feralAnimals` below (prefix + animal), the same
-   *  prefix+suffix combinatorial approach ProgressionSystem's own
-   *  NAME_P1/NAME_P2 already uses for the old SF-flavored enemy names. */
-  feralAnimals: string[];
+  /** The animals met here, each combined with a FERAL_PREFIXES adjective
+   *  (prefix + animal) to name a rank-and-file enemy. */
+  feralAnimals: FeralAnimal[];
   /** The strongest feral animal native to this region - fought alone as
    *  the 6th (final) stage of this region's 6-stage Extra dungeon. */
   bossName: string;
   bossClass: HeroClass;
+  /** The boss's picture (see the note at the top); drawn as a silhouette if left out. */
+  bossArt?: string;
   look: RegionLook;
 }
 
@@ -74,7 +79,12 @@ export const REGIONS: RegionDef[] = [
     name: '迷いの森',
     mapDescription: '赤い瘴気が漂い始めた、プレイヤーの故郷の森。',
     themeColor: 0x4c8a4c,
-    feralAnimals: ['鹿', '狼', '熊', '兎', '狐', '猿', '烏', '猪'],
+    feralAnimals: [
+      { name: 'リス', art: 'squirrel' },
+      { name: '熊', art: 'bear' },
+      { name: '烏', art: 'crow' },
+      { name: 'インコ', art: 'parrot' },
+    ],
     bossName: '紅角の大鹿・ガルムード',
     bossClass: 'tank',
     look: { skyTop: 0x0f2418, skyBottom: 0x2f5230, motif: 'pine', motifDark: 0x16361f, motifLight: 0x3f8043, battleTint: 0xffffff },
@@ -85,7 +95,13 @@ export const REGIONS: RegionDef[] = [
     name: '灰塵の荒野',
     mapDescription: '狂暴化が森の外にも広がっていた、隊商と猟師ギルドの大地。',
     themeColor: 0xc9933f,
-    feralAnimals: ['隼', '蠍', '禿鷲', '砂蜥蜴', '野犬', '毒蛇', '駱駝', '山猫'],
+    feralAnimals: [
+      { name: '獅子', art: 'lion' },
+      { name: 'キリン', art: 'giraffe' },
+      { name: '象', art: 'elephant' },
+      { name: 'カンガルー', art: 'kangaroo' },
+      { name: '砂蜥蜴', art: 'lizard' },
+    ],
     bossName: '砂塵の女王蠍・アラクネア',
     bossClass: 'archer',
     look: { skyTop: 0x3a2410, skyBottom: 0x8f5d28, motif: 'dune', motifDark: 0x5c3a18, motifLight: 0xd09a45, battleTint: 0xf0b878 },
@@ -96,7 +112,12 @@ export const REGIONS: RegionDef[] = [
     name: '蒼氷の山嶺',
     mapDescription: '共生研究院の廃研究所が眠る、氷に閉ざされた山岳地帯。',
     themeColor: 0x6fc8e0,
-    feralAnimals: ['白虎', '雪豹', '巨角羊', '氷狼', '白鷲', '穴熊', '雪猿', '樹氷鹿'],
+    feralAnimals: [
+      { name: 'パンダ', art: 'panda' },
+      { name: '穴熊', art: 'bear' },
+      { name: '雪猿', art: 'gorilla' },
+      { name: '巨象', art: 'elephant' },
+    ],
     bossName: '白銀の山王虎・コンゴウ',
     bossClass: 'warrior',
     look: { skyTop: 0x10283a, skyBottom: 0x4f819c, motif: 'peak', motifDark: 0x2a4a62, motifLight: 0xd4ecf8, battleTint: 0x9fd4f0 },
@@ -107,7 +128,13 @@ export const REGIONS: RegionDef[] = [
     name: '瘴気の遺跡',
     mapDescription: '教授が因子を培養し続ける、濃い瘴気漂う古代遺跡。',
     themeColor: 0x8a4fcf,
-    feralAnimals: ['骸蝙蝠', '瘴狼', '古骨竜', '穢獣', '腐肉犀', '瘴猿', '墓場烏', '呪蛇'],
+    feralAnimals: [
+      { name: '呪蛇', art: 'snake' },
+      { name: '腐肉犀', art: 'rhino' },
+      { name: '瘴猿', art: 'gorilla' },
+      { name: '墓場烏', art: 'crow' },
+      { name: '瘴蜥蜴', art: 'lizard' },
+    ],
     bossName: '古骨の竜・ネクロドラコ',
     bossClass: 'mage',
     look: { skyTop: 0x1c1030, skyBottom: 0x4c3375, motif: 'pillar', motifDark: 0x2a1a44, motifLight: 0x9a5fe0, battleTint: 0xb090e0 },
@@ -118,9 +145,16 @@ export const REGIONS: RegionDef[] = [
     name: '黄昏の都',
     mapDescription: '因子をばら撒かれ、動物の暴走で混乱に陥った都。',
     themeColor: 0xd6527a,
-    feralAnimals: ['野良犬', '軍鳩', '下水鼠', '野良猫', '暴走馬', '闇猫', '逃亡鷹', '見世物熊'],
+    feralAnimals: [
+      { name: 'プードル', art: 'poodle' },
+      { name: '野良猫', art: 'cat' },
+      { name: '下水鼠', art: 'rat' },
+      { name: '暴走馬', art: 'horse' },
+      { name: 'インコ', art: 'parrot' },
+    ],
     bossName: '闇走りの大狼・クロガネ',
     bossClass: 'warrior',
+    bossArt: 'wolf',
     look: { skyTop: 0x2a1020, skyBottom: 0x80345a, motif: 'tower', motifDark: 0x2a1220, motifLight: 0xe0608a, battleTint: 0xe890a8 },
   },
 ];
@@ -131,12 +165,15 @@ export function getRegion(index: number): RegionDef {
   return REGIONS[Math.max(0, Math.min(REGION_COUNT - 1, index))];
 }
 
-/** Deterministically builds a feral-flavor enemy name from a region +
- *  PRNG draw - mirrors ProgressionSystem's own NAME_P1/NAME_P2 combination
- *  so quest enemies read with the same "generated from two small pools"
- *  texture as the original SF-flavored ones. */
-export function pickFeralName(region: RegionDef, rng: () => number): string {
+/** Deterministically builds a feral enemy from a region + PRNG draws: an
+ *  adjective plus one of the region's animals ("牙剥く熊"), with that animal's picture. */
+export function pickFeral(region: RegionDef, rng: () => number): { name: string; art?: string } {
   const prefix = FERAL_PREFIXES[Math.floor(rng() * FERAL_PREFIXES.length)];
   const animal = region.feralAnimals[Math.floor(rng() * region.feralAnimals.length)];
-  return prefix + animal;
+  return { name: prefix + animal.name, art: animal.art };
 }
+
+/** Every picture a region's animals or boss ask for: what BootScene loads. */
+export const ENEMY_ART_IDS: string[] = [
+  ...new Set(REGIONS.flatMap((r) => [...r.feralAnimals.map((a) => a.art), r.bossArt]).filter((id): id is string => !!id)),
+];

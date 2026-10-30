@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData, type InfiniteModeRunResult } from '../systems/SaveSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { AnimationController } from '../characters/AnimationController';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { BigNumber } from '../systems/BigNumber';
@@ -45,11 +46,11 @@ interface RunningHud {
 // Same 720-wide, 3-front/2-back footprint BattleScene lays stage-battle
 // enemies out on, so Infinite Mode's arena reads as the same kind of fight.
 const ENEMY_SLOT_XY: Record<string, { x: number; y: number }> = {
-  'front-0': { x: 210, y: 420 },
-  'front-1': { x: 360, y: 420 },
-  'front-2': { x: 510, y: 420 },
-  'back-0': { x: 285, y: 280 },
-  'back-1': { x: 435, y: 280 },
+  'front-0': { x: 360 - ENEMY_SPACING, y: ENEMY_ROW_Y.front },
+  'front-1': { x: 360, y: ENEMY_ROW_Y.front },
+  'front-2': { x: 360 + ENEMY_SPACING, y: ENEMY_ROW_Y.front },
+  'back-0': { x: 360 - ENEMY_SPACING / 2, y: ENEMY_ROW_Y.back },
+  'back-1': { x: 360 + ENEMY_SPACING / 2, y: ENEMY_ROW_Y.back },
 };
 
 /**
@@ -194,9 +195,15 @@ export class InfiniteModeScene extends Phaser.Scene {
   }
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean): void {
-    const { textureKey, size } = this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
-    const sprite = this.add.sprite(x, y, textureKey).setDisplaySize(size * 0.9, size * 0.9);
-    if (!isPlayer) sprite.setFlipX(true);
+    // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
+    const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
+    const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
+    const textureKey = art?.key ?? generated?.textureKey ?? '';
+    const size = art ? art.height : (generated?.size ?? 96);
+    const sprite = this.add.sprite(x, y, textureKey);
+    if (art) sprite.setDisplaySize(art.width, art.height);
+    else sprite.setDisplaySize(size * 0.9, size * 0.9);
+    if (!isPlayer && !art) sprite.setFlipX(true);
 
     const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;

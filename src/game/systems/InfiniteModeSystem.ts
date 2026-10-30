@@ -1,7 +1,8 @@
 import { BigNumber } from './BigNumber';
 import { BattleSystem, ULT_GAIN, ULT_MAX, type UnitInstance } from './BattleSystem';
 import { castSkill, effectiveAtk, effectiveDef, isInvincible, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
-import { ENEMY_CLASSES, NAME_P1, NAME_P2, type EnemyUnitDef } from './ProgressionSystem';
+import { getRegion } from '../data/regions';
+import { rollEnemy, type EnemyUnitDef } from './ProgressionSystem';
 import type { HeroData, Rarity, Row } from '../types';
 
 export interface EnemySlotPosition {
@@ -52,14 +53,11 @@ export function getDifficultyIndex(elapsedMs: number): number {
   return elapsedMs / 1000 / SECONDS_PER_DIFFICULTY_STAGE;
 }
 
+/** The animals met deeper in a run are those of the later regions, as in the quest campaign
+ *  (a region's rarity tier is its index + 1). */
 function pickEnemyDef(difficultyIndex: number): EnemyUnitDef {
   const rarity = Math.min(5, 1 + Math.floor(difficultyIndex / 6)) as Rarity;
-  return {
-    seed: Math.floor(Math.random() * 2 ** 31),
-    heroClass: ENEMY_CLASSES[Math.floor(Math.random() * ENEMY_CLASSES.length)],
-    rarity,
-    name: NAME_P1[Math.floor(Math.random() * NAME_P1.length)] + NAME_P2[Math.floor(Math.random() * NAME_P2.length)],
-  };
+  return rollEnemy(getRegion(rarity - 1), rarity, Math.random);
 }
 
 // --- Scoring --------------------------------------------------------------
