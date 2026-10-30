@@ -32,14 +32,17 @@ export class GachaDetailScene extends InboxScene {
   protected emptyText = '';
   private banner?: GachaBannerEntry;
   private generator!: CharacterGenerator;
+  /** Where the list was scrolled to when a hero was opened, so coming back lands in the same place. */
+  private restoreScroll = 0;
 
   constructor() {
     super('GachaDetail');
   }
 
-  init(data: { bannerId?: string }): void {
+  init(data: { bannerId?: string; scroll?: number }): void {
     super.init();
     this.banner = getActiveGachaBanners().find((b) => b.id === data?.bannerId);
+    this.restoreScroll = data?.scroll ?? 0;
   }
 
   protected goBack(): void {
@@ -49,6 +52,7 @@ export class GachaDetailScene extends InboxScene {
   create(): void {
     this.generator = new CharacterGenerator(this);
     super.create();
+    if (this.restoreScroll > 0) this.scroll.scrollTo(this.restoreScroll);
   }
 
   protected buildCards(): InboxCard[] {
@@ -78,6 +82,7 @@ export class GachaDetailScene extends InboxScene {
     } else {
       lines.push({ text: 'このガチャに天井はありません。', color: '#cdbb94', size: 19 });
     }
+    if (banner.kind !== 'equipment') lines.push({ text: 'キャラをタップすると、レベル・フェーズ・スキルが最大のときの姿を見られます。', color: '#9fe39f', size: 19, bold: true });
     if (banner.kind !== 'equipment') lines.push({ text: 'すでに持っているキャラは、合成用の素材として手に入ります。フェーズの上限を超える分は、ゴールドになります。', color: '#cdbb94', size: 18 });
 
     const texts = lines.map((l) => wrappedText(this, PAD + 6, 0, l.text, CARD_WIDTH - PAD * 2 - 12, { fontSize: `${l.size}px`, color: l.color, fontStyle: l.bold ? 'bold' : 'normal' }));
@@ -126,10 +131,17 @@ export class GachaDetailScene extends InboxScene {
       const x = PAD + SLOT / 2 + (i % COLS) * (SLOT + gapX);
       const top = 70 + Math.floor(i / COLS) * ROW_H;
       const hero = createHeroInstance(def.id, `detail-${def.id}`);
-      container.add(new HeroSlot(this, x, top + SLOT / 2, { hero, generator: this.generator, hideLevel: true }, SLOT));
+      const open = (): void => this.openPreview(def.id);
+      container.add(new HeroSlot(this, x, top + SLOT / 2, { hero, generator: this.generator, hideLevel: true, onTap: open, guard: () => this.scroll.isTap() }, SLOT));
       this.addTileText(container, x, top + SLOT, def.name, percent(each));
     });
     return { container, height };
+  }
+
+  /** The character at its best (level, phase and skills all maxed); 戻る returns to this list where it was. */
+  private openPreview(heroId: string): void {
+    if (!this.banner) return;
+    this.scene.start('HeroDetail', { heroId, preview: true, from: 'GachaDetail', fromData: { bannerId: this.banner.id, scroll: this.scroll.getScroll() } });
   }
 
   /** One rarity's pieces of equipment: icon, name, effect at level 1 and the rate. */

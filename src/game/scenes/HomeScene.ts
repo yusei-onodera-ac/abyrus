@@ -5,6 +5,7 @@ import { LoginBonusSystem } from '../systems/LoginBonusSystem';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
 import { clipboardIcon, hourglassIcon } from '../ui/ItemIcons';
 import { MissionSystem } from '../systems/MissionSystem';
+import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import { getMissionGroup } from '../data/missions';
 import { homeLinesFor } from '../data/homeLines';
 import { VoiceSystem } from '../systems/VoiceSystem';
@@ -55,6 +56,7 @@ export class HomeScene extends Phaser.Scene {
 
   create(): void {
     const save = this.getSave();
+    stopAutoAdvance(this.game);
     // Hand over any gifts/mails the operator has added since the last visit.
     if (InboxSystem.deliver(save)) SaveSystem.save(save);
     this.cameras.main.setBackgroundColor('#10121c');

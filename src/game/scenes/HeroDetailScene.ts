@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { SaveSystem, expToNextLevel, type SaveData } from '../systems/SaveSystem';
+import { createHeroInstance } from '../data/heroes';
 import { describeEquip, getEquipDef } from '../data/equipment';
 import { equipIcon } from '../ui/ItemIcons';
+import { getHeroDefinition } from '../data/heroes';
 import { MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillUpgradeCost, type SkillDefinition } from '../data/skills';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
@@ -24,6 +26,11 @@ interface HeroDetailData {
   heroId: string;
   /** Scene to return to when the back button is tapped. */
   from: string;
+  /** What to start that scene with (e.g. the gacha banner it was showing). */
+  fromData?: Record<string, unknown>;
+  /** Look at a hero that may not be owned, at its best: level, phase and skills all at the
+   *  maximum. Read-only - nothing here changes the save, and no button acts on the hero. */
+  preview?: boolean;
 }
 
 const INK = '#1c130a';
@@ -56,9 +63,9 @@ export class HeroDetailScene extends Phaser.Scene {
   create(): void {
     const save: SaveData = this.game.registry.get('save');
     this.save = save;
-    const hero = SaveSystem.getHero(save, this.detailData.heroId);
+    const hero = this.detailData.preview ? this.maxedHero(this.detailData.heroId) : SaveSystem.getHero(save, this.detailData.heroId);
     if (!hero) {
-      this.scene.start(this.detailData.from);
+      this.goBack();
       return;
     }
 
@@ -70,7 +77,8 @@ export class HeroDetailScene extends Phaser.Scene {
     this.buildHeaderBar();
     this.buildStageLabels(hero);
     this.buildSkillChips(hero);
-    this.buildGearChips(hero);
+    if (this.detailData.preview) this.buildPreviewBadge();
+    else this.buildGearChips(hero);
 
     let y = STAGE_H + 10;
     y += this.buildStatusBlock(hero, generator, y) + GAP;
@@ -79,7 +87,32 @@ export class HeroDetailScene extends Phaser.Scene {
 
     new BottomNavBar(this, 720, 1280, null);
     this.buildButtons(hero);
-    enter(this, new BackButton(this, () => this.scene.start(this.detailData.from)), { dx: -40, dy: 0, duration: 300, delay: 250 });
+    enter(this, new BackButton(this, () => this.goBack()), { dx: -40, dy: 0, duration: 300, delay: 250 });
+  }
+
+  private goBack(): void {
+    this.scene.start(this.detailData.from, this.detailData.fromData);
+  }
+
+  /** The hero as it can become: level, phase and every skill at the top. Not stored anywhere. */
+  private maxedHero(heroId: string): HeroData | undefined {
+    if (!getHeroDefinition(heroId)) return undefined;
+    const hero = createHeroInstance(heroId, `preview-${heroId}`, MAX_LEVEL);
+    hero.phase = MAX_PHASE;
+    hero.skillLevels = hero.skillLevels.map(() => MAX_SKILL_LEVEL);
+    return hero;
+  }
+
+  /** In the preview: what the figure is shown at, at its feet (the head and the chips stay clear). */
+  private buildPreviewBadge(): void {
+    const g = this.add.graphics();
+    g.fillStyle(0x0d0905, 0.88);
+    g.fillRoundedRect(206, STAGE_H - 74, 300, 44, 22);
+    g.lineStyle(2, CHROME.brassBright, 1);
+    g.strokeRoundedRect(206, STAGE_H - 74, 300, 44, 22);
+    const label = body(this, 356, STAGE_H - 52, '最大まで強化した姿', { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+    enter(this, g, { dy: 10, delay: 260 });
+    enter(this, label, { dy: 10, delay: 260 });
   }
 
   /** The wall + floor circle (or the supplied hero_detail background, if there
@@ -118,7 +151,7 @@ export class HeroDetailScene extends Phaser.Scene {
     bar.fillRect(0, 62, 720, 3);
     bar.fillStyle(CHROME.brassBright, 0.55);
     bar.fillRect(0, 58, 720, 1);
-    const title = heading(this, 360, 32, 'キャラ詳細', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    const title = heading(this, 360, 32, this.detailData.preview ? 'キャラ詳細　最大強化' : 'キャラ詳細', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     enter(this, bar, { dy: -20, duration: 280 });
     enter(this, title, { dy: -20, duration: 280, delay: 40 });
   }
@@ -201,7 +234,7 @@ export class HeroDetailScene extends Phaser.Scene {
       panel.container.add(g);
     }
     panel.container.add(body(this, PANEL_W - 18, top + 28, `${hero.phase} / ${MAX_PHASE}`, { fontSize: '30px', fontStyle: 'bold', color: '#d9c2ff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
-    panel.container.add(caption(this, 18, top + 64, '同じキャラを合成するか、フェーズ素材を使うと上がります', { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, 18, top + 64, this.detailData.preview ? 'フェーズが最大のときの姿です' : '同じキャラを合成するか、フェーズ素材を使うと上がります', { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     panel.container.setPosition(PANEL_X, y);
     enter(this, panel.container, { dy: 24, duration: 340, delay: 170 });
     return panel.height;
@@ -336,7 +369,8 @@ export class HeroDetailScene extends Phaser.Scene {
     modal.add([panel, block]);
 
     modal.add(body(this, 360, top + 40, `${hero.name} のスキル`, { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    modal.add(caption(this, 360, top + 86, `所持 技素：${this.save.skillEssence.toLocaleString('ja-JP')}`, { fontSize: '22px', color: '#ffd9a0', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+    const note = this.detailData.preview ? 'すべてのスキルが最大レベルです' : `所持 技素：${this.save.skillEssence.toLocaleString('ja-JP')}`;
+    modal.add(caption(this, 360, top + 86, note, { fontSize: '22px', color: '#ffd9a0', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
 
     let row = 0;
     for (let slot = 0; slot < slotCount; slot++) {
@@ -366,6 +400,11 @@ export class HeroDetailScene extends Phaser.Scene {
     modal.add(body(this, x, y + h - 14, `Lv.${level} / ${MAX_SKILL_LEVEL}`, { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     modal.add(caption(this, x + 150, y + h - 14, formatSkillEffectSummary(def, level), { fontSize: '19px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
+    // Nothing to buy when only looking (and nothing left to buy at the top level).
+    if (this.detailData.preview) {
+      modal.add(body(this, x + w, y + h - 14, 'MAX', { fontSize: '26px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+      return;
+    }
     const maxed = level >= MAX_SKILL_LEVEL;
     const cost = maxed ? 0 : skillUpgradeCost(level);
     const button = new Button(this, x + w - 80, y + h - 27, 160, 58, maxed ? 'MAX' : '強化', () => this.upgradeSkill(hero, slot), {
@@ -399,6 +438,13 @@ export class HeroDetailScene extends Phaser.Scene {
 
   /** 強化する (to the 強化 screen), ホームに設定, and 編成にセット when we came from the roster. */
   private buildButtons(hero: HeroData): void {
+    if (this.detailData.preview) {
+      // Looking only: no button acts on a hero that may not be owned.
+      const note = caption(this, 440, 1114, 'まだ持っていなくても、最大まで強化した姿を見られます', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+      if (note.width > 520) note.setScale(520 / note.width);
+      enter(this, note, { dy: 20, delay: 260 });
+      return;
+    }
     const y = 1114;
     const h = 66;
     const enhance = (): void => {

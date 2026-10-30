@@ -50,7 +50,7 @@ export const EVENTS: EventEntry[] = [
     kind: 'premium',
     actionLabel: '詳細・購入',
     title: 'プレミアムパス',
-    description: '毎日魔晶石がもらえて、戦闘2倍速・放置報酬の上限アップも。',
+    description: '毎日魔晶石がもらえて、戦闘2倍速・連戦モード・放置報酬の上限アップも。',
     accent: 0xc79a2a,
     emblem: '♛',
   },

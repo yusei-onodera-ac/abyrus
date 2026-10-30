@@ -6,7 +6,7 @@ import type { SaveData } from './SaveSystem';
  *  short tones each) - there are no audio files yet. Placeholders: when real
  *  files exist, play them from `play` and keep the names. Volume is the SE
  *  setting (設定), 0 being off. No BGM yet. */
-export type Sfx = 'tap' | 'confirm' | 'hit' | 'crit' | 'skill' | 'heal' | 'reveal' | 'victory' | 'defeat';
+export type Sfx = 'tap' | 'confirm' | 'hit' | 'crit' | 'skill' | 'heal' | 'reveal' | 'victory' | 'defeat' | 'boom' | 'levelup';
 
 interface Tone {
   /** Hz. */
@@ -41,6 +41,17 @@ const SFX: Record<Sfx, Tone[]> = {
     { freq: 880, at: 0, dur: 0.12, type: 'sine', gain: 0.45 },
     { freq: 1320, at: 0.1, dur: 0.2, type: 'sine', gain: 0.45 },
   ],
+  boom: [
+    { freq: 150, to: 38, at: 0, dur: 0.28, type: 'sawtooth', gain: 0.5 },
+    { freq: 520, to: 90, at: 0, dur: 0.12, type: 'square', gain: 0.3 },
+  ],
+  levelup: [
+    { freq: 784, at: 0, dur: 0.1, type: 'triangle', gain: 0.5 },
+    { freq: 988, at: 0.09, dur: 0.1, type: 'triangle', gain: 0.5 },
+    { freq: 1319, at: 0.18, dur: 0.1, type: 'triangle', gain: 0.5 },
+    { freq: 1568, at: 0.27, dur: 0.34, type: 'triangle', gain: 0.55 },
+    { freq: 2093, at: 0.27, dur: 0.34, type: 'sine', gain: 0.3 },
+  ],
   reveal: [
     { freq: 1318, at: 0, dur: 0.1, type: 'sine', gain: 0.45 },
     { freq: 1568, at: 0.08, dur: 0.1, type: 'sine', gain: 0.45 },
@@ -60,7 +71,7 @@ const SFX: Record<Sfx, Tone[]> = {
 };
 
 /** A sound that fires again within this many ms is skipped (a fight can ask for a hit sound every few frames). */
-const MIN_GAP_MS: Partial<Record<Sfx, number>> = { hit: 70, crit: 90, skill: 120, heal: 120, tap: 40 };
+const MIN_GAP_MS: Partial<Record<Sfx, number>> = { hit: 70, crit: 90, skill: 120, heal: 120, tap: 40, boom: 90 };
 /** Loudest the effects go at full volume (0..1 of the output). */
 const MASTER = 0.22;
 

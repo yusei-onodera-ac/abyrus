@@ -3,8 +3,8 @@ import { SaveSystem, type SaveData, type InfiniteModeRunResult } from '../system
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { AnimationController } from '../characters/AnimationController';
+import { BattleFx, type Positioned } from '../characters/BattleFx';
 import { DamagePopupPool } from '../ui/DamagePopup';
-import { BigNumber } from '../systems/BigNumber';
 import { AutoSkillToggle } from '../ui/AutoSkillToggle';
 import { SpeedToggle } from '../ui/SpeedToggle';
 import { Button } from '../ui/Button';
@@ -68,6 +68,9 @@ export class InfiniteModeScene extends Phaser.Scene {
   private generator!: CharacterGenerator;
   private anim!: AnimationController;
   private popups!: DamagePopupPool;
+  private fx!: BattleFx;
+  /** False while the party is still rising into place: the run waits for it. */
+  private ready = false;
   private engine?: InfiniteRunEngine;
   private views = new Map<string, UnitView>();
   private state: SceneState = 'running';
@@ -90,6 +93,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.generator = new CharacterGenerator(this);
     this.anim = new AnimationController(this);
     this.popups = new DamagePopupPool(this);
+    this.fx = new BattleFx(this);
     this.views.clear();
     this.engine = undefined;
     this.state = 'running';
@@ -116,7 +120,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (this.state !== 'running' || !this.engine) return;
+    if (this.state !== 'running' || !this.engine || !this.ready) return;
     // 2倍速: the run and every animation in it go faster together.
     const speed = this.speed?.factor() ?? 1;
     this.tweens.timeScale = speed;
@@ -153,15 +157,31 @@ export class InfiniteModeScene extends Phaser.Scene {
     const engine = new InfiniteRunEngine({ front, back });
     this.engine = engine;
 
+    this.ready = false;
     this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'front'), 760);
     this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'back'), 900);
     this.buildRunningHud();
+    this.riseParty();
   }
 
   private placePlayerRow(units: UnitInstance[], y: number): void {
     const spacing = 150;
     const startX = 360 - ((units.length - 1) * spacing) / 2;
-    units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, true));
+    units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, true, true));
+  }
+
+  /** The party rises in from below the screen; the run begins once they are up. */
+  private riseParty(): void {
+    const views = [...this.views.values()].filter((v) => v.unit.isPlayer);
+    const token = this.stateToken;
+    this.fx.rise(
+      views.map((v) => [v.sprite, v.nameText, v.hpBg, v.hpFill, v.ultFill, v.readyRing] as Positioned[]),
+      () => {
+        if (token !== this.stateToken) return;
+        this.ready = true;
+        for (const v of views) if (v.sprite.active) this.anim.idle(v.sprite);
+      },
+    );
   }
 
   /** A wood-and-brass strip across the top: リタイア, then survival time and
@@ -194,7 +214,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.hud.scoreText.setText(`スコア ${snap.score.toLocaleString('ja-JP')}`);
   }
 
-  private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean): void {
+  private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean, entrance = false): void {
     // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
     const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
     const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
@@ -204,6 +224,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (art) sprite.setDisplaySize(art.width, art.height);
     else sprite.setDisplaySize(size * 0.9, size * 0.9);
     if (!isPlayer && !art) sprite.setFlipX(true);
+    sprite.setData('baseScale', sprite.scaleX);
 
     const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;
@@ -216,7 +237,7 @@ export class InfiniteModeScene extends Phaser.Scene {
       .setRounded(2);
     const readyRing = this.add.circle(x, y, size * 0.52).setStrokeStyle(3, 0xffd23f, 0.9).setVisible(false);
 
-    this.anim.idle(sprite);
+    if (!entrance) this.anim.idle(sprite);
     this.anim.attachAura(unit.id, sprite, unit.rarity);
 
     if (isPlayer) {
@@ -246,6 +267,7 @@ export class InfiniteModeScene extends Phaser.Scene {
         view.ultFill.setScale(Phaser.Math.Clamp(view.unit.ultGauge / 100, 0, 1), 1);
         const ready = view.unit.ultGauge >= 100;
         if (ready && !view.readyRing.visible) {
+          this.fx.ready(view.sprite.x, view.sprite.y);
           view.readyRing.setVisible(true).setScale(1).setAlpha(1);
           view.readyPulse = this.tweens.add({
             targets: view.readyRing,
@@ -266,10 +288,16 @@ export class InfiniteModeScene extends Phaser.Scene {
   }
 
   private handleEvents(events: InfiniteBattleEvent[]): void {
+    // A skill's orb is still flying when the engine already reports who fell: hold those back.
+    let hold = 0;
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
-      else if (event.kind === 'skillCast') this.onSkillCast(event);
-      else if (event.kind === 'defeated') this.onDefeated(event.unitId);
+      else if (event.kind === 'skillCast') hold = this.onSkillCast(event);
+      else if (event.kind === 'defeated') {
+        const id = event.unitId;
+        if (hold > 0) this.time.delayedCall(hold, () => this.onDefeated(id));
+        else this.onDefeated(id);
+      }
       else if (event.kind === 'enemySpawned') this.onEnemySpawned(event.unit, event.position);
       else if (event.kind === 'runOver') this.endRun();
     }
@@ -280,24 +308,34 @@ export class InfiniteModeScene extends Phaser.Scene {
     const attackerView = this.views.get(event.attackerId);
     const targetView = this.views.get(event.targetId);
     if (!attackerView || !targetView) return;
-    this.anim.attack(attackerView.sprite, attackerView.unit.isPlayer);
+    const target = targetView.sprite;
+    this.anim.lunge(attackerView.sprite, target);
     if (event.blocked) {
-      this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { label: '無敵' });
+      this.popups.pop(target.x, target.y - 30, event.damage, { label: '無敵' });
+      this.fx.block(target.x, target.y);
       return;
     }
-    this.anim.hitFlash(targetView.sprite, event.crit);
-    this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
-    if (event.crit) this.anim.critShake(this.cameras.main);
+    this.anim.hitFlash(target, event.crit);
+    this.anim.knockback(target, attackerView.sprite, event.crit ? 24 : 12);
+    this.popups.pop(target.x, target.y - 30, event.damage, { crit: event.crit });
+    this.fx.hit(target.x, target.y, { crit: event.crit });
+    if (attackerView.unit.isPlayer) this.fx.combo();
   }
 
   /** Mirrors BattleScene's onSkillCast: a hero's unlocked skill firing can
    *  hit every enemy, land on allies, or revive a party member whose view
    *  onDefeated already tore down (and, here, removed from `views`
    *  entirely) - that case rebuilds the view instead of animating nothing. */
-  private onSkillCast(event: Extract<InfiniteBattleEvent, { kind: 'skillCast' }>): void {
+  private onSkillCast(event: Extract<InfiniteBattleEvent, { kind: 'skillCast' }>): number {
     SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
-    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+    const fromPlayer = !!casterView?.unit.isPlayer;
+    // How long the longest orb flies: units it kills are held until it lands.
+    let hold = 0;
+    if (casterView) {
+      this.anim.attack(casterView.sprite, fromPlayer);
+      this.fx.skillStart(casterView.sprite.x, casterView.sprite.y, event.effectKind, event.skillName, fromPlayer);
+    }
 
     for (const result of event.results) {
       if (result.revived) {
@@ -306,30 +344,48 @@ export class InfiniteModeScene extends Phaser.Scene {
         const pos = this.computePlayerUnitPosition(unit);
         this.createUnitView(unit, pos.x, pos.y, true);
         const view = this.views.get(unit.id);
+        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', '復活');
         if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
         continue;
       }
 
       const targetView = this.views.get(result.targetId);
       if (!targetView) continue;
+      const { x, y } = targetView.sprite;
       if (result.damage) {
-        this.anim.hitFlash(targetView.sprite, !!result.crit);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
-        if (result.crit) this.anim.critShake(this.cameras.main);
+        // An orb flies from the caster; the hit and the number land with it.
+        const { damage } = result;
+        const crit = !!result.crit;
+        const sprite = targetView.sprite;
+        const land = (): void => {
+          if (!sprite.active) return;
+          this.anim.hitFlash(sprite, crit);
+          if (casterView) this.anim.knockback(sprite, casterView.sprite, crit ? 30 : 18);
+          this.popups.pop(x, y - 30, damage, { crit });
+          this.fx.hit(x, y, { crit, big: true, palette: 'fire' });
+          if (fromPlayer) this.fx.combo();
+        };
+        if (casterView) hold = Math.max(hold, this.fx.travel({ x: casterView.sprite.x, y: casterView.sprite.y }, { x, y }, event.effectKind, land));
+        else land();
       } else if (result.heal) {
         this.anim.statusFlash(targetView.sprite, COLORS.heal);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+        this.popups.pop(x, y - 30, result.heal, { heal: true });
+        this.fx.status(x, y, 'heal');
       } else if (result.buffAtk || result.buffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.gold);
+        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? '攻防UP' : result.buffAtk ? '攻撃UP' : '防御UP');
       } else if (result.debuffAtk || result.debuffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
+        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? '攻防DOWN' : result.debuffAtk ? '攻撃DOWN' : '防御DOWN');
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+        this.fx.status(x, y, 'stun', 'スタン');
       } else if (result.invincible) {
         this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, BigNumber.ZERO, { label: '無敵' });
+        this.fx.status(x, y, 'invincible', '無敵');
       }
     }
+    return hold;
   }
 
   private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
@@ -351,6 +407,8 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.anim.destroyAura(unitId);
     view.readyPulse?.stop();
     view.readyRing.destroy();
+    this.fx.kill(view.sprite.x, view.sprite.y, view.unit.isPlayer);
+    if (!view.unit.isPlayer) SoundSystem.play(this, 'boom');
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
       view.hpBg.destroy();
@@ -382,6 +440,7 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private endRun(): void {
     if (this.state === 'result' || !this.engine) return;
+    this.fx.clearCombo();
     const snapshot = this.engine.getSnapshot();
     const result: InfiniteModeRunResult = {
       score: snapshot.score,

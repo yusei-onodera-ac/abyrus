@@ -41,7 +41,7 @@ export function buildPremiumStatusCard(scene: Phaser.Scene, save: SaveData): Pan
   return { container, height };
 }
 
-/** The three standing benefits: daily 魔晶石, 2倍速, a bigger 放置報酬 cap. */
+/** The standing benefits: daily 魔晶石, 2倍速, 連戦, a bigger 放置報酬 cap. */
 export function buildPremiumBenefitsCard(scene: Phaser.Scene): PanelCard {
   const rows: { icon: (x: number, y: number, c: Phaser.GameObjects.Container) => void; title: string; detail: string }[] = [
     {
@@ -53,6 +53,11 @@ export function buildPremiumBenefitsCard(scene: Phaser.Scene): PanelCard {
       icon: (x, y, c) => c.add(body(scene, x, y, '×2', { fontSize: '40px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 6 }).setOrigin(0.5)),
       title: `${PREMIUM.battleSpeed}倍速でサクサク`,
       detail: 'クエストも無限モードも、戦闘が2倍の速さに',
+    },
+    {
+      icon: (x, y, c) => c.add(body(scene, x, y, '連', { fontSize: '42px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 6 }).setOrigin(0.5)),
+      title: '連戦モード',
+      detail: '勝つたびに自動で次のステージへ。負けるまで挑み続けます',
     },
     {
       icon: (x, y, c) => c.add(scene.add.image(x, y, hourglassIcon(scene, 56))),

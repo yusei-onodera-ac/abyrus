@@ -1,3 +1,4 @@
+import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT } from '../systems/ProgressionSystem';
@@ -66,6 +67,7 @@ export class StageSelectScene extends Phaser.Scene {
 
   create(): void {
     const save = this.getSave();
+    stopAutoAdvance(this.game);
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'stage_select');
 

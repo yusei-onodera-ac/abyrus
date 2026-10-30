@@ -34,6 +34,18 @@ export class DamagePopupPool {
     }
   }
 
+  /** "CRITICAL!" over a critical number: pops in big, shakes, and is gone with it. */
+  private critLabel(x: number, y: number): void {
+    const label = this.scene.add
+      .text(x, y - 46, 'CRITICAL!', { fontFamily: 'Arial Black, sans-serif', fontSize: '24px', color: '#ffffff', stroke: '#b3220f', strokeThickness: 7 })
+      .setOrigin(0.5)
+      .setDepth(1001)
+      .setScale(0.3)
+      .setRotation(Phaser.Math.DegToRad(-8));
+    this.scene.tweens.add({ targets: label, scale: 1.25, rotation: 0, duration: 130, ease: 'Back.easeOut' });
+    this.scene.tweens.add({ targets: label, y: label.y - 36, alpha: 0, delay: 380, duration: 340, onComplete: () => label.destroy() });
+  }
+
   /** `label` shows that text instead of the number (e.g. 無敵 on a blocked hit). */
   pop(x: number, y: number, amount: BigNumber, opts: { crit?: boolean; heal?: boolean; label?: string } = {}): void {
     const entry = this.pool.find((e) => !e.inUse) ?? this.pool[0];
@@ -41,10 +53,12 @@ export class DamagePopupPool {
     const { text } = entry;
     const crit = !!opts.crit;
     const heal = !!opts.heal;
+    if (crit && !opts.label) this.critLabel(x, y);
 
     text.setText(opts.label ?? (heal ? '+' : '') + amount.toString());
     text.setColor(opts.label ? '#9fe0ff' : heal ? Phaser.Display.Color.ValueToColor(COLORS.heal).rgba : crit ? Phaser.Display.Color.ValueToColor(COLORS.gold).rgba : '#ffffff');
-    text.setFontSize(crit ? 40 : 24);
+    text.setStroke(crit ? '#b3220f' : heal ? '#0f5a2a' : '#1c130a', crit ? 9 : 6);
+    text.setFontSize(crit ? 58 : 32);
     text.setPosition(x + Phaser.Math.Between(-10, 10), y);
     text.setRotation(Phaser.Math.DegToRad(Phaser.Math.Between(-6, 6)));
     this.scene.tweens.killTweensOf(text);
@@ -52,22 +66,22 @@ export class DamagePopupPool {
     // Squash-and-stretch pop: land wide and flat, then snap up to full size
     // with an elastic overshoot before drifting up and fading - reads as a
     // much punchier hit than a flat scale tween.
-    text.setScale(crit ? 0.5 : 0.75, crit ? 0.3 : 0.45);
+    text.setScale(crit ? 0.4 : 0.7, crit ? 0.2 : 0.4);
     text.setAlpha(1);
     text.setVisible(true);
 
     this.scene.tweens.add({
       targets: text,
-      scaleX: crit ? 1.35 : 1.05,
-      scaleY: crit ? 1.35 : 1.05,
-      duration: 110,
+      scaleX: crit ? 1.7 : 1.2,
+      scaleY: crit ? 1.7 : 1.2,
+      duration: 100,
       ease: 'Quad.easeOut',
       onComplete: () => {
         this.scene.tweens.add({
           targets: text,
-          scaleX: crit ? 1.1 : 1,
-          scaleY: crit ? 1.1 : 1,
-          y: y - (crit ? 72 : 50),
+          scaleX: crit ? 1.2 : 1,
+          scaleY: crit ? 1.2 : 1,
+          y: y - (crit ? 96 : 64),
           rotation: 0,
           duration: 180,
           ease: 'Back.easeOut',

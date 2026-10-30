@@ -24,9 +24,12 @@ import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEven
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { AnimationController } from '../characters/AnimationController';
+import { BattleFx, type Positioned } from '../characters/BattleFx';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { AutoSkillToggle } from '../ui/AutoSkillToggle';
 import { SpeedToggle } from '../ui/SpeedToggle';
+import { AutoAdvance, AutoAdvanceToggle, stopAutoAdvance } from '../ui/AutoAdvanceToggle';
+import { buildPartyResult, type PartyGain } from '../ui/PartyResult';
 import { Button } from '../ui/Button';
 import { openConfirm } from '../ui/Dialogs';
 import { buildRewardGrid, type RewardTile } from '../ui/RewardTiles';
@@ -34,6 +37,7 @@ import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { applyBattleBackground } from '../ui/Background';
 import { subheading, caption, heading, CHROME, COLORS } from '../ui/theme';
+import { MAX_LEVEL } from '../types';
 import { enter, popIn } from '../ui/Transitions';
 
 const INK = '#1c130a';
@@ -62,10 +66,16 @@ export class BattleScene extends Phaser.Scene {
   private generator!: CharacterGenerator;
   private anim!: AnimationController;
   private popups!: DamagePopupPool;
+  private fx!: BattleFx;
+  /** False while the party is still rising into place: the fight waits for it. */
+  private ready = false;
+  /** Set once the fight is over, so the end is handled once. */
+  private ending = false;
   private engine!: BattleEngine;
   private views = new Map<string, UnitView>();
   private resultOverlay?: Phaser.GameObjects.Container;
   private autoSkill?: AutoSkillToggle;
+  private autoAdvance?: AutoAdvanceToggle;
   private speed?: SpeedToggle;
   private modal?: ModalHandle;
 
@@ -86,7 +96,10 @@ export class BattleScene extends Phaser.Scene {
     this.views.clear();
     this.resultOverlay = undefined;
     this.autoSkill = undefined;
+    this.autoAdvance = undefined;
     this.speed = undefined;
+    this.ready = false;
+    this.ending = false;
     this.modal = undefined;
     this.currentStageDef = undefined;
     this.finalStage = undefined;
@@ -101,6 +114,7 @@ export class BattleScene extends Phaser.Scene {
     this.generator = new CharacterGenerator(this);
     this.anim = new AnimationController(this);
     this.popups = new DamagePopupPool(this);
+    this.fx = new BattleFx(this);
     this.cameras.main.setBackgroundColor('#0c0e18');
     this.applyBackdrop();
 
@@ -137,6 +151,7 @@ export class BattleScene extends Phaser.Scene {
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);
     this.autoSkill = new AutoSkillToggle(this, this.save);
     this.speed = new SpeedToggle(this, this.save);
+    if (this.mode !== 'final') this.autoAdvance = new AutoAdvanceToggle(this, this.save);
     this.tweens.timeScale = 1;
     this.time.timeScale = 1;
     if (pFront.length + pBack.length === 0) {
@@ -148,7 +163,8 @@ export class BattleScene extends Phaser.Scene {
       ...pFront.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i)),
       ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
     ];
-    this.layoutUnits(playerUnits, true);
+    this.layoutUnits(playerUnits, true, true);
+    this.riseParty();
 
     if (this.mode === 'final' && this.finalStage) {
       this.waveIndex = 0;
@@ -184,20 +200,37 @@ export class BattleScene extends Phaser.Scene {
     ];
   }
 
-  private layoutUnits(units: UnitInstance[], isPlayer: boolean): void {
+  private layoutUnits(units: UnitInstance[], isPlayer: boolean, entrance = false): void {
     const frontY = isPlayer ? 760 : ENEMY_ROW_Y.front;
     const backY = isPlayer ? 900 : ENEMY_ROW_Y.back;
-    this.placeRow(units.filter((u) => u.row === 'front'), frontY, isPlayer);
-    this.placeRow(units.filter((u) => u.row === 'back'), backY, isPlayer);
+    this.placeRow(units.filter((u) => u.row === 'front'), frontY, isPlayer, entrance);
+    this.placeRow(units.filter((u) => u.row === 'back'), backY, isPlayer, entrance);
   }
 
-  private placeRow(units: UnitInstance[], y: number, isPlayer: boolean): void {
+  private placeRow(units: UnitInstance[], y: number, isPlayer: boolean, entrance: boolean): void {
     const spacing = isPlayer ? 150 : ENEMY_SPACING;
     const startX = 360 - ((units.length - 1) * spacing) / 2;
-    units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, isPlayer));
+    units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, isPlayer, entrance));
   }
 
-  private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean): void {
+  /** A view's pieces, which move together. */
+  private partsOf(view: UnitView): Positioned[] {
+    return [view.sprite, view.nameText, view.hpBg, view.hpFill, view.ultFill, view.readyRing];
+  }
+
+  /** At the start: the party rises in from below the screen; the fight begins once they are up. */
+  private riseParty(): void {
+    const views = [...this.views.values()].filter((v) => v.unit.isPlayer);
+    this.fx.rise(
+      views.map((v) => this.partsOf(v)),
+      () => {
+        this.ready = true;
+        for (const v of views) if (v.sprite.active) this.anim.idle(v.sprite);
+      },
+    );
+  }
+
+  private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean, entrance = false): void {
     // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
     const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
     const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
@@ -207,6 +240,7 @@ export class BattleScene extends Phaser.Scene {
     if (art) sprite.setDisplaySize(art.width, art.height);
     else sprite.setDisplaySize(size * 0.9, size * 0.9);
     if (!isPlayer && !art) sprite.setFlipX(true);
+    sprite.setData('baseScale', sprite.scaleX);
 
     const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
     const barWidth = 90;
@@ -219,7 +253,7 @@ export class BattleScene extends Phaser.Scene {
       .setRounded(2);
     const readyRing = this.add.circle(x, y, size * 0.52).setStrokeStyle(3, 0xffd23f, 0.9).setVisible(false);
 
-    this.anim.idle(sprite);
+    if (!entrance) this.anim.idle(sprite);
     this.anim.attachAura(unit.id, sprite, unit.rarity);
 
     if (isPlayer) {
@@ -236,7 +270,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number): void {
-    if (!this.engine || this.engine.isOver()) return;
+    if (!this.ready || !this.engine || this.engine.isOver()) return;
     // The tutorial's speech holds the fight still while it is on screen.
     if (TutorialDirector.isBlocking()) return;
     // 2倍速: the fight and every animation in it run faster together.
@@ -266,6 +300,7 @@ export class BattleScene extends Phaser.Scene {
         view.ultFill.setScale(Phaser.Math.Clamp(view.unit.ultGauge / 100, 0, 1), 1);
         const ready = view.unit.ultGauge >= 100;
         if (ready && !view.readyRing.visible) {
+          this.fx.ready(view.sprite.x, view.sprite.y);
           view.readyRing.setVisible(true).setScale(1).setAlpha(1);
           view.readyPulse = this.tweens.add({
             targets: view.readyRing,
@@ -286,10 +321,16 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private handleEvents(events: BattleEvent[]): void {
+    // A skill's orb is still flying when the engine already reports who fell: hold those back.
+    let hold = 0;
     for (const event of events) {
       if (event.kind === 'attack') this.onAttack(event);
-      else if (event.kind === 'skillCast') this.onSkillCast(event);
-      else if (event.kind === 'defeated') this.onDefeated(event.unitId);
+      else if (event.kind === 'skillCast') hold = this.onSkillCast(event);
+      else if (event.kind === 'defeated') {
+        const id = event.unitId;
+        if (hold > 0) this.time.delayedCall(hold, () => this.onDefeated(id));
+        else this.onDefeated(id);
+      }
       else if (event.kind === 'victory') this.onWaveOrBattleVictory();
       else if (event.kind === 'defeat') this.onBattleEnd(false);
     }
@@ -300,24 +341,34 @@ export class BattleScene extends Phaser.Scene {
     const attackerView = this.views.get(event.attackerId);
     const targetView = this.views.get(event.targetId);
     if (!attackerView || !targetView) return;
-    this.anim.attack(attackerView.sprite, attackerView.unit.isPlayer);
+    const target = targetView.sprite;
+    this.anim.lunge(attackerView.sprite, target);
     if (event.blocked) {
-      this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { label: '無敵' });
+      this.popups.pop(target.x, target.y - 30, event.damage, { label: '無敵' });
+      this.fx.block(target.x, target.y);
       return;
     }
-    this.anim.hitFlash(targetView.sprite, event.crit);
-    this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, event.damage, { crit: event.crit });
-    if (event.crit) this.anim.critShake(this.cameras.main);
+    this.anim.hitFlash(target, event.crit);
+    this.anim.knockback(target, attackerView.sprite, event.crit ? 24 : 12);
+    this.popups.pop(target.x, target.y - 30, event.damage, { crit: event.crit });
+    this.fx.hit(target.x, target.y, { crit: event.crit });
+    if (attackerView.unit.isPlayer) this.fx.combo();
   }
 
   /** A hero's unlocked skill firing: unlike a plain attack this can hit
    *  every enemy (AoE), land on allies (heals/buffs), or revive a unit
    *  whose view was already torn down by onDefeated - that last case
    *  rebuilds the view from scratch instead of animating a destroyed one. */
-  private onSkillCast(event: Extract<BattleEvent, { kind: 'skillCast' }>): void {
+  private onSkillCast(event: Extract<BattleEvent, { kind: 'skillCast' }>): number {
     SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
-    if (casterView) this.anim.attack(casterView.sprite, casterView.unit.isPlayer);
+    const fromPlayer = !!casterView?.unit.isPlayer;
+    // How long the longest orb flies: units it kills are held until it lands.
+    let hold = 0;
+    if (casterView) {
+      this.anim.attack(casterView.sprite, fromPlayer);
+      this.fx.skillStart(casterView.sprite.x, casterView.sprite.y, event.effectKind, event.skillName, fromPlayer);
+    }
 
     for (const result of event.results) {
       if (result.revived) {
@@ -326,30 +377,48 @@ export class BattleScene extends Phaser.Scene {
         const pos = this.computePlayerUnitPosition(unit);
         this.createUnitView(unit, pos.x, pos.y, true);
         const view = this.views.get(unit.id);
+        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', '復活');
         if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
         continue;
       }
 
       const targetView = this.views.get(result.targetId);
       if (!targetView) continue;
+      const { x, y } = targetView.sprite;
       if (result.damage) {
-        this.anim.hitFlash(targetView.sprite, !!result.crit);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.damage, { crit: result.crit });
-        if (result.crit) this.anim.critShake(this.cameras.main);
+        // An orb flies from the caster; the hit and the number land with it.
+        const { damage } = result;
+        const crit = !!result.crit;
+        const sprite = targetView.sprite;
+        const land = (): void => {
+          if (!sprite.active) return;
+          this.anim.hitFlash(sprite, crit);
+          if (casterView) this.anim.knockback(sprite, casterView.sprite, crit ? 30 : 18);
+          this.popups.pop(x, y - 30, damage, { crit });
+          this.fx.hit(x, y, { crit, big: true, palette: 'fire' });
+          if (fromPlayer) this.fx.combo();
+        };
+        if (casterView) hold = Math.max(hold, this.fx.travel({ x: casterView.sprite.x, y: casterView.sprite.y }, { x, y }, event.effectKind, land));
+        else land();
       } else if (result.heal) {
         this.anim.statusFlash(targetView.sprite, COLORS.heal);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, result.heal, { heal: true });
+        this.popups.pop(x, y - 30, result.heal, { heal: true });
+        this.fx.status(x, y, 'heal');
       } else if (result.buffAtk || result.buffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.gold);
+        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? '攻防UP' : result.buffAtk ? '攻撃UP' : '防御UP');
       } else if (result.debuffAtk || result.debuffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
+        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? '攻防DOWN' : result.debuffAtk ? '攻撃DOWN' : '防御DOWN');
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
+        this.fx.status(x, y, 'stun', 'スタン');
       } else if (result.invincible) {
         this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
-        this.popups.pop(targetView.sprite.x, targetView.sprite.y - 30, BigNumber.ZERO, { label: '無敵' });
+        this.fx.status(x, y, 'invincible', '無敵');
       }
     }
+    return hold;
   }
 
   /** Recomputes a player unit's on-screen slot from its row/position among
@@ -370,6 +439,8 @@ export class BattleScene extends Phaser.Scene {
     this.anim.destroyAura(unitId);
     view.readyPulse?.stop();
     view.readyRing.destroy();
+    this.fx.kill(view.sprite.x, view.sprite.y, view.unit.isPlayer);
+    if (!view.unit.isPlayer) SoundSystem.play(this, 'boom');
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
       view.hpBg.destroy();
@@ -434,13 +505,17 @@ export class BattleScene extends Phaser.Scene {
   // ------------------------------------------------------------ result --
 
   private onBattleEnd(victory: boolean): void {
-    if (this.resultOverlay) return;
+    if (this.resultOverlay || this.ending) return;
+    this.ending = true;
     SoundSystem.play(this, victory ? 'victory' : 'defeat');
     const next = victory ? this.nextStageOffer() : null;
 
     // The clear is settled first: what it pays decides how tall the panel is.
     let tiles: RewardTile[] = [];
     let levelUp: LevelUp | null = null;
+    let party: PartyGain[] = [];
+    let chainWins = 0;
+    const chain = AutoAdvance.isOn(this.game, this.save);
     if (victory) {
       const stage: QuestStage = { kind: this.mode ?? 'main', index: this.stageIndex };
       // First-clear status has to be read before the progress counters move.
@@ -448,6 +523,11 @@ export class BattleScene extends Phaser.Scene {
       SaveSystem.addGold(this.save, this.rewardGold);
       SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
       StageRewardSystem.grant(this.save, bonus);
+      // Who was on the field, and where they stood before the EXP: the result shows the change.
+      party = this.engine.playerUnits.flatMap((unit) => {
+        const hero = SaveSystem.getHero(this.save, unit.id);
+        return hero ? [{ hero, levelBefore: hero.level, expBefore: hero.exp, gained: hero.level >= MAX_LEVEL ? 0 : this.rewardExp }] : [];
+      });
       for (const unit of this.engine.playerUnits) {
         SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
       }
@@ -457,6 +537,7 @@ export class BattleScene extends Phaser.Scene {
       const playerExp = stageStaminaCost(stage.kind, stage.index);
       levelUp = PlayerLevelSystem.gain(this.save, playerExp);
       SaveSystem.save(this.save);
+      if (chain) AutoAdvance.addWin(this.game);
 
       tiles = [
         { kind: 'gold', amount: `+${this.rewardGold.toString()}` },
@@ -468,15 +549,58 @@ export class BattleScene extends Phaser.Scene {
       if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
       if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: 'ドロップ' });
       for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: 'ドロップ' });
+    } else if (chain) {
+      // A loss ends a 連戦.
+      chainWins = AutoAdvance.wins(this.game);
+      stopAutoAdvance(this.game);
+      this.autoAdvance?.refresh();
     }
-    const grid = victory ? buildRewardGrid(this, tiles, 600) : undefined;
 
-    // Title, the reward tiles, then the buttons (and, with a next stage on offer, a row of ways out).
+    if (!victory) {
+      this.showResult(false, null, [], null, [], false, chainWins, chain);
+      return;
+    }
+    // The win: a flash and confetti, the party floating up off the screen, then the panel.
+    this.fx.clearCombo();
+    this.fx.victory();
+    this.exitParty(() => this.showResult(true, next, tiles, levelUp, party, chain && !!next, chainWins, chain));
+  }
+
+  /** After a win the party lifts off the top of the screen, fading; `onDone` runs once they are gone. */
+  private exitParty(onDone: () => void): void {
+    const views = [...this.views.values()].filter((v) => v.unit.isPlayer && v.sprite.active);
+    for (const v of views) {
+      this.anim.destroyAura(v.unit.id);
+      v.readyPulse?.stop();
+      v.readyRing.setVisible(false);
+      this.tweens.killTweensOf(v.sprite);
+    }
+    this.fx.exit(views.map((v) => this.partsOf(v)), onDone);
+  }
+
+  /** The panel: the title, the party with its EXP, what was won, and the ways on. */
+  private showResult(
+    victory: boolean,
+    next: QuestStage | null,
+    tiles: RewardTile[],
+    levelUp: LevelUp | null,
+    party: PartyGain[],
+    chaining: boolean,
+    chainWins: number,
+    wasChain: boolean,
+  ): void {
+    const grid = victory ? buildRewardGrid(this, tiles, 600) : undefined;
+    const partyResult = party.length > 0 ? buildPartyResult(this, this.generator, this.fx, party, 600) : undefined;
+
+    // Title, the party, the reward tiles, then the buttons (and, with a next stage on offer, a row of ways out).
     const gridH = grid?.height ?? 0;
-    const buttonsH = !victory ? 90 : next ? 230 : 120;
-    const panelH = (victory ? 112 : 170) + gridH + buttonsH;
+    const partyH = partyResult ? partyResult.height + 10 : 0;
+    const chainH = chaining ? 44 : 0;
+    const buttonsH = !victory ? 90 : next ? 230 + chainH : 120;
+    const panelH = (victory ? 112 : 170) + partyH + gridH + buttonsH;
     const top = 640 - panelH / 2;
-    const gridTop = top + 112;
+    const partyTop = top + 104;
+    const gridTop = top + 112 + partyH;
     const buttonsTop = victory ? gridTop + gridH + 22 : top + 150;
     const container = this.add.container(0, 0);
     this.resultOverlay = container;
@@ -506,7 +630,17 @@ export class BattleScene extends Phaser.Scene {
     container.add(title);
     title.setScale(0);
     popIn(this, title, { duration: 360, delay: 180 });
+    if (!victory && wasChain) {
+      container.add(caption(this, 360, top + 130, chainWins > 0 ? `連戦は ${chainWins}勝 で終了です` : '連戦を終了しました', { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    }
 
+    if (partyResult) {
+      partyResult.container.setPosition(360 - 300, partyTop);
+      container.add(partyResult.container);
+      enter(this, partyResult.container, { dy: 14, delay: 300 });
+      // Once the panel has settled, the bars fill (and a level gained bursts).
+      this.time.delayedCall(620, () => partyResult.play());
+    }
     if (grid) {
       grid.container.setPosition(360 - 300, gridTop);
       container.add(grid.container);
@@ -518,19 +652,61 @@ export class BattleScene extends Phaser.Scene {
       showToast(this, `プレイヤーレベル ${levelUp.from} → ${levelUp.to}！ スタミナが全回復しました`, '#ffd23f');
     }
     const buttons: Button[] = [];
+    let countdown: Phaser.Time.TimerEvent | undefined;
     if (next) {
       const cost = stageStaminaCost(next.kind, next.index);
       StaminaSystem.refresh(this.save);
       const enough = StaminaSystem.canAfford(this.save, cost);
+      const rowY = buttonsTop + chainH;
       buttons.push(
-        new Button(this, 360, buttonsTop + 43, 560, 86, '次のステージへ', () => this.goToNextStage(next), {
+        new Button(this, 360, rowY + 43, 560, 86, '次のステージへ', () => {
+          countdown?.remove();
+          this.goToNextStage(next);
+        }, {
           variant: 'gold',
           fontSize: '30px',
           subLabel: `${questStageName(next)}　スタミナ ${cost}${enough ? '' : '（不足）'}`,
         }),
-        new Button(this, 215, buttonsTop + 150, 270, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '24px' }),
-        new Button(this, 505, buttonsTop + 150, 270, 66, 'クエスト一覧', () => this.scene.start('StageSelect', this.mode === 'extra' ? { initialTab: 'extra' } : undefined), { variant: 'wood', fontSize: '24px' }),
       );
+      const toList = (): void => {
+        this.scene.start('StageSelect', this.mode === 'extra' ? { initialTab: 'extra' } : undefined);
+      };
+      if (chaining) {
+        // 連戦: the next fight starts by itself after a short count, unless the player stops it.
+        let remaining = 4;
+        const note = caption(this, 360, buttonsTop + 14, `連戦中…　${remaining}秒後に次のステージへ`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+        container.add(note);
+        const stop = new Button(this, 160, rowY + 150, 190, 66, 'ストップ', () => {
+          countdown?.remove();
+          stopAutoAdvance(this.game);
+          this.autoAdvance?.refresh();
+          note.setText('連戦をとめました');
+          stop.setEnabled(false);
+        }, { variant: 'danger', fontSize: '24px' });
+        buttons.push(
+          stop,
+          new Button(this, 360, rowY + 150, 190, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '22px' }),
+          new Button(this, 560, rowY + 150, 190, 66, 'クエスト一覧', toList, { variant: 'wood', fontSize: '22px' }),
+        );
+        countdown = this.time.addEvent({
+          delay: 1000,
+          loop: true,
+          callback: () => {
+            remaining -= 1;
+            if (remaining > 0) {
+              note.setText(`連戦中…　${remaining}秒後に次のステージへ`);
+              return;
+            }
+            countdown?.remove();
+            this.goToNextStage(next);
+          },
+        });
+      } else {
+        buttons.push(
+          new Button(this, 215, rowY + 150, 270, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '24px' }),
+          new Button(this, 505, rowY + 150, 270, 66, 'クエスト一覧', toList, { variant: 'wood', fontSize: '24px' }),
+        );
+      }
     } else {
       buttons.push(
         new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : 'ホームへ戻る', () => this.onContinue(victory), {
@@ -574,6 +750,11 @@ export class BattleScene extends Phaser.Scene {
     if (this.modal?.container.active) return;
     const cost = stageStaminaCost(next.kind, next.index);
     if (!StaminaSystem.canAfford(this.save, cost)) {
+      if (AutoAdvance.isOn(this.game, this.save)) {
+        stopAutoAdvance(this.game);
+        this.autoAdvance?.refresh();
+        showToast(this, 'スタミナが足りないので、連戦を終了しました');
+      }
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));
       // The popup's own dim layer blocks the result panel; there is no list to freeze.
       this.modal = openConfirm(this, { setEnabled: () => {} }, {
