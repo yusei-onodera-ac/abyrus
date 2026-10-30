@@ -101,6 +101,7 @@ export class SettingsScene extends InboxScene {
     cards.push(this.sectionCard('サウンド'));
     cards.push(this.volumeCard('bgm', 'BGM'));
     cards.push(this.volumeCard('se', '効果音'));
+    cards.push(this.volumeCard('voice', 'ボイス・ムービー'));
     cards.push(this.hintCard('※ サウンドは今後追加予定です。設定は保存され、追加されたときに反映されます。'));
 
     cards.push(this.sectionCard('通知'));

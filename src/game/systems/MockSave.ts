@@ -12,7 +12,18 @@ import { SaveSystem, type SaveData } from './SaveSystem';
 export function applyMockFromUrl(save: SaveData): boolean {
   if (!import.meta.env.DEV) return false;
   const params = new URLSearchParams(location.search);
-  if (params.get('mock') !== 'allclear') return false;
+  const which = params.get('mock');
+  if (which === 'tutorial') {
+    // A brand-new player: opening story and tutorial start over (progress is left alone).
+    save.tutorial = { opening: false, step: 0, done: false };
+    save.stageProgress = 0;
+    SaveSystem.save(save);
+    params.delete('mock');
+    const left = params.toString();
+    history.replaceState(null, '', location.pathname + (left ? `?${left}` : ''));
+    return true;
+  }
+  if (which !== 'allclear') return false;
 
   const seen = (): boolean[] => Array.from({ length: REGION_COUNT }, () => true);
   save.stageProgress = FINAL_STAGE_INDEX + 1;

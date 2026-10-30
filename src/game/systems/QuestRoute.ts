@@ -1,4 +1,4 @@
-import { getExtraIntroScript, getFinalIntroScript, getRegionIntroScript } from '../data/storyScript';
+import { OPENING_SCRIPTS, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript } from '../data/storyScript';
 import { EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT, FINAL_STAGE_INDEX, MAIN_STAGE_COUNT, STAGES_PER_REGION, ProgressionSystem } from './ProgressionSystem';
 import type { SaveData } from './SaveSystem';
 import type { StageKind } from './StaminaSystem';
@@ -39,21 +39,35 @@ export function questRoute(save: SaveData, stage: QuestStage): SceneRoute {
   if (stage.kind === 'final') {
     const battle = { stageIndex: FINAL_STAGE_INDEX, mode: 'final' };
     if (save.storyFlags.finalIntro) return { scene: 'Battle', data: battle };
-    return { scene: 'Story', data: { lines: getFinalIntroScript().lines, next: { scene: 'Battle', data: battle }, markSeen: { kind: 'finalIntro' } } };
+    const script = getFinalIntroScript();
+    return { scene: 'Story', data: { id: script.id, lines: script.lines, next: { scene: 'Battle', data: battle }, markSeen: { kind: 'finalIntro' } } };
   }
 
   if (stage.kind === 'extra') {
     const battle = { stageIndex: stage.index, mode: 'extra' };
     if (stage.index % EXTRA_STAGES_PER_REGION !== 0) return { scene: 'Battle', data: battle };
     const regionIndex = Math.floor(stage.index / EXTRA_STAGES_PER_REGION);
-    return { scene: 'Story', data: { lines: getExtraIntroScript(regionIndex).lines, next: { scene: 'Battle', data: battle } } };
+    const script = getExtraIntroScript(regionIndex);
+    return { scene: 'Story', data: { id: script.id, lines: script.lines, next: { scene: 'Battle', data: battle } } };
   }
 
   const battle = { stageIndex: stage.index };
   const regionIndex = Math.floor(stage.index / STAGES_PER_REGION);
   if (stage.index % STAGES_PER_REGION !== 0 || save.storyFlags.regionIntro[regionIndex]) return { scene: 'Battle', data: battle };
+  const script = getRegionIntroScript(regionIndex);
   return {
     scene: 'Story',
-    data: { lines: getRegionIntroScript(regionIndex).lines, next: { scene: 'Battle', data: battle }, markSeen: { kind: 'regionIntro', regionIndex } },
+    data: { id: script.id, lines: script.lines, next: { scene: 'Battle', data: battle }, markSeen: { kind: 'regionIntro', regionIndex } },
   };
+}
+
+/** The first launch: the opening story (three scripts in a row), then Home, where the
+ *  tutorial takes over. Marks the opening as seen at the end of the last script. */
+export function openingRoute(): SceneRoute {
+  const [first, ...rest] = OPENING_SCRIPTS;
+  let next: { scene: string; data?: object } = { scene: 'Home' };
+  rest.reverse().forEach((script, i) => {
+    next = { scene: 'Story', data: { id: script.id, lines: script.lines, next, ...(i === 0 ? { markSeen: { kind: 'opening' } } : {}) } };
+  });
+  return { scene: 'Story', data: { id: first.id, lines: first.lines, next } };
 }

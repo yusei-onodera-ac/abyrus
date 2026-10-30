@@ -1,3 +1,5 @@
+import type { Rarity } from '../types';
+
 export interface GachaBannerEntry {
   id: string;
   /** Header line above the banner art, e.g. "新ガチャ開催！". */
@@ -16,6 +18,17 @@ export interface GachaBannerEntry {
   /** With no banner art, the card draws a banner in this colour (with `emblem` on it) instead of 準備中. */
   accent?: number;
   emblem?: string;
+  /** 排出率 for this gacha (★ and its share, adding up to 1). Leave out for the standard rates (GACHA_RATES). */
+  rates?: { rarity: Rarity; rate: number }[];
+  /** Which characters (hero ids, data/heroes.ts) can come out. Leave out for everyone. The
+   *  ガチャ詳細 screen lists exactly these, each with its own rate. */
+  pool?: string[];
+  /** 天井: the `at`-th pull counted since the last ★minRarity-or-better is certain to be one,
+   *  and the count starts over whenever one comes out. Leave out for no 天井. */
+  pity?: { at: number; minRarity: Rarity };
+  /** 魔晶石 for one pull / a ten-pull. Leave out for the standard prices of its kind. */
+  singleCost?: number;
+  tenCost?: number;
 }
 
 /**
@@ -28,6 +41,23 @@ export interface GachaBannerEntry {
  * GachaSystem) - an entry changes what's shown, not what's rolled.
  */
 export const GACHA_BANNERS: GachaBannerEntry[] = [
+  {
+    id: 'first',
+    title: 'はじめてのガチャ',
+    image: 'first.jpg',
+    description: '30回目までに★4以上が必ず出る！',
+    accent: 0xc7701c,
+    emblem: '初',
+    // 仮の数字: ★5 / ★4 をほんの少し高く。
+    rates: [
+      { rarity: 5, rate: 0.01 },
+      { rarity: 4, rate: 0.04 },
+      { rarity: 3, rate: 0.12 },
+      { rarity: 2, rate: 0.28 },
+      { rarity: 1, rate: 0.55 },
+    ],
+    pity: { at: 30, minRarity: 4 },
+  },
   {
     id: 'new-gacha',
     title: '新ガチャ開催！',

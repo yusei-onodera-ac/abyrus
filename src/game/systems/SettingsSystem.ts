@@ -13,7 +13,7 @@ export const REPORT_MAX = 500;
 /** Reports waiting to be sent (there is no server yet); the oldest drops first. */
 export const MAX_QUEUED_REPORTS = 20;
 
-export type VolumeKind = 'bgm' | 'se';
+export type VolumeKind = 'bgm' | 'se' | 'voice';
 export type NotificationKind = 'news' | 'stamina' | 'social';
 
 export interface SettingsState {
@@ -92,7 +92,7 @@ export const SettingsSystem = {
     return {
       email: '',
       twitter: '',
-      audio: { bgm: VOLUME_DEFAULT, se: VOLUME_DEFAULT },
+      audio: { bgm: VOLUME_DEFAULT, se: VOLUME_DEFAULT, voice: VOLUME_DEFAULT },
       notifications: { news: true, stamina: true, social: true },
       autoSkill: false,
       speed2x: false,
@@ -106,7 +106,7 @@ export const SettingsSystem = {
     return {
       email: typeof raw.email === 'string' && isValidEmail(raw.email) ? raw.email : '',
       twitter: typeof raw.twitter === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(raw.twitter) ? raw.twitter : '',
-      audio: { bgm: clampVolume(raw.audio?.bgm), se: clampVolume(raw.audio?.se) },
+      audio: { bgm: clampVolume(raw.audio?.bgm), se: clampVolume(raw.audio?.se), voice: clampVolume(raw.audio?.voice) },
       notifications: {
         news: raw.notifications?.news !== false,
         stamina: raw.notifications?.stamina !== false,

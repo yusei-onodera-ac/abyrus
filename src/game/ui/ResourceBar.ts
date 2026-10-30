@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
+import { PlayerLevelSystem } from '../systems/PlayerLevelSystem';
+import { MAX_PLAYER_LEVEL, playerExpToNext } from '../data/playerLevel';
+import { showToast } from './Toast';
 import { createPanel } from './Panel';
 import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
 import { COLORS, CHROME } from './theme';
@@ -41,6 +44,8 @@ export class ResourceBar extends Phaser.GameObjects.Container {
   private save?: SaveData;
   private ticker?: Phaser.Time.TimerEvent;
   private levelText?: Phaser.GameObjects.Text;
+  private expRing?: Phaser.GameObjects.Graphics;
+  private levelPos?: { x: number; y: number };
   private nameText?: Phaser.GameObjects.Text;
   /** True when the real topbar artwork is in use, so callers (HomeScene's
    *  separate "ABYRUS" wordmark) can skip anything the art already shows. */
@@ -81,6 +86,14 @@ export class ResourceBar extends Phaser.GameObjects.Container {
         })
         .setOrigin(0.5);
       this.add(this.levelText);
+      this.levelPos = levelPos;
+      this.expRing = scene.add.graphics();
+      this.add(this.expRing);
+      // Tapping the level circle says where the player stands.
+      const hit = scene.add.zone(levelPos.x, levelPos.y, 100, 100).setOrigin(0.5);
+      hit.setInteractive({ useHandCursor: true });
+      hit.on('pointerup', () => this.showLevelInfo());
+      this.add(hit);
 
       const crestPos = art(388, 200);
       this.add(scene.add.image(crestPos.x, crestPos.y, legionCrestIcon(scene, 40)));
@@ -199,10 +212,41 @@ export class ResourceBar extends Phaser.GameObjects.Container {
     this.goldText.setText(`${SaveSystem.getGold(save).toString()}${unit}`);
     this.gemText.setText(this.hasArt ? save.gems.toLocaleString('ja-JP') : `${save.gems.toLocaleString('ja-JP')} 魔晶石`);
     this.levelText?.setText(`Lv${save.playerLevel}`);
+    this.save = save;
+    this.drawExpRing();
     this.nameText?.setText(save.playerName);
     this.save = save;
     this.showStamina();
     this.startTicker();
+  }
+
+  /** A gold arc around the level circle: how far to the next プレイヤーレベル. */
+  private drawExpRing(): void {
+    if (!this.expRing || !this.levelPos || !this.save) return;
+    const g = this.expRing;
+    g.clear();
+    const radius = 49;
+    const progress = PlayerLevelSystem.progress(this.save);
+    g.lineStyle(5, 0x120a04, 0.75);
+    g.beginPath();
+    g.arc(this.levelPos.x, this.levelPos.y, radius, 0, Math.PI * 2, false);
+    g.strokePath();
+    if (progress > 0) {
+      g.lineStyle(5, 0xffd23f, 1);
+      g.beginPath();
+      g.arc(this.levelPos.x, this.levelPos.y, radius, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress, false);
+      g.strokePath();
+    }
+  }
+
+  private showLevelInfo(): void {
+    if (!this.save) return;
+    const { playerLevel, playerExp } = this.save;
+    const text =
+      playerLevel >= MAX_PLAYER_LEVEL
+        ? `プレイヤーLv${playerLevel}（最大）`
+        : `プレイヤーLv${playerLevel}　次のレベルまで あと${playerExpToNext(playerLevel) - playerExp}（クエスト勝利でたまります）`;
+    showToast(this.scene, text);
   }
 
   /** Stamina comes back over time, so the readout is brought up to date on

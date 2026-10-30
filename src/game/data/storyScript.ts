@@ -69,6 +69,41 @@ export const STORY_BACKGROUND_REGION: Record<string, string> = {
   tower_summit: 'twilight',
 };
 
+// --- はじまり (the first launch) ---------------------------------------------------------
+// Three short scripts played in a row before the tutorial. Each has a movie slot
+// (public/assets/movies/<id>.mp4); until the movie is supplied, the text plays.
+
+const OPENING_STORY: StoryScript = {
+  id: 'opening_story',
+  lines: [
+    { speaker: '', text: '迷いの森のはずれ。軍団長と、その相棒のカラスが静かに暮らす村があった。', background: 'forest_day' },
+    { speaker: '', text: '毎朝、鳥たちはさえずり、森の動物たちは村のまわりで穏やかに草を食んでいた。', background: 'forest_day' },
+    { speaker: '', text: '――あの日までは。', background: 'forest_day' },
+  ],
+};
+
+const OPENING_RAMPAGE: StoryScript = {
+  id: 'opening_rampage',
+  lines: [
+    { speaker: '', text: 'ある朝、森の奥から赤い霧が流れ込んできた。', background: 'forest_mist', cue: 'flashRed' },
+    { speaker: '', text: '霧を浴びた動物たちの目が、ひとつ、またひとつと、赤く光りはじめる。', background: 'forest_mist' },
+    { speaker: '', text: '牙を剥き、吠え、仲間にさえ襲いかかる。森は悲鳴に包まれた。', background: 'forest_mist', cue: 'shake' },
+  ],
+};
+
+const OPENING_TALK: StoryScript = {
+  id: 'opening_talk',
+  lines: [
+    { speaker: '', text: '怯える軍団長のそばで、相棒のカラスだけが、いつもと同じようにそこにいた。', background: 'forest_mist' },
+    { speaker: 'ルリ', text: '……ねえ、軍団長。聞こえる？', background: 'forest_mist', portrait: 'worried' },
+    { speaker: 'ルリ', text: 'しゃべれる……アタシ、しゃべれるようになってる！', background: 'forest_mist' },
+    { speaker: 'ルリ', text: '理由は分からない。でも、この森で起きてることを言葉で伝えられるのは、アタシだけ。', background: 'forest_mist', portrait: 'determined' },
+    { speaker: 'ルリ', text: 'だから教えるよ、軍団長。戦い方を、ね。ここから先は、アタシがついてる！', background: 'forest_mist', portrait: 'determined' },
+  ],
+};
+
+export const OPENING_SCRIPTS: StoryScript[] = [OPENING_STORY, OPENING_RAMPAGE, OPENING_TALK];
+
 // --- 地方1: 迷いの森 -------------------------------------------------------
 
 const FOREST_INTRO: StoryScript = {
@@ -83,7 +118,7 @@ const FOREST_INTRO: StoryScript = {
     { speaker: '', text: '森の獣たちが、次々と理性を失っていく。原因は分からない。ただ確かなのは――これが"始まり"だということ。', background: 'forest_mist', cue: 'flashRed' },
     { speaker: 'ルリ', text: '逃げる? ううん、違うよね。軍団長の目、もう決まってる。', background: 'forest_mist', portrait: 'determined' },
     { speaker: 'ルリ', text: 'じゃあ決まり。アタシも付き合う。最後まで、ずっと。', background: 'forest_mist', portrait: 'determined' },
-    { speaker: '', text: 'インコのルリと軍団長――奇妙な相棒の旅が、ここから始まる。', background: 'forest_mist' },
+    { speaker: '', text: 'カラスのルリと軍団長――奇妙な相棒の旅が、ここから始まる。', background: 'forest_mist' },
   ],
 };
 

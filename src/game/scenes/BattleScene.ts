@@ -14,6 +14,10 @@ import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
 import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { nextQuestStage, questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
 import { StageRewardSystem } from '../systems/StageRewardSystem';
+import { PlayerLevelSystem, type LevelUp } from '../systems/PlayerLevelSystem';
+import { TutorialDirector } from '../systems/TutorialDirector';
+import { recordMission } from '../systems/MissionProgress';
+import { showToast } from '../ui/Toast';
 import { SoundSystem } from '../systems/SoundSystem';
 import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
@@ -226,6 +230,8 @@ export class BattleScene extends Phaser.Scene {
 
   update(_time: number, delta: number): void {
     if (!this.engine || this.engine.isOver()) return;
+    // The tutorial's speech holds the fight still while it is on screen.
+    if (TutorialDirector.isBlocking()) return;
     // 2倍速: the fight and every animation in it run faster together.
     const speed = this.speed?.factor() ?? 1;
     this.tweens.timeScale = speed;
@@ -427,6 +433,7 @@ export class BattleScene extends Phaser.Scene {
 
     // The clear is settled first: what it pays decides how tall the panel is.
     let tiles: RewardTile[] = [];
+    let levelUp: LevelUp | null = null;
     if (victory) {
       const stage: QuestStage = { kind: this.mode ?? 'main', index: this.stageIndex };
       // First-clear status has to be read before the progress counters move.
@@ -438,6 +445,10 @@ export class BattleScene extends Phaser.Scene {
         SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
       }
       this.applyProgressionOnVictory();
+      recordMission(this.save, 'quest_clear');
+      // プレイヤーEXP = the stamina this stage cost.
+      const playerExp = stageStaminaCost(stage.kind, stage.index);
+      levelUp = PlayerLevelSystem.gain(this.save, playerExp);
       SaveSystem.save(this.save);
 
       tiles = [
@@ -445,6 +456,8 @@ export class BattleScene extends Phaser.Scene {
         { kind: 'exp', amount: `+${this.rewardExp}` },
         { kind: 'essence', amount: `+${this.rewardSkillEssence}` },
       ];
+      tiles.push({ kind: 'rank', amount: `+${playerExp}`, tag: levelUp ? `Lv${levelUp.to}` : undefined });
+      if (levelUp) tiles.push({ kind: 'gems', amount: `+${levelUp.gems}`, tag: 'LvUP' });
       if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
       if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: 'ドロップ' });
       for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: 'ドロップ' });
@@ -493,6 +506,10 @@ export class BattleScene extends Phaser.Scene {
       enter(this, grid.container, { dy: 14, delay: 320 });
     }
 
+    if (levelUp) {
+      SoundSystem.play(this, 'reveal');
+      showToast(this, `プレイヤーレベル ${levelUp.from} → ${levelUp.to}！ スタミナが全回復しました`, '#ffd23f');
+    }
     const buttons: Button[] = [];
     if (next) {
       const cost = stageStaminaCost(next.kind, next.index);
@@ -515,6 +532,7 @@ export class BattleScene extends Phaser.Scene {
         }),
       );
     }
+    if (victory) TutorialDirector.trigger(this, 'result');
     buttons.forEach((btn, i) => {
       container.add(btn);
       btn.setScale(0);
@@ -585,7 +603,8 @@ export class BattleScene extends Phaser.Scene {
     }
 
     if (this.mode === 'final') {
-      this.scene.start('Story', { lines: getEndingScript().lines, next: { scene: 'Home' }, markSeen: { kind: 'ending' } });
+      const ending = getEndingScript();
+      this.scene.start('Story', { id: ending.id, lines: ending.lines, next: { scene: 'Home' }, markSeen: { kind: 'ending' } });
       return;
     }
     if (this.mode === 'extra') {
@@ -596,8 +615,10 @@ export class BattleScene extends Phaser.Scene {
     const regionIndex = Math.floor(this.stageIndex / STAGES_PER_REGION);
     const stageInRegion = this.stageIndex % STAGES_PER_REGION;
     if (stageInRegion === STAGES_PER_REGION - 1 && !this.save.storyFlags.regionOutro[regionIndex]) {
+      const outro = getRegionOutroScript(regionIndex);
       this.scene.start('Story', {
-        lines: getRegionOutroScript(regionIndex).lines,
+        id: outro.id,
+        lines: outro.lines,
         next: { scene: 'Home' },
         markSeen: { kind: 'regionOutro', regionIndex },
       });

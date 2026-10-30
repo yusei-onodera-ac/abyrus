@@ -21,6 +21,7 @@ import { PremiumSystem } from './PremiumSystem';
 import { MAIN_STAGE_COUNT, STAGES_PER_REGION, ProgressionSystem, levelAskedByStage } from './ProgressionSystem';
 import { expToNextLevel } from './LevelCurve';
 import { SaveSystem, type SaveData } from './SaveSystem';
+import { recordMission } from './MissionProgress';
 import { periodKey } from './ShopSystem';
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -127,6 +128,7 @@ export const IdleSystem = {
     const equipment = Array.from({ length: count }, () => EquipmentSystem.grantRandom(save, rollRarity(weights, rng), rng));
 
     save.idle.lastClaimAt = now;
+    recordMission(save, 'idle_claim', 1, now);
     return { preview: { ...preview, equipment: count }, equipment };
   },
 

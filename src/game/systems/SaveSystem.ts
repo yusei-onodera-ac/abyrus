@@ -10,7 +10,9 @@ import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 import { StaminaSystem } from './StaminaSystem';
+import { recordMission } from './MissionProgress';
 import { expToNextLevel } from './LevelCurve';
+import { MAX_PLAYER_LEVEL, staminaMaxFor } from '../data/playerLevel';
 import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
 
 export interface PartyFormation {
@@ -137,6 +139,19 @@ export interface SaveData {
   updatedAt: number;
   playerName: string;
   playerLevel: number;
+  /** デイリーミッション: the local day the counts belong to (a new day starts them over),
+   *  what has been done today, which missions were taken, and the all-done bonus. */
+  missions: { day: string; counts: Record<string, number>; claimed: string[]; bonusClaimed: boolean };
+  /** Per gacha banner id: pulls since its last 天井 hit (see GachaBannerEntry.pity). */
+  gachaPity: Record<string, number>;
+  /** The hero standing on the Home screen (an owned hero's `id`). Always one of the heroes
+   *  owned: SaveSystem.getHomeHero repairs it when it is empty or the hero is gone. */
+  homeHeroId: string;
+  /** The first-launch story and チュートリアル: `opening` once the opening story has been
+   *  seen, `step` the next tutorial step (data/tutorial.ts), `done` when finished or skipped. */
+  tutorial: { opening: boolean; step: number; done: boolean };
+  /** EXP towards the next プレイヤーレベル (see data/playerLevel.ts). */
+  playerExp: number;
   /** [current, max]. Starting a stage spends it and it recovers over time -
    *  always go through StaminaSystem, which brings it up to date first. */
   stamina: [number, number];
@@ -336,6 +351,11 @@ export const SaveSystem = {
       updatedAt: Date.now(),
       playerName: 'プレイヤー',
       playerLevel: 1,
+      playerExp: 0,
+      tutorial: { opening: false, step: 0, done: false },
+      homeHeroId: '',
+      gachaPity: {},
+      missions: { day: '', counts: {}, claimed: [], bonusClaimed: false },
       stamina: [50, 50],
       staminaAt: Date.now(),
       gifts: [],
@@ -380,6 +400,24 @@ export const SaveSystem = {
       merged.settings = SettingsSystem.restore(parsed.settings);
       merged.reports = SettingsSystem.restoreReports(parsed.reports);
       if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
+      merged.playerLevel = Number.isInteger(parsed.playerLevel) ? Math.max(1, Math.min(MAX_PLAYER_LEVEL, parsed.playerLevel!)) : 1;
+      // A save from before the tutorial existed belongs to someone already playing: nothing to teach.
+      const t = parsed.tutorial;
+      merged.tutorial =
+        t && typeof t.opening === 'boolean' && Number.isInteger(t.step) && typeof t.done === 'boolean'
+          ? { opening: t.opening, step: Math.max(0, t.step), done: t.done }
+          : { opening: true, step: 0, done: true };
+      const ms = parsed.missions;
+      merged.missions =
+        ms && typeof ms.day === 'string' && ms.counts && typeof ms.counts === 'object' && Array.isArray(ms.claimed)
+          ? { day: ms.day, counts: { ...ms.counts }, claimed: ms.claimed.filter((id): id is string => typeof id === 'string'), bonusClaimed: ms.bonusClaimed === true }
+          : { day: '', counts: {}, claimed: [], bonusClaimed: false };
+      merged.gachaPity = {};
+      for (const [id, n] of Object.entries(parsed.gachaPity ?? {})) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) merged.gachaPity[id] = Math.floor(n);
+      merged.homeHeroId = typeof parsed.homeHeroId === 'string' ? parsed.homeHeroId : '';
+      merged.playerExp = typeof parsed.playerExp === 'number' && parsed.playerExp >= 0 ? Math.floor(parsed.playerExp) : 0;
+      // The stamina maximum follows the level (a save from before levels still holds 50).
+      merged.stamina = [Math.min(merged.stamina[0], Math.max(merged.stamina[1], staminaMaxFor(merged.playerLevel))), Math.max(merged.stamina[1], staminaMaxFor(merged.playerLevel))];
       merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
       // A hero saved before phase / skills existed lacks those fields.
       merged.heroes = merged.heroes.map((hero) => ({
@@ -547,6 +585,8 @@ export const SaveSystem = {
       const worn = material.gear[slot];
       if (worn) data.equipment.push(worn);
     }
+    // The fused copy stood on Home? Its character carries on there, as the copy it was fused into.
+    if (data.homeHeroId === material.id) data.homeHeroId = base.id;
     data.heroes = data.heroes.filter((h) => h.id !== material.id);
     for (const deck of data.decks) {
       const hasBase = deck.front.includes(base.id) || deck.back.includes(base.id);
@@ -555,6 +595,7 @@ export const SaveSystem = {
       deck.back = deck.back.map(swap);
     }
     base.phase += 1;
+    recordMission(data, 'hero_enhance');
     return true;
   },
 
@@ -565,6 +606,26 @@ export const SaveSystem = {
     if (!hero || hero.phase >= MAX_PHASE || data.phaseMaterials <= 0) return false;
     data.phaseMaterials -= 1;
     hero.phase += 1;
+    recordMission(data, 'hero_enhance');
+    return true;
+  },
+
+  /** The hero on the Home screen. There is always one: if none was chosen (or the chosen
+   *  one is gone - fused away), the best owned hero is taken and remembered. */
+  getHomeHero(data: SaveData): HeroData | undefined {
+    const chosen = this.getHero(data, data.homeHeroId);
+    if (chosen) return chosen;
+    if (data.heroes.length === 0) return undefined;
+    let best = data.heroes[0];
+    for (const hero of data.heroes) if (hero.rarity >= best.rarity) best = hero;
+    data.homeHeroId = best.id;
+    return best;
+  },
+
+  /** Makes an owned hero the Home character. False (no change) for an id that is not owned. */
+  setHomeHero(data: SaveData, heroId: string): boolean {
+    if (!this.getHero(data, heroId)) return false;
+    data.homeHeroId = heroId;
     return true;
   },
 
@@ -669,6 +730,10 @@ export const SaveSystem = {
 
   markFinalIntroSeen(data: SaveData): void {
     data.storyFlags.finalIntro = true;
+  },
+
+  markOpeningSeen(data: SaveData): void {
+    data.tutorial.opening = true;
   },
 
   markEndingSeen(data: SaveData): void {

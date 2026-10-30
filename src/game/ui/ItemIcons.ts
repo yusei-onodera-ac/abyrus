@@ -183,6 +183,38 @@ function drawEquipGlyph(g: Phaser.GameObjects.Graphics, glyph: EquipGlyph, c: nu
 
 // --- home screen corner buttons (the same neutral badge as the bell and the gear) ---
 
+/** A head-and-shoulders silhouette on the neutral corner badge: "choose the Home character". */
+export function personIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_person_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillCircle(c, c - c * 0.22, c * 0.26);
+    g.fillRoundedRect(c - c * 0.46, c + c * 0.1, c * 0.92, c * 0.46, { tl: c * 0.4, tr: c * 0.4, bl: 4, br: 4 });
+  });
+}
+
+/** A clipboard with ticked lines on the neutral corner badge: ミッション. */
+export function clipboardIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_clipboard_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillRoundedRect(c - c * 0.42, c - c * 0.46, c * 0.84, c * 1.0, 5);
+    g.fillStyle(CORNER_BADGE_FILL, 1);
+    g.fillRoundedRect(c - c * 0.22, c - c * 0.56, c * 0.44, c * 0.2, 4);
+    g.lineStyle(2.5, CORNER_BADGE_FILL, 1);
+    for (let i = 0; i < 3; i++) {
+      const y = c - c * 0.14 + i * c * 0.24;
+      g.beginPath();
+      g.moveTo(c - c * 0.28, y);
+      g.lineTo(c - c * 0.2, y + c * 0.07);
+      g.lineTo(c - c * 0.08, y - c * 0.07);
+      g.moveTo(c + c * 0.04, y);
+      g.lineTo(c + c * 0.28, y);
+      g.strokePath();
+    }
+  });
+}
+
 export function hourglassIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `icon_hourglass_${size}`, size, (g, c) => {
     drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);

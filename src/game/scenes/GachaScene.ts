@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData, type HeroPullOutcome } from '../systems/SaveSystem';
 import { SoundSystem } from '../systems/SoundSystem';
-import { GachaSystem, GACHA_RATES, EQUIP_GACHA_RATES, EQUIP_SINGLE_COST, EQUIP_TEN_COST, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { GachaSystem, costOf, pityLeft } from '../systems/GachaSystem';
 import { showRewardModal } from '../ui/RewardModal';
 import { tilesForEquipment } from '../ui/RewardTiles';
 import { getActiveGachaBanners, type GachaBannerEntry } from '../data/gachaBanners';
@@ -16,13 +16,10 @@ import { buildFriendGachaRow, buildGachaBannerCard } from '../ui/GachaPanels';
 import { buildTitlePlate, buildFramedScrollView, CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { showToast } from '../ui/Toast';
 import { openModal, type ModalHandle } from '../ui/Modal';
-import { createPanel } from '../ui/Panel';
 import { applyBackground } from '../ui/Background';
-import { heading, caption, body, CHROME } from '../ui/theme';
+import { caption } from '../ui/theme';
+import { RARITY_COLORS } from '../types';
 import { enter, enterStagger } from '../ui/Transitions';
-import { RARITY_COLORS, hex } from '../types';
-
-const INK = '#1c130a';
 
 const LIST_GAP = 14;
 
@@ -77,9 +74,10 @@ export class GachaScene extends Phaser.Scene {
     const banners = getActiveGachaBanners();
     for (const entry of banners) {
       const card = buildGachaBannerCard(this, entry, {
-        onDetail: () => this.showDetail(entry),
-        onSingle: () => (entry.kind === 'equipment' ? this.doEquipPull(1, EQUIP_SINGLE_COST) : this.doPull(1, SINGLE_PULL_COST)),
-        onTen: () => (entry.kind === 'equipment' ? this.doEquipPull(10, EQUIP_TEN_COST) : this.doPull(10, TEN_PULL_COST)),
+        onDetail: () => this.scene.start('GachaDetail', { bannerId: entry.id }),
+        onSingle: () => this.doPull(entry, 1),
+        onTen: () => this.doPull(entry, 10),
+        pityLeft: pityLeft(this.getSave(), entry) ?? undefined,
         guard,
       });
       card.container.setPosition(left, y);
@@ -109,63 +107,29 @@ export class GachaScene extends Phaser.Scene {
     this.modal = undefined;
   }
 
-  /** The odds popup behind each card's 詳細 button. Rates come straight from
-   *  GACHA_RATES - the same table the pull itself rolls against - since
-   *  disclosing them is required (Japan's 景品表示法). */
-  private showDetail(entry: GachaBannerEntry): void {
-    const modal = this.openModal(0.7, true);
-    const w = 580;
-    const rowH = 54;
-    const rates = entry.kind === 'equipment' ? EQUIP_GACHA_RATES : GACHA_RATES;
-    const h = 150 + rates.length * rowH + 100;
-    const cy = 620;
-    const top = cy - h / 2;
-
-    const panel = createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false });
-    // Swallows taps so touching the panel itself doesn't dismiss the popup.
-    const block = this.add.zone(360, cy, w, h).setInteractive();
-    modal.add([panel, block]);
-
-    modal.add(heading(this, 360, top + 48, '排出率', { fontSize: '34px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    modal.add(caption(this, 360, top + 94, entry.title, { fontSize: '18px', color: '#d8c49a' }).setOrigin(0.5));
-
-    let y = top + 150 + rowH / 2;
-    for (const rate of rates) {
-      modal.add(this.add.text(360 - w / 2 + 60, y, '★'.repeat(rate.rarity), { fontSize: '24px', color: hex(RARITY_COLORS[rate.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      modal.add(body(this, 360 + w / 2 - 60, y, `${(rate.rate * 100).toFixed(1)}%`, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
-      y += rowH;
-    }
-
-    modal.add(new Button(this, 360, top + h - 56, 240, 68, '閉じる', () => this.closeModal(), { variant: 'wood', fontSize: '24px' }));
-  }
-
-  private doPull(count: number, cost: number): void {
+  /** One pull or a ten-pull of `entry`: pays its price, rolls with its own rates and 天井 (see
+   *  GachaSystem), and shows what came out. */
+  private doPull(entry: GachaBannerEntry, count: 1 | 10): void {
     const save = this.getSave();
-    if (!SaveSystem.spendGems(save, cost)) {
+    if (!SaveSystem.spendGems(save, costOf(entry, count))) {
       showToast(this, '魔晶石が足りません', '#ff8a8a');
       return;
     }
-    const results = GachaSystem.pullMany(count);
-    const outcomes = results.map((hero) => SaveSystem.addHero(save, hero));
+    if (entry.kind === 'equipment') {
+      const items = GachaSystem.pullEquipment(save, entry, count);
+      save.equipment.push(...items);
+      SaveSystem.save(save);
+      this.refreshResources();
+      SoundSystem.play(this, items.some((i) => Number(i.defId.split('-')[1]) >= 4) ? 'reveal' : 'confirm');
+      this.closeModal();
+      this.modal = showRewardModal(this, this.scroll, { title: entry.title, tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）', onClose: () => this.scene.restart() });
+      return;
+    }
+    const heroes = GachaSystem.pullHeroes(save, entry, count);
+    const outcomes = heroes.map((hero) => SaveSystem.addHero(save, hero));
     SaveSystem.save(save);
     this.refreshResources();
     this.showResults(outcomes);
-  }
-
-  /** 装備ガチャ: the pieces go to the bag and are shown as tiles. */
-  private doEquipPull(count: number, cost: number): void {
-    const save = this.getSave();
-    if (!SaveSystem.spendGems(save, cost)) {
-      showToast(this, '魔晶石が足りません', '#ff8a8a');
-      return;
-    }
-    const items = GachaSystem.pullEquipmentMany(count);
-    save.equipment.push(...items);
-    SaveSystem.save(save);
-    this.refreshResources();
-    SoundSystem.play(this, items.some((i) => i.defId.split('-')[1] >= '4') ? 'reveal' : 'confirm');
-    this.closeModal();
-    this.modal = showRewardModal(this, this.scroll, { title: '装備ガチャ', tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）' });
   }
 
   private showResults(outcomes: HeroPullOutcome[]): void {

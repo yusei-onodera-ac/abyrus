@@ -16,6 +16,7 @@ import { ULT_MAX, type UnitInstance } from '../systems/BattleSystem';
 import { LeaderboardSystem } from '../systems/LeaderboardSystem';
 import { formatSurvival } from '../ui/format';
 import { SoundSystem } from '../systems/SoundSystem';
+import { recordMission } from '../systems/MissionProgress';
 
 type SceneState = 'running' | 'result';
 
@@ -384,6 +385,7 @@ export class InfiniteModeScene extends Phaser.Scene {
 
     const previousBestScore = this.save.infiniteMode.bestScore;
     SaveSystem.recordInfiniteModeResult(this.save, result);
+    recordMission(this.save, 'infinite_run');
     const skillEssenceGained = Math.round(result.score / 40);
     SaveSystem.addSkillEssence(this.save, skillEssenceGained);
     SaveSystem.save(this.save);

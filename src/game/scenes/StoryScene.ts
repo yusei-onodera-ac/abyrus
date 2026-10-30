@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { STORY_BACKGROUNDS, STORY_BACKGROUND_REGION, type StoryLine, type RuriPortrait } from '../data/storyScript';
 import { REGIONS } from '../data/regions';
+import { MovieSystem } from '../systems/MovieSystem';
+import { SettingsSystem } from '../systems/SettingsSystem';
+import { ruriTexture } from '../ui/PetPortrait';
 import { Button } from '../ui/Button';
 import { wrapToWidth } from '../ui/CardParts';
 import { createPanel } from '../ui/Panel';
@@ -14,15 +17,19 @@ import { enter } from '../ui/Transitions';
  *  `next` instead of replaying. Declarative on purpose (plain data, not a
  *  callback) so it can travel through `scene.start(key, data)` the same
  *  way every other scene transition in this game already does. */
-export type StoryMarkSeen = { kind: 'regionIntro' | 'regionOutro'; regionIndex: number } | { kind: 'finalIntro' | 'ending' };
+export type StoryMarkSeen = { kind: 'regionIntro' | 'regionOutro'; regionIndex: number } | { kind: 'finalIntro' | 'ending' | 'opening' };
 
 export interface StoryIntent {
+  /** The script's id: if `public/assets/movies/<id>.mp4` exists it plays instead of the text. */
+  id?: string;
   lines: StoryLine[];
   next: { scene: string; data?: Record<string, unknown> };
   markSeen?: StoryMarkSeen;
 }
 
 const INK = '#1c130a';
+/** Set after the first tap that starts a movie: later movies in the session start by themselves. */
+let movieUnlocked = false;
 const PANEL_Y = 1068;
 const PANEL_WIDTH = 690;
 const PANEL_HEIGHT = 330;
@@ -63,12 +70,19 @@ export class StoryScene extends Phaser.Scene {
   private charIndex = 0;
   private charTimer = 0;
   private lineDone = false;
+  private scriptId?: string;
+  private video?: Phaser.GameObjects.Video;
+  /** Counts the times the scene has been started, so an answer that arrives late is ignored. */
+  private token = 0;
 
   constructor() {
     super('Story');
   }
 
   init(data: StoryIntent): void {
+    this.token += 1;
+    this.scriptId = data.id;
+    this.video = undefined;
     this.lines = data.lines;
     this.next = data.next;
     this.markSeen = data.markSeen;
@@ -78,22 +92,81 @@ export class StoryScene extends Phaser.Scene {
     this.bgTween = undefined;
   }
 
+  private movieKey(): string {
+    return `movie_${this.scriptId}`;
+  }
+
+  /** The movie for this script, if one was supplied (public/assets/movies/<id>.mp4, see
+   *  MovieSystem): it plays instead of the text, so a script needs no setup to get one. */
   create(): void {
     this.save = this.game.registry.get('save');
     this.cameras.main.setBackgroundColor('#0a0a0e');
-
-    this.buildDialoguePanel();
     this.buildSkipButton();
+    const id = this.scriptId;
+    if (!id) {
+      this.startText();
+      return;
+    }
+    this.lineDone = true;
+    const token = this.token;
+    void MovieSystem.has(id).then((has) => {
+      if (token !== this.token || !this.sys.isActive()) return; // the scene moved on while we asked
+      if (has) this.startMovie(id);
+      else this.startText();
+    });
+  }
 
+  private startText(): void {
+    this.lineDone = false;
+    this.buildDialoguePanel();
     const tapZone = this.add.zone(360, 640, 720, 1280).setOrigin(0.5).setDepth(5);
     tapZone.setInteractive({ useHandCursor: true });
     tapZone.on('pointerup', () => this.onTap());
-
     this.showLine(0);
   }
 
+  /** Plays the movie full screen (kept whole, black bars where the shapes differ), then goes
+   *  on. Browsers only allow sound after a tap, so the first movie of a session waits for
+   *  one. Anything that goes wrong falls back to the text. */
+  private startMovie(id: string): void {
+    // What Phaser's video loader would have cached; the Video object does the real loading.
+    if (!this.cache.video.exists(this.movieKey())) this.cache.video.add(this.movieKey(), { url: MovieSystem.url(id), noAudio: false });
+    const video = this.add.video(360, 640, this.movieKey()).setDepth(1);
+    this.video = video;
+    video.setVolume(SettingsSystem.getVolume(this.save, 'voice'));
+    video.on(Phaser.GameObjects.Events.VIDEO_CREATED, (_v: unknown, w: number, h: number) => {
+      if (w > 0 && h > 0) video.setScale(Math.min(720 / w, 1280 / h));
+    });
+    video.on(Phaser.GameObjects.Events.VIDEO_COMPLETE, () => this.finish());
+    video.on(Phaser.GameObjects.Events.VIDEO_ERROR, () => {
+      video.destroy();
+      this.video = undefined;
+      this.startText();
+    });
+
+    const play = (): void => {
+      movieUnlocked = true;
+      video.play(false);
+    };
+    if (movieUnlocked) {
+      play();
+      return;
+    }
+    const cover = this.add.container(0, 0).setDepth(4);
+    cover.add(this.add.rectangle(360, 640, 720, 1280, 0x000000, 1).setInteractive());
+    cover.add(subheading(this, 360, 600, 'ムービー', { fontSize: '44px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
+    const tap = body(this, 360, 690, 'タップで再生', { fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    cover.add(tap);
+    this.tweens.add({ targets: tap, alpha: { from: 1, to: 0.3 }, duration: 700, yoyo: true, repeat: -1 });
+    cover.once('destroy', () => this.tweens.killTweensOf(tap));
+    cover.list[0].once('pointerup', () => {
+      cover.destroy();
+      play();
+    });
+  }
+
   update(_time: number, delta: number): void {
-    if (this.lineDone) return;
+    if (this.lineDone || !this.bodyText) return;
     this.charTimer += delta;
     while (this.charTimer >= MS_PER_CHAR && this.charIndex < this.fullText.length) {
       this.charTimer -= MS_PER_CHAR;
@@ -184,8 +257,10 @@ export class StoryScene extends Phaser.Scene {
       else if (mark.kind === 'regionOutro') SaveSystem.markRegionOutroSeen(this.save, mark.regionIndex);
       else if (mark.kind === 'finalIntro') SaveSystem.markFinalIntroSeen(this.save);
       else if (mark.kind === 'ending') SaveSystem.markEndingSeen(this.save);
+      else if (mark.kind === 'opening') SaveSystem.markOpeningSeen(this.save);
       SaveSystem.save(this.save);
     }
+    this.video?.stop();
     this.scene.start(this.next.scene, this.next.data);
   }
 
@@ -278,65 +353,11 @@ export class StoryScene extends Phaser.Scene {
       this.nameplate = this.add.container(0, 0, [plate, text]).setDepth(4);
       enter(this, this.nameplate, { duration: 180, dy: 0, dx: -10 });
 
-      const badgeKey = speaker === 'ルリ' ? this.ruriTexture(portrait ?? 'normal') : this.silhouetteTexture();
+      const badgeKey = speaker === 'ルリ' ? ruriTexture(this, portrait ?? 'normal') : this.silhouetteTexture();
       const badge = this.add.image(left + 66, top - 66, badgeKey).setOrigin(0.5).setScale(1.3).setDepth(4);
       this.portrait = this.add.container(0, 0, [badge]).setDepth(4);
       enter(this, this.portrait, { duration: 220, dy: 12 });
     }
-  }
-
-  private ruriTexture(mood: RuriPortrait): string {
-    const key = `story_ruri_${mood}`;
-    if (this.textures.exists(key)) return key;
-
-    const size = 100;
-    const c = size / 2;
-    const g = this.add.graphics();
-    const desaturated = mood === 'blank';
-    const bodyColor = desaturated ? 0x6a6a74 : 0x3a7fd6;
-    const bellyColor = desaturated ? 0x8a8a94 : 0xffd23f;
-
-    g.fillStyle(0x12141c, 0.5);
-    g.fillCircle(c, c, c);
-    g.fillStyle(bodyColor, 1);
-    g.fillEllipse(c, c + 4, c * 1.3, c * 1.5);
-    g.fillStyle(bellyColor, 1);
-    g.fillEllipse(c, c + 18, c * 0.7, c * 0.8);
-
-    // Wing.
-    g.fillStyle(Phaser.Display.Color.ValueToColor(bodyColor).darken(18).color, 1);
-    g.fillEllipse(c - 10, c + 12, c * 0.5, c * 0.8);
-
-    // Beak.
-    g.fillStyle(0xe8a23f, 1);
-    g.fillTriangle(c + 18, c - 2, c + 36, c + 4, c + 18, c + 12);
-
-    // Eye, mood-dependent.
-    if (mood === 'blank') {
-      g.lineStyle(2.5, 0xe8e8ec, 0.9);
-      g.strokeCircle(c + 6, c - 14, 7);
-    } else {
-      g.fillStyle(0x0a0a0e, 1);
-      const eyeY = mood === 'determined' ? c - 12 : c - 14;
-      const eyeRy = mood === 'determined' ? 3 : 6;
-      g.fillEllipse(c + 6, eyeY, 6, eyeRy);
-      g.fillStyle(0xffffff, 0.8);
-      g.fillCircle(c + 7.5, eyeY - 1.5, 1.6);
-    }
-    if (mood === 'worried') {
-      g.lineStyle(2, 0x1a1a1a, 0.7);
-      g.beginPath();
-      g.moveTo(c - 1, c - 22);
-      g.lineTo(c + 11, c - 25);
-      g.strokePath();
-    }
-
-    g.lineStyle(2, 0x1a1a1a, 0.5);
-    g.strokeEllipse(c, c + 4, c * 1.3, c * 1.5);
-
-    g.generateTexture(key, size, size);
-    g.destroy();
-    return key;
   }
 
   private silhouetteTexture(): string {

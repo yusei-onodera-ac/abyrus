@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { SaveSystem } from '../systems/SaveSystem';
 import { applyMockFromUrl } from '../systems/MockSave';
+import { openingRoute } from '../systems/QuestRoute';
+import { TutorialDirector } from '../systems/TutorialDirector';
 import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { preloadBackgrounds } from '../ui/Background';
@@ -45,6 +47,8 @@ export class BootScene extends Phaser.Scene {
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);
+    // The tutorial guide's own art, if supplied (otherwise she is drawn from code).
+    this.load.image('pet_guide', '/assets/ui/pet_guide.png');
     preloadEventArt(this, EVENTS);
   }
 
@@ -58,8 +62,13 @@ export class BootScene extends Phaser.Scene {
     const code = new URLSearchParams(location.search).get('friend');
     const friendId = code ? parseFriendInput(code) : null;
     if (code) history.replaceState(null, '', location.pathname);
+    TutorialDirector.install(this.game);
     if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
-    else this.scene.start('Home');
+    // The very first launch: the opening story, which ends at Home where the tutorial starts.
+    else if (!save.tutorial.opening) {
+      const route = openingRoute();
+      this.scene.start(route.scene, route.data);
+    } else this.scene.start('Home');
   }
 
   private buildLoadingUi(): void {

@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { formatGachaEnd, FRIEND_GACHA_IMAGE, type GachaBannerEntry } from '../data/gachaBanners';
-import { EQUIP_SINGLE_COST, EQUIP_TEN_COST, SINGLE_PULL_COST, TEN_PULL_COST } from '../systems/GachaSystem';
+import { costOf } from '../systems/GachaSystem';
 import { drawBanner } from './EventPanels';
 import { Button } from './Button';
+import { buildChip } from './CardParts';
 import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
 import { body, caption, CHROME } from './theme';
@@ -36,6 +37,8 @@ export interface GachaCardHandlers {
   onTen: () => void;
   /** Click guard for the card's buttons, see ScrollView.isTap(). */
   guard: () => boolean;
+  /** Pulls left before the banner's 天井 certainty (omitted for a banner without one). */
+  pityLeft?: number;
 }
 
 /** Promo strip + フレンドガチャ button. Container is anchored top-left. */
@@ -102,6 +105,11 @@ export function buildGachaBannerCard(
   outline.lineStyle(2, 0x120a04, 0.9);
   outline.strokeRect(PAD, y, innerW, bannerH);
   container.add(outline);
+  if (entry.pity && handlers.pityLeft !== undefined) {
+    const left = handlers.pityLeft;
+    const chip = buildChip(scene, PAD + 12, y + bannerH - 26, left <= 1 ? `次の1回で★${entry.pity.minRarity}以上が確定！` : `あと${left}回で★${entry.pity.minRarity}以上が確定`, { fill: left <= 1 ? 0xb8472a : 0x1c130a, color: '#ffe9b8', fontSize: 20 });
+    container.add(chip.container);
+  }
   y += bannerH + 10;
 
   // Description + 詳細.
@@ -120,7 +128,7 @@ export function buildGachaBannerCard(
     new Button(scene, PAD + ctaW / 2, y + ctaH / 2, ctaW, ctaH, 'シングルガチャ', handlers.onSingle, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${entry.kind === 'equipment' ? EQUIP_SINGLE_COST : SINGLE_PULL_COST} 魔晶石`,
+      subLabel: `${costOf(entry, 1)} 魔晶石`,
       guard: handlers.guard,
     }),
   );
@@ -128,7 +136,7 @@ export function buildGachaBannerCard(
     new Button(scene, PAD + ctaW + 14 + ctaW / 2, y + ctaH / 2, ctaW, ctaH, '10連ガチャ', handlers.onTen, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${entry.kind === 'equipment' ? EQUIP_TEN_COST : TEN_PULL_COST} 魔晶石`,
+      subLabel: `${costOf(entry, 10)} 魔晶石`,
       guard: handlers.guard,
     }),
   );

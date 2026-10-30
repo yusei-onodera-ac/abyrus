@@ -21,6 +21,8 @@ export interface HeroSlotOptions {
   /** Another copy of this hero's character is already in the deck (a deck holds
    *  one of each): dims the portrait and adds a 同キャラ ribbon. */
   twinInDeck?: boolean;
+  /** Leave the LV label off (a list of heroes that are not owned has no level to show). */
+  hideLevel?: boolean;
   /** Pulsing ring, for the slot/hero the next tap will act on. */
   selected?: boolean;
   onTap?: () => void;
@@ -74,11 +76,13 @@ export class HeroSlot extends Phaser.GameObjects.Container {
           .text(-half + 29, -half + 18, `★${hero.rarity}`, { fontFamily: 'Arial, sans-serif', fontSize: '18px', fontStyle: 'bold', color: hex(frameColor), stroke: INK, strokeThickness: 3 })
           .setOrigin(0.5),
       );
-      this.add(
-        scene.add
-          .text(-half + 8, half - 6, `LV.${hero.level}`, { fontFamily: 'Arial, sans-serif', fontSize: '19px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
-          .setOrigin(0, 1),
-      );
+      if (!opts.hideLevel) {
+        this.add(
+          scene.add
+            .text(-half + 8, half - 6, `LV.${hero.level}`, { fontFamily: 'Arial, sans-serif', fontSize: '19px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
+            .setOrigin(0, 1),
+        );
+      }
     }
 
     const ribbon = opts.inDeck ? { text: '編成中', color: hex(CHROME.brassBright) } : opts.twinInDeck ? { text: '同キャラ', color: '#c9b6ff' } : null;

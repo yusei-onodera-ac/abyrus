@@ -4,6 +4,7 @@ import { BootScene } from './game/scenes/BootScene';
 import { HomeScene } from './game/scenes/HomeScene';
 import { BattleScene } from './game/scenes/BattleScene';
 import { GachaScene } from './game/scenes/GachaScene';
+import { GachaDetailScene } from './game/scenes/GachaDetailScene';
 import { RosterScene } from './game/scenes/RosterScene';
 import { NoticeScene } from './game/scenes/NoticeScene';
 import { GiftScene } from './game/scenes/GiftScene';
@@ -20,6 +21,8 @@ import { InfiniteModeScene } from './game/scenes/InfiniteModeScene';
 import { EnhanceHubScene } from './game/scenes/EnhanceHubScene';
 import { EquipmentScene } from './game/scenes/EquipmentScene';
 import { GearPickScene } from './game/scenes/GearPickScene';
+import { HomeHeroScene } from './game/scenes/HomeHeroScene';
+import { MissionScene } from './game/scenes/MissionScene';
 import { IdleScene } from './game/scenes/IdleScene';
 import { PremiumScene } from './game/scenes/PremiumScene';
 import { ShopScene } from './game/scenes/ShopScene';
@@ -43,6 +46,7 @@ const config: Phaser.Types.Core.GameConfig = {
     HomeScene,
     BattleScene,
     GachaScene,
+    GachaDetailScene,
     RosterScene,
     NoticeScene,
     GiftScene,
@@ -59,6 +63,8 @@ const config: Phaser.Types.Core.GameConfig = {
     EnhanceHubScene,
     EquipmentScene,
     GearPickScene,
+    HomeHeroScene,
+    MissionScene,
     IdleScene,
     PremiumScene,
     ShopScene,

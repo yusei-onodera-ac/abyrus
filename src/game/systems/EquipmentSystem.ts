@@ -1,6 +1,7 @@
 import { dismantleValue, equipDefsOfRarity, equipLevelUpCost, getEquipDef } from '../data/equipment';
 import { EQUIP_SLOTS, type EquipSlot, type EquipmentItem, type HeroData, type Rarity } from '../types';
 import { SaveSystem, type SaveData } from './SaveSystem';
+import { recordMission } from './MissionProgress';
 
 /** A piece of equipment found somewhere in the save, with who wears it (nobody if it is in the bag). */
 export interface OwnedEquipment {
@@ -72,6 +73,7 @@ export const EquipmentSystem = {
     const cost = found ? equipLevelUpCost(found.item) : null;
     if (!found || cost === null || !SaveSystem.spendItem(save, 'equip_essence', cost)) return false;
     found.item.level += 1;
+    recordMission(save, 'equip_enhance');
     return true;
   },
 

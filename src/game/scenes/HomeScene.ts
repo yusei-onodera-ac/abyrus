@@ -3,7 +3,11 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
-import { hourglassIcon } from '../ui/ItemIcons';
+import { clipboardIcon, hourglassIcon, personIcon } from '../ui/ItemIcons';
+import { MissionSystem } from '../systems/MissionSystem';
+import { homeLinesFor } from '../data/homeLines';
+import { VoiceSystem } from '../systems/VoiceSystem';
+import { wrapToWidth } from '../ui/CardParts';
 import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
@@ -17,7 +21,7 @@ import { createPanel } from '../ui/Panel';
 import { addGoodIcon } from '../ui/RewardIcon';
 import { showToast } from '../ui/Toast';
 import { body, caption, CHROME } from '../ui/theme';
-import { enter, enterStagger } from '../ui/Transitions';
+import { enter, enterStagger, popIn } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { buildBannerCarousel } from '../ui/BannerCarousel';
 import { BANNERS } from '../data/banners';
@@ -77,20 +81,8 @@ export class HomeScene extends Phaser.Scene {
     return this.game.registry.get('save');
   }
 
-  /** Highest rarity among owned heroes, ties broken by whichever was added
-   *  most recently (heroes are appended on pull/starter-grant, so later
-   *  array entries are newer). */
-  private pickShowcaseHero(save: SaveData): HeroData | null {
-    if (save.heroes.length === 0) return null;
-    let best = save.heroes[0];
-    for (const hero of save.heroes) {
-      if (hero.rarity >= best.rarity) best = hero;
-    }
-    return best;
-  }
-
   private buildCharacterShowcase(save: SaveData): void {
-    const hero = this.pickShowcaseHero(save);
+    const hero = SaveSystem.getHomeHero(save);
     if (!hero) return;
 
     // Driven by target HEIGHT, not a width x height bounding box: the
@@ -140,6 +132,55 @@ export class HomeScene extends Phaser.Scene {
 
     enter(this, portrait, { dy: 26, duration: 480, ease: 'Cubic.easeOut' });
     this.floatIdle(portrait);
+
+    // Tapping the character: a hop, a line in a speech bubble and (if supplied) their voice.
+    const zone = this.add.zone(cx, 590, 400, 860).setOrigin(0.5);
+    zone.setInteractive({ useHandCursor: true });
+    zone.on('pointerup', () => this.talk(save, hero, portrait));
+  }
+
+  private lastLine = -1;
+  private bubble?: Phaser.GameObjects.Container;
+  private bubbleTimer?: Phaser.Time.TimerEvent;
+
+  /** A line from the Home hero (never the same twice in a row), in a bubble that fades after a few seconds. */
+  private talk(save: SaveData, hero: HeroData, portrait: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite): void {
+    const lines = homeLinesFor(hero.heroId, hero.heroClass);
+    let index = Math.floor(Math.random() * lines.length);
+    if (lines.length > 1 && index === this.lastLine) index = (index + 1) % lines.length;
+    this.lastLine = index;
+    const line = lines[index];
+
+    this.tweens.add({ targets: portrait, scaleX: portrait.scaleX * 1.025, scaleY: portrait.scaleY * 1.025, duration: 90, yoyo: true, ease: 'Sine.easeOut' });
+    VoiceSystem.play(save, line.voice);
+
+    this.bubble?.destroy();
+    this.bubbleTimer?.remove();
+    const w = 380;
+    const text = body(this, 0, 0, wrapToWidth(line.text, w - 44, 24, 4, 'bold'), { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4, lineSpacing: 8 }).setOrigin(0.5);
+    const nameText = caption(this, 0, 0, hero.name, { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5);
+    const h = text.height + 58;
+    const box = this.add.container(470, 470).setDepth(20);
+    box.add(createPanel(this, 0, 0, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, gradient: false }));
+    // A tail toward the character.
+    const tail = this.add.graphics();
+    tail.fillStyle(CHROME.woodFill, 1);
+    tail.lineStyle(3, CHROME.brass, 1);
+    tail.fillTriangle(-24, h / 2 - 2, 24, h / 2 - 2, 0, h / 2 + 26);
+    tail.beginPath();
+    tail.moveTo(-24, h / 2);
+    tail.lineTo(0, h / 2 + 26);
+    tail.lineTo(24, h / 2);
+    tail.strokePath();
+    box.add(tail);
+    nameText.setPosition(0, -h / 2 + 22);
+    text.setPosition(0, 12);
+    box.add([nameText, text]);
+    this.bubble = box;
+    popIn(this, box, { duration: 220 });
+    this.bubbleTimer = this.time.delayedCall(4200, () => {
+      this.tweens.add({ targets: box, alpha: 0, duration: 260, onComplete: () => box.destroy() });
+    });
   }
 
   /** Gentle drifting bob so the showcase hero reads as hovering rather than
@@ -190,6 +231,8 @@ export class HomeScene extends Phaser.Scene {
       { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
       { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
       { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
+      { texture: personIcon(this, size), scene: 'HomeHero', unread: false },
+      { texture: clipboardIcon(this, size), scene: 'Mission', unread: MissionSystem.hasReward(save) },
     ];
     const buttons = items.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item));
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });

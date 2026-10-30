@@ -16,7 +16,7 @@ export const TILE_H = 132;
 const GAP = 10;
 const PER_ROW = 5;
 
-export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'item' | 'equipment';
+export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'item' | 'equipment';
 
 export interface RewardTile {
   kind: RewardTileKind;
@@ -31,7 +31,8 @@ export interface RewardTile {
 }
 
 /** EXP and 技素 have no illustration of their own: a brass-ringed disc with a kanji. */
-const BADGE: Record<'exp' | 'essence', { color: number; glyph: string; label: string }> = {
+const BADGE: Record<'exp' | 'essence' | 'rank', { color: number; glyph: string; label: string }> = {
+  rank: { color: 0xc7701c, glyph: 'Lv', label: 'プレイヤー' },
   exp: { color: 0x3a7fd6, glyph: '経', label: 'EXP' },
   essence: { color: 0x3f9a5a, glyph: '技', label: '技素' },
 };
@@ -62,7 +63,7 @@ export function tilesForGranted(granted: GrantedReward[]): RewardTile[] {
 
 /** The tile's illustration - a supplied/drawn icon, or a disc with a kanji - centered at (x, y), `size` px across. Returns its label. */
 export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.Container, tile: RewardTile, x: number, y: number, size: number): string {
-  if (tile.kind === 'exp' || tile.kind === 'essence') {
+  if (tile.kind === 'exp' || tile.kind === 'essence' || tile.kind === 'rank') {
     const badge = BADGE[tile.kind];
     const r = size / 2;
     const g = scene.add.graphics();
@@ -75,7 +76,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
     g.lineStyle(Math.max(2, r * 0.12), CHROME.brassBright, 0.95);
     g.strokeCircle(x, y, r);
     container.add(g);
-    container.add(body(scene, x, y, badge.glyph, { fontSize: `${Math.round(r * 1.08)}px`, fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+    container.add(body(scene, x, y, badge.glyph, { fontSize: `${Math.round(r * (badge.glyph.length > 1 ? 0.8 : 1.08))}px`, fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
     return badge.label;
   }
   if (tile.kind === 'item' && tile.item) {

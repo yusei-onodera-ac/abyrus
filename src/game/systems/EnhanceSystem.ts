@@ -1,6 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { ProgressionSystem } from './ProgressionSystem';
 import { SaveSystem, expToNextLevel, type SaveData } from './SaveSystem';
+import { recordMission } from './MissionProgress';
 import { ITEMS, type ItemId } from '../data/items';
 import { MAX_LEVEL, type CombatStats, type HeroData } from '../types';
 
@@ -40,6 +41,7 @@ export const EnhanceSystem = {
       SaveSystem.grantExp(save, heroId, exp);
       used += 1;
     }
+    if (used > 0) recordMission(save, 'hero_enhance');
     return { used, gained: used * exp };
   },
 
@@ -58,6 +60,7 @@ export const EnhanceSystem = {
     const cost = levelUpCost(hero, levels);
     if (!SaveSystem.spendGold(save, BigNumber.from(cost))) return null;
     hero.level += levels;
+    recordMission(save, 'hero_enhance');
     // The partial EXP was counted into the price, so the new level starts clean.
     hero.exp = 0;
     return cost;

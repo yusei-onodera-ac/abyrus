@@ -1,4 +1,5 @@
 import type { SaveData } from './SaveSystem';
+import { recordMission } from './MissionProgress';
 
 /** How long one point of stamina takes to come back. Placeholder balance. */
 export const STAMINA_REGEN_SECONDS = 180;
@@ -49,6 +50,7 @@ export const StaminaSystem = {
     if (current < cost) return false;
     if (current >= max) save.staminaAt = now;
     save.stamina = [current - cost, max];
+    recordMission(save, 'stamina', cost, now);
     return true;
   },
 
