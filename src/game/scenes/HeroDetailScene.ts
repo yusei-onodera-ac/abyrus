@@ -13,6 +13,7 @@ import { buildCardPanel } from '../ui/CardParts';
 import { HeroSlot } from '../ui/HeroSlot';
 import { buildInfoPanel } from '../ui/InfoPanel';
 import { openModal, type ModalHandle } from '../ui/Modal';
+import { showToast } from '../ui/Toast';
 import { createPanel, createDivider } from '../ui/Panel';
 import { buildStoneStage } from '../ui/StoneStage';
 import { body, caption, heading, CHROME } from '../ui/theme';
@@ -388,7 +389,15 @@ export class HeroDetailScene extends Phaser.Scene {
     this.modal = undefined;
   }
 
-  /** 強化する (to the 強化 screen), and 編成にセット when we came from the roster. */
+  /** ホームに設定: makes this hero the one standing on the Home screen. */
+  private setAsHome(hero: HeroData): void {
+    if (!SaveSystem.setHomeHero(this.save, hero.id)) return;
+    SaveSystem.save(this.save);
+    showToast(this, `${hero.name} をホームに設定しました`);
+    this.scene.restart(this.detailData);
+  }
+
+  /** 強化する (to the 強化 screen), ホームに設定, and 編成にセット when we came from the roster. */
   private buildButtons(hero: HeroData): void {
     const y = 1114;
     const h = 66;
@@ -399,14 +408,22 @@ export class HeroDetailScene extends Phaser.Scene {
     // Right of the back tab (which fills the left 156px).
     const left = 176;
     const right = 704;
+    const isHome = SaveSystem.getHomeHero(this.save)?.id === hero.id;
+    const makeHome = (cx: number, w: number, fontSize: string): Button => {
+      const b = new Button(this, cx, y, w, h, isHome ? 'ホーム表示中' : 'ホームに設定', () => this.setAsHome(hero), { variant: 'wood', fontSize });
+      b.setEnabled(!isHome);
+      return b;
+    };
     const buttons: Button[] = [];
-    if (fromRoster) {
-      const w = (right - left - 16) / 2;
-      buttons.push(new Button(this, left + w / 2, y, w, h, '編成にセット', () => this.scene.start('Roster', { preSelect: hero.id }), { variant: 'wood', fontSize: '26px' }));
-      buttons.push(new Button(this, right - w / 2, y, w, h, '強化する', enhance, { variant: 'gold', fontSize: '30px' }));
-    } else {
-      buttons.push(new Button(this, (left + right) / 2, y, right - left, h, '強化する', enhance, { variant: 'gold', fontSize: '32px' }));
-    }
+    const gap = 12;
+    const count = fromRoster ? 3 : 2;
+    const w = (right - left - gap * (count - 1)) / count;
+    const cx = (i: number): number => left + w / 2 + i * (w + gap);
+    const small = count === 3 ? '22px' : '26px';
+    let i = 0;
+    if (fromRoster) buttons.push(new Button(this, cx(i++), y, w, h, '編成にセット', () => this.scene.start('Roster', { preSelect: hero.id }), { variant: 'wood', fontSize: small }));
+    buttons.push(makeHome(cx(i++), w, small));
+    buttons.push(new Button(this, cx(i), y, w, h, '強化する', enhance, { variant: 'gold', fontSize: count === 3 ? '28px' : '30px' }));
     buttons.forEach((b, i) => enter(this, b, { dy: 20, delay: 260 + i * 50 }));
   }
 }

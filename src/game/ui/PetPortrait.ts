@@ -1,10 +1,41 @@
 import Phaser from 'phaser';
 import type { RuriPortrait } from '../data/storyScript';
 
-/** The pet (ルリ) as a round bust, drawn from code: the story player's portrait and the
- *  tutorial guide's face. If `public/assets/ui/pet_guide.png` exists (BootScene loads it
- *  as 'pet_guide') the tutorial uses that art instead; see addPetFace. */
+/** ルリ's expressions that have a picture: `public/assets/pet/<mood>.png`, a round bust
+ *  (256px, with its backing and ring). 'blank' (the miasma's grip) is made from 'normal'. */
+const ART_MOODS: RuriPortrait[] = ['normal', 'worried', 'determined', 'happy', 'flying'];
+
+export function preloadPetArt(scene: Phaser.Scene): void {
+  for (const mood of ART_MOODS) scene.load.image(`pet_${mood}`, `/assets/pet/${mood}.png`);
+}
+
+/** 'normal' drained of colour and dimmed: her eyes losing their colour in the ruins. */
+function blankFromArt(scene: Phaser.Scene): string | null {
+  const key = 'pet_blank';
+  if (scene.textures.exists(key)) return key;
+  if (!scene.textures.exists('pet_normal')) return null;
+  const source = scene.textures.get('pet_normal').getSourceImage() as HTMLImageElement;
+  const canvas = scene.textures.createCanvas(key, source.width, source.height);
+  const ctx = canvas?.getContext();
+  if (!canvas || !ctx) return null;
+  ctx.drawImage(source, 0, 0);
+  const pixels = ctx.getImageData(0, 0, source.width, source.height);
+  const d = pixels.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const grey = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) * 0.78;
+    d[i] = d[i + 1] = d[i + 2] = grey;
+  }
+  ctx.putImageData(pixels, 0, 0);
+  canvas.refresh();
+  return key;
+}
+
+/** The pet (ルリ) as a round bust: her picture for that expression if there is one, else a
+ *  bird drawn from code - the story player's portrait and the tutorial guide's face. */
 export function ruriTexture(scene: Phaser.Scene, mood: RuriPortrait): string {
+  const art = mood === 'blank' ? blankFromArt(scene) : scene.textures.exists(`pet_${mood}`) ? `pet_${mood}` : null;
+  if (art) return art;
+
   const key = `story_ruri_${mood}`;
   if (scene.textures.exists(key)) return key;
 
@@ -61,12 +92,7 @@ export function ruriTexture(scene: Phaser.Scene, mood: RuriPortrait): string {
   return key;
 }
 
-/** The pet's face centred at (x, y), about `size` px across: the supplied art if there is
- *  some, else the drawn bust. */
+/** The pet's face centred at (x, y), `size` px across. */
 export function addPetFace(scene: Phaser.Scene, x: number, y: number, size: number, mood: RuriPortrait = 'normal'): Phaser.GameObjects.Image {
-  if (scene.textures.exists('pet_guide')) {
-    const frame = scene.textures.get('pet_guide').getSourceImage();
-    return scene.add.image(x, y, 'pet_guide').setScale(size / Math.max(frame.width, frame.height));
-  }
   return scene.add.image(x, y, ruriTexture(scene, mood)).setDisplaySize(size, size);
 }

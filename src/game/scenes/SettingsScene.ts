@@ -98,6 +98,17 @@ export class SettingsScene extends InboxScene {
       }),
     );
 
+    cards.push(this.sectionCard('ホーム画面'));
+    cards.push(
+      this.valueCard({
+        label: 'ホームキャラ',
+        value: SaveSystem.getHomeHero(this.save)?.name ?? '未設定',
+        note: 'ホーム画面に表示されます。タップするとしゃべります。キャラ詳細からも変えられます。',
+        buttons: [{ label: '変更', variant: 'wood', onTap: () => this.scene.start('HomeHero', { from: 'Settings' }) }],
+        guard,
+      }),
+    );
+
     cards.push(this.sectionCard('サウンド'));
     cards.push(this.volumeCard('bgm', 'BGM'));
     cards.push(this.volumeCard('se', '効果音'));

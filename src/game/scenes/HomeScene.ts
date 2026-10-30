@@ -3,8 +3,9 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
-import { clipboardIcon, hourglassIcon, personIcon } from '../ui/ItemIcons';
+import { clipboardIcon, hourglassIcon } from '../ui/ItemIcons';
 import { MissionSystem } from '../systems/MissionSystem';
+import { getMissionGroup } from '../data/missions';
 import { homeLinesFor } from '../data/homeLines';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { wrapToWidth } from '../ui/CardParts';
@@ -34,6 +35,10 @@ import { RARITY_COLORS, type HeroData } from '../types';
 /** Promo banner frame, top-left under the resource bar. The quest/roster
  *  diamonds line their left edge up with this one's. */
 const BANNER = { x: 28, y: 138, w: 336, h: 188 };
+
+/** Where the Home hero's speech bubble sits: centred over the head, its lower edge here. */
+const BUBBLE_X = 494;
+const BUBBLE_BOTTOM = 262;
 
 /** "2時間30分" - mirrors IdleScene's own formatter so the two read the same. */
 function formatIdleHours(hours: number): string {
@@ -72,6 +77,7 @@ export class HomeScene extends Phaser.Scene {
     this.buildCornerButtons(save);
     this.buildBanners();
     this.buildIdleBox(save);
+    this.buildMissionBox(save);
     this.buildMessageWidget(save);
     new BottomNavBar(this, 720, 1280, 'home');
     this.maybeClaimLoginBonus(save);
@@ -156,11 +162,14 @@ export class HomeScene extends Phaser.Scene {
 
     this.bubble?.destroy();
     this.bubbleTimer?.remove();
-    const w = 380;
-    const text = body(this, 0, 0, wrapToWidth(line.text, w - 44, 24, 4, 'bold'), { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4, lineSpacing: 8 }).setOrigin(0.5);
+    // Above the character's head (the free space between the banner and the corner buttons),
+    // growing upward, so it never covers the face.
+    const w = 252;
+    const text = body(this, 0, 0, wrapToWidth(line.text, w - 36, 22, 4, 'bold'), { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4, lineSpacing: 7 }).setOrigin(0.5);
     const nameText = caption(this, 0, 0, hero.name, { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5);
-    const h = text.height + 58;
-    const box = this.add.container(470, 470).setDepth(20);
+    const h = text.height + 54;
+    const bottom = Math.max(BUBBLE_BOTTOM, 134 + h);
+    const box = this.add.container(BUBBLE_X, bottom - h / 2).setDepth(20);
     box.add(createPanel(this, 0, 0, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, gradient: false }));
     // A tail toward the character.
     const tail = this.add.graphics();
@@ -174,7 +183,7 @@ export class HomeScene extends Phaser.Scene {
     tail.strokePath();
     box.add(tail);
     nameText.setPosition(0, -h / 2 + 22);
-    text.setPosition(0, 12);
+    text.setPosition(0, 10);
     box.add([nameText, text]);
     this.bubble = box;
     popIn(this, box, { duration: 220 });
@@ -231,8 +240,6 @@ export class HomeScene extends Phaser.Scene {
       { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
       { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
       { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
-      { texture: personIcon(this, size), scene: 'HomeHero', unread: false },
-      { texture: clipboardIcon(this, size), scene: 'Mission', unread: MissionSystem.hasReward(save) },
     ];
     const buttons = items.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item));
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
@@ -293,6 +300,45 @@ export class HomeScene extends Phaser.Scene {
     enter(this, box, { dy: 10, duration: 320, delay: 260 });
   }
 
+  /** ミッション, just under 放置報酬: how far along デイリー / ウィークリー / 実績 are (done / total),
+   *  with a red dot while something can be taken. Tapping it opens the list that has a reward
+   *  waiting (the daily one otherwise). */
+  private buildMissionBox(save: SaveData): void {
+    const x = BANNER.x;
+    const y = BANNER.y + BANNER.h + 12 + 100 + 8;
+    const w = BANNER.w;
+    const h = 74;
+    const box = this.add.container(x, y);
+    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
+
+    const summary = MissionSystem.summary(save);
+    const waiting = summary.find((g) => g.claimable > 0 || MissionSystem.bonusClaimable(save, g.group));
+    box.add(this.add.image(38, h / 2, clipboardIcon(this, 54)).setDisplaySize(54, 54));
+    if (MissionSystem.hasReward(save)) {
+      const dot = this.add.graphics();
+      dot.fillStyle(0x1b1d29, 1);
+      dot.fillCircle(58, 14, 9);
+      dot.fillStyle(0xff4d4d, 1);
+      dot.fillCircle(58, 14, 7);
+      box.add(dot);
+    }
+    box.add(caption(this, 76, 16, 'ミッション', { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const columns = [76, 154, 264];
+    summary.forEach((g, i) => {
+      const cx = columns[i];
+      const ready = g.claimable > 0;
+      box.add(caption(this, cx, 40, getMissionGroup(g.group).short, { fontSize: '14px', color: '#cdbb94', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(body(this, cx, 58, `${g.done}/${g.total}`, { fontSize: '20px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5));
+    });
+
+    const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', () => this.scene.start('Mission', { group: waiting?.group ?? 'daily' }));
+    box.add(hit);
+
+    enter(this, box, { dy: 10, duration: 320, delay: 280 });
+  }
+
   /** Claims whatever 放置報酬 has piled up and rebuilds the box in place. */
   private claimIdle(save: SaveData, box: Phaser.GameObjects.Container): void {
     const result = IdleSystem.claim(save);
@@ -310,25 +356,25 @@ export class HomeScene extends Phaser.Scene {
    *  there: who said it, how long ago, and as much of the line as fits. Tapping
    *  it opens that conversation. Rebuilt every time Home loads. */
   private buildMessageWidget(save: SaveData): void {
-    const w = 330;
-    const h = 100;
+    const w = 410;
+    const h = 130;
     const x = 720 - 14 - w;
     const y = 1280 - BottomNavBar.totalHeight() - 12 - h;
     const box = this.add.container(x, y).setDepth(5);
-    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 16, gradient: false }));
+    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 18, gradient: false }));
 
     const latest = ChatSystem.latestMessage(save);
-    const textX = 84;
-    const textW = w - textX - 14;
-    box.add(buildAvatar(this, 44, h / 2 + 4, 27, latest?.senderName ?? save.playerName));
-    box.add(caption(this, textX, 20, 'メッセージ', { fontSize: '15px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const textX = 104;
+    const textW = w - textX - 18;
+    box.add(buildAvatar(this, 54, h / 2 + 6, 35, latest?.senderName ?? save.playerName));
+    box.add(caption(this, textX, 24, 'メッセージ', { fontSize: '19px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
 
     if (latest) {
-      box.add(caption(this, w - 14, 20, formatAgo(latest.sentAt), { fontSize: '14px', color: '#a89a78', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(1, 0.5));
-      box.add(this.fitted(body(this, textX, 50, latest.senderName, { fontSize: '19px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
-      box.add(this.fitted(caption(this, textX, 78, plainPreview(latest.text), { fontSize: '17px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
+      box.add(caption(this, w - 18, 24, formatAgo(latest.sentAt), { fontSize: '17px', color: '#a89a78', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(1, 0.5));
+      box.add(this.fitted(body(this, textX, 62, latest.senderName, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5), textW));
+      box.add(this.fitted(caption(this, textX, 98, plainPreview(latest.text), { fontSize: '22px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
     } else {
-      box.add(caption(this, textX, 60, 'まだメッセージがありません', { fontSize: '17px', color: '#9a8a6a' }).setOrigin(0, 0.5));
+      box.add(caption(this, textX, 76, 'まだメッセージがありません', { fontSize: '22px', color: '#9a8a6a' }).setOrigin(0, 0.5));
     }
 
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);

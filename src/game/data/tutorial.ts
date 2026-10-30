@@ -1,4 +1,5 @@
 import type { Reward } from './rewards';
+import type { RuriPortrait } from './storyScript';
 
 /**
  * チュートリアル: the pet (ルリ) walks a new player through the game, in text and - when
@@ -29,6 +30,8 @@ export interface TutorialStep {
   lines: string[];
   target?: TutorialRect;
   advance: 'tap' | 'target';
+  /** Her expression while she says it (default 'normal'). */
+  mood?: RuriPortrait;
 }
 
 const HOME_TAB: TutorialRect = { x: 288, y: 1156, w: 144, h: 124 };
@@ -36,6 +39,7 @@ const HOME_TAB: TutorialRect = { x: 288, y: 1156, w: 144, h: 124 };
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: 'home_welcome',
+    mood: 'happy',
     scene: 'Home',
     lines: ['やっほー、軍団長！ ルリだよ。', 'これから、この世界での戦い方をアタシが教えてあげる。ちゃんとついてきてね！'],
     advance: 'tap',
@@ -63,6 +67,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'quest_go',
+    mood: 'flying',
     scene: 'StageSelect',
     lines: ['出撃するとスタミナを使うよ。「出撃」を押して、戦いに行こう！'],
     target: { x: 392, y: 684, w: 216, h: 74 },
@@ -70,6 +75,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'battle_basic',
+    mood: 'determined',
     scene: 'Battle',
     lines: ['戦いは自動で進むよ。ヒーローの下のゲージがたまったら、その子をタップでスキル発動！', '右下の「オート」を押せば、たまった瞬間に自動で撃ってくれるよ。'],
     target: { x: 490, y: 1152, w: 220, h: 76 },
@@ -77,6 +83,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'battle_result',
+    mood: 'happy',
     scene: 'Battle',
     on: 'result',
     lines: ['やったね、勝利！ お金や経験値、素材がもらえたよ。', '「次のステージへ」で続けて戦えるし、ホームに戻ってもいいよ。'],
@@ -91,6 +98,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'gacha_info',
+    mood: 'happy',
     scene: 'Gacha',
     lines: ['ここでは魔晶石を使って、新しい仲間や装備を召喚できるよ。', '「詳細」を見れば、どのキャラが出るか、出る確率も全部わかる。はじめてのガチャは、30回目までにレアが必ず出るから、遠慮なく回してね！', '見終わったら、下のホームに戻ろう。'],
     target: HOME_TAB,
@@ -119,6 +127,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'enhance_info',
+    mood: 'determined',
     scene: 'EnhanceHub',
     lines: ['経験値素材でレベルアップ、フェーズ素材や同じキャラの合成で限界突破。装備もここから強化できるよ。', '強くなったキャラで、もっと先のステージを目指そう！'],
     target: HOME_TAB,
@@ -126,8 +135,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'home_end',
+    mood: 'happy',
     scene: 'Home',
-    lines: ['これでひと通り。あとは、軍団長の好きに冒険して！', 'ホーム左の「放置報酬」は、ゲームを閉じている間もたまるよ。右の「ミッション」をこなせば、毎日ごほうびももらえるから、忘れずにね。', 'ルリは、ずっとここにいるから。'],
+    lines: ['これでひと通り。あとは、軍団長の好きに冒険して！', 'ホーム左の「放置報酬」は、ゲームを閉じている間もたまるよ。その下の「ミッション」をこなせば、ごほうびももらえるから、忘れずにね。', 'ルリは、ずっとここにいるから。'],
     advance: 'tap',
   },
 ];

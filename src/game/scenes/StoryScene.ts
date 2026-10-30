@@ -354,7 +354,7 @@ export class StoryScene extends Phaser.Scene {
       enter(this, this.nameplate, { duration: 180, dy: 0, dx: -10 });
 
       const badgeKey = speaker === 'ルリ' ? ruriTexture(this, portrait ?? 'normal') : this.silhouetteTexture();
-      const badge = this.add.image(left + 66, top - 66, badgeKey).setOrigin(0.5).setScale(1.3).setDepth(4);
+      const badge = this.add.image(left + 66, top - 66, badgeKey).setOrigin(0.5).setDisplaySize(130, 130).setDepth(4);
       this.portrait = this.add.container(0, 0, [badge]).setDepth(4);
       enter(this, this.portrait, { duration: 220, dy: 12 });
     }

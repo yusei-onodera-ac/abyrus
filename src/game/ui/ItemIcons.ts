@@ -183,16 +183,6 @@ function drawEquipGlyph(g: Phaser.GameObjects.Graphics, glyph: EquipGlyph, c: nu
 
 // --- home screen corner buttons (the same neutral badge as the bell and the gear) ---
 
-/** A head-and-shoulders silhouette on the neutral corner badge: "choose the Home character". */
-export function personIcon(scene: Phaser.Scene, size = 72): string {
-  return ensureTexture(scene, `icon_person_${size}`, size, (g, c) => {
-    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
-    g.fillStyle(CORNER_GLYPH, 1);
-    g.fillCircle(c, c - c * 0.22, c * 0.26);
-    g.fillRoundedRect(c - c * 0.46, c + c * 0.1, c * 0.92, c * 0.46, { tl: c * 0.4, tr: c * 0.4, bl: 4, br: 4 });
-  });
-}
-
 /** A clipboard with ticked lines on the neutral corner badge: ミッション. */
 export function clipboardIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `icon_clipboard_${size}`, size, (g, c) => {

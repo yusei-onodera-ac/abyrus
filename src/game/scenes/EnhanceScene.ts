@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
-import { EnhanceSystem, LEVEL_STEPS } from '../systems/EnhanceSystem';
+import { EnhanceSystem } from '../systems/EnhanceSystem';
 import { SaveSystem, expToNextLevel } from '../systems/SaveSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { Button } from '../ui/Button';
@@ -26,8 +26,8 @@ const PAD = 14;
 const INK = '#1c130a';
 
 /** 強化: the screen the hero detail's 強化する button opens. Two ways to make a
- *  hero stronger - ゴールドでレベルアップ (1 or 5 levels at a time, showing what
- *  HP / 攻撃 become), フェーズ素材でフェーズ強化 (+1 phase per material) and
+ *  hero stronger - 経験値素材 for levels (the other way to gain levels is clearing
+ *  quests; gold cannot buy them), フェーズ素材でフェーズ強化 (+1 phase per material) and
  *  合成 (+1 phase per same-character copy used up).
  *  戻る goes back to that hero's detail. */
 export class EnhanceScene extends InboxScene {
@@ -67,7 +67,7 @@ export class EnhanceScene extends InboxScene {
       this.time.delayedCall(0, () => this.scene.start(this.target.from));
       return [];
     }
-    return [this.heroCard(hero), this.levelCard(hero), this.expCard(hero), this.phaseCard(hero), this.fuseCard(hero)];
+    return [this.heroCard(hero), this.expCard(hero), this.phaseCard(hero), this.fuseCard(hero)];
   }
 
   // --- cards ------------------------------------------------------------
@@ -102,65 +102,26 @@ export class EnhanceScene extends InboxScene {
     return { container, height };
   }
 
-  /** レベル強化: pay ゴールド for +1 or +5 levels, with HP / 攻撃 before → after. */
-  private levelCard(hero: HeroData): InboxCard {
-    const left = EnhanceSystem.levelsLeft(hero);
-    if (left === 0) {
-      const panel = buildInfoPanel(this, CARD_WIDTH, 80, 'レベル強化', 0xc7701c);
-      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 40, `レベルは最大（Lv.${MAX_LEVEL}）です。`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      return { container: panel.container, height: panel.height };
-    }
-    const now = ProgressionSystem.computeHeroStats(hero);
-    const bodyH = 288;
-    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, 'レベル強化', 0xc7701c);
-    const top = panel.bodyTop;
-    panel.container.add(caption(this, PAD + 4, top + 22, 'ゴールドを使って、レベルを上げます。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-
-    // What +1 level does to the two stats that matter.
-    const next = EnhanceSystem.statsAfterLevels(hero, 1);
-    const rows: [string, string, string][] = [
-      ['HP', now.maxHp.toString(), next.maxHp.toString()],
-      ['攻撃', now.atk.toString(), next.atk.toString()],
-    ];
-    rows.forEach(([label, from, to], i) => {
-      const y = top + 68 + i * 50;
-      panel.container.add(caption(this, PAD + 4, y, label, { fontSize: '22px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      panel.container.add(body(this, PAD + 100, y, from, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      panel.container.add(body(this, CARD_WIDTH - PAD - 4, y, `→ ${to}`, { fontSize: '26px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
-    });
-    panel.container.add(caption(this, CARD_WIDTH - PAD - 4, top + 156, '※ 矢印は +1 レベルしたときの数値です', { fontSize: '16px', color: '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
-
-    const guard = () => this.scroll.isTap();
-    const w = (CARD_WIDTH - PAD * 2 - 14) / 2;
-    LEVEL_STEPS.forEach((step, i) => {
-      // Close to the cap a step buys only what is left; a step that would repeat the one before is off.
-      const levels = Math.min(step, left);
-      const repeats = i > 0 && levels === Math.min(LEVEL_STEPS[i - 1], left);
-      const cost = EnhanceSystem.levelUpCost(hero, levels);
-      const affordable = EnhanceSystem.canAfford(this.save, cost);
-      const x = PAD + w / 2 + i * (w + 14);
-      const button = new Button(this, x, top + bodyH - 62, w, 92, `+${levels} レベル`, () => this.levelUp(hero, levels), {
-        variant: i === 0 ? 'gold' : 'wood',
-        fontSize: '28px',
-        subLabel: `${cost.toLocaleString('ja-JP')} G${affordable ? '' : '（不足）'}`,
-        guard,
-      });
-      if (repeats) button.setEnabled(false);
-      panel.container.add(button);
-    });
-    return { container: panel.container, height: panel.height };
-  }
-
-  /** 経験値素材: each of the four sizes with how many are held and a button to use one or ten. */
+  /** 経験値素材: each of the four sizes with how many are held and a button to use one or ten,
+   *  under a line saying what the next level gives (levels also come from clearing quests). */
   private expCard(hero: HeroData): InboxCard {
     const guard = () => this.scroll.isTap();
     const rowH = 96;
-    const panel = buildInfoPanel(this, CARD_WIDTH, EXP_ITEMS.length * rowH + 14, '経験値素材', 0x3a7fd6);
+    const headH = 76;
+    const panel = buildInfoPanel(this, CARD_WIDTH, headH + EXP_ITEMS.length * rowH + 14, '経験値素材', 0x3a7fd6);
     const atMax = hero.level >= MAX_LEVEL;
+    if (atMax) {
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 30, `レベルは最大（Lv.${MAX_LEVEL}）です。`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    } else {
+      const now = ProgressionSystem.computeHeroStats(hero);
+      const next = EnhanceSystem.statsAfterLevels(hero, 1);
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 20, 'レベルは、素材を使うか、クエストをクリアすると上がります。', { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 52, `次のレベルで　HP ${now.maxHp.toString()} → ${next.maxHp.toString()}　攻撃 ${now.atk.toString()} → ${next.atk.toString()}`, { fontSize: '19px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    }
     EXP_ITEMS.forEach((id, i) => {
       const def = ITEMS[id];
       const have = SaveSystem.getItem(this.save, id);
-      const y = panel.bodyTop + 8 + i * rowH + rowH / 2;
+      const y = panel.bodyTop + headH + 8 + i * rowH + rowH / 2;
       panel.container.add(this.add.image(PAD + 34, y, itemIcon(this, id, 56)));
       panel.container.add(body(this, PAD + 76, y - 17, def.name, { fontSize: '22px', fontStyle: 'bold', color: def.color, stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       panel.container.add(caption(this, PAD + 76, y + 15, `EXP +${(def.exp ?? 0).toLocaleString('ja-JP')}　所持 ${have.toLocaleString('ja-JP')}`, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
@@ -288,20 +249,6 @@ export class EnhanceScene extends InboxScene {
     this.queueRender();
   }
 
-  private levelUp(hero: HeroData, levels: number): void {
-    const cost = EnhanceSystem.levelUpCost(hero, levels);
-    if (!EnhanceSystem.canAfford(this.save, cost)) {
-      this.offerGold(cost);
-      return;
-    }
-    const before = hero.level;
-    if (EnhanceSystem.levelUp(this.save, hero.id, levels) === null) return;
-    SaveSystem.save(this.save);
-    this.refreshResources();
-    showToast(this, `Lv.${before} → Lv.${hero.level} になりました`);
-    this.queueRender();
-  }
-
   private useExp(hero: HeroData, id: ItemId, count: number): void {
     const before = hero.level;
     const result = EnhanceSystem.useExpItem(this.save, hero.id, id, count);
@@ -328,18 +275,5 @@ export class EnhanceScene extends InboxScene {
     SaveSystem.save(this.save);
     showToast(this, `フェーズ ${hero.phase} になりました`);
     this.queueRender();
-  }
-
-  /** Not enough ゴールド for the level-up: offer the shop. */
-  private offerGold(cost: number): void {
-    const short = Math.max(1, Math.ceil(cost - SaveSystem.getGold(this.save).toNumber()));
-    this.modal?.close();
-    this.modal = openConfirm(this, this.scroll, {
-      title: 'ゴールドが足りません',
-      message: `あとゴールド ${short.toLocaleString('ja-JP')} 必要です。\nゴールドを購入しますか？`,
-      confirmLabel: 'ゴールドを購入',
-      confirmVariant: 'gold',
-      onConfirm: () => this.scene.start('Shop', { focus: 'gold' }),
-    });
   }
 }

@@ -17,7 +17,7 @@
  */
 
 export type StoryCue = 'shake' | 'flashRed' | 'none';
-export type RuriPortrait = 'normal' | 'worried' | 'determined' | 'blank';
+export type RuriPortrait = 'normal' | 'worried' | 'determined' | 'happy' | 'flying' | 'blank';
 
 export interface StoryLine {
   /** Empty string = pure narration line, drawn without a nameplate. */
@@ -96,7 +96,7 @@ const OPENING_TALK: StoryScript = {
   lines: [
     { speaker: '', text: '怯える軍団長のそばで、相棒のカラスだけが、いつもと同じようにそこにいた。', background: 'forest_mist' },
     { speaker: 'ルリ', text: '……ねえ、軍団長。聞こえる？', background: 'forest_mist', portrait: 'worried' },
-    { speaker: 'ルリ', text: 'しゃべれる……アタシ、しゃべれるようになってる！', background: 'forest_mist' },
+    { speaker: 'ルリ', text: 'しゃべれる……アタシ、しゃべれるようになってる！', background: 'forest_mist', portrait: 'happy' },
     { speaker: 'ルリ', text: '理由は分からない。でも、この森で起きてることを言葉で伝えられるのは、アタシだけ。', background: 'forest_mist', portrait: 'determined' },
     { speaker: 'ルリ', text: 'だから教えるよ、軍団長。戦い方を、ね。ここから先は、アタシがついてる！', background: 'forest_mist', portrait: 'determined' },
   ],
@@ -113,7 +113,7 @@ const FOREST_INTRO: StoryScript = {
     { speaker: '', text: '迷いの森の奥、軍団長の住む村に、見たことのない赤い霧が立ち込めていた。', background: 'forest_mist' },
     { speaker: 'ルリ', text: '……ねえ、様子がおかしいよ。森の動物たち、みんな目が赤く光ってる。', background: 'forest_mist', portrait: 'worried' },
     { speaker: 'ルリ', text: 'アタシ、ずっとこの森で軍団長と一緒にいたのに……なんで自分だけ平気なんだろ。', background: 'forest_mist', portrait: 'worried' },
-    { speaker: 'ルリ', text: 'って、こんなこと言ってる暇ないか。とにかく、言葉が喋れるようになったのは好都合だよね!', background: 'forest_mist' },
+    { speaker: 'ルリ', text: 'って、こんなこと言ってる暇ないか。とにかく、言葉が喋れるようになったのは好都合だよね!', background: 'forest_mist', portrait: 'happy' },
     { speaker: 'ルリ', text: '軍団長、聞いてる? ――これから起きることを、ちゃんと言葉で伝えられるのはアタシだけなんだから。', background: 'forest_mist' },
     { speaker: '', text: '森の獣たちが、次々と理性を失っていく。原因は分からない。ただ確かなのは――これが"始まり"だということ。', background: 'forest_mist', cue: 'flashRed' },
     { speaker: 'ルリ', text: '逃げる? ううん、違うよね。軍団長の目、もう決まってる。', background: 'forest_mist', portrait: 'determined' },

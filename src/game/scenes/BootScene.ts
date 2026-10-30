@@ -7,6 +7,7 @@ import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { ENEMY_ART_IDS } from '../data/regions';
 import { preloadEnemyArt } from '../characters/EnemyArt';
+import { preloadPetArt } from '../ui/PetPortrait';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
 import { preloadIconAssets } from '../ui/IconAssets';
@@ -50,8 +51,8 @@ export class BootScene extends Phaser.Scene {
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);
-    // The tutorial guide's own art, if supplied (otherwise she is drawn from code).
-    this.load.image('pet_guide', '/assets/ui/pet_guide.png');
+    // ルリ's expressions (public/assets/pet/<mood>.png), if supplied (otherwise she is drawn from code).
+    preloadPetArt(this);
     preloadEventArt(this, EVENTS);
   }
 

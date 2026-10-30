@@ -160,7 +160,7 @@ export class TutorialOverlay {
     const top = cy - h / 2;
 
     this.add(createPanel(this.scene, 360, cy, PANEL_W, h, { fillColor: CHROME.woodFill, fillAlpha: 0.98, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 4, gradient: false }));
-    this.add(addPetFace(this.scene, left + 76, top + 96, 112));
+    this.add(addPetFace(this.scene, left + 76, top + 96, 112, this.step.mood));
     const plate = this.add(createPanel(this.scene, left + 76, top + 168, 110, 38, { fillColor: CHROME.woodGrain, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 10, gradient: false }));
     void plate;
     this.add(subheading(this.scene, left + 76, top + 168, TUTORIAL_GUIDE_NAME, { fontSize: '22px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));

@@ -10,7 +10,7 @@ import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 import { StaminaSystem } from './StaminaSystem';
-import { recordMission } from './MissionProgress';
+import { emptyMissions, loadMissions, recordMission, type MissionState } from './MissionProgress';
 import { expToNextLevel } from './LevelCurve';
 import { MAX_PLAYER_LEVEL, staminaMaxFor } from '../data/playerLevel';
 import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
@@ -139,9 +139,10 @@ export interface SaveData {
   updatedAt: number;
   playerName: string;
   playerLevel: number;
-  /** デイリーミッション: the local day the counts belong to (a new day starts them over),
-   *  what has been done today, which missions were taken, and the all-done bonus. */
-  missions: { day: string; counts: Record<string, number>; claimed: string[]; bonusClaimed: boolean };
+  /** ミッション: what has been done in the current day and week (each starts over when its
+   *  `id` - the local date, or the week's Monday - is no longer current), which missions
+   *  were taken, and whether the all-done bonus was; plus the never-reset totals for 実績. */
+  missions: MissionState;
   /** Per gacha banner id: pulls since its last 天井 hit (see GachaBannerEntry.pity). */
   gachaPity: Record<string, number>;
   /** The hero standing on the Home screen (an owned hero's `id`). Always one of the heroes
@@ -355,7 +356,7 @@ export const SaveSystem = {
       tutorial: { opening: false, step: 0, done: false },
       homeHeroId: '',
       gachaPity: {},
-      missions: { day: '', counts: {}, claimed: [], bonusClaimed: false },
+      missions: emptyMissions(),
       stamina: [50, 50],
       staminaAt: Date.now(),
       gifts: [],
@@ -407,11 +408,7 @@ export const SaveSystem = {
         t && typeof t.opening === 'boolean' && Number.isInteger(t.step) && typeof t.done === 'boolean'
           ? { opening: t.opening, step: Math.max(0, t.step), done: t.done }
           : { opening: true, step: 0, done: true };
-      const ms = parsed.missions;
-      merged.missions =
-        ms && typeof ms.day === 'string' && ms.counts && typeof ms.counts === 'object' && Array.isArray(ms.claimed)
-          ? { day: ms.day, counts: { ...ms.counts }, claimed: ms.claimed.filter((id): id is string => typeof id === 'string'), bonusClaimed: ms.bonusClaimed === true }
-          : { day: '', counts: {}, claimed: [], bonusClaimed: false };
+      merged.missions = loadMissions(parsed.missions);
       merged.gachaPity = {};
       for (const [id, n] of Object.entries(parsed.gachaPity ?? {})) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) merged.gachaPity[id] = Math.floor(n);
       merged.homeHeroId = typeof parsed.homeHeroId === 'string' ? parsed.homeHeroId : '';

@@ -16,14 +16,25 @@ const SLOT = 108;
 
 /** ホームキャラ: who stands on the Home screen (and talks when tapped). Every hero the
  *  player owns is listed; tapping one makes it the home character - there is always
- *  exactly one, so nothing here un-picks. 戻る goes back to Home. */
+ *  exactly one, so nothing here un-picks. Opened from 設定 (戻る returns there); the hero
+ *  detail screen has its own 'set as home' button for the hero being looked at. */
 export class HomeHeroScene extends InboxScene {
   protected readonly screenTitle = 'ホームキャラ';
   protected emptyText = '';
   private generator!: CharacterGenerator;
+  private from = 'Home';
 
   constructor() {
     super('HomeHero');
+  }
+
+  init(data?: { from?: string }): void {
+    super.init(data);
+    this.from = data?.from ?? 'Home';
+  }
+
+  protected goBack(): void {
+    this.scene.start(this.from);
   }
 
   create(): void {
