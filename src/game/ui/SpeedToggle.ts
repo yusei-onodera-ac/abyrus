@@ -3,7 +3,7 @@ import { PREMIUM } from '../data/premium';
 import { PremiumSystem } from '../systems/PremiumSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { SettingsSystem } from '../systems/SettingsSystem';
-import { Button } from './Button';
+import { BATTLE_CONTROL_POS, RoundControl } from './BattleControl';
 import { openConfirm } from './Dialogs';
 
 /** The 2倍速 button beside オート in a fight: プレミアムパス members switch the fight
@@ -11,7 +11,7 @@ import { openConfirm } from './Dialogs';
 export class SpeedToggle extends Phaser.GameObjects.Container {
   private readonly save: SaveData;
 
-  constructor(scene: Phaser.Scene, save: SaveData, x = 350, y = 1190) {
+  constructor(scene: Phaser.Scene, save: SaveData, x = BATTLE_CONTROL_POS.speed.x, y = BATTLE_CONTROL_POS.speed.y) {
     super(scene, x, y);
     this.save = save;
     this.setDepth(30);
@@ -28,13 +28,7 @@ export class SpeedToggle extends Phaser.GameObjects.Container {
     this.removeAll(true);
     const member = PremiumSystem.isActive(this.save);
     const on = this.factor() > 1;
-    this.add(
-      new Button(this.scene, 0, 0, 220, 76, `${PREMIUM.battleSpeed}倍速`, () => this.tap(), {
-        variant: on ? 'gold' : 'wood',
-        fontSize: '30px',
-        subLabel: !member ? 'パス限定' : on ? 'ON' : 'OFF',
-      }),
-    );
+    this.add(new RoundControl(this.scene, `${PREMIUM.battleSpeed}倍速`, !member ? 'パス限定' : on ? 'ON' : 'OFF', on, () => this.tap()));
   }
 
   private tap(): void {

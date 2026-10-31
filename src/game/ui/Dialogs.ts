@@ -116,6 +116,8 @@ export interface ConfirmOptions {
   confirmLabel: string;
   /** Color of the confirm button; red ('danger') unless it isn't a destructive action. */
   confirmVariant?: ButtonVariant;
+  /** A row of its own between the message and the buttons (e.g. the 連戦 switch in the 出撃 popup). */
+  extra?: { height: number; build: (container: Phaser.GameObjects.Container, y: number) => void };
   onConfirm: () => void;
 }
 
@@ -126,10 +128,12 @@ export function openConfirm(scene: Phaser.Scene, scroll: ModalLock, opts: Confir
   const w = 600;
   const text = body(scene, 360, 0, opts.message, { fontSize: '24px', color: '#fff4dc', align: 'center', wordWrap: { width: w - 80 }, stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   // A long message makes the popup taller instead of running into the buttons.
-  const h = Math.max(330, Math.round(text.height) + 240);
+  const extraH = opts.extra?.height ?? 0;
+  const h = Math.max(330, Math.round(text.height) + 240 + extraH);
   const top = dialogFrame(scene, modal, cy, w, h, opts.title);
-  text.setY(top + 96 + (h - 96 - 112) / 2);
+  text.setY(top + 96 + (h - 96 - 112 - extraH) / 2);
   modal.container.add(text);
+  opts.extra?.build(modal.container, top + h - 112 - extraH / 2);
   const buttonY = top + h - 56;
   modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, 'キャンセル', () => modal.close(), { variant: 'wood', fontSize: '24px' }));
   modal.container.add(

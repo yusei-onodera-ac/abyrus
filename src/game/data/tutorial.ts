@@ -77,8 +77,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     id: 'battle_basic',
     mood: 'determined',
     scene: 'Battle',
-    lines: ['戦いは自動で進むよ。ヒーローの下のゲージがたまったら、その子をタップでスキル発動！', '右下の「オート」を押せば、たまった瞬間に自動で撃ってくれるよ。'],
-    target: { x: 490, y: 1152, w: 220, h: 76 },
+    lines: ['戦いは自動で進むよ。画面の下に並んだキャラのゲージがたまったら、そのアイコンをタップでスキル発動！', '右下の「オート」を押せば、たまった瞬間に自動で撃ってくれるよ。'],
+    target: { x: 628, y: 944, w: 80, h: 80 },
     advance: 'tap',
   },
   {

@@ -194,10 +194,12 @@ export class TutorialOverlay {
   // --- skip ----------------------------------------------------------------------------
 
   private buildSkip(): void {
-    // Opposite the bubble, so they never overlap.
-    const y = this.bubbleAtTop() ? 1214 : 168;
-    const label = this.add(body(this.scene, 640, y, 'スキップ', { fontSize: '22px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5)) as Phaser.GameObjects.Text;
-    const hit = this.add(this.scene.add.zone(640, y, 150, 56));
+    // Opposite the bubble, so they never overlap; at the top it keeps to the left, clear of the fight's controls down the right edge.
+    const atTop = this.bubbleAtTop();
+    const x = atTop ? 640 : 100;
+    const y = atTop ? 1214 : 168;
+    const label = this.add(body(this.scene, x, y, 'スキップ', { fontSize: '22px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5)) as Phaser.GameObjects.Text;
+    const hit = this.add(this.scene.add.zone(x, y, 150, 56));
     (hit as Phaser.GameObjects.Zone).setInteractive({ useHandCursor: true });
     hit.on('pointerup', () => {
       if (!this.skipArmed) {

@@ -23,12 +23,14 @@ import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
+import { fitPartyArt, PARTY_ROW_Y, PARTY_SPACING } from '../characters/PartyLayout';
 import { AnimationController } from '../characters/AnimationController';
 import { BattleFx, type Positioned } from '../characters/BattleFx';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { AutoSkillToggle } from '../ui/AutoSkillToggle';
 import { SpeedToggle } from '../ui/SpeedToggle';
-import { AutoAdvance, AutoAdvanceToggle, stopAutoAdvance } from '../ui/AutoAdvanceToggle';
+import { PartyBar } from '../ui/PartyBar';
+import { AutoAdvance, stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import { buildPartyResult, type PartyGain } from '../ui/PartyResult';
 import { Button } from '../ui/Button';
 import { openConfirm } from '../ui/Dialogs';
@@ -42,14 +44,18 @@ import { enter, popIn } from '../ui/Transitions';
 
 const INK = '#1c130a';
 
+/** The name and HP bar floating by a unit: enemies only - the party's are on the PartyBar below. */
+interface UnitBars {
+  hpBg: Phaser.GameObjects.Rectangle;
+  hpFill: Phaser.GameObjects.Rectangle;
+  nameText: Phaser.GameObjects.Text;
+}
+
 interface UnitView {
   unit: UnitInstance;
   sprite: Phaser.GameObjects.Sprite;
-  hpBg: Phaser.GameObjects.Rectangle;
-  hpFill: Phaser.GameObjects.Rectangle;
-  ultFill: Phaser.GameObjects.Rectangle;
+  bars?: UnitBars;
   readyRing: Phaser.GameObjects.Arc;
-  nameText: Phaser.GameObjects.Text;
   readyPulse?: Phaser.Tweens.Tween;
 }
 
@@ -75,8 +81,8 @@ export class BattleScene extends Phaser.Scene {
   private views = new Map<string, UnitView>();
   private resultOverlay?: Phaser.GameObjects.Container;
   private autoSkill?: AutoSkillToggle;
-  private autoAdvance?: AutoAdvanceToggle;
   private speed?: SpeedToggle;
+  private partyBar?: PartyBar;
   private modal?: ModalHandle;
 
   private currentStageDef?: StageDef;
@@ -96,8 +102,8 @@ export class BattleScene extends Phaser.Scene {
     this.views.clear();
     this.resultOverlay = undefined;
     this.autoSkill = undefined;
-    this.autoAdvance = undefined;
     this.speed = undefined;
+    this.partyBar = undefined;
     this.ready = false;
     this.ending = false;
     this.modal = undefined;
@@ -151,7 +157,6 @@ export class BattleScene extends Phaser.Scene {
     const { front: pFront, back: pBack } = SaveSystem.getPartyHeroes(this.save);
     this.autoSkill = new AutoSkillToggle(this, this.save);
     this.speed = new SpeedToggle(this, this.save);
-    if (this.mode !== 'final') this.autoAdvance = new AutoAdvanceToggle(this, this.save);
     this.tweens.timeScale = 1;
     this.time.timeScale = 1;
     if (pFront.length + pBack.length === 0) {
@@ -164,6 +169,12 @@ export class BattleScene extends Phaser.Scene {
       ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
     ];
     this.layoutUnits(playerUnits, true, true);
+    this.partyBar = new PartyBar(this, {
+      generator: this.generator,
+      units: playerUnits,
+      heroOf: (u) => SaveSystem.getHero(this.save, u.id),
+      onTap: (u) => this.onHeroTap(u.id),
+    });
     this.riseParty();
 
     if (this.mode === 'final' && this.finalStage) {
@@ -201,21 +212,21 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private layoutUnits(units: UnitInstance[], isPlayer: boolean, entrance = false): void {
-    const frontY = isPlayer ? 760 : ENEMY_ROW_Y.front;
-    const backY = isPlayer ? 900 : ENEMY_ROW_Y.back;
+    const frontY = isPlayer ? PARTY_ROW_Y.front : ENEMY_ROW_Y.front;
+    const backY = isPlayer ? PARTY_ROW_Y.back : ENEMY_ROW_Y.back;
     this.placeRow(units.filter((u) => u.row === 'front'), frontY, isPlayer, entrance);
     this.placeRow(units.filter((u) => u.row === 'back'), backY, isPlayer, entrance);
   }
 
   private placeRow(units: UnitInstance[], y: number, isPlayer: boolean, entrance: boolean): void {
-    const spacing = isPlayer ? 150 : ENEMY_SPACING;
+    const spacing = isPlayer ? PARTY_SPACING : ENEMY_SPACING;
     const startX = 360 - ((units.length - 1) * spacing) / 2;
     units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, isPlayer, entrance));
   }
 
   /** A view's pieces, which move together. */
   private partsOf(view: UnitView): Positioned[] {
-    return [view.sprite, view.nameText, view.hpBg, view.hpFill, view.ultFill, view.readyRing];
+    return [view.sprite, view.readyRing];
   }
 
   /** At the start: the party rises in from below the screen; the fight begins once they are up. */
@@ -232,7 +243,7 @@ export class BattleScene extends Phaser.Scene {
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean, entrance = false): void {
     // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
-    const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
+    const art = isPlayer ? fitPartyArt(this, this.generator, unit) : fitEnemyArt(this, unit.art, unit.isBoss);
     const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
     const textureKey = art?.key ?? generated?.textureKey ?? '';
     const size = art ? art.height : (generated?.size ?? 96);
@@ -242,26 +253,21 @@ export class BattleScene extends Phaser.Scene {
     if (!isPlayer && !art) sprite.setFlipX(true);
     sprite.setData('baseScale', sprite.scaleX);
 
-    const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
-    const barWidth = 90;
-    const hpBg = this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
-    const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
-    const ultFill = this.add
-      .rectangle(x - barWidth / 2, y + size / 2 + 13, barWidth, 4, 0xffd23f)
-      .setOrigin(0, 0.5)
-      .setScale(0, 1)
-      .setRounded(2);
+    // The party's name, HP and skill gauge are on the PartyBar; an enemy carries its own.
+    let bars: UnitBars | undefined;
+    if (!isPlayer) {
+      const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
+      const barWidth = 90;
+      const hpBg = this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
+      const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
+      bars = { hpBg, hpFill, nameText };
+    }
     const readyRing = this.add.circle(x, y, size * 0.52).setStrokeStyle(3, 0xffd23f, 0.9).setVisible(false);
 
     if (!entrance) this.anim.idle(sprite);
     this.anim.attachAura(unit.id, sprite, unit.rarity);
 
-    if (isPlayer) {
-      sprite.setInteractive({ useHandCursor: true });
-      sprite.on('pointerdown', () => this.onHeroTap(unit.id));
-    }
-
-    this.views.set(unit.id, { unit, sprite, hpBg, hpFill, ultFill, readyRing, nameText });
+    this.views.set(unit.id, { unit, sprite, bars, readyRing });
   }
 
   private onHeroTap(unitId: string): void {
@@ -293,11 +299,12 @@ export class BattleScene extends Phaser.Scene {
 
   private refreshBars(): void {
     for (const view of this.views.values()) {
-      const ratio = view.unit.maxHp.isZero() ? 0 : view.unit.hp.div(view.unit.maxHp).toNumber();
-      view.hpFill.setScale(Phaser.Math.Clamp(ratio, 0, 1), 1);
-      view.hpFill.setFillStyle(ratio < 0.3 ? 0xe05353 : ratio < 0.6 ? 0xe0c653 : 0x4caf50);
+      if (view.bars) {
+        const ratio = view.unit.maxHp.isZero() ? 0 : view.unit.hp.div(view.unit.maxHp).toNumber();
+        view.bars.hpFill.setScale(Phaser.Math.Clamp(ratio, 0, 1), 1);
+        view.bars.hpFill.setFillStyle(ratio < 0.3 ? 0xe05353 : ratio < 0.6 ? 0xe0c653 : 0x4caf50);
+      }
       if (view.unit.isPlayer) {
-        view.ultFill.setScale(Phaser.Math.Clamp(view.unit.ultGauge / 100, 0, 1), 1);
         const ready = view.unit.ultGauge >= 100;
         if (ready && !view.readyRing.visible) {
           this.fx.ready(view.sprite.x, view.sprite.y);
@@ -318,6 +325,7 @@ export class BattleScene extends Phaser.Scene {
         }
       }
     }
+    this.partyBar?.refresh();
   }
 
   private handleEvents(events: BattleEvent[]): void {
@@ -363,6 +371,7 @@ export class BattleScene extends Phaser.Scene {
     SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
     const fromPlayer = !!casterView?.unit.isPlayer;
+    if (fromPlayer) this.partyBar?.cast(event.casterId);
     // How long the longest orb flies: units it kills are held until it lands.
     let hold = 0;
     if (casterView) {
@@ -428,9 +437,8 @@ export class BattleScene extends Phaser.Scene {
   private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
     const rowUnits = this.engine.playerUnits.filter((u) => u.row === unit.row);
     const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
-    const spacing = 150;
-    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
-    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
+    const startX = 360 - ((rowUnits.length - 1) * PARTY_SPACING) / 2;
+    return { x: startX + i * PARTY_SPACING, y: PARTY_ROW_Y[unit.row] };
   }
 
   private onDefeated(unitId: string): void {
@@ -443,10 +451,7 @@ export class BattleScene extends Phaser.Scene {
     if (!view.unit.isPlayer) SoundSystem.play(this, 'boom');
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
-      view.hpBg.destroy();
-      view.hpFill.destroy();
-      view.ultFill.destroy();
-      view.nameText.destroy();
+      this.destroyBars(view);
     });
   }
 
@@ -480,16 +485,20 @@ export class BattleScene extends Phaser.Scene {
     this.announceWave(wave.name);
   }
 
+  /** An enemy's floating name and HP bar. */
+  private destroyBars(view: UnitView): void {
+    view.bars?.hpBg.destroy();
+    view.bars?.hpFill.destroy();
+    view.bars?.nameText.destroy();
+  }
+
   private clearEnemyViews(): void {
     for (const [id, view] of [...this.views]) {
       if (view.unit.isPlayer) continue;
       this.anim.destroyAura(id);
       view.readyPulse?.stop();
       view.sprite.destroy();
-      view.hpBg.destroy();
-      view.hpFill.destroy();
-      view.ultFill.destroy();
-      view.nameText.destroy();
+      this.destroyBars(view);
       view.readyRing.destroy();
       this.views.delete(id);
     }
@@ -507,6 +516,10 @@ export class BattleScene extends Phaser.Scene {
   private onBattleEnd(victory: boolean): void {
     if (this.resultOverlay || this.ending) return;
     this.ending = true;
+    // The bottom of the screen is the panel's now: the cards drop away, and so do the controls.
+    this.partyBar?.refresh();
+    this.partyBar?.leave();
+    for (const control of [this.autoSkill, this.speed]) control?.setVisible(false);
     SoundSystem.play(this, victory ? 'victory' : 'defeat');
     const next = victory ? this.nextStageOffer() : null;
 
@@ -553,7 +566,6 @@ export class BattleScene extends Phaser.Scene {
       // A loss ends a 連戦.
       chainWins = AutoAdvance.wins(this.game);
       stopAutoAdvance(this.game);
-      this.autoAdvance?.refresh();
     }
 
     if (!victory) {
@@ -679,7 +691,6 @@ export class BattleScene extends Phaser.Scene {
         const stop = new Button(this, 160, rowY + 150, 190, 66, 'ストップ', () => {
           countdown?.remove();
           stopAutoAdvance(this.game);
-          this.autoAdvance?.refresh();
           note.setText('連戦をとめました');
           stop.setEnabled(false);
         }, { variant: 'danger', fontSize: '24px' });
@@ -752,7 +763,6 @@ export class BattleScene extends Phaser.Scene {
     if (!StaminaSystem.canAfford(this.save, cost)) {
       if (AutoAdvance.isOn(this.game, this.save)) {
         stopAutoAdvance(this.game);
-        this.autoAdvance?.refresh();
         showToast(this, 'スタミナが足りないので、連戦を終了しました');
       }
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));

@@ -1,4 +1,4 @@
-import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
+import { addChainRow, CHAIN_ROW_HEIGHT, stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT } from '../systems/ProgressionSystem';
@@ -350,6 +350,8 @@ export class StageSelectScene extends Phaser.Scene {
       message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
       confirmLabel: '出撃',
       confirmVariant: 'gold',
+      // The final battle has no next stage to chain on to.
+      extra: stage.kind === 'final' ? undefined : { height: CHAIN_ROW_HEIGHT, build: (container, y) => addChainRow(this, container, y, save) },
       onConfirm: () => {
         if (!StaminaSystem.spend(save, cost)) return;
         SaveSystem.save(save);

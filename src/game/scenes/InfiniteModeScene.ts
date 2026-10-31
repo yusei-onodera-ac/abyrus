@@ -2,11 +2,13 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData, type InfiniteModeRunResult } from '../systems/SaveSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
+import { fitPartyArt, PARTY_ROW_Y, PARTY_SPACING } from '../characters/PartyLayout';
 import { AnimationController } from '../characters/AnimationController';
 import { BattleFx, type Positioned } from '../characters/BattleFx';
 import { DamagePopupPool } from '../ui/DamagePopup';
 import { AutoSkillToggle } from '../ui/AutoSkillToggle';
 import { SpeedToggle } from '../ui/SpeedToggle';
+import { PartyBar } from '../ui/PartyBar';
 import { Button } from '../ui/Button';
 import { createPanel } from '../ui/Panel';
 import { applyBattleBackground } from '../ui/Background';
@@ -25,14 +27,18 @@ const INK = '#1c130a';
 /** The shared battle backdrop is tinted this violet for the arena (or replaced by public/assets/backgrounds/battle_infinite.jpg). */
 const ARENA_TINT = 0xa890e0;
 
+/** The name and HP bar floating by a unit: enemies only - the party's are on the PartyBar below. */
+interface UnitBars {
+  hpBg: Phaser.GameObjects.Rectangle;
+  hpFill: Phaser.GameObjects.Rectangle;
+  nameText: Phaser.GameObjects.Text;
+}
+
 interface UnitView {
   unit: UnitInstance;
   sprite: Phaser.GameObjects.Sprite;
-  hpBg: Phaser.GameObjects.Rectangle;
-  hpFill: Phaser.GameObjects.Rectangle;
-  ultFill: Phaser.GameObjects.Rectangle;
+  bars?: UnitBars;
   readyRing: Phaser.GameObjects.Arc;
-  nameText: Phaser.GameObjects.Text;
   readyPulse?: Phaser.Tweens.Tween;
 }
 
@@ -83,6 +89,7 @@ export class InfiniteModeScene extends Phaser.Scene {
   private hud?: RunningHud;
   private autoSkill?: AutoSkillToggle;
   private speed?: SpeedToggle;
+  private partyBar?: PartyBar;
 
   constructor() {
     super('InfiniteRun');
@@ -102,6 +109,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.hud = undefined;
     this.autoSkill = undefined;
     this.speed = undefined;
+    this.partyBar = undefined;
 
     this.cameras.main.setBackgroundColor('#10121c');
     applyBattleBackground(this, 'infinite', ARENA_TINT);
@@ -158,16 +166,21 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.engine = engine;
 
     this.ready = false;
-    this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'front'), 760);
-    this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'back'), 900);
+    this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'front'), PARTY_ROW_Y.front);
+    this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'back'), PARTY_ROW_Y.back);
+    this.partyBar = new PartyBar(this, {
+      generator: this.generator,
+      units: engine.playerUnits,
+      heroOf: (u) => SaveSystem.getHero(this.save, u.id),
+      onTap: (u) => this.onHeroTap(u.id),
+    });
     this.buildRunningHud();
     this.riseParty();
   }
 
   private placePlayerRow(units: UnitInstance[], y: number): void {
-    const spacing = 150;
-    const startX = 360 - ((units.length - 1) * spacing) / 2;
-    units.forEach((unit, i) => this.createUnitView(unit, startX + i * spacing, y, true, true));
+    const startX = 360 - ((units.length - 1) * PARTY_SPACING) / 2;
+    units.forEach((unit, i) => this.createUnitView(unit, startX + i * PARTY_SPACING, y, true, true));
   }
 
   /** The party rises in from below the screen; the run begins once they are up. */
@@ -175,7 +188,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     const views = [...this.views.values()].filter((v) => v.unit.isPlayer);
     const token = this.stateToken;
     this.fx.rise(
-      views.map((v) => [v.sprite, v.nameText, v.hpBg, v.hpFill, v.ultFill, v.readyRing] as Positioned[]),
+      views.map((v) => [v.sprite, v.readyRing] as Positioned[]),
       () => {
         if (token !== this.stateToken) return;
         this.ready = true;
@@ -216,7 +229,7 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean, entrance = false): void {
     // An enemy with a picture is drawn from it (as drawn, facing whichever way); the rest are silhouettes.
-    const art = isPlayer ? null : fitEnemyArt(this, unit.art, unit.isBoss);
+    const art = isPlayer ? fitPartyArt(this, this.generator, unit) : fitEnemyArt(this, unit.art, unit.isBoss);
     const generated = art ? null : this.generator.generate(unit.seed, unit.heroClass, unit.rarity, unit.heroId);
     const textureKey = art?.key ?? generated?.textureKey ?? '';
     const size = art ? art.height : (generated?.size ?? 96);
@@ -226,26 +239,21 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (!isPlayer && !art) sprite.setFlipX(true);
     sprite.setData('baseScale', sprite.scaleX);
 
-    const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
-    const barWidth = 90;
-    const hpBg = this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
-    const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
-    const ultFill = this.add
-      .rectangle(x - barWidth / 2, y + size / 2 + 13, barWidth, 4, 0xffd23f)
-      .setOrigin(0, 0.5)
-      .setScale(0, 1)
-      .setRounded(2);
+    // The party's name, HP and skill gauge are on the PartyBar; an enemy carries its own.
+    let bars: UnitBars | undefined;
+    if (!isPlayer) {
+      const nameText = caption(this, x, y - size / 2 - 14, unit.name, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
+      const barWidth = 90;
+      const hpBg = this.add.rectangle(x, y + size / 2 + 4, barWidth, 7, 0x000000, 0.6).setRounded(3);
+      const hpFill = this.add.rectangle(x - barWidth / 2, y + size / 2 + 4, barWidth, 7, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
+      bars = { hpBg, hpFill, nameText };
+    }
     const readyRing = this.add.circle(x, y, size * 0.52).setStrokeStyle(3, 0xffd23f, 0.9).setVisible(false);
 
     if (!entrance) this.anim.idle(sprite);
     this.anim.attachAura(unit.id, sprite, unit.rarity);
 
-    if (isPlayer) {
-      sprite.setInteractive({ useHandCursor: true });
-      sprite.on('pointerdown', () => this.onHeroTap(unit.id));
-    }
-
-    this.views.set(unit.id, { unit, sprite, hpBg, hpFill, ultFill, readyRing, nameText });
+    this.views.set(unit.id, { unit, sprite, bars, readyRing });
   }
 
   private onHeroTap(unitId: string): void {
@@ -260,11 +268,12 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private refreshBars(): void {
     for (const view of this.views.values()) {
-      const ratio = view.unit.maxHp.isZero() ? 0 : view.unit.hp.div(view.unit.maxHp).toNumber();
-      view.hpFill.setScale(Phaser.Math.Clamp(ratio, 0, 1), 1);
-      view.hpFill.setFillStyle(ratio < 0.3 ? 0xe05353 : ratio < 0.6 ? 0xe0c653 : 0x4caf50);
+      if (view.bars) {
+        const ratio = view.unit.maxHp.isZero() ? 0 : view.unit.hp.div(view.unit.maxHp).toNumber();
+        view.bars.hpFill.setScale(Phaser.Math.Clamp(ratio, 0, 1), 1);
+        view.bars.hpFill.setFillStyle(ratio < 0.3 ? 0xe05353 : ratio < 0.6 ? 0xe0c653 : 0x4caf50);
+      }
       if (view.unit.isPlayer) {
-        view.ultFill.setScale(Phaser.Math.Clamp(view.unit.ultGauge / 100, 0, 1), 1);
         const ready = view.unit.ultGauge >= 100;
         if (ready && !view.readyRing.visible) {
           this.fx.ready(view.sprite.x, view.sprite.y);
@@ -285,6 +294,7 @@ export class InfiniteModeScene extends Phaser.Scene {
         }
       }
     }
+    this.partyBar?.refresh();
   }
 
   private handleEvents(events: InfiniteBattleEvent[]): void {
@@ -330,6 +340,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     SoundSystem.play(this, 'skill');
     const casterView = this.views.get(event.casterId);
     const fromPlayer = !!casterView?.unit.isPlayer;
+    if (fromPlayer) this.partyBar?.cast(event.casterId);
     // How long the longest orb flies: units it kills are held until it lands.
     let hold = 0;
     if (casterView) {
@@ -391,9 +402,8 @@ export class InfiniteModeScene extends Phaser.Scene {
   private computePlayerUnitPosition(unit: UnitInstance): { x: number; y: number } {
     const rowUnits = (this.engine?.playerUnits ?? []).filter((u) => u.row === unit.row);
     const i = Math.max(0, rowUnits.findIndex((u) => u.id === unit.id));
-    const spacing = 150;
-    const startX = 360 - ((rowUnits.length - 1) * spacing) / 2;
-    return { x: startX + i * spacing, y: unit.row === 'front' ? 760 : 900 };
+    const startX = 360 - ((rowUnits.length - 1) * PARTY_SPACING) / 2;
+    return { x: startX + i * PARTY_SPACING, y: PARTY_ROW_Y[unit.row] };
   }
 
   private onEnemySpawned(unit: UnitInstance, position: EnemySlotPosition): void {
@@ -411,12 +421,16 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (!view.unit.isPlayer) SoundSystem.play(this, 'boom');
     this.anim.death(view.sprite, () => {
       view.sprite.destroy();
-      view.hpBg.destroy();
-      view.hpFill.destroy();
-      view.ultFill.destroy();
-      view.nameText.destroy();
+      this.destroyBars(view);
       this.views.delete(unitId);
     });
+  }
+
+  /** An enemy's floating name and HP bar. */
+  private destroyBars(view: UnitView): void {
+    view.bars?.hpBg.destroy();
+    view.bars?.hpFill.destroy();
+    view.bars?.nameText.destroy();
   }
 
   private clearCombatViews(): void {
@@ -426,14 +440,13 @@ export class InfiniteModeScene extends Phaser.Scene {
       this.tweens.killTweensOf(view.readyRing);
       view.readyPulse?.stop();
       view.sprite.destroy();
-      view.hpBg.destroy();
-      view.hpFill.destroy();
-      view.ultFill.destroy();
-      view.nameText.destroy();
+      this.destroyBars(view);
       view.readyRing.destroy();
     }
     this.views.clear();
     this.hud = undefined;
+    this.partyBar?.destroy();
+    this.partyBar = undefined;
   }
 
   // ------------------------------------------------------------- result --
@@ -460,6 +473,7 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private showResult(result: InfiniteModeRunResult, isNewLocalBest: boolean, skillEssenceGained: number): void {
     this.enterState('result');
+    for (const control of [this.autoSkill, this.speed]) control?.setVisible(false);
     SoundSystem.play(this, isNewLocalBest ? 'victory' : 'confirm');
     const container = this.add.container(0, 0);
     this.stateContainer = container;
