@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ABYRUS 一覧（キャラ・敵・装備・アイテム）</title>
+    <style>
+      :root {
+        --bg: #17110b;
+        --panel: #231a10;
+        --line: #5a4426;
+        --brass: #c9a052;
+        --text: #f3e6c8;
+        --muted: #b9a57c;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 "Hiragino Kaku Gothic ProN", "Noto Sans JP", Meiryo, sans-serif; }
+      header { position: sticky; top: 0; z-index: 5; background: #0f0b07; border-bottom: 2px solid var(--brass); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+      header h1 { margin: 0; font-size: 18px; color: #ffe9b8; }
+      nav a { color: var(--brass); margin-right: 14px; text-decoration: none; font-weight: bold; }
+      nav a:hover { color: #ffe9b8; }
+      header input, header select { background: #261b0f; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; font: inherit; }
+      main { padding: 16px; max-width: 1500px; margin: 0 auto; }
+      section { margin-bottom: 36px; }
+      h2 { margin: 0 0 4px; font-size: 20px; color: #ffe9b8; border-left: 5px solid var(--brass); padding-left: 10px; }
+      h3 { margin: 18px 0 6px; font-size: 16px; color: var(--brass); }
+      .note { color: var(--muted); font-size: 12px; margin: 2px 0 10px; }
+      table { width: 100%; border-collapse: collapse; background: var(--panel); }
+      th, td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; text-align: left; }
+      th { background: #2e2113; color: var(--brass); position: sticky; top: 52px; z-index: 2; white-space: nowrap; }
+      td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+      td.img { width: 150px; text-align: center; background: #120d08; }
+      td.img img { max-width: 130px; max-height: 170px; image-rendering: auto; }
+      td.icon { width: 84px; text-align: center; background: #120d08; }
+      td.icon img { width: 64px; height: 64px; }
+      .star { color: #ffcf33; letter-spacing: -1px; }
+      .tag { display: inline-block; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; margin: 1px 2px 1px 0; font-size: 12px; color: var(--muted); }
+      .skill { margin: 0 0 6px; padding: 0 0 6px; border-bottom: 1px dotted var(--line); }
+      .skill:last-child { border-bottom: 0; margin: 0; padding: 0; }
+      .skill b { color: #ffe9b8; }
+      .skill small { color: var(--muted); display: block; }
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+      .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; text-align: center; }
+      .card .pic { height: 130px; display: flex; align-items: center; justify-content: center; background: #120d08; border-radius: 6px; margin-bottom: 6px; }
+      .card .pic img { max-width: 100%; max-height: 126px; }
+      .card .pic span { color: var(--muted); font-size: 12px; }
+      .hidden { display: none !important; }
+      .miss { color: #e07a6a; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>ABYRUS 一覧</h1>
+      <nav>
+        <a href="#heroes">キャラ</a><a href="#enemies">敵</a><a href="#equipment">装備</a><a href="#items">アイテム</a>
+      </nav>
+      <input id="q" type="search" placeholder="名前・IDで絞り込み" size="22" />
+      <select id="rarity">
+        <option value="">★すべて</option>
+        <option value="5">★5</option><option value="4">★4</option><option value="3">★3</option><option value="2">★2</option><option value="1">★1</option>
+      </select>
+    </header>
+    <main id="app">読み込み中…</main>
+    <div id="phaser" style="display: none"></div>
+    <script type="module" src="/src/catalog/main.ts"></script>
+  </body>
+</html>
