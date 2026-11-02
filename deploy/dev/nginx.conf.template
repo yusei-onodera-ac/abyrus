@@ -1,0 +1,35 @@
+server {
+  listen ${PORT};
+  root /usr/share/nginx/html;
+  index index.html;
+
+  # The dev environment shows unreleased content: a user name and password in front of all of it.
+  auth_basic "ABYRUS dev";
+  auth_basic_user_file /etc/nginx/htpasswd;
+
+  gzip on;
+  gzip_min_length 1024;
+  gzip_types text/css application/javascript application/json image/svg+xml;
+
+  # Vite's built scripts and styles carry a hash in their name: they never change.
+  location ~* "^/assets/.+\.(js|css)$" {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    try_files $uri =404;
+  }
+
+  # The pictures, movies and sounds keep their names when replaced: the browser keeps them for an
+  # hour, then asks whether they changed (a small request when they did not). A missing one is a
+  # real 404, never index.html (the game probes for optional movies and voices that way).
+  location /assets/ {
+    add_header Cache-Control "public, max-age=3600, must-revalidate";
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    try_files $uri =404;
+  }
+
+  location / {
+    add_header Cache-Control "no-cache";
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    try_files $uri /index.html;
+  }
+}

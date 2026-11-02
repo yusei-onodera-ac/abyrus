@@ -27,6 +27,7 @@ import { IdleScene } from './game/scenes/IdleScene';
 import { PremiumScene } from './game/scenes/PremiumScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
+import { showDevNotice } from './devNotice';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -71,5 +72,8 @@ const config: Phaser.Types.Core.GameConfig = {
     SettingsScene,
   ],
 };
+
+// The dev environment (deploy/dev/deploy.sh builds it with VITE_DEV_ENV=1) says what it is before anything else.
+if (import.meta.env.VITE_DEV_ENV === '1') showDevNotice();
 
 new Phaser.Game(config);
