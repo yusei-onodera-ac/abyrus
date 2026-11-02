@@ -1,10 +1,14 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData, type HeroPullOutcome } from '../systems/SaveSystem';
 import { SoundSystem } from '../systems/SoundSystem';
+import { SettingsSystem } from '../systems/SettingsSystem';
 import { GachaSystem, costOf, pityLeft } from '../systems/GachaSystem';
 import { showRewardModal } from '../ui/RewardModal';
 import { tilesForEquipment } from '../ui/RewardTiles';
 import { getActiveGachaBanners, type GachaBannerEntry } from '../data/gachaBanners';
+import { gachaMovieId } from '../data/gachaMovies';
+import { playMovieOverlay } from '../ui/MovieOverlay';
+import { playGemDrop } from '../ui/GemDrop';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { ResourceBar } from '../ui/ResourceBar';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -31,12 +35,15 @@ export class GachaScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
   private scroll!: ScrollView;
   private modal?: ModalHandle;
+  /** True from a pull being paid until its results are up: a second tap in between does nothing. */
+  private pulling = false;
 
   constructor() {
     super('Gacha');
   }
 
   create(): void {
+    this.pulling = false;
     this.generator = new CharacterGenerator(this);
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'gacha');
@@ -110,6 +117,7 @@ export class GachaScene extends Phaser.Scene {
   /** One pull or a ten-pull of `entry`: pays its price, rolls with its own rates and 天井 (see
    *  GachaSystem), and shows what came out. */
   private doPull(entry: GachaBannerEntry, count: 1 | 10): void {
+    if (this.pulling) return;
     const save = this.getSave();
     if (!SaveSystem.spendGems(save, costOf(entry, count))) {
       showToast(this, '魔晶石が足りません', '#ff8a8a');
@@ -120,16 +128,41 @@ export class GachaScene extends Phaser.Scene {
       save.equipment.push(...items);
       SaveSystem.save(save);
       this.refreshResources();
-      SoundSystem.play(this, items.some((i) => Number(i.defId.split('-')[1]) >= 4) ? 'reveal' : 'confirm');
-      this.closeModal();
-      this.modal = showRewardModal(this, this.scroll, { title: entry.title, tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）', onClose: () => this.scene.restart() });
+      this.playPull(entry, count, Math.max(...items.map((i) => Number(i.defId.split('-')[1]))), () => {
+        SoundSystem.play(this, items.some((i) => Number(i.defId.split('-')[1]) >= 4) ? 'reveal' : 'confirm');
+        this.closeModal();
+        this.modal = showRewardModal(this, this.scroll, { title: entry.title, tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）', onClose: () => this.scene.restart() });
+      });
       return;
     }
     const heroes = GachaSystem.pullHeroes(save, entry, count);
     const outcomes = heroes.map((hero) => SaveSystem.addHero(save, hero));
     SaveSystem.save(save);
     this.refreshResources();
-    this.showResults(outcomes);
+    this.playPull(entry, count, Math.max(...heroes.map((hero) => hero.rarity)), () => this.showResults(outcomes));
+  }
+
+  /** What happens between the tap and the results: the gems are dropped onto the magic circle (a
+   *  pile of ten for a ten-pull), then the pull's movie - picked by the best ★ in it (data/gachaMovies)
+   *  - and then `show`, which puts the results up underneath as the movie fades. The pull is already
+   *  paid and saved. */
+  private playPull(entry: GachaBannerEntry, count: 1 | 10, bestRarity: number, show: () => void): void {
+    this.pulling = true;
+    const layer = playGemDrop(this, {
+      count,
+      rarity: bestRarity,
+      cost: costOf(entry, count),
+      onDrop: () => {
+        playMovieOverlay(this, gachaMovieId(bestRarity), {
+          volume: SettingsSystem.getVolume(this.getSave(), 'se'),
+          onEnd: () => {
+            this.pulling = false;
+            layer.close();
+            show();
+          },
+        });
+      },
+    });
   }
 
   private showResults(outcomes: HeroPullOutcome[]): void {
@@ -152,11 +185,10 @@ export class GachaScene extends Phaser.Scene {
       const card = new HeroCard(this, x, y, hero, this.generator, 110);
       card.setScale(0);
       container.add(card);
-      if (outcome.kind !== 'new') {
-        const text = outcome.kind === 'copy' ? '合成素材に追加' : `上限のため +${outcome.duplicateGold.toString()}G`;
-        const color = outcome.kind === 'copy' ? '#9fe39f' : '#ffd23f';
-        container.add(caption(this, x, y + 70, text, { fontSize: '15px', color, stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5));
-      }
+      // Tapping a character opens its detail screen.
+      const zone = this.add.zone(x, y, 116, 150).setInteractive({ useHandCursor: true });
+      zone.on('pointerup', () => this.openHeroDetail(outcome));
+      container.add(zone);
       this.tweens.add({
         targets: card,
         scale: 1,
@@ -169,10 +201,20 @@ export class GachaScene extends Phaser.Scene {
       });
     });
 
-    const closeBtn = new Button(this, 360, 1100, 220, 64, '閉じる', () => this.closeModal(), { variant: 'gold', fontSize: '24px' });
+    container.add(caption(this, 360, 1030, 'キャラをタップすると、詳細を見られます', { fontSize: '20px', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5));
+    const closeBtn = new Button(this, 360, 1100, 220, 64, '確認', () => this.closeModal(), { variant: 'gold', fontSize: '24px' });
     container.add(closeBtn);
     closeBtn.setScale(0);
     this.tweens.add({ targets: closeBtn, scale: 1, duration: 300, delay: 120 * outcomes.length + 120, ease: 'Back.easeOut' });
+  }
+
+  /** キャラ詳細 of a character that just came out: the copy itself, or - when it was not kept (a
+   *  repeat past what can be used) - the best copy held of that character. */
+  private openHeroDetail(outcome: HeroPullOutcome): void {
+    const save = this.getSave();
+    const owned = SaveSystem.getHero(save, outcome.hero.id) ?? [...SaveSystem.getCopies(save, outcome.hero)].sort((a, b) => b.phase - a.phase || b.level - a.level)[0];
+    if (!owned) return;
+    this.scene.start('HeroDetail', { heroId: owned.id, from: 'Gacha' });
   }
 
   /** Radial burst of fading lines for the biggest pulls, so a 5-star

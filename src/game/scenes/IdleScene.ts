@@ -8,7 +8,7 @@ import { Button } from '../ui/Button';
 import { buildCardPanel } from '../ui/CardParts';
 import { hourglassIcon } from '../ui/ItemIcons';
 import { openModal } from '../ui/Modal';
-import { buildRewardGrid, tilesForEquipment, type RewardTile } from '../ui/RewardTiles';
+import { buildRewardGrid, tilesForIdleClaim, type RewardTile } from '../ui/RewardTiles';
 import { showRewardModal } from '../ui/RewardModal';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { showToast } from '../ui/Toast';
@@ -118,12 +118,7 @@ export class IdleScene extends InboxScene {
     const result = IdleSystem.claim(this.save);
     SaveSystem.save(this.save);
     this.refreshResources();
-    const p = result.preview;
-    const tiles: RewardTile[] = [{ kind: 'gold', amount: `+${p.gold.toString()}` }];
-    if (p.skillEssence > 0) tiles.push({ kind: 'essence', amount: `+${p.skillEssence.toLocaleString('ja-JP')}` });
-    for (const { item, amount } of p.items) tiles.push({ kind: 'item', item, amount: `+${amount.toLocaleString('ja-JP')}` });
-    if (p.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${p.phaseMaterials}` });
-    tiles.push(...tilesForEquipment(result.equipment));
+    const tiles = tilesForIdleClaim(result.preview, result.equipment);
     this.modal?.close();
     this.modal = showRewardModal(this, this.scroll, { title: '放置報酬を受け取りました', tiles, onClose: () => this.queueRender() });
   }

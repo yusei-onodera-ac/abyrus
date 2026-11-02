@@ -6,6 +6,8 @@ import { buildCardPanel, wrappedText } from '../ui/CardParts';
 import { openConfirm } from '../ui/Dialogs';
 import { formatDateTime, formatRemaining } from '../ui/format';
 import { addRewardIcon, REWARD_COLOR, REWARD_LABEL } from '../ui/RewardIcon';
+import { showRewardModal } from '../ui/RewardModal';
+import type { RewardTile } from '../ui/RewardTiles';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { createPanel } from '../ui/Panel';
 import { body, CHROME } from '../ui/theme';
@@ -110,8 +112,8 @@ export class GiftScene extends InboxScene {
     if (!reward) return;
     SaveSystem.save(this.save);
     this.refreshResources();
-    showToast(this, `${REWARD_LABEL[reward.type]} +${reward.amount.toLocaleString('ja-JP')} を受け取りました`);
-    this.queueRender();
+    this.modal?.close();
+    this.modal = showRewardModal(this, this.scroll, { title: 'プレゼントを受け取りました', tiles: [{ kind: reward.type, amount: `+${reward.amount.toLocaleString('ja-JP')}` }], onClose: () => this.queueRender() });
   }
 
   private claimAll(): void {
@@ -119,11 +121,11 @@ export class GiftScene extends InboxScene {
     if (summary.count === 0) return;
     SaveSystem.save(this.save);
     this.refreshResources();
-    const parts: string[] = [];
-    if (summary.gems > 0) parts.push(`魔晶石 +${summary.gems.toLocaleString('ja-JP')}`);
-    if (summary.gold > 0) parts.push(`ゴールド +${summary.gold.toLocaleString('ja-JP')}`);
-    showToast(this, `${parts.join('　')}（${summary.count}件）を受け取りました`);
-    this.queueRender();
+    const tiles: RewardTile[] = [];
+    if (summary.gems > 0) tiles.push({ kind: 'gems', amount: `+${summary.gems.toLocaleString('ja-JP')}` });
+    if (summary.gold > 0) tiles.push({ kind: 'gold', amount: `+${summary.gold.toLocaleString('ja-JP')}` });
+    this.modal?.close();
+    this.modal = showRewardModal(this, this.scroll, { title: `${summary.count}件を受け取りました`, tiles, onClose: () => this.queueRender() });
   }
 
   private remove(id: string): void {

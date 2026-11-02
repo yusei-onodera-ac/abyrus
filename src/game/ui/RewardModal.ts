@@ -9,7 +9,7 @@ const INK = '#1c130a';
 const W = 640;
 
 /** A popup that shows what the player just received: a title, the reward tiles,
- *  an optional note, and an OK button. `onClose` runs when it is dismissed. */
+ *  an optional note, and a 確認 button. `onClose` runs when it is dismissed. */
 export function showRewardModal(
   scene: Phaser.Scene,
   lock: ModalLock,
@@ -35,7 +35,7 @@ export function showRewardModal(
       top + h - 56,
       260,
       70,
-      'OK',
+      '確認',
       () => {
         handle.close();
         opts.onClose?.();

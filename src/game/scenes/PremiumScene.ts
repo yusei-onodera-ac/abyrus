@@ -35,9 +35,11 @@ export class PremiumScene extends InboxScene {
   }
 
   private claimDaily(): void {
-    if (!claimPremiumDaily(this, this.save)) return;
+    this.modal?.close();
+    const handle = claimPremiumDaily(this, this.scroll, this.save, () => this.queueRender());
+    if (!handle) return;
+    this.modal = handle;
     this.refreshResources();
-    this.queueRender();
   }
 
   private buy(): void {

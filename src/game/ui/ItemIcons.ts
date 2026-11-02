@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import type { ItemId } from '../data/items';
+import { ITEMS, type ItemId } from '../data/items';
 import type { EquipGlyph } from '../data/equipment';
 import { RARITY_COLORS, type Rarity } from '../types';
 import { CORNER_BADGE_FILL, CORNER_BADGE_RING, CORNER_GLYPH, drawNavBadge, ensureTexture } from './Icons';
@@ -13,8 +13,36 @@ const POTION: Record<'exp_s' | 'exp_m' | 'exp_l' | 'exp_xl', { body: number; liq
   exp_xl: { body: 0xa03070, liquid: 0xff7ac0 },
 };
 
-/** A 素材: a potion bottle for each 経験値素材 (bigger tiers fuller and brighter), a glowing crystal for 装備強化素材. */
+/** 素材 pictures: `public/assets/items/<item id>.png` (exp_s, exp_m, exp_l, exp_xl, equip_essence), each a
+ *  square with a transparent background. An item without one - or whose file is missing - keeps its drawn icon. */
+const ART_PREFIX = 'item_art_';
+
+export function preloadItemArt(scene: Phaser.Scene): void {
+  for (const id of Object.keys(ITEMS)) scene.load.image(`${ART_PREFIX}${id}`, `/assets/items/${id}.png`);
+}
+
+/** The supplied picture of `item`, shrunk to `size` (drawn once per size, smoothly: a straight
+ *  scale-down of a big picture would shimmer), or null when there is none. */
+function itemArt(scene: Phaser.Scene, item: ItemId, size: number): string | null {
+  const source = `${ART_PREFIX}${item}`;
+  if (!scene.textures.exists(source)) return null;
+  const key = `icon_item_art_${item}_${size}`;
+  if (scene.textures.exists(key)) return key;
+  const canvas = scene.textures.createCanvas(key, size, size);
+  const ctx = canvas?.getContext();
+  if (!canvas || !ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(scene.textures.get(source).getSourceImage() as CanvasImageSource, 0, 0, size, size);
+  canvas.refresh();
+  return key;
+}
+
+/** A 素材: its supplied picture if there is one, else a potion bottle for each 経験値素材 (bigger tiers fuller and
+ *  brighter) or a glowing crystal for 装備強化素材. */
 export function itemIcon(scene: Phaser.Scene, item: ItemId, size = 56): string {
+  const art = itemArt(scene, item, size);
+  if (art) return art;
   return ensureTexture(scene, `icon_item_${item}_${size}`, size, (g, c) => {
     if (item === 'equip_essence') {
       // A faceted orange crystal on a small anvil-grey base.

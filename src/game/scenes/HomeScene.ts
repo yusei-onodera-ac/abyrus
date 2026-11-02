@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
+import { TutorialSystem } from '../systems/TutorialSystem';
+import { showRewardModal } from '../ui/RewardModal';
+import { tilesForGranted, tilesForIdleClaim } from '../ui/RewardTiles';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
 import { clipboardIcon, hourglassIcon } from '../ui/ItemIcons';
 import { MissionSystem } from '../systems/MissionSystem';
@@ -21,7 +24,6 @@ import { Button } from '../ui/Button';
 import { formatAgo } from '../ui/format';
 import { createPanel } from '../ui/Panel';
 import { addGoodIcon } from '../ui/RewardIcon';
-import { showToast } from '../ui/Toast';
 import { body, caption, CHROME } from '../ui/theme';
 import { enter, enterStagger, popIn } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -247,14 +249,18 @@ export class HomeScene extends Phaser.Scene {
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
-  /** ログインボーナス is handed over the moment Home is first shown on a new
-   *  day - no popup, no button to tap. お知らせ has the calendar of what each
-   *  day gives, for anyone curious what just arrived. */
+  /** ログインボーナス is handed over the moment Home is first shown on a new day - there is
+   *  nothing to tap to get it, but what came is shown, with a 確認 button. While the
+   *  チュートリアル is still going it waits (its lit spots could not be pressed through the
+   *  popup), and comes on the first Home after. お知らせ has the calendar of what each day gives. */
   private maybeClaimLoginBonus(save: SaveData): void {
+    if (TutorialSystem.current(save)) return;
     if (!LoginBonusSystem.canClaim(save)) return;
-    if (!LoginBonusSystem.claim(save)) return;
+    const granted = LoginBonusSystem.claim(save);
+    if (!granted) return;
     SaveSystem.save(save);
     this.resourceBar.update(save);
+    showRewardModal(this, { setEnabled: () => {} }, { title: 'ログインボーナス', tiles: tilesForGranted([granted]), note: `${LoginBonusSystem.dayOfMonth()}日目の報酬です` });
   }
 
   /** 放置報酬, pinned just under the promo banner: how long has piled up (with a
@@ -346,7 +352,7 @@ export class HomeScene extends Phaser.Scene {
     const result = IdleSystem.claim(save);
     SaveSystem.save(save);
     this.resourceBar.update(save);
-    showToast(this, `放置報酬を受け取りました：+${result.preview.gold.toString()}`);
+    showRewardModal(this, { setEnabled: () => {} }, { title: '放置報酬を受け取りました', tiles: tilesForIdleClaim(result.preview, result.equipment) });
     // Rebuilt after this tap has finished: the button being replaced is still handling it.
     this.time.delayedCall(0, () => {
       box.destroy();

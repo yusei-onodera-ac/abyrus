@@ -11,6 +11,7 @@ import { buildInfoPanel } from '../ui/InfoPanel';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
+import { playEnhanceFx } from '../ui/EnhanceFx';
 import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, RARITY_COLORS, hex, type HeroData } from '../types';
 import { EXP_ITEMS, ITEMS, type ItemId } from '../data/items';
 import { itemIcon } from '../ui/ItemIcons';
@@ -242,20 +243,34 @@ export class EnhanceScene extends InboxScene {
 
   private fuse(hero: HeroData, materials: HeroData[]): void {
     let used = 0;
+    const from = hero.phase;
     for (const material of materials) if (SaveSystem.fuseHero(this.save, hero.id, material.id)) used++;
     if (used === 0) return;
     SaveSystem.save(this.save);
-    showToast(this, `合成しました　フェーズ ${hero.phase} になりました`);
     this.queueRender();
+    playEnhanceFx(this, { kind: 'fuse', hero, generator: this.generator, from, to: hero.phase, materials });
   }
 
   private useExp(hero: HeroData, id: ItemId, count: number): void {
     const before = hero.level;
+    const statsBefore = ProgressionSystem.computeHeroStats(hero);
     const result = EnhanceSystem.useExpItem(this.save, hero.id, id, count);
     if (result.used === 0) return;
     SaveSystem.save(this.save);
-    showToast(this, hero.level > before ? `Lv.${before} → Lv.${hero.level} になりました` : `経験値 +${result.gained.toLocaleString('ja-JP')}`);
     this.queueRender();
+    if (hero.level > before) {
+      const now = ProgressionSystem.computeHeroStats(hero);
+      playEnhanceFx(this, {
+        kind: 'level',
+        hero,
+        generator: this.generator,
+        from: before,
+        to: hero.level,
+        lines: [`HP ${statsBefore.maxHp.toString()} → ${now.maxHp.toString()}`, `攻撃 ${statsBefore.atk.toString()} → ${now.atk.toString()}`],
+      });
+    } else {
+      showToast(this, `経験値 +${result.gained.toLocaleString('ja-JP')}`);
+    }
   }
 
   private raisePhase(hero: HeroData): void {
@@ -271,9 +286,10 @@ export class EnhanceScene extends InboxScene {
       });
       return;
     }
+    const from = hero.phase;
     if (!SaveSystem.usePhaseMaterial(this.save, hero.id)) return;
     SaveSystem.save(this.save);
-    showToast(this, `フェーズ ${hero.phase} になりました`);
     this.queueRender();
+    playEnhanceFx(this, { kind: 'phase', hero, generator: this.generator, from, to: hero.phase });
   }
 }

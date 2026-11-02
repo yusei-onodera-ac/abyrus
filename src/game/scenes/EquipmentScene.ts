@@ -9,6 +9,7 @@ import { Button } from '../ui/Button';
 import { itemIcon } from '../ui/ItemIcons';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { showToast } from '../ui/Toast';
+import { showRewardModal } from '../ui/RewardModal';
 import { body, caption } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
 
@@ -115,8 +116,8 @@ export class EquipmentScene extends InboxScene {
         const gained = EquipmentSystem.dismantle(this.save, itemId);
         if (gained === null) return;
         SaveSystem.save(this.save);
-        showToast(this, `装備強化素材 +${gained.toLocaleString('ja-JP')}`);
-        this.queueRender();
+        this.modal?.close();
+        this.modal = showRewardModal(this, this.scroll, { title: '分解しました', tiles: [{ kind: 'item', item: 'equip_essence', amount: `+${gained.toLocaleString('ja-JP')}` }], onClose: () => this.queueRender() });
       },
     });
   }
@@ -133,8 +134,8 @@ export class EquipmentScene extends InboxScene {
       onConfirm: () => {
         const result = EquipmentSystem.dismantleUpTo(this.save, 2);
         SaveSystem.save(this.save);
-        showToast(this, `${result.count}個を分解　素材 +${result.essence.toLocaleString('ja-JP')}`);
-        this.queueRender();
+        this.modal?.close();
+        this.modal = showRewardModal(this, this.scroll, { title: `${result.count}個を分解しました`, tiles: [{ kind: 'item', item: 'equip_essence', amount: `+${result.essence.toLocaleString('ja-JP')}` }], onClose: () => this.queueRender() });
       },
     });
   }

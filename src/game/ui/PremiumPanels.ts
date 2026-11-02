@@ -132,13 +132,12 @@ export function buildPremiumActionCard(scene: Phaser.Scene, save: SaveData, hand
   return { container, height };
 }
 
-/** Takes today's 魔晶石. Returns true if some was given. */
-export function claimPremiumDaily(scene: Phaser.Scene, save: SaveData): boolean {
+/** Takes today's 魔晶石 and shows it, with a 確認 button. Returns the popup, or null if there was none to take. */
+export function claimPremiumDaily(scene: Phaser.Scene, lock: ModalLock, save: SaveData, onClosed: () => void): ModalHandle | null {
   const gems = PremiumSystem.claimDaily(save);
-  if (gems === 0) return false;
+  if (gems === 0) return null;
   SaveSystem.save(save);
-  showToast(scene, `魔晶石 ${gems}個を受け取りました`);
-  return true;
+  return showRewardModal(scene, lock, { title: '今日の魔晶石', tiles: [{ kind: 'gems', amount: `+${gems.toLocaleString('ja-JP')}` }], note: 'プレミアムパスの毎日の特典です', onClose: onClosed });
 }
 
 /** Confirm, pay through PaymentSystem, and on success start/extend the pass and show what came with it. */

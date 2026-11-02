@@ -83,7 +83,7 @@ export class GachaDetailScene extends InboxScene {
       lines.push({ text: 'このガチャに天井はありません。', color: '#cdbb94', size: 19 });
     }
     if (banner.kind !== 'equipment') lines.push({ text: 'キャラをタップすると、レベル・フェーズ・スキルが最大のときの姿を見られます。', color: '#9fe39f', size: 19, bold: true });
-    if (banner.kind !== 'equipment') lines.push({ text: 'すでに持っているキャラは、合成用の素材として手に入ります。フェーズの上限を超える分は、ゴールドになります。', color: '#cdbb94', size: 18 });
+    if (banner.kind !== 'equipment') lines.push({ text: 'すでに持っているキャラも、名鑑に増えます。（編成に入れられるのは、同じキャラ1体まで）', color: '#cdbb94', size: 18 });
 
     const texts = lines.map((l) => wrappedText(this, PAD + 6, 0, l.text, CARD_WIDTH - PAD * 2 - 12, { fontSize: `${l.size}px`, color: l.color, fontStyle: l.bold ? 'bold' : 'normal' }));
     let y = 64;

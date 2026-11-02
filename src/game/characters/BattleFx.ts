@@ -509,6 +509,14 @@ export class BattleFx {
     for (let i = 0; i < count; i++) this.confetti.emitParticleAt(Phaser.Math.Between(0, 720), Phaser.Math.Between(-40, -10), 1);
   }
 
+  /** A burst for something good outside a fight (an upgrade, a fusion): sparks and rings in `palette`. */
+  celebrate(x: number, y: number, palette: FxPalette, strong = false): void {
+    this.burst(palette, x, y, strong ? 46 : 22);
+    if (strong) this.burst('white', x, y, 14);
+    this.ring(x, y, MAIN[palette], 18, strong ? 190 : 120, strong ? 640 : 460, strong ? 9 : 6);
+    if (strong) this.ring(x, y, 0xffffff, 10, 120, 420, 4);
+  }
+
   /** Sparks and rings for a party member levelling up on the result panel. */
   levelUp(x: number, y: number): void {
     this.burst('gold', x, y, 34);

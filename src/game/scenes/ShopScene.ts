@@ -13,13 +13,14 @@ import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { openConfirm } from '../ui/Dialogs';
 import { openDocument } from '../ui/DocumentViewer';
 import { formatDateTime, formatRemaining } from '../ui/format';
-import { openModal } from '../ui/Modal';
+import { showRewardModal } from '../ui/RewardModal';
+import { tilesForGoods } from '../ui/RewardTiles';
 import { createPanel } from '../ui/Panel';
 import { addGoodIcon, GOOD_COLOR, GOOD_LABEL } from '../ui/RewardIcon';
 import { askBuyPremium, buildPremiumActionCard, buildPremiumBenefitsCard, buildPremiumPackCard, claimPremiumDaily } from '../ui/PremiumPanels';
 import { CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { buildTabStrip } from '../ui/TabStrip';
-import { body, caption, heading, CHROME } from '../ui/theme';
+import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
 
@@ -194,9 +195,11 @@ export class ShopScene extends InboxScene {
   }
 
   private claimPremiumDaily(): void {
-    if (!claimPremiumDaily(this, this.save)) return;
+    this.modal?.close();
+    const handle = claimPremiumDaily(this, this.scroll, this.save, () => this.queueRender());
+    if (!handle) return;
+    this.modal = handle;
     this.refreshResources();
-    this.queueRender();
   }
 
   private shell(height: number, highlight = false): InboxCard {
@@ -456,33 +459,9 @@ export class ShopScene extends InboxScene {
       });
   }
 
-  /** A single good is a toast; a bundle gets a receipt popup listing everything. */
+  /** What a purchase handed over, shown as a popup with a 確認 button. */
   private announce(product: ShopProduct, goods: Good[]): void {
-    if (goods.length === 1) {
-      const good = goods[0];
-      const verb = good.type === 'stamina' ? '回復しました' : '手に入れました';
-      showToast(this, `${GOOD_LABEL[good.type]} ×${good.amount.toLocaleString('ja-JP')} を${verb}`);
-      return;
-    }
     this.modal?.close();
-    const handle = openModal(this, this.scroll, 0.75, false);
-    const modal = handle.container;
-    const w = 580;
-    const rowH = 78;
-    const h = 250 + goods.length * rowH;
-    const cy = 600;
-    const top = cy - h / 2;
-    modal.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false }));
-    modal.add(this.add.zone(360, cy, w, h).setInteractive());
-    modal.add(heading(this, 360, top + 50, '購入完了', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    modal.add(caption(this, 360, top + 94, product.name, { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
-    goods.forEach((good, i) => {
-      const y = top + 150 + i * rowH + rowH / 2;
-      modal.add(addGoodIcon(this, good.type, 360 - w / 2 + 70, y, 56));
-      modal.add(body(this, 360 - w / 2 + 120, y, GOOD_LABEL[good.type], { fontSize: '24px', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      modal.add(body(this, 360 + w / 2 - 50, y, `×${good.amount.toLocaleString('ja-JP')}`, { fontSize: '28px', fontStyle: 'bold', color: GOOD_COLOR[good.type], stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
-    });
-    modal.add(new Button(this, 360, top + h - 56, 240, 68, 'OK', () => handle.close(), { variant: 'gold', fontSize: '30px' }));
-    this.modal = handle;
+    this.modal = showRewardModal(this, this.scroll, { title: '購入完了', note: product.name, tiles: tilesForGoods(goods) });
   }
 }

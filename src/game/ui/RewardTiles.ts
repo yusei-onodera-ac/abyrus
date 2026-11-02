@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { DEFAULT_GLYPH, getEquipDef, type EquipGlyph } from '../data/equipment';
-import { ITEMS, type ItemId } from '../data/items';
+import { isItemId, ITEMS, type ItemId } from '../data/items';
+import type { GoodType } from '../data/shop';
 import type { Reward } from '../data/rewards';
 import type { GrantedReward } from '../systems/RewardSystem';
 import type { EquipmentItem, Rarity } from '../types';
@@ -137,4 +138,27 @@ export function buildRewardTiles(scene: Phaser.Scene, tiles: RewardTile[], cx: n
   const { container } = buildRewardGrid(scene, tiles, TILE_W * PER_ROW + GAP * (PER_ROW - 1));
   container.setPosition(cx - (TILE_W * PER_ROW + GAP * (PER_ROW - 1)) / 2, cy - TILE_H / 2);
   return container;
+}
+
+/** The tiles for what a shop product (or anything else described as goods) hands over. */
+export function tilesForGoods(goods: { type: GoodType; amount: number }[]): RewardTile[] {
+  return goods.map((g): RewardTile => {
+    const amount = `+${g.amount.toLocaleString('ja-JP')}`;
+    if (isItemId(g.type)) return { kind: 'item', item: g.type, amount };
+    if (g.type === 'skillEssence') return { kind: 'essence', amount };
+    return { kind: g.type, amount };
+  });
+}
+
+/** The tiles for 放置報酬 that was just claimed: what it came to, and the equipment that dropped. */
+export function tilesForIdleClaim(
+  p: { gold: { toString(): string }; skillEssence: number; items: { item: ItemId; amount: number }[]; phaseMaterials: number },
+  equipment: EquipmentItem[],
+): RewardTile[] {
+  const tiles: RewardTile[] = [{ kind: 'gold', amount: `+${p.gold.toString()}` }];
+  if (p.skillEssence > 0) tiles.push({ kind: 'essence', amount: `+${p.skillEssence.toLocaleString('ja-JP')}` });
+  for (const { item, amount } of p.items) tiles.push({ kind: 'item', item, amount: `+${amount.toLocaleString('ja-JP')}` });
+  if (p.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${p.phaseMaterials}` });
+  tiles.push(...tilesForEquipment(equipment));
+  return tiles;
 }

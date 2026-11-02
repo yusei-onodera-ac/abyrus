@@ -1,5 +1,4 @@
 import { BigNumber } from './BigNumber';
-import { DUPLICATE_GOLD_REWARD } from './GachaSystem';
 import { createHeroInstance } from '../data/heroes';
 import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emptyDeck } from './DeckSystem';
 import { REGION_COUNT } from '../data/regions';
@@ -225,11 +224,9 @@ export interface InfiniteModeRunResult {
 
 export interface HeroPullOutcome {
   hero: HeroData;
-  /** 'new': first of this character. 'copy': a repeat, kept in the roster as
-   *  material for 合成. 'gold': a repeat nothing could use any more (the owned
-   *  copies already reach MAX_PHASE), paid out as `duplicateGold` instead. */
-  kind: 'new' | 'copy' | 'gold';
-  duplicateGold: BigNumber;
+  /** 'new': first of this character. 'copy': a repeat - which is added to the roster like
+   *  any other (every pull is kept). */
+  kind: 'new' | 'copy';
 }
 
 const STORAGE_KEY = 'abyrus_save_v1';
@@ -531,24 +528,12 @@ export const SaveSystem = {
     return true;
   },
 
-  /** Adds a newly pulled hero. A repeat of an owned character is kept as its
-   *  own copy, to be fused (fuseHero) into another copy for +1 phase - unless
-   *  the copies held already cover what's left to MAX_PHASE, in which case it
-   *  pays gold instead of piling up in the roster. */
+  /** Adds a newly pulled hero. A repeat of an owned character is added too, as its own copy
+   *  (the 強化 screen can fuse copies, but a pull never turns one into anything else). */
   addHero(data: SaveData, hero: HeroData): HeroPullOutcome {
-    const copies = this.getCopies(data, hero);
-    if (copies.length === 0) {
-      data.heroes.push(hero);
-      return { hero, kind: 'new', duplicateGold: BigNumber.ZERO };
-    }
-    const bestPhase = Math.max(...copies.map((c) => c.phase));
-    if (bestPhase + (copies.length - 1) < MAX_PHASE) {
-      data.heroes.push(hero);
-      return { hero, kind: 'copy', duplicateGold: BigNumber.ZERO };
-    }
-    const duplicateGold = BigNumber.from(DUPLICATE_GOLD_REWARD[hero.rarity]);
-    this.addGold(data, duplicateGold);
-    return { hero, kind: 'gold', duplicateGold };
+    const kind = this.getCopies(data, hero).length === 0 ? 'new' : 'copy';
+    data.heroes.push(hero);
+    return { hero, kind };
   },
 
   /** Every owned copy of the same character as `hero` (itself included). */

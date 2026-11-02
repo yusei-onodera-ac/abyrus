@@ -7,6 +7,7 @@ import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { ENEMY_ART_IDS } from '../data/regions';
 import { preloadEnemyArt } from '../characters/EnemyArt';
+import { preloadItemArt } from '../ui/ItemIcons';
 import { preloadPetArt } from '../ui/PetPortrait';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
@@ -48,6 +49,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image('currency_gem', '/assets/ui/gem.png');
     this.load.image('currency_stamina', '/assets/ui/stamina.png');
     preloadEnemyArt(this, ENEMY_ART_IDS);
+    preloadItemArt(this);
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);
