@@ -87,6 +87,7 @@ export const REGIONS: RegionDef[] = [
     ],
     bossName: '紅角の大鹿・ガルムード',
     bossClass: 'tank',
+    bossArt: 'garumudo',
     look: { skyTop: 0x0f2418, skyBottom: 0x2f5230, motif: 'pine', motifDark: 0x16361f, motifLight: 0x3f8043, battleTint: 0xffffff },
   },
   {
@@ -104,6 +105,7 @@ export const REGIONS: RegionDef[] = [
     ],
     bossName: '砂塵の女王蠍・アラクネア',
     bossClass: 'archer',
+    bossArt: 'arachnea',
     look: { skyTop: 0x3a2410, skyBottom: 0x8f5d28, motif: 'dune', motifDark: 0x5c3a18, motifLight: 0xd09a45, battleTint: 0xf0b878 },
   },
   {
@@ -120,6 +122,7 @@ export const REGIONS: RegionDef[] = [
     ],
     bossName: '白銀の山王虎・コンゴウ',
     bossClass: 'warrior',
+    bossArt: 'kongo',
     look: { skyTop: 0x10283a, skyBottom: 0x4f819c, motif: 'peak', motifDark: 0x2a4a62, motifLight: 0xd4ecf8, battleTint: 0x9fd4f0 },
   },
   {
@@ -137,6 +140,7 @@ export const REGIONS: RegionDef[] = [
     ],
     bossName: '古骨の竜・ネクロドラコ',
     bossClass: 'mage',
+    bossArt: 'necrodraco',
     look: { skyTop: 0x1c1030, skyBottom: 0x4c3375, motif: 'pillar', motifDark: 0x2a1a44, motifLight: 0x9a5fe0, battleTint: 0xb090e0 },
   },
   {
