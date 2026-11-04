@@ -39,6 +39,24 @@ export function ensureTexture(scene: Phaser.Scene, key: string, size: number, dr
   return key;
 }
 
+/** Texture-key prefix of the 素材 pictures BootScene loads (see ItemIcons.preloadItemArt). */
+export const ITEM_ART_PREFIX = 'item_art_';
+
+/** The supplied picture loaded as `source`, shrunk to a `size` square under `key` (drawn once per size,
+ *  smoothly: a straight scale-down of a big picture would shimmer), or null when it was not loaded. */
+export function scaledArt(scene: Phaser.Scene, source: string, key: string, size: number): string | null {
+  if (!scene.textures.exists(source)) return null;
+  if (scene.textures.exists(key)) return key;
+  const canvas = scene.textures.createCanvas(key, size, size);
+  const ctx = canvas?.getContext();
+  if (!canvas || !ctx) return null;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(scene.textures.get(source).getSourceImage() as CanvasImageSource, 0, 0, size, size);
+  canvas.refresh();
+  return key;
+}
+
 /** Coin icon for gold: a stamped medallion with a glint highlight. */
 export function coinIcon(scene: Phaser.Scene, size = 28): string {
   return ensureTexture(scene, `${ICON_COIN}_${size}`, size, (g, c) => {
@@ -460,8 +478,11 @@ export function settingsIcon(scene: Phaser.Scene, size = 72): string {
   });
 }
 
-/** フェーズ素材: a violet crystal shard, in the gem's family but not its colour. */
+/** フェーズ素材: its supplied picture (public/assets/items/phase_material.png) if there is one, else a violet
+ *  crystal shard, in the gem's family but not its colour. */
 export function phaseMaterialIcon(scene: Phaser.Scene, size = 28): string {
+  const art = scaledArt(scene, `${ITEM_ART_PREFIX}phase_material`, `icon_item_art_phase_material_${size}`, size);
+  if (art) return art;
   return ensureTexture(scene, `${ICON_PHASE_MATERIAL}_${size}`, size, (g, c) => {
     const top = c * 0.1;
     const bottom = size - c * 0.1;

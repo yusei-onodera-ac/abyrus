@@ -27,8 +27,8 @@ export interface RewardTile {
   tag?: string;
   /** For kind 'item'. */
   item?: ItemId;
-  /** For kind 'equipment': the piece's slot, rarity and name. */
-  equip?: { glyph: EquipGlyph; rarity: Rarity; name: string };
+  /** For kind 'equipment': the piece's slot, rarity and name - and its id, unless only the rarity is known (then its shape is drawn). */
+  equip?: { glyph: EquipGlyph; rarity: Rarity; name: string; id?: string };
 }
 
 /** EXP and 技素 have no illustration of their own: a brass-ringed disc with a kanji. */
@@ -43,7 +43,7 @@ export function tilesForEquipment(pieces: EquipmentItem[]): RewardTile[] {
   const tiles: RewardTile[] = [];
   for (const piece of pieces) {
     const def = getEquipDef(piece.defId);
-    if (def) tiles.push({ kind: 'equipment', amount: '★'.repeat(def.rarity), equip: { glyph: def.glyph, rarity: def.rarity, name: def.name } });
+    if (def) tiles.push({ kind: 'equipment', amount: '★'.repeat(def.rarity), equip: { glyph: def.glyph, rarity: def.rarity, name: def.name, id: def.id } });
   }
   return tiles;
 }
@@ -85,7 +85,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
     return ITEMS[tile.item].short;
   }
   if (tile.kind === 'equipment' && tile.equip) {
-    container.add(scene.add.image(x, y, equipIcon(scene, tile.equip.glyph, tile.equip.rarity, size)));
+    container.add(scene.add.image(x, y, equipIcon(scene, tile.equip.glyph, tile.equip.rarity, size, tile.equip.id)));
     return tile.equip.name;
   }
   const good = tile.kind as 'gems' | 'gold' | 'stamina' | 'phaseMaterials';

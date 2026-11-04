@@ -6,7 +6,7 @@ import { FERAL_PREFIXES, REGIONS } from '../game/data/regions';
 import { formatSkillEffectSummary, getHeroSkillLoadout, MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL } from '../game/data/skills';
 import { ENEMY_CLASSES, ProgressionSystem, STAGES_PER_REGION } from '../game/systems/ProgressionSystem';
 import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, type HeroClass, type Rarity } from '../game/types';
-import { equipIcon, itemIcon, preloadItemArt, skillEssenceIcon } from '../game/ui/ItemIcons';
+import { equipIcon, itemIcon, preloadEquipArt, preloadItemArt, skillEssenceIcon } from '../game/ui/ItemIcons';
 import { phaseMaterialIcon } from '../game/ui/Icons';
 
 /**
@@ -99,7 +99,7 @@ function equipmentSection(icon: Icons): string {
     const max = EQUIP_MAX_LEVEL[def.rarity];
     return (
       `<tr ${attr(`${def.id} ${def.name} ${SLOT_LABEL[def.slot]} ${def.glyph}`, def.rarity)}>` +
-      `<td class="icon"><img src="${icon(`equip:${def.glyph}:${def.rarity}`, 64)}" /></td>` +
+      `<td class="icon"><img src="${icon(`equip:${def.glyph}:${def.rarity}:${def.id}`, 64)}" /></td>` +
       `<td><b>${esc(def.name)}</b><br><code>${def.id}</code></td><td>${SLOT_LABEL[def.slot]}</td><td>${stars(def.rarity)}</td>` +
       `<td>${esc(fmt(def, 1))}</td><td>${esc(fmt(def, max))}</td><td class="num">${max}</td></tr>`
     );
@@ -139,7 +139,7 @@ function itemsSection(icon: Icons): string {
     .join('');
   return (
     `<section id="items"><h2>アイテム・通貨</h2>` +
-    `<p class="note">経験値素材の絵は <code>public/assets/items/&lt;ID&gt;.png</code>（なければ、ゲーム内で描いた瓶）です。</p>` +
+    `<p class="note">素材の絵は <code>public/assets/items/&lt;ID&gt;.png</code>（技素は skill_essence、フェーズ素材は phase_material。なければ、ゲーム内で描いたアイコン）です。</p>` +
     `<table><thead><tr><th>見た目</th><th>名前 / ID</th><th>説明</th><th>経験値</th></tr></thead><tbody>${itemRows}${goodRows}</tbody></table></section>`
   );
 }
@@ -154,6 +154,7 @@ class CatalogScene extends Phaser.Scene {
   preload(): void {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {});
     preloadItemArt(this);
+    preloadEquipArt(this);
   }
 
   create(): void {
@@ -163,9 +164,9 @@ class CatalogScene extends Phaser.Scene {
       const id = `${key}@${size}`;
       let url = cache.get(id);
       if (!url) {
-        const [kind, a, b] = key.split(':');
+        const [kind, a, b, c] = key.split(':');
         let textureKey: string;
-        if (kind === 'equip') textureKey = equipIcon(this, a as EquipDef['glyph'], Number(b) as Rarity, size);
+        if (kind === 'equip') textureKey = equipIcon(this, a as EquipDef['glyph'], Number(b) as Rarity, size, c);
         else if (kind === 'item') textureKey = itemIcon(this, a as ItemId, size);
         else if (a === 'phase') textureKey = phaseMaterialIcon(this, size);
         else textureKey = skillEssenceIcon(this, size);

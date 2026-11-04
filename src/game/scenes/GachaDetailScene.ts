@@ -158,7 +158,7 @@ export class GachaDetailScene extends InboxScene {
     pieces.forEach((def, i) => {
       const x = PAD + SLOT / 2 + (i % COLS) * (SLOT + gapX);
       const top = 70 + Math.floor(i / COLS) * ROW_H;
-      container.add(this.add.image(x, top + SLOT / 2 - 6, equipIcon(this, def.glyph, def.rarity, 84)));
+      container.add(this.add.image(x, top + SLOT / 2 - 6, equipIcon(this, def.glyph, def.rarity, 84, def.id)));
       container.add(caption(this, x, top + SLOT - 4, describeEquip({ id: 'x', defId: def.id, level: 1 }), { fontSize: '14px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
       this.addTileText(container, x, top + SLOT, def.name, percent(each));
     });

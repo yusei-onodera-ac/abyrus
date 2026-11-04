@@ -1,8 +1,8 @@
 import Phaser from 'phaser';
 import { ITEMS, type ItemId } from '../data/items';
-import type { EquipGlyph } from '../data/equipment';
+import { EQUIP_DEFS, type EquipGlyph } from '../data/equipment';
 import { RARITY_COLORS, type Rarity } from '../types';
-import { CORNER_BADGE_FILL, CORNER_BADGE_RING, CORNER_GLYPH, drawNavBadge, ensureTexture } from './Icons';
+import { CORNER_BADGE_FILL, CORNER_BADGE_RING, CORNER_GLYPH, ITEM_ART_PREFIX, drawNavBadge, ensureTexture, scaledArt } from './Icons';
 
 /** Code-drawn icons for 素材, equipment and the home screen's new corner buttons. */
 
@@ -14,28 +14,17 @@ const POTION: Record<'exp_s' | 'exp_m' | 'exp_l' | 'exp_xl', { body: number; liq
 };
 
 /** 素材 pictures: `public/assets/items/<item id>.png` (exp_s, exp_m, exp_l, exp_xl, equip_essence), each a
- *  square with a transparent background. An item without one - or whose file is missing - keeps its drawn icon. */
-const ART_PREFIX = 'item_art_';
+ *  square with a transparent background. An item without one - or whose file is missing - keeps its drawn icon.
+ *  技素 and フェーズ素材 are not in ITEMS (the save keeps them in fields of their own), so their pictures are named here. */
+const SAVE_MATERIAL_ART = ['skill_essence', 'phase_material'];
 
 export function preloadItemArt(scene: Phaser.Scene): void {
-  for (const id of Object.keys(ITEMS)) scene.load.image(`${ART_PREFIX}${id}`, `/assets/items/${id}.png`);
+  for (const id of [...Object.keys(ITEMS), ...SAVE_MATERIAL_ART]) scene.load.image(`${ITEM_ART_PREFIX}${id}`, `/assets/items/${id}.png`);
 }
 
-/** The supplied picture of `item`, shrunk to `size` (drawn once per size, smoothly: a straight
- *  scale-down of a big picture would shimmer), or null when there is none. */
+/** The supplied picture of `item`, shrunk to `size`, or null when there is none. */
 function itemArt(scene: Phaser.Scene, item: ItemId, size: number): string | null {
-  const source = `${ART_PREFIX}${item}`;
-  if (!scene.textures.exists(source)) return null;
-  const key = `icon_item_art_${item}_${size}`;
-  if (scene.textures.exists(key)) return key;
-  const canvas = scene.textures.createCanvas(key, size, size);
-  const ctx = canvas?.getContext();
-  if (!canvas || !ctx) return null;
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(scene.textures.get(source).getSourceImage() as CanvasImageSource, 0, 0, size, size);
-  canvas.refresh();
-  return key;
+  return scaledArt(scene, `${ITEM_ART_PREFIX}${item}`, `icon_item_art_${item}_${size}`, size);
 }
 
 /** A 素材: its supplied picture if there is one, else a potion bottle for each 経験値素材 (bigger tiers fuller and
@@ -84,8 +73,11 @@ export function itemIcon(scene: Phaser.Scene, item: ItemId, size = 56): string {
   });
 }
 
-/** 技素: a green orb with a four-pointed spark. */
+/** 技素: its supplied picture (public/assets/items/skill_essence.png) if there is one, else a green orb with a
+ *  four-pointed spark. */
 export function skillEssenceIcon(scene: Phaser.Scene, size = 56): string {
+  const art = scaledArt(scene, `${ITEM_ART_PREFIX}skill_essence`, `icon_item_art_skill_essence_${size}`, size);
+  if (art) return art;
   return ensureTexture(scene, `icon_skill_essence_${size}`, size, (g, c) => {
     g.fillStyle(0x000000, 0.3);
     g.fillEllipse(c, c * 1.86, c * 1.0, c * 0.18);
@@ -107,8 +99,52 @@ export function skillEssenceIcon(scene: Phaser.Scene, size = 56): string {
   });
 }
 
-/** An equipment piece's shape on a disc ringed in its rarity colour. */
-export function equipIcon(scene: Phaser.Scene, glyph: EquipGlyph, rarity: Rarity, size = 64): string {
+/** Equipment pictures: `public/assets/equipment/<piece id>.png` (weapon-1-0, ... - the ids of data/equipment.ts), the
+ *  piece alone on a transparent background. One without a picture - or whose file is missing - keeps its drawn shape. */
+const EQUIP_ART_PREFIX = 'equip_art_';
+
+/** How much of the disc's inner width the picture spans (the pieces lie on a diagonal, so the tips stay inside the ring). */
+const EQUIP_ART_FILL = 0.9;
+
+export function preloadEquipArt(scene: Phaser.Scene): void {
+  for (const def of EQUIP_DEFS) scene.load.image(`${EQUIP_ART_PREFIX}${def.id}`, `/assets/equipment/${def.id}.png`);
+}
+
+/** The piece's picture on the same disc ringed in its rarity colour that the drawn shapes sit on, or null when it has none. */
+function equipArtIcon(scene: Phaser.Scene, defId: string, rarity: Rarity, size: number): string | null {
+  const source = `${EQUIP_ART_PREFIX}${defId}`;
+  if (!scene.textures.exists(source)) return null;
+  const key = `icon_equip_art_${defId}_${size}`;
+  if (scene.textures.exists(key)) return key;
+  const canvas = scene.textures.createCanvas(key, size, size);
+  const ctx = canvas?.getContext();
+  if (!canvas || !ctx) return null;
+  const c = size / 2;
+  const ring = `#${RARITY_COLORS[rarity].toString(16).padStart(6, '0')}`;
+  const disc = (r: number, fill: string, alpha: number, dy = 0): void => {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.arc(c, c + dy, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  disc(c - 1, '#000000', 0.35, 2);
+  disc(c - 1, ring, 1);
+  disc(c - 4, '#1a1209', 1);
+  disc(c - 4, ring, 0.3); // a little lighter than behind the drawn shapes: the pieces are dark and thin
+  ctx.globalAlpha = 1;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const side = (c - 4) * 2 * EQUIP_ART_FILL;
+  ctx.drawImage(scene.textures.get(source).getSourceImage() as CanvasImageSource, c - side / 2, c - side / 2, side, side);
+  canvas.refresh();
+  return key;
+}
+
+/** An equipment piece on a disc ringed in its rarity colour: its picture if `defId` names a piece that has one, else its shape. */
+export function equipIcon(scene: Phaser.Scene, glyph: EquipGlyph, rarity: Rarity, size = 64, defId?: string): string {
+  const art = defId ? equipArtIcon(scene, defId, rarity, size) : null;
+  if (art) return art;
   return ensureTexture(scene, `icon_equip_${glyph}_${rarity}_${size}`, size, (g, c) => {
     const ring = RARITY_COLORS[rarity];
     g.fillStyle(0x000000, 0.35);

@@ -317,7 +317,7 @@ export class RosterScene extends Phaser.Scene {
       const item = hero.gear[slot];
       const def = item ? getEquipDef(item.defId) : undefined;
       if (def) {
-        strip.add(this.add.image(x, 0, equipIcon(this, def.glyph, def.rarity, icon)));
+        strip.add(this.add.image(x, 0, equipIcon(this, def.glyph, def.rarity, icon, def.id)));
       } else {
         const g = this.add.graphics();
         g.fillStyle(0x0d0905, 0.8);
@@ -361,7 +361,7 @@ export class RosterScene extends Phaser.Scene {
       const item = hero.gear[slot];
       const def = item ? getEquipDef(item.defId) : undefined;
       if (item && def) {
-        modal.add(this.add.image(left + 56, y, equipIcon(this, def.glyph, def.rarity, 76)));
+        modal.add(this.add.image(left + 56, y, equipIcon(this, def.glyph, def.rarity, 76, def.id)));
         const name = body(this, left + 112, y - 28, def.name, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
         if (name.width > 280) name.setScale(280 / name.width);
         modal.add(name);
