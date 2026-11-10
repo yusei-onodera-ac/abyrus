@@ -44,3 +44,22 @@ export function formatSurvival(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds));
   return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
 }
+
+/** How long a piece of work takes: "5分", "2時間", "1時間30分", "1日". */
+export function formatSpan(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  if (minutes >= 60 * 24) return `${Math.round(minutes / (60 * 24))}日`;
+  if (minutes >= 60) {
+    const rest = minutes % 60;
+    return rest === 0 ? `${minutes / 60}時間` : `${Math.floor(minutes / 60)}時間${rest}分`;
+  }
+  return `${minutes}分`;
+}
+
+/** Like formatSpan but down to the second for short spans: "45秒", "1分15秒", "2分"; from an hour up it is formatSpan's. */
+export function formatSpanExact(seconds: number): string {
+  const s = Math.max(1, Math.round(seconds));
+  if (s >= 3600) return formatSpan(s);
+  if (s < 60) return `${s}秒`;
+  return s % 60 === 0 ? `${s / 60}分` : `${Math.floor(s / 60)}分${s % 60}秒`;
+}

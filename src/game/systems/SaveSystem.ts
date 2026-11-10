@@ -4,7 +4,10 @@ import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emp
 import { REGION_COUNT } from '../data/regions';
 import { EQUIP_SLOTS, MAX_LEVEL, MAX_PHASE, emptyGear, type EquipmentItem, type HeroData, type HeroGear, type Row } from '../types';
 import { getEquipDef } from '../data/equipment';
+import { EXPEDITION_SLOTS, getExpedition } from '../data/expeditions';
+import { EXTRA_BUILDER_GEMS, RAID_INTERVAL_HOURS, VILLAGE_COLS, VILLAGE_MATERIALS, VILLAGE_ROWS, VILLAGE_START, VILLAGE_START_MATERIALS, WANDERERS, getBuilding, isBuildingKind, type BuildingKind, type MaterialBundle, type VillageMaterial, type WandererKind } from '../data/village';
 import { isItemId, type ItemId } from '../data/items';
+import { getSupplySlot } from '../data/supply';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
@@ -117,6 +120,88 @@ export interface ShopState {
   purchases: Record<string, { period: string; count: number }>;
 }
 
+/** An expedition under way (data/expeditions.ts): which one, who is away on it, when they left, and
+ *  what its rewards are multiplied by (settled when they left, from who was sent). */
+export interface ExpeditionRun {
+  id: string;
+  heroIds: string[];
+  startedAt: number;
+  bonus: number;
+}
+
+/** A building in the village (data/village.ts): where its top-left tile is, the level it has reached, and
+ *  the work under way on it - building it (`level` 0), raising it one level, or moving it (`move`: it is taken
+ *  down for `demolish` seconds where it stands, then put up again at (toX, toY) for `rebuild` seconds). It counts
+ *  at the new level / place once the time has run, even if the village has not been opened since (see VillageIncome). */
+export interface PlacedBuilding {
+  id: string;
+  kind: BuildingKind;
+  x: number;
+  y: number;
+  level: number;
+  upgrade?: { startedAt: number; seconds: number };
+  move?: { startedAt: number; demolish: number; rebuild: number; toX: number; toY: number };
+  /** Broken by a 襲撃 that got through: it does nothing until it is repaired (VillageSystem.repair). */
+  damaged?: boolean;
+}
+
+/** A 行商人 or 宝箱 standing on the map (top-left tile x, y) until `expiresAt`, holding this much. */
+export interface Wanderer {
+  id: string;
+  kind: WandererKind;
+  x: number;
+  y: number;
+  expiresAt: number;
+  materials: MaterialBundle;
+  /** Hours of the 放置報酬 gold it holds too. */
+  goldHours: number;
+}
+
+/** A 襲撃 waiting to be answered: when it came, when it gives up waiting, how strong it is (and the region that sets it). */
+export interface PendingRaid {
+  arrivedAt: number;
+  expiresAt: number;
+  power: number;
+  region: number;
+}
+
+/** What happened to a 襲撃 nobody answered (shown once, the next time the village is opened). */
+export interface RaidReport {
+  at: number;
+  outcome: 'repelled' | 'damaged';
+  /** The names of the buildings that were broken. */
+  damaged: string[];
+}
+
+export interface VillageRaid {
+  /** When the next one comes (while none is waiting). */
+  nextAt: number;
+  pending: PendingRaid | null;
+  report: RaidReport | null;
+  /** How many have been beaten in battle. */
+  won: number;
+}
+
+/** Today's 村の依頼: how far each chore has got and which have been collected. `day` is the period key it belongs to. */
+export interface VillageQuestState {
+  day: string;
+  counts: Record<string, number>;
+  claimed: string[];
+}
+
+export interface VillageState {
+  buildings: PlacedBuilding[];
+  /** Next number for a new building's id. */
+  nextId: number;
+  /** 木材 / 鉄 / 石 in hand (data/village.ts). Only the village shows them. */
+  materials: Record<VillageMaterial, number>;
+  /** Builders bought with 魔晶石, on top of what the 城 gives. */
+  extraBuilders: number;
+  quests: VillageQuestState;
+  wanderers: { lastSpawnAt: number; items: Wanderer[] };
+  raid: VillageRaid;
+}
+
 export interface SaveData {
   version: number;
   gold: [number, number];
@@ -211,8 +296,15 @@ export interface SaveData {
   premium: { expiresAt: number; dailyDay: string };
   /** ログインボーナス of the month in `month` ("2026-10"): the day numbers already claimed. */
   loginBonus: { month: string; claimed: number[] };
+  /** 朝夕の補給 (data/supply.ts): the local day ("2026-11-10") the record is for, the slots taken that day and whether that
+   *  day's both-slots bonus was paid. A record of an earlier day counts as nothing taken. */
+  supply: { day: string; claimed: string[]; bonus: boolean };
   /** 放置報酬: epoch ms it has been piling up from, and today's count of ads watched to speed it. */
   idle: { lastClaimAt: number; adDay: string; adCount: number };
+  /** 遠征: one entry per slot (EXPEDITION_SLOTS), null where nothing is out. */
+  expeditions: { slots: (ExpeditionRun | null)[] };
+  /** 村: the buildings standing in it. */
+  village: VillageState;
 }
 
 export interface InfiniteModeRunResult {
@@ -304,12 +396,183 @@ function restoreInventory(merged: SaveData, parsed: Partial<SaveData>): void {
     month: typeof login?.month === 'string' ? login.month : '',
     claimed: Array.isArray(login?.claimed) ? login.claimed.filter((d): d is number => Number.isInteger(d)) : [],
   };
+  const supply = parsed.supply;
+  merged.supply = {
+    day: typeof supply?.day === 'string' ? supply.day : '',
+    claimed: Array.isArray(supply?.claimed) ? [...new Set(supply.claimed.filter((id): id is string => typeof id === 'string' && !!getSupplySlot(id)))] : [],
+    bonus: supply?.bonus === true,
+  };
   const idle = parsed.idle;
   merged.idle = {
     lastClaimAt: typeof idle?.lastClaimAt === 'number' && Number.isFinite(idle.lastClaimAt) ? idle.lastClaimAt : Date.now(),
     adDay: typeof idle?.adDay === 'string' ? idle.adDay : '',
     adCount: typeof idle?.adCount === 'number' ? Math.max(0, Math.floor(idle.adCount)) : 0,
   };
+  merged.expeditions = restoreExpeditions(parsed.expeditions);
+  merged.village = restoreVillage(parsed.village);
+}
+
+/** A new village (also what a save from before 村 existed is given): the 城 and one 店. */
+function defaultVillage(now = Date.now()): VillageState {
+  return {
+    buildings: VILLAGE_START.map((s, i) => ({ id: `b${i + 1}`, kind: s.kind, x: s.x, y: s.y, level: s.level })),
+    nextId: VILLAGE_START.length + 1,
+    materials: { ...VILLAGE_START_MATERIALS },
+    extraBuilders: 0,
+    quests: { day: '', counts: {}, claimed: [] },
+    wanderers: { lastSpawnAt: now, items: [] },
+    raid: { nextAt: now + RAID_INTERVAL_HOURS * 3600 * 1000, pending: null, report: null, won: 0 },
+  };
+}
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+/** The saved 行商人 / 宝箱: the ones that are malformed are dropped, positions are pulled onto the map. */
+function restoreWanderers(raw: Partial<VillageState['wanderers']> | undefined, now: number): VillageState['wanderers'] {
+  const items: Wanderer[] = [];
+  const seen = new Set<string>();
+  for (const w of Array.isArray(raw?.items) ? (raw.items as Partial<Wanderer>[]) : []) {
+    if (!w || typeof w.id !== 'string' || !w.id || seen.has(w.id) || (w.kind !== 'chest' && w.kind !== 'merchant') || !WANDERERS[w.kind]) continue;
+    if (!finiteNumber(w.x) || !finiteNumber(w.y) || !finiteNumber(w.expiresAt)) continue;
+    const materials: MaterialBundle = {};
+    for (const { id } of VILLAGE_MATERIALS) {
+      const amount = (w.materials as MaterialBundle | undefined)?.[id];
+      if (finiteNumber(amount) && amount > 0) materials[id] = Math.floor(amount);
+    }
+    seen.add(w.id);
+    items.push({
+      id: w.id,
+      kind: w.kind,
+      x: Math.max(0, Math.min(VILLAGE_COLS - 1, Math.floor(w.x))),
+      y: Math.max(0, Math.min(VILLAGE_ROWS - 1, Math.floor(w.y))),
+      expiresAt: w.expiresAt,
+      materials,
+      goldHours: finiteNumber(w.goldHours) ? Math.max(0, w.goldHours) : 0,
+    });
+  }
+  return { lastSpawnAt: finiteNumber(raw?.lastSpawnAt) ? raw.lastSpawnAt : now, items };
+}
+
+/** The saved 襲撃 state: a pending one that is malformed is dropped, and a missing clock starts a fresh interval. */
+function restoreRaid(raw: Partial<VillageRaid> | undefined, now: number): VillageRaid {
+  const p = raw?.pending as Partial<PendingRaid> | null | undefined;
+  const pending =
+    p && finiteNumber(p.arrivedAt) && finiteNumber(p.expiresAt) && finiteNumber(p.power) && finiteNumber(p.region)
+      ? { arrivedAt: p.arrivedAt, expiresAt: p.expiresAt, power: Math.max(0, p.power), region: Math.max(0, Math.floor(p.region)) }
+      : null;
+  const r = raw?.report as Partial<RaidReport> | null | undefined;
+  const report: RaidReport | null =
+    r && finiteNumber(r.at) && (r.outcome === 'repelled' || r.outcome === 'damaged')
+      ? { at: r.at, outcome: r.outcome, damaged: Array.isArray(r.damaged) ? r.damaged.filter((n): n is string => typeof n === 'string') : [] }
+      : null;
+  return {
+    nextAt: finiteNumber(raw?.nextAt) ? raw.nextAt : now + RAID_INTERVAL_HOURS * 3600 * 1000,
+    pending,
+    report,
+    won: finiteNumber(raw?.won) ? Math.max(0, Math.floor(raw.won)) : 0,
+  };
+}
+
+function restoreQuests(raw: Partial<VillageQuestState> | undefined): VillageQuestState {
+  const counts: Record<string, number> = {};
+  if (raw?.counts && typeof raw.counts === 'object') {
+    for (const [id, n] of Object.entries(raw.counts)) if (finiteNumber(n) && n > 0) counts[id] = Math.floor(n);
+  }
+  return {
+    day: typeof raw?.day === 'string' ? raw.day : '',
+    counts,
+    claimed: Array.isArray(raw?.claimed) ? raw.claimed.filter((id): id is string => typeof id === 'string') : [],
+  };
+}
+
+/** The most of one material that is kept (so the count stays an exact whole number). */
+const MATERIAL_CAP = Number.MAX_SAFE_INTEGER;
+
+/** The saved materials: whole numbers from 0; a save from before the village had materials is given the starting amounts. */
+function restoreMaterials(raw: Partial<Record<VillageMaterial, number>> | undefined): Record<VillageMaterial, number> {
+  const materials = { ...VILLAGE_START_MATERIALS };
+  if (!raw || typeof raw !== 'object') return materials;
+  for (const { id } of VILLAGE_MATERIALS) {
+    const value = raw[id];
+    if (typeof value === 'number' && Number.isFinite(value)) materials[id] = Math.max(0, Math.min(MATERIAL_CAP, Math.floor(value)));
+  }
+  return materials;
+}
+
+/** The saved village: buildings that are malformed or of a kind that no longer exists are dropped, positions are
+ *  pulled back onto the map, and a village without a 城 is replaced by a new one. Two buildings on the same tiles
+ *  are left as they are (a layout can only get that way by editing the map's size); moving one sorts it out. */
+function restoreVillage(raw: Partial<VillageState> | undefined): VillageState {
+  if (!raw || !Array.isArray(raw.buildings)) return defaultVillage();
+  const seen = new Set<string>();
+  const buildings: PlacedBuilding[] = [];
+  for (const item of raw.buildings as Partial<PlacedBuilding>[]) {
+    if (!item || typeof item.id !== 'string' || !item.id || seen.has(item.id) || !isBuildingKind(item.kind)) continue;
+    if (!Number.isFinite(item.x) || !Number.isFinite(item.y) || !Number.isFinite(item.level)) continue;
+    const def = getBuilding(item.kind);
+    const level = Math.max(0, Math.min(def.levels.length, Math.floor(item.level as number)));
+    const upgrade = item.upgrade;
+    const work =
+      upgrade && Number.isFinite(upgrade.startedAt) && Number.isFinite(upgrade.seconds) && upgrade.seconds > 0 && level < def.levels.length
+        ? { startedAt: upgrade.startedAt, seconds: Math.floor(upgrade.seconds) }
+        : undefined;
+    // A building with no level and no work under way would be an empty plot: it is not kept.
+    if (level === 0 && !work) continue;
+    // A move needs a finished building that can be moved, with no other work going on it.
+    const m = item.move;
+    const move =
+      m && !work && level > 0 && def.movable && [m.startedAt, m.demolish, m.rebuild, m.toX, m.toY].every((n) => typeof n === 'number' && Number.isFinite(n))
+        ? {
+            startedAt: m.startedAt,
+            demolish: Math.max(0, Math.floor(m.demolish)),
+            rebuild: Math.max(0, Math.floor(m.rebuild)),
+            toX: Math.max(0, Math.min(VILLAGE_COLS - def.w, Math.floor(m.toX))),
+            toY: Math.max(0, Math.min(VILLAGE_ROWS - def.h, Math.floor(m.toY))),
+          }
+        : undefined;
+    seen.add(item.id);
+    buildings.push({
+      id: item.id,
+      kind: item.kind,
+      x: Math.max(0, Math.min(VILLAGE_COLS - def.w, Math.floor(item.x as number))),
+      y: Math.max(0, Math.min(VILLAGE_ROWS - def.h, Math.floor(item.y as number))),
+      level,
+      ...(work ? { upgrade: work } : {}),
+      ...(move ? { move } : {}),
+      ...(item.damaged === true && level > 0 && item.kind !== 'castle' && !def.decor ? { damaged: true } : {}),
+    });
+  }
+  if (!buildings.some((b) => b.kind === 'castle')) return defaultVillage();
+  const highest = buildings.reduce((max, b) => Math.max(max, Number(b.id.replace(/^b/, '')) || 0), 0);
+  const nextId = typeof raw.nextId === 'number' && Number.isFinite(raw.nextId) ? Math.floor(raw.nextId) : 0;
+  const now = Date.now();
+  const extra = finiteNumber(raw.extraBuilders) ? Math.max(0, Math.min(EXTRA_BUILDER_GEMS.length, Math.floor(raw.extraBuilders))) : 0;
+  return {
+    buildings,
+    nextId: Math.max(nextId, highest + 1, 1),
+    materials: restoreMaterials(raw.materials),
+    extraBuilders: extra,
+    quests: restoreQuests(raw.quests),
+    wanderers: restoreWanderers(raw.wanderers, now),
+    raid: restoreRaid(raw.raid, now),
+  };
+}
+
+/** The saved expeditions under way: one entry per slot, dropping any that are malformed or whose
+ *  kind no longer exists (the heroes on it are simply free again). */
+function restoreExpeditions(raw: Partial<SaveData['expeditions']> | undefined): SaveData['expeditions'] {
+  const saved = Array.isArray(raw?.slots) ? raw.slots : [];
+  const slots = Array.from({ length: EXPEDITION_SLOTS }, (_, i): ExpeditionRun | null => {
+    const run = saved[i] as Partial<ExpeditionRun> | null | undefined;
+    if (!run || typeof run.id !== 'string' || !getExpedition(run.id)) return null;
+    if (typeof run.startedAt !== 'number' || !Number.isFinite(run.startedAt)) return null;
+    const heroIds = Array.isArray(run.heroIds) ? run.heroIds.filter((id): id is string => typeof id === 'string') : [];
+    const bonus = typeof run.bonus === 'number' && Number.isFinite(run.bonus) ? Math.max(1, Math.min(run.bonus, 5)) : 1;
+    return { id: run.id, heroIds, startedAt: run.startedAt, bonus };
+  });
+  return { slots };
 }
 
 /** Keeps a saved social state, filling in anything missing (an older save, or
@@ -378,7 +641,10 @@ export const SaveSystem = {
       equipment: [],
       premium: { expiresAt: 0, dailyDay: '' },
       loginBonus: { month: '', claimed: [] },
+      supply: { day: '', claimed: [], bonus: false },
       idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
+      expeditions: { slots: Array.from({ length: EXPEDITION_SLOTS }, () => null) },
+      village: defaultVillage(),
     };
   },
 
@@ -448,6 +714,31 @@ export const SaveSystem = {
 
   addGold(data: SaveData, amount: BigNumber): void {
     data.gold = this.getGold(data).add(amount).toJSON();
+  },
+
+  /** 木材 / 鉄 / 石 in hand. */
+  getMaterial(data: SaveData, id: VillageMaterial): number {
+    return data.village.materials[id] ?? 0;
+  },
+
+  /** Adds 素材 to the village's store (whole numbers; anything else is ignored). */
+  addMaterials(data: SaveData, bundle: MaterialBundle): void {
+    for (const { id } of VILLAGE_MATERIALS) {
+      const amount = Math.floor(bundle[id] ?? 0);
+      if (amount > 0) data.village.materials[id] = Math.min(MATERIAL_CAP, (data.village.materials[id] ?? 0) + amount);
+    }
+  },
+
+  /** The materials of `bundle` that there are not enough of in hand (none when it can be paid). */
+  missingMaterials(data: SaveData, bundle: MaterialBundle): VillageMaterial[] {
+    return VILLAGE_MATERIALS.filter(({ id }) => (bundle[id] ?? 0) > this.getMaterial(data, id)).map(({ id }) => id);
+  },
+
+  /** Pays `bundle` out of the store. False, with nothing taken, when any of it is short. */
+  spendMaterials(data: SaveData, bundle: MaterialBundle): boolean {
+    if (this.missingMaterials(data, bundle).length > 0) return false;
+    for (const { id } of VILLAGE_MATERIALS) data.village.materials[id] = this.getMaterial(data, id) - (bundle[id] ?? 0);
+    return true;
   },
 
   getItem(data: SaveData, id: ItemId): number {

@@ -6,7 +6,13 @@ import { TutorialSystem } from '../systems/TutorialSystem';
 import { showRewardModal } from '../ui/RewardModal';
 import { tilesForGranted, tilesForIdleClaim } from '../ui/RewardTiles';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
-import { clipboardIcon, hourglassIcon } from '../ui/ItemIcons';
+import { clipboardIcon, expeditionIcon, hourglassIcon, supplyIcon, villageIcon } from '../ui/ItemIcons';
+import { SUPPLY_SLOTS } from '../data/supply';
+import { SupplySystem } from '../systems/SupplySystem';
+import { openSupplyModal, supplyHours } from '../ui/SupplyModal';
+import { ExpeditionSystem } from '../systems/ExpeditionSystem';
+import { VillageSystem } from '../systems/VillageSystem';
+import { StaminaSystem } from '../systems/StaminaSystem';
 import { MissionSystem } from '../systems/MissionSystem';
 import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import { getMissionGroup } from '../data/missions';
@@ -80,6 +86,9 @@ export class HomeScene extends Phaser.Scene {
     this.buildNav();
     this.buildCornerButtons(save);
     this.buildBanners();
+    this.buildExpeditionBox(save);
+    this.buildVillageBox(save);
+    this.buildSupplyBox(save);
     this.buildIdleBox(save);
     this.buildMissionBox(save);
     this.buildMessageWidget(save);
@@ -261,6 +270,157 @@ export class HomeScene extends Phaser.Scene {
     SaveSystem.save(save);
     this.resourceBar.update(save);
     showRewardModal(this, { setEnabled: () => {} }, { title: 'ログインボーナス', tiles: tilesForGranted([granted]), note: `${LoginBonusSystem.dayOfMonth()}日目の報酬です` });
+  }
+
+  /** A small status box on the right of the promo banner: an icon, a label, a line of state and a smaller one under
+   *  it, a row of pips, and a red dot when something is waiting. `read` is asked now and every second after, so
+   *  what it says (a countdown, a slot coming home) moves by itself. Tapping the box opens its screen. */
+  private buildStatusBox(opts: {
+    y: number;
+    icon: string;
+    label: string;
+    onOpen: () => void;
+    read: (now: number) => { main: string; mainColor: string; sub: string; pips: ('empty' | 'busy' | 'ready')[]; dot: boolean };
+    delay: number;
+  }): void {
+    const x = BANNER.x + BANNER.w + 12;
+    const w = 608 - x;
+    const h = 84;
+    const box = this.add.container(x, opts.y);
+    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
+    box.add(this.add.image(38, h / 2, opts.icon).setDisplaySize(52, 52));
+    box.add(caption(this, 74, 18, opts.label, { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    const main = body(this, 74, 45, '', { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5);
+    const sub = caption(this, 74, 67, '', { fontSize: '16px', fontStyle: 'bold', color: '#cdbb94', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5);
+    const pips = this.add.graphics();
+    const dot = this.add.graphics();
+    box.add([main, sub, pips, dot]);
+
+    const draw = (): void => {
+      const state = opts.read(Date.now());
+      main.setText(state.main).setColor(state.mainColor);
+      sub.setText(state.sub);
+      pips.clear();
+      state.pips.forEach((pip, i) => {
+        const cx = w - 22 - (state.pips.length - 1 - i) * 22;
+        pips.fillStyle(pip === 'ready' ? 0xffd23f : pip === 'busy' ? 0xe0822a : 0x0d0905, 1);
+        pips.fillCircle(cx, 18, 7);
+        pips.lineStyle(2, pip === 'ready' ? 0xfff0b0 : CHROME.brassDark, 1);
+        pips.strokeCircle(cx, 18, 7);
+      });
+      dot.clear();
+      if (state.dot) {
+        dot.fillStyle(0x1b1d29, 1);
+        dot.fillCircle(58, h / 2 - 20, 9);
+        dot.fillStyle(0xff4d4d, 1);
+        dot.fillCircle(58, h / 2 - 20, 7);
+      }
+    };
+    draw();
+    this.time.addEvent({ delay: 1000, loop: true, callback: draw });
+
+    const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerup', opts.onOpen);
+    box.add(hit);
+
+    enter(this, box, { dy: 10, duration: 320, delay: opts.delay });
+  }
+
+  /** 遠征: how many are back (gold, with a red dot), else how long until the next one, else a nudge to send
+   *  someone out. The three pips are the three slots (empty / away / back). */
+  private buildExpeditionBox(save: SaveData): void {
+    this.buildStatusBox({
+      y: BANNER.y,
+      icon: expeditionIcon(this, 52),
+      label: '遠征',
+      delay: 240,
+      // The data is always given: starting a scene without any would hand it the last screen's (see ExpeditionScene.init).
+      onOpen: () => this.scene.start('Expedition', { view: 'board' }),
+      read: (now) => {
+        const runs = save.expeditions.slots;
+        const ready = ExpeditionSystem.readyCount(save, now);
+        const running = ExpeditionSystem.runningCount(save, now);
+        const left = runs.filter((run) => run !== null && !ExpeditionSystem.isDone(run, now)).map((run) => ExpeditionSystem.secondsLeft(run!, now));
+        const state =
+          ready > 0
+            ? { main: `帰還 ${ready}`, mainColor: '#ffd23f', sub: running > 0 ? `遠征中 ${running}` : '受け取れます' }
+            : running > 0
+              ? { main: `遠征中 ${running}/${runs.length}`, mainColor: '#fff4dc', sub: `あと ${StaminaSystem.formatDuration(Math.min(...left))}` }
+              : { main: '出発できます', mainColor: '#9fe39f', sub: `${runs.length}枠 空き` };
+        return {
+          ...state,
+          pips: runs.map((run) => (run === null ? 'empty' : ExpeditionSystem.isDone(run, now) ? 'ready' : 'busy')),
+          dot: ready > 0,
+        };
+      },
+    });
+  }
+
+  /** 村: a nudge when a builder is free and something can be built or strengthened (red dot), else how the work is
+   *  going. The pips are the builders (dark = free). */
+  private buildVillageBox(save: SaveData): void {
+    this.buildStatusBox({
+      y: BANNER.y + 84 + 8,
+      icon: villageIcon(this, 52),
+      label: '村',
+      delay: 260,
+      onOpen: () => this.scene.start('Village'),
+      read: (now) => {
+        // Brings the village up to date first, so a 襲撃 that has come (or gone) shows here without opening it.
+        VillageSystem.settle(save, now);
+        const summary = VillageSystem.summary(save, now);
+        const job = VillageSystem.hasJob(save, now);
+        const need = VillageSystem.attention(save, now);
+        // The most pressing thing first: a 襲撃 waiting, then broken buildings, 依頼 to collect, 行商人 / 宝箱 on the map.
+        const state = need.raid
+          ? { main: '襲撃！', mainColor: '#ff9a8a', sub: `あと ${StaminaSystem.formatDuration(VillageSystem.raidSecondsLeft(save, now))}` }
+          : need.broken > 0
+            ? { main: '壊れています', mainColor: '#ffb07a', sub: `${need.broken}件　直しましょう` }
+            : need.quests > 0
+              ? { main: '依頼の報酬', mainColor: '#9fe39f', sub: `${need.quests}件　受け取れます` }
+              : need.wanderers > 0
+                ? { main: '宝箱・行商人', mainColor: '#9fe39f', sub: '村で受け取れます' }
+                : job
+                  ? { main: '建てられます', mainColor: '#9fe39f', sub: `売上 ×${summary.multiplier.toFixed(2)}` }
+                  : summary.busy > 0
+                    ? { main: `建築中 ${summary.busy}/${summary.builders}`, mainColor: '#fff4dc', sub: `あと ${StaminaSystem.formatDuration(summary.nextSeconds)}` }
+                    : { main: `売上 ×${summary.multiplier.toFixed(2)}`, mainColor: '#fff4dc', sub: 'ゴールドをためよう' };
+        const dot = need.raid || need.broken > 0 || need.quests > 0 || need.wanderers > 0 || job;
+        return { ...state, pips: Array.from({ length: summary.builders }, (_, i) => (i < summary.busy ? 'busy' : 'empty')), dot };
+      },
+    });
+  }
+
+  /** 朝夕の補給, under 村: the slot that can be taken now (red dot, with how long it stays open), else the one coming next
+   *  and when, else that today is done. The two pips are the two slots (gold = can be taken, orange = taken). Tapping it
+   *  opens the list to take them from. */
+  private buildSupplyBox(save: SaveData): void {
+    this.buildStatusBox({
+      y: BANNER.y + (84 + 8) * 2,
+      icon: supplyIcon(this, 52),
+      label: '朝夕の補給',
+      delay: 270,
+      onOpen: () => openSupplyModal(this, save, () => this.resourceBar.update(save)),
+      read: (now) => {
+        const next = SupplySystem.next(save, now);
+        let state: { main: string; mainColor: string; sub: string };
+        if (next?.state === 'open') state = { main: next.slot.name, mainColor: '#ffd23f', sub: `受け取れます　あと${StaminaSystem.formatDuration(next.seconds)}` };
+        else if (next) state = { main: next.slot.name, mainColor: '#fff4dc', sub: `${supplyHours(next.slot)}　あと${StaminaSystem.formatDuration(next.seconds)}` };
+        else {
+          const first = SUPPLY_SLOTS[0];
+          state = { main: SupplySystem.allTaken(save, now) ? '本日分 完了' : '本日は終了', mainColor: SupplySystem.allTaken(save, now) ? '#9fe39f' : '#cdbb94', sub: `次は ${first.name} ${first.startHour}:00` };
+        }
+        return {
+          ...state,
+          pips: SUPPLY_SLOTS.map((slot) => {
+            const slotState = SupplySystem.state(save, slot, now);
+            return slotState === 'claimed' ? 'busy' : slotState === 'open' ? 'ready' : 'empty';
+          }),
+          dot: SupplySystem.openCount(save, now) > 0,
+        };
+      },
+    });
   }
 
   /** 放置報酬, pinned just under the promo banner: how long has piled up (with a

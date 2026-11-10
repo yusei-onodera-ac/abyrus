@@ -2,6 +2,7 @@ import { BigNumber } from './BigNumber';
 import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
 import { REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
+import { WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
 import { expToNextLevel } from './LevelCurve';
 
@@ -299,6 +300,53 @@ export const ProgressionSystem = {
       rewardExp: expRewardForLevel(levelAskedByStage(MAIN_STAGE_COUNT + index * 4)),
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
       isBossStage,
+    };
+  },
+
+  /** 曜日ダンジョン (data/weekdayDungeons.ts): the day's dungeon at `tier` (0 = 初級 ... 3 = 超級). Its enemies, region and
+   *  gold / EXP are set like the main stage the tier names (`likeStage`); the day then changes the gold and 技素. It
+   *  is no stage of the campaign: `index` is only the tier. */
+  getWeekdayStage(day: number, tier: number): StageDef {
+    const dungeon = getWeekdayDungeon(day);
+    const t = getWeekdayTier(tier);
+    const tierIndex = WEEKDAY_TIERS.indexOf(t);
+    const region = getRegion(Math.floor(t.likeStage / STAGES_PER_REGION));
+    const rng = mulberry32(31000 + dungeon.day * 53 + tierIndex * 7);
+    const difficulty = mainDifficulty(t.likeStage);
+    const count = Math.max(3, enemyCountForIndex(t.likeStage));
+    const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
+    return {
+      index: tierIndex,
+      regionIndex: region.index,
+      stageInRegion: t.likeStage % STAGES_PER_REGION,
+      name: `${WEEKDAY_NAMES[dungeon.day]}曜 ${dungeon.name} ${t.name}`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(dungeon.goldMul),
+      rewardExp: expRewardForLevel(levelAskedByStage(t.likeStage)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)) + (dungeon.skillEssence[tierIndex] ?? 0),
+    };
+  },
+
+  /** 襲撃 (the village): a pack of beasts of the region `likeStage` lies in, as strong as that main stage. `seed` varies the
+   *  pack from one 襲撃 to the next. It is no stage of the campaign: `index` is only the main stage it is set like. */
+  getRaidStage(likeStage: number, seed = 0): StageDef {
+    const index = Math.max(0, Math.min(MAIN_STAGE_COUNT - 1, Math.floor(likeStage)));
+    const region = getRegion(Math.floor(index / STAGES_PER_REGION));
+    const rng = mulberry32(47000 + index * 13 + (Math.abs(Math.floor(seed)) % 997));
+    const difficulty = mainDifficulty(index);
+    const count = Math.max(3, enemyCountForIndex(index));
+    const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
+    return {
+      index,
+      regionIndex: region.index,
+      stageInRegion: index % STAGES_PER_REGION,
+      name: `襲撃！ ${region.name}の獣の群れ`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
+      rewardExp: expRewardForLevel(levelAskedByStage(index)),
+      rewardSkillEssence: 0,
     };
   },
 

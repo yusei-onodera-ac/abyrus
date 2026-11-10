@@ -8,6 +8,7 @@ import { HERO_ROSTER } from '../data/heroes';
 import { ENEMY_ART_IDS } from '../data/regions';
 import { preloadEnemyArt } from '../characters/EnemyArt';
 import { preloadEquipArt, preloadItemArt } from '../ui/ItemIcons';
+import { preloadVillageArt } from '../ui/VillageArt';
 import { preloadPetArt } from '../ui/PetPortrait';
 import { preloadBackgrounds } from '../ui/Background';
 import { preloadButtonAssets } from '../ui/ButtonAssets';
@@ -51,6 +52,7 @@ export class BootScene extends Phaser.Scene {
     preloadEnemyArt(this, ENEMY_ART_IDS);
     preloadItemArt(this);
     preloadEquipArt(this);
+    preloadVillageArt(this);
     preloadBanners(this, BANNERS);
     preloadGachaArt(this, GACHA_BANNERS);
     preloadNoticeArt(this);

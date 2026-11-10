@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { ITEMS, type ItemId } from '../data/items';
+import type { VillageMaterial } from '../data/village';
 import { EQUIP_DEFS, type EquipGlyph } from '../data/equipment';
 import { RARITY_COLORS, type Rarity } from '../types';
 import { CORNER_BADGE_FILL, CORNER_BADGE_RING, CORNER_GLYPH, ITEM_ART_PREFIX, drawNavBadge, ensureTexture, scaledArt } from './Icons';
@@ -16,7 +17,7 @@ const POTION: Record<'exp_s' | 'exp_m' | 'exp_l' | 'exp_xl', { body: number; liq
 /** 素材 pictures: `public/assets/items/<item id>.png` (exp_s, exp_m, exp_l, exp_xl, equip_essence), each a
  *  square with a transparent background. An item without one - or whose file is missing - keeps its drawn icon.
  *  技素 and フェーズ素材 are not in ITEMS (the save keeps them in fields of their own), so their pictures are named here. */
-const SAVE_MATERIAL_ART = ['skill_essence', 'phase_material'];
+const SAVE_MATERIAL_ART = ['skill_essence', 'phase_material', 'wood', 'iron', 'stone'];
 
 export function preloadItemArt(scene: Phaser.Scene): void {
   for (const id of [...Object.keys(ITEMS), ...SAVE_MATERIAL_ART]) scene.load.image(`${ITEM_ART_PREFIX}${id}`, `/assets/items/${id}.png`);
@@ -70,6 +71,67 @@ export function itemIcon(scene: Phaser.Scene, item: ItemId, size = 56): string {
     const sparkles = item === 'exp_s' ? 0 : item === 'exp_m' ? 1 : item === 'exp_l' ? 2 : 3;
     g.fillStyle(0xffffff, 0.95);
     for (let i = 0; i < sparkles; i++) g.fillCircle(c * (1.0 + 0.3 * i), c * (1.35 + 0.12 * (i % 2)), Math.max(1.3, c * 0.06));
+  });
+}
+
+/** 村の素材: its supplied picture (public/assets/items/wood.png, iron.png, stone.png) if there is one, else a pile of
+ *  logs (木材), of ingots (鉄) or a heap of rocks (石). */
+export function materialIcon(scene: Phaser.Scene, material: VillageMaterial, size = 56): string {
+  const art = scaledArt(scene, `${ITEM_ART_PREFIX}${material}`, `icon_item_art_${material}_${size}`, size);
+  if (art) return art;
+  return ensureTexture(scene, `icon_material_${material}_${size}`, size, (g, c) => {
+    g.fillStyle(0x000000, 0.3);
+    g.fillEllipse(c, c * 1.86, c * 1.5, c * 0.2);
+    if (material === 'wood') {
+      // Two logs side by side with a third on top, their cut ends facing us.
+      const log = (x: number, y: number): void => {
+        const r = c * 0.3;
+        g.fillStyle(0x7a4c22, 1);
+        g.fillRoundedRect(x - c * 0.62, y - r, c * 1.0, r * 2, r * 0.45);
+        g.fillStyle(0x9a6630, 1);
+        g.fillRect(x - c * 0.58, y - r * 0.85, c * 0.9, r * 0.5);
+        g.fillStyle(0xe2b472, 1);
+        g.fillEllipse(x + c * 0.38, y, r * 1.1, r * 2);
+        g.lineStyle(Math.max(1.5, c * 0.04), 0x9a6630, 1);
+        g.strokeEllipse(x + c * 0.38, y, r * 0.62, r * 1.2);
+        g.strokeEllipse(x + c * 0.38, y, r * 0.22, r * 0.44);
+      };
+      log(c * 0.82, c * 1.5);
+      log(c * 1.12, c * 1.5 - c * 0.02);
+      log(c * 0.98, c * 0.95);
+      return;
+    }
+    if (material === 'iron') {
+      // Three ingots: two on the ground, one across them.
+      const ingot = (x: number, y: number, w: number, h: number): void => {
+        const inset = w * 0.16;
+        g.fillStyle(0x56606d, 1);
+        g.fillRoundedRect(x - w / 2, y, w, h, 3);
+        g.fillStyle(0x8a95a4, 1);
+        g.fillPoints(
+          [new Phaser.Math.Vector2(x - w / 2, y + h * 0.1), new Phaser.Math.Vector2(x - w / 2 + inset, y - h * 0.55), new Phaser.Math.Vector2(x + w / 2 - inset, y - h * 0.55), new Phaser.Math.Vector2(x + w / 2, y + h * 0.1)],
+          true,
+        );
+        g.fillStyle(0xdbe3ee, 0.85);
+        g.fillRect(x - w / 2 + inset + 2, y - h * 0.45, w - inset * 2 - 4, Math.max(2, h * 0.14));
+      };
+      ingot(c * 0.62, c * 1.38, c * 0.86, c * 0.4);
+      ingot(c * 1.42, c * 1.38, c * 0.86, c * 0.4);
+      ingot(c * 1.02, c * 0.92, c * 0.9, c * 0.4);
+      return;
+    }
+    // 石: a heap of three rocks, each with a lit and a shaded side.
+    const rock = (pts: number[][], lit: number[][]): void => {
+      g.fillStyle(0x77726a, 1);
+      g.fillPoints(pts.map(([x, y]) => new Phaser.Math.Vector2(x * c, y * c)), true);
+      g.fillStyle(0xc4beb2, 1);
+      g.fillPoints(lit.map(([x, y]) => new Phaser.Math.Vector2(x * c, y * c)), true);
+      g.lineStyle(Math.max(1.5, c * 0.04), 0x4e4a44, 0.9);
+      g.strokePoints(pts.map(([x, y]) => new Phaser.Math.Vector2(x * c, y * c)), true);
+    };
+    rock([[0.1, 1.7], [0.2, 1.05], [0.7, 0.8], [1.1, 1.15], [1.15, 1.7]], [[0.2, 1.05], [0.7, 0.8], [0.8, 1.05], [0.4, 1.3]]);
+    rock([[0.9, 1.7], [0.95, 0.95], [1.45, 0.55], [1.85, 1.0], [1.9, 1.7]], [[0.95, 0.95], [1.45, 0.55], [1.55, 0.88], [1.15, 1.2]]);
+    rock([[0.55, 1.7], [0.6, 1.38], [0.95, 1.22], [1.25, 1.42], [1.3, 1.7]], [[0.6, 1.38], [0.95, 1.22], [1.0, 1.4], [0.75, 1.52]]);
   });
 }
 
@@ -287,6 +349,62 @@ export function swordBadgeIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `icon_sword_badge_${size}`, size, (g, c) => {
     drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
     drawEquipGlyph(g, 'sword', c, CORNER_GLYPH, 0xffd23f);
+  });
+}
+
+/** A flag planted on a peak on the neutral corner badge: 遠征. */
+export function expeditionIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_expedition_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillTriangle(c - c * 0.52, c + c * 0.46, c + c * 0.52, c + c * 0.46, c + c * 0.02, c - c * 0.02);
+    g.lineStyle(Math.max(2, c * 0.08), CORNER_GLYPH, 1);
+    g.beginPath();
+    g.moveTo(c + c * 0.02, c - c * 0.02);
+    g.lineTo(c + c * 0.02, c - c * 0.54);
+    g.strokePath();
+    g.fillStyle(0xffd23f, 1);
+    g.fillTriangle(c + c * 0.02, c - c * 0.54, c + c * 0.4, c - c * 0.4, c + c * 0.02, c - c * 0.26);
+  });
+}
+
+/** A little house under a gold roof on the neutral corner badge: 村. */
+export function villageIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_village_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillRect(c - c * 0.36, c - c * 0.02, c * 0.72, c * 0.5);
+    g.fillStyle(0xffd23f, 1);
+    g.fillTriangle(c - c * 0.54, c + c * 0.02, c + c * 0.54, c + c * 0.02, c, c - c * 0.52);
+    g.fillStyle(CORNER_BADGE_FILL, 1);
+    g.fillRect(c - c * 0.1, c + c * 0.2, c * 0.2, c * 0.28);
+  });
+}
+
+/** A sun over a crescent moon on the neutral corner badge: 朝夕の補給. */
+export function supplyIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_supply_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    // The sun, upper left, with short rays.
+    const sx = c - c * 0.22;
+    const sy = c - c * 0.2;
+    g.fillStyle(0xffd23f, 1);
+    g.fillCircle(sx, sy, c * 0.24);
+    g.lineStyle(Math.max(2, c * 0.06), 0xffd23f, 1);
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      g.beginPath();
+      g.moveTo(sx + Math.cos(a) * c * 0.34, sy + Math.sin(a) * c * 0.34);
+      g.lineTo(sx + Math.cos(a) * c * 0.46, sy + Math.sin(a) * c * 0.46);
+      g.strokePath();
+    }
+    // The moon, lower right: a disc with a bite taken out of it.
+    const mx = c + c * 0.22;
+    const my = c + c * 0.24;
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillCircle(mx, my, c * 0.26);
+    g.fillStyle(CORNER_BADGE_FILL, 1);
+    g.fillCircle(mx + c * 0.12, my - c * 0.08, c * 0.22);
   });
 }
 

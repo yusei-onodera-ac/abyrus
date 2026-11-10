@@ -3,10 +3,11 @@ import { DEFAULT_GLYPH, getEquipDef, type EquipGlyph } from '../data/equipment';
 import { isItemId, ITEMS, type ItemId } from '../data/items';
 import type { GoodType } from '../data/shop';
 import type { Reward } from '../data/rewards';
+import { VILLAGE_MATERIALS, materialName, type VillageMaterial } from '../data/village';
 import type { GrantedReward } from '../systems/RewardSystem';
 import type { EquipmentItem, Rarity } from '../types';
 import { buildChip } from './CardParts';
-import { equipIcon, itemIcon } from './ItemIcons';
+import { equipIcon, itemIcon, materialIcon } from './ItemIcons';
 import { createPanel } from './Panel';
 import { addGoodIcon, GOOD_LABEL } from './RewardIcon';
 import { body, caption, CHROME } from './theme';
@@ -17,7 +18,7 @@ export const TILE_H = 132;
 const GAP = 10;
 const PER_ROW = 5;
 
-export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'item' | 'equipment';
+export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'item' | 'equipment' | 'material';
 
 export interface RewardTile {
   kind: RewardTileKind;
@@ -27,6 +28,8 @@ export interface RewardTile {
   tag?: string;
   /** For kind 'item'. */
   item?: ItemId;
+  /** For kind 'material': 木材 / 鉄 / 石 (only the village lists these). */
+  material?: VillageMaterial;
   /** For kind 'equipment': the piece's slot, rarity and name - and its id, unless only the rarity is known (then its shape is drawn). */
   equip?: { glyph: EquipGlyph; rarity: Rarity; name: string; id?: string };
 }
@@ -83,6 +86,10 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
   if (tile.kind === 'item' && tile.item) {
     container.add(scene.add.image(x, y, itemIcon(scene, tile.item, size)));
     return ITEMS[tile.item].short;
+  }
+  if (tile.kind === 'material' && tile.material) {
+    container.add(scene.add.image(x, y, materialIcon(scene, tile.material, size)));
+    return materialName(tile.material);
   }
   if (tile.kind === 'equipment' && tile.equip) {
     container.add(scene.add.image(x, y, equipIcon(scene, tile.equip.glyph, tile.equip.rarity, size, tile.equip.id)));
@@ -160,5 +167,17 @@ export function tilesForIdleClaim(
   for (const { item, amount } of p.items) tiles.push({ kind: 'item', item, amount: `+${amount.toLocaleString('ja-JP')}` });
   if (p.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${p.phaseMaterials}` });
   tiles.push(...tilesForEquipment(equipment));
+  return tiles;
+}
+
+/** The tiles for 放置報酬 claimed in the village: those of `tilesForIdleClaim`, with the 木材・鉄・石 that came with it
+ *  after the gold. (Anywhere else the materials are handed over without being listed: only the village shows them.) */
+export function tilesForVillageClaim(
+  p: Parameters<typeof tilesForIdleClaim>[0] & { materials: Record<VillageMaterial, number> },
+  equipment: EquipmentItem[],
+): RewardTile[] {
+  const tiles = tilesForIdleClaim(p, equipment);
+  const materials = VILLAGE_MATERIALS.filter(({ id }) => p.materials[id] > 0).map(({ id }): RewardTile => ({ kind: 'material', material: id, amount: `+${p.materials[id].toLocaleString('ja-JP')}` }));
+  tiles.splice(1, 0, ...materials);
   return tiles;
 }

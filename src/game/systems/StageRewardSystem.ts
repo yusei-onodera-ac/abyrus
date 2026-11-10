@@ -1,5 +1,6 @@
 import { BOSS_DROP_MULTIPLIER, FINAL_ITEM_DROPS, STAGE_BONUS, STAGE_ITEM_DROPS, type ItemDrop, type StageTier } from '../data/stageRewards';
 import { ITEMS, type ItemId } from '../data/items';
+import { VILLAGE_STAGE_DROPS, type MaterialBundle } from '../data/village';
 import type { QuestStage } from './QuestRoute';
 import { EXTRA_STAGES_PER_REGION, FINAL_STAGE_INDEX, STAGES_PER_REGION } from './ProgressionSystem';
 import { SaveSystem, type SaveData } from './SaveSystem';
@@ -11,6 +12,8 @@ export interface StageBonus {
   phaseMaterials: number;
   /** 経験値素材 / 装備強化素材 that dropped. */
   items: { item: ItemId; amount: number }[];
+  /** 村の素材 (木材・鉄・石) that dropped: the village alone shows them, so no result panel lists them. */
+  materials: MaterialBundle;
 }
 
 export function stageTier(stage: QuestStage): StageTier {
@@ -43,11 +46,17 @@ export const StageRewardSystem = {
       const base = drop.expShare !== undefined ? Math.max(1, Math.round((drop.expShare * expReward) / (ITEMS[drop.item].exp ?? 1))) : (drop.amount ?? 1);
       items.push({ item: drop.item, amount: base * (boss ? BOSS_DROP_MULTIPLIER : 1) });
     }
+    const materials: MaterialBundle = {};
+    for (const drop of VILLAGE_STAGE_DROPS) {
+      if (rng() >= drop.chance) continue;
+      materials[drop.material] = (drop.amounts[Math.min(drop.amounts.length - 1, region)] ?? 0) * (boss ? BOSS_DROP_MULTIPLIER : 1);
+    }
     return {
       firstClear,
       gems: firstClear ? rule.firstClearGems : 0,
       phaseMaterials: rng() < rule.phaseMaterialChance ? rule.phaseMaterialAmount : 0,
       items,
+      materials,
     };
   },
 
@@ -55,5 +64,6 @@ export const StageRewardSystem = {
     SaveSystem.addGems(save, bonus.gems);
     SaveSystem.addPhaseMaterials(save, bonus.phaseMaterials);
     for (const { item, amount } of bonus.items) SaveSystem.addItem(save, item, amount);
+    SaveSystem.addMaterials(save, bonus.materials);
   },
 };

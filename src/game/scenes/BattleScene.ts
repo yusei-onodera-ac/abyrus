@@ -13,7 +13,11 @@ import {
 import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
 import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { nextQuestStage, questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
-import { StageRewardSystem } from '../systems/StageRewardSystem';
+import { StageRewardSystem, type StageBonus } from '../systems/StageRewardSystem';
+import { VillageSystem } from '../systems/VillageSystem';
+import { RAID_PLAYER_EXP } from '../data/village';
+import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
+import { getWeekdayTier } from '../data/weekdayDungeons';
 import { PlayerLevelSystem, type LevelUp } from '../systems/PlayerLevelSystem';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { recordMission } from '../systems/MissionProgress';
@@ -62,12 +66,19 @@ interface UnitView {
 /** 'final' = the finite-wave 最終決戦 (see ProgressionSystem.getFinalStage);
  *  'extra' = a post-ending Extra dungeon stage (getExtraStage), its own
  *  index space from the main campaign; undefined = an ordinary main-quest
- *  stage (getStage). */
-type BattleMode = 'final' | 'extra' | undefined;
+ *  stage (getStage); 'weekday' = a 曜日ダンジョン fight (getWeekdayStage): `stageIndex`
+ *  is its tier and `day` the day it belongs to, and it moves no campaign progress;
+ *  'raid' = a 襲撃 on the village (getRaidStage): `stageIndex` is the main stage it is set like and `seed`
+ *  varies the pack. It moves no campaign progress, costs no stamina and pays the village (VillageSystem.winRaid). */
+type BattleMode = 'final' | 'extra' | 'weekday' | 'raid' | undefined;
 
 export class BattleScene extends Phaser.Scene {
   private stageIndex = 0;
   private mode: BattleMode;
+  /** 曜日ダンジョン only: 0 = 日曜 ... 6 = 土曜. */
+  private weekdayDay = 0;
+  /** 襲撃 only: varies the pack of beasts. */
+  private raidSeed = 0;
   private save!: SaveData;
   private generator!: CharacterGenerator;
   private anim!: AnimationController;
@@ -96,9 +107,11 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  init(data: { stageIndex?: number; mode?: BattleMode }): void {
+  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number }): void {
     this.stageIndex = data.stageIndex ?? 0;
     this.mode = data.mode;
+    this.weekdayDay = data.day ?? 0;
+    this.raidSeed = data.seed ?? 0;
     this.views.clear();
     this.resultOverlay = undefined;
     this.autoSkill = undefined;
@@ -137,6 +150,19 @@ export class BattleScene extends Phaser.Scene {
       this.rewardGold = this.currentStageDef.rewardGold;
       this.rewardExp = this.currentStageDef.rewardExp;
       this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
+    } else if (this.mode === 'weekday') {
+      this.currentStageDef = ProgressionSystem.getWeekdayStage(this.weekdayDay, this.stageIndex);
+      title = this.currentStageDef.name;
+      this.rewardGold = this.currentStageDef.rewardGold;
+      this.rewardExp = this.currentStageDef.rewardExp;
+      this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
+    } else if (this.mode === 'raid') {
+      this.currentStageDef = ProgressionSystem.getRaidStage(this.stageIndex, this.raidSeed);
+      title = this.currentStageDef.name;
+      // The village pays a won 襲撃 (gold included): see VillageSystem.winRaid.
+      this.rewardGold = BigNumber.ZERO;
+      this.rewardExp = this.currentStageDef.rewardExp;
+      this.rewardSkillEssence = 0;
     } else {
       this.currentStageDef = ProgressionSystem.getStage(this.stageIndex);
       title = this.currentStageDef.name;
@@ -148,7 +174,7 @@ export class BattleScene extends Phaser.Scene {
     // A wood-and-brass strip across the top: 撤退 and the stage's name.
     const hud = this.add.container(0, 0).setDepth(30);
     hud.add(createPanel(this, 360, 62, 696, 92, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
-    hud.add(new Button(this, 104, 62, 160, 62, '撤退', () => this.scene.start('Home'), { variant: 'wood', fontSize: '26px' }));
+    hud.add(new Button(this, 104, 62, 160, 62, '撤退', () => this.scene.start(this.mode === 'raid' ? 'Village' : 'Home'), { variant: 'wood', fontSize: '26px' }));
     const titleText = subheading(this, 408, 62, title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     if (titleText.width > 470) titleText.setScale(470 / titleText.width);
     hud.add(titleText);
@@ -195,6 +221,11 @@ export class BattleScene extends Phaser.Scene {
   private applyBackdrop(): void {
     if (this.mode === 'final') {
       applyBattleBackground(this, 'final', FINAL_BATTLE_TINT);
+      return;
+    }
+    if (this.mode === 'weekday') {
+      const dungeonRegion = getRegion(ProgressionSystem.getWeekdayStage(this.weekdayDay, this.stageIndex).regionIndex);
+      applyBattleBackground(this, dungeonRegion.id, dungeonRegion.look.battleTint);
       return;
     }
     const perRegion = this.mode === 'extra' ? EXTRA_STAGES_PER_REGION : STAGES_PER_REGION;
@@ -530,9 +561,19 @@ export class BattleScene extends Phaser.Scene {
     let chainWins = 0;
     const chain = AutoAdvance.isOn(this.game, this.save);
     if (victory) {
-      const stage: QuestStage = { kind: this.mode ?? 'main', index: this.stageIndex };
+      // 曜日ダンジョン pays its day's 素材 in fixed amounts, and is no stage of the campaign.
+      const weekday = this.mode === 'weekday';
+      // A 襲撃 is no stage of the campaign either: the village pays it.
+      const raid = this.mode === 'raid';
+      const stage: QuestStage = { kind: this.mode === 'extra' || this.mode === 'final' ? this.mode : 'main', index: this.stageIndex };
       // First-clear status has to be read before the progress counters move.
-      const bonus = StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage), this.rewardExp);
+      const noBonus: StageBonus = { firstClear: false, gems: 0, phaseMaterials: 0, items: [], materials: {} };
+      const bonus = raid
+        ? noBonus
+        : weekday
+          ? WeekdayDungeonSystem.bonus(this.weekdayDay, this.stageIndex)
+          : StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage), this.rewardExp);
+      const raidWin = raid ? VillageSystem.winRaid(this.save) : null;
       SaveSystem.addGold(this.save, this.rewardGold);
       SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
       StageRewardSystem.grant(this.save, bonus);
@@ -545,18 +586,18 @@ export class BattleScene extends Phaser.Scene {
         SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
       }
       this.applyProgressionOnVictory();
-      recordMission(this.save, 'quest_clear');
+      if (!raid) recordMission(this.save, 'quest_clear');
       // プレイヤーEXP = the stamina this stage cost.
-      const playerExp = stageStaminaCost(stage.kind, stage.index);
+      const playerExp = raid ? RAID_PLAYER_EXP : weekday ? getWeekdayTier(this.stageIndex).stamina : stageStaminaCost(stage.kind, stage.index);
       levelUp = PlayerLevelSystem.gain(this.save, playerExp);
       SaveSystem.save(this.save);
       if (chain) AutoAdvance.addWin(this.game);
 
       tiles = [
-        { kind: 'gold', amount: `+${this.rewardGold.toString()}` },
+        { kind: 'gold', amount: `+${(raidWin ? raidWin.gold : this.rewardGold).toString()}` },
         { kind: 'exp', amount: `+${this.rewardExp}` },
-        { kind: 'essence', amount: `+${this.rewardSkillEssence}` },
       ];
+      if (!raid) tiles.push({ kind: 'essence', amount: `+${this.rewardSkillEssence}` });
       tiles.push({ kind: 'rank', amount: `+${playerExp}`, tag: levelUp ? `Lv${levelUp.to}` : undefined });
       if (levelUp) tiles.push({ kind: 'gems', amount: `+${levelUp.gems}`, tag: 'LvUP' });
       if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
@@ -720,7 +761,7 @@ export class BattleScene extends Phaser.Scene {
       }
     } else {
       buttons.push(
-        new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : 'ホームへ戻る', () => this.onContinue(victory), {
+        new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : this.mode === 'raid' ? '村へ戻る' : 'ホームへ戻る', () => this.onContinue(victory), {
           variant: victory ? 'gold' : 'wood',
           fontSize: '28px',
         }),
@@ -738,7 +779,7 @@ export class BattleScene extends Phaser.Scene {
    *  clear leads somewhere else first: a story still to read (a region's last
    *  stage, the final battle's ending) or the end of the Extra stages. */
   private nextStageOffer(): QuestStage | null {
-    if (this.mode === 'final') return null;
+    if (this.mode === 'final' || this.mode === 'weekday' || this.mode === 'raid') return null;
     if (this.mode !== 'extra' && this.storyAfterClear()) return null;
     return nextQuestStage({ kind: this.mode === 'extra' ? 'extra' : 'main', index: this.stageIndex });
   }
@@ -752,6 +793,8 @@ export class BattleScene extends Phaser.Scene {
   private continueLabel(): string {
     if (this.mode === 'final') return 'エンディングへ';
     if (this.mode === 'extra') return 'クエスト一覧へ';
+    if (this.mode === 'weekday') return 'ダンジョン一覧へ';
+    if (this.mode === 'raid') return '村へ戻る';
     return 'ストーリーへ';
   }
 
@@ -785,6 +828,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private applyProgressionOnVictory(): void {
+    if (this.mode === 'weekday' || this.mode === 'raid') return;
     if (this.mode === 'extra') {
       SaveSystem.clearExtraStage(this.save, this.stageIndex);
     } else if (this.mode === 'final') {
@@ -796,10 +840,14 @@ export class BattleScene extends Phaser.Scene {
 
   private onContinue(victory: boolean): void {
     if (!victory) {
-      this.scene.start('Home');
+      this.scene.start(this.mode === 'raid' ? 'Village' : 'Home');
       return;
     }
 
+    if (this.mode === 'raid') {
+      this.scene.start('Village');
+      return;
+    }
     if (this.mode === 'final') {
       const ending = getEndingScript();
       this.scene.start('Story', { id: ending.id, lines: ending.lines, next: { scene: 'Home' }, markSeen: { kind: 'ending' } });
@@ -807,6 +855,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (this.mode === 'extra') {
       this.scene.start('StageSelect', { initialTab: 'extra' });
+      return;
+    }
+    if (this.mode === 'weekday') {
+      this.scene.start('WeekdayDungeon');
       return;
     }
 

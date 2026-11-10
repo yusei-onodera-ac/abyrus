@@ -5,6 +5,8 @@ import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_ST
 import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
 import { REGIONS, REGION_COUNT, type RegionDef } from '../data/regions';
+import { WEEKDAY_NAMES, getWeekdayDungeon } from '../data/weekdayDungeons';
+import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { BackButton } from '../ui/BackButton';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
@@ -76,6 +78,7 @@ export class StageSelectScene extends Phaser.Scene {
     enter(this, resourceBar, { dy: -20, duration: 280 });
 
     buildTitlePlate(this, 'クエスト');
+    this.buildWeekdayEntry();
     this.view = buildFramedScrollView(this, TAB_H + TAB_GAP);
     this.buildTabs(save);
     if (this.activeTab === 'extra') this.buildExtraPage(save);
@@ -87,6 +90,30 @@ export class StageSelectScene extends Phaser.Scene {
 
   private getSave(): SaveData {
     return this.game.registry.get('save');
+  }
+
+  /** 曜日ダンジョン is played with stamina like the stages are, so it is entered from here: a plate beside the
+   *  screen's title naming today's dungeon, which opens its own screen. */
+  private buildWeekdayEntry(): void {
+    const w = 244;
+    const h = 52;
+    const day = WeekdayDungeonSystem.today();
+    const box = this.add.container(SCREEN_VIEW.x + SCREEN_VIEW.w - w / 2 - 4, 166);
+    box.add(createPanel(this, 0, 0, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.96, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 12, gradient: false }));
+    box.add(body(this, -w / 2 + 16, -11, '曜日ダンジョン', { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    box.add(caption(this, -w / 2 + 16, 14, `今日は${WEEKDAY_NAMES[day]}曜　${getWeekdayDungeon(day).name}`, { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(body(this, w / 2 - 16, 0, '›', { fontSize: '34px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+
+    const hit = this.add.zone(0, 0, w, h).setOrigin(0.5);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => this.tweens.add({ targets: box, scale: 0.96, duration: 70, ease: 'Sine.easeOut' }));
+    hit.on('pointerout', () => this.tweens.add({ targets: box, scale: 1, duration: 120, ease: 'Sine.easeOut' }));
+    hit.on('pointerup', () => {
+      if (this.modal?.container.active) return;
+      this.scene.start('WeekdayDungeon');
+    });
+    box.add(hit);
+    enter(this, box, { dx: 30, dy: 0, duration: 320, delay: 140 });
   }
 
   // --------------------------------------------------------------- tabs --

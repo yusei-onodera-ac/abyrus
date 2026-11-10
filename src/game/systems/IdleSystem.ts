@@ -11,9 +11,11 @@ import {
   IDLE_EXP_MIN_LEVEL,
   IDLE_EXP_SPLIT,
   IDLE_PHASE_PER_HOUR,
+  IDLE_VILLAGE_MATERIALS_PER_HOUR,
 } from '../data/idle';
 import { ITEMS, type ItemId } from '../data/items';
 import { PREMIUM } from '../data/premium';
+import { VILLAGE_MATERIALS, type VillageMaterial } from '../data/village';
 import type { EquipmentItem, Rarity } from '../types';
 import type { BigNumber } from './BigNumber';
 import { EquipmentSystem } from './EquipmentSystem';
@@ -23,6 +25,8 @@ import { expToNextLevel } from './LevelCurve';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import { recordMission } from './MissionProgress';
 import { periodKey } from './ShopSystem';
+import { incomeMultiplier, materialRates } from './VillageIncome';
+import { VillageQuests } from './VillageQuests';
 
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -36,6 +40,8 @@ export interface IdlePreview {
   skillEssence: number;
   phaseMaterials: number;
   items: { item: ItemId; amount: number }[];
+  /** 木材・鉄・石 for the village (it alone shows them). */
+  materials: Record<VillageMaterial, number>;
   /** Pieces of equipment so far (the claim adds a chance of one more). */
   equipment: number;
 }
@@ -73,8 +79,22 @@ export const IdleSystem = {
     return Math.min(elapsed, this.capHours(save, now));
   },
 
-  /** Per-hour rates for the player's progress (equipment excluded: see IDLE_EQUIP_PER_HOUR). */
-  perHour(save: SaveData): { gold: BigNumber; skillEssence: number; phaseMaterials: number; items: Record<ItemId, number> } {
+  /** ゴールド per hour at the stage reached, before the 村's 売上倍率 - what the village's prices are counted in. */
+  baseGoldPerHour(save: SaveData): BigNumber {
+    return ProgressionSystem.getStage(progressReference(save).stageIndex).rewardGold.mul(IDLE_GOLD_CLEARS_PER_HOUR);
+  },
+
+  /** 村の素材 an hour: the rate for the region reached plus what the village's 採集施設 add (木材・鉄・石). */
+  materialsPerHour(save: SaveData, now = Date.now()): Record<VillageMaterial, number> {
+    const { region } = progressReference(save);
+    const base = IDLE_VILLAGE_MATERIALS_PER_HOUR[region] ?? IDLE_VILLAGE_MATERIALS_PER_HOUR[0];
+    const gathered = materialRates(save, now);
+    return Object.fromEntries(VILLAGE_MATERIALS.map(({ id }) => [id, base[id] + gathered[id]])) as Record<VillageMaterial, number>;
+  },
+
+  /** Per-hour rates for the player's progress (equipment excluded: see IDLE_EQUIP_PER_HOUR). The gold is
+   *  the stage rate times the 村's 売上倍率 (1 for a village of one level-1 店). */
+  perHour(save: SaveData, now = Date.now()): { gold: BigNumber; skillEssence: number; phaseMaterials: number; items: Record<ItemId, number>; materials: Record<VillageMaterial, number> } {
     const { stageIndex, region } = progressReference(save);
     const stage = ProgressionSystem.getStage(stageIndex);
     const items = {} as Record<ItemId, number>;
@@ -85,17 +105,18 @@ export const IdleSystem = {
     const expPerHour = IDLE_EXP_LEVELS_PER_HOUR * expToNextLevel(level);
     for (const { item, share } of IDLE_EXP_SPLIT[region] ?? []) items[item] += (expPerHour * share) / (ITEMS[item].exp ?? 1);
     return {
-      gold: stage.rewardGold.mul(IDLE_GOLD_CLEARS_PER_HOUR),
+      gold: this.baseGoldPerHour(save).mul(incomeMultiplier(save, now)),
       skillEssence: stage.rewardSkillEssence * IDLE_ESSENCE_CLEARS_PER_HOUR,
       phaseMaterials: IDLE_PHASE_PER_HOUR,
       items,
+      materials: this.materialsPerHour(save, now),
     };
   },
 
   preview(save: SaveData, now = Date.now()): IdlePreview {
     const hours = this.hoursPiled(save, now);
     const capHours = this.capHours(save, now);
-    const rate = this.perHour(save);
+    const rate = this.perHour(save, now);
     return {
       hours,
       capHours,
@@ -104,6 +125,7 @@ export const IdleSystem = {
       skillEssence: Math.floor(rate.skillEssence * hours),
       phaseMaterials: Math.floor(rate.phaseMaterials * hours),
       items: (Object.keys(rate.items) as ItemId[]).map((item) => ({ item, amount: Math.floor(rate.items[item] * hours) })).filter((i) => i.amount > 0),
+      materials: Object.fromEntries(VILLAGE_MATERIALS.map(({ id }) => [id, Math.floor(rate.materials[id] * hours)])) as Record<VillageMaterial, number>,
       equipment: Math.floor(IDLE_EQUIP_PER_HOUR * hours),
     };
   },
@@ -120,6 +142,7 @@ export const IdleSystem = {
     SaveSystem.addSkillEssence(save, preview.skillEssence);
     SaveSystem.addPhaseMaterials(save, preview.phaseMaterials);
     for (const { item, amount } of preview.items) SaveSystem.addItem(save, item, amount);
+    SaveSystem.addMaterials(save, preview.materials);
 
     // Equipment drops whole: the fraction of a piece is a chance of one more.
     const exact = IDLE_EQUIP_PER_HOUR * preview.hours;
@@ -129,6 +152,7 @@ export const IdleSystem = {
 
     save.idle.lastClaimAt = now;
     recordMission(save, 'idle_claim', 1, now);
+    VillageQuests.record(save, 'claim', 1, now);
     return { preview: { ...preview, equipment: count }, equipment };
   },
 

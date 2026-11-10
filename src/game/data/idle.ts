@@ -1,4 +1,5 @@
 import type { ItemId } from './items';
+import type { VillageMaterial } from './village';
 
 /**
  * 放置報酬の数字。ゲームを閉じている間も、プレイヤーの進行度(クリア済みの
@@ -36,6 +37,15 @@ export const IDLE_EXP_SPLIT: { item: ItemId; share: number }[][] = [
 
 /** 装備強化素材 per hour, by region reached. */
 export const IDLE_EQUIP_ESSENCE_PER_HOUR: number[] = [2, 4, 6, 8, 10];
+
+/** 村の素材 (木材・鉄・石, data/village.ts) per hour, by region reached, before what the village's 採集施設 add. They are kept and shown by the village alone. */
+export const IDLE_VILLAGE_MATERIALS_PER_HOUR: Record<VillageMaterial, number>[] = [
+  { wood: 14, iron: 6, stone: 20 },
+  { wood: 22, iron: 10, stone: 32 },
+  { wood: 34, iron: 17, stone: 50 },
+  { wood: 50, iron: 27, stone: 76 },
+  { wood: 74, iron: 42, stone: 112 },
+];
 
 /** Pieces of equipment per hour, and which rarities they are: weights for ★1, ★2, ★3 by region. Low-level gear only. */
 export const IDLE_EQUIP_PER_HOUR = 0.6;

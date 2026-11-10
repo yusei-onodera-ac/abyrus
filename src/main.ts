@@ -24,6 +24,9 @@ import { GearPickScene } from './game/scenes/GearPickScene';
 import { HomeHeroScene } from './game/scenes/HomeHeroScene';
 import { MissionScene } from './game/scenes/MissionScene';
 import { IdleScene } from './game/scenes/IdleScene';
+import { ExpeditionScene } from './game/scenes/ExpeditionScene';
+import { WeekdayDungeonScene } from './game/scenes/WeekdayDungeonScene';
+import { VillageScene } from './game/scenes/VillageScene';
 import { PremiumScene } from './game/scenes/PremiumScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
@@ -67,6 +70,9 @@ const config: Phaser.Types.Core.GameConfig = {
     HomeHeroScene,
     MissionScene,
     IdleScene,
+    ExpeditionScene,
+    WeekdayDungeonScene,
+    VillageScene,
     PremiumScene,
     ShopScene,
     SettingsScene,
