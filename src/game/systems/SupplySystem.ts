@@ -1,4 +1,5 @@
 import { SUPPLY_BOTH_BONUS, SUPPLY_SLOTS, getSupplySlot, type SupplySlot, type SupplySlotId } from '../data/supply';
+import { recordMission } from './MissionProgress';
 import { RewardSystem, type GrantedReward } from './RewardSystem';
 import type { SaveData } from './SaveSystem';
 import { periodKey } from './ShopSystem';
@@ -107,6 +108,7 @@ export const SupplySystem = {
     const day = periodKey('day', now);
     if (save.supply.day !== day) save.supply = { day, claimed: [], bonus: false };
     save.supply.claimed.push(slot.id);
+    recordMission(save, 'supply', 1, now);
     const granted = RewardSystem.grantAll(save, slot.rewards, rng);
     let bonus: GrantedReward[] = [];
     if (!save.supply.bonus && SupplySystem.allTaken(save, now)) {

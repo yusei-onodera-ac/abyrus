@@ -47,6 +47,10 @@ export class ResourceBar extends Phaser.GameObjects.Container {
   private expRing?: Phaser.GameObjects.Graphics;
   private levelPos?: { x: number; y: number };
   private nameText?: Phaser.GameObjects.Text;
+  /** The three readouts of the plank (ゴールド / 魔晶石 / スタミナ), laid out again whenever a number changes width. */
+  private slots?: { icon: Phaser.GameObjects.Image; text: Phaser.GameObjects.Text; plus: Phaser.GameObjects.Container }[];
+  private slotRange = { left: 172, right: 700 };
+  private staminaWidth = 0;
   /** True when the real topbar artwork is in use, so callers (HomeScene's
    *  separate "ABYRUS" wordmark) can skip anything the art already shows. */
   readonly hasArt: boolean;
@@ -152,14 +156,25 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       this.gemText = scene.add.text(gemPos.x + 2, gemPos.y, '', statStyle('#bfeaff')).setOrigin(0, 0.5);
       this.add([goldIcon, this.goldText, gemIconImg, this.gemText]);
 
-      this.add(this.buildPlus(goldPos.x + PLUS_OFFSET, goldPos.y, 'gold', onPlus));
-      this.add(this.buildPlus(gemPos.x + PLUS_OFFSET, gemPos.y, 'gems', onPlus));
+      const goldPlus = this.buildPlus(goldPos.x + PLUS_OFFSET, goldPos.y, 'gold', onPlus);
+      const gemPlus = this.buildPlus(gemPos.x + PLUS_OFFSET, gemPos.y, 'gems', onPlus);
+      this.add([goldPlus, gemPlus]);
+      this.slots = [
+        { icon: goldIcon, text: this.goldText, plus: goldPlus },
+        { icon: gemIconImg, text: this.gemText, plus: gemPlus },
+      ];
       if (staminaPos) {
         const staminaIconImg = statIcon(scene, 'currency_stamina', staminaIcon(scene, 32), staminaPos.x - 17, staminaPos.y, 38);
         this.staminaText = scene.add.text(staminaPos.x + 2, staminaPos.y, '', statStyle('#ffd9a0')).setOrigin(0, 0.5);
         this.add([staminaIconImg, this.staminaText]);
-        this.add(this.buildPlus(staminaPos.x + PLUS_OFFSET, staminaPos.y, 'stamina', onPlus));
+        const staminaPlus = this.buildPlus(staminaPos.x + PLUS_OFFSET, staminaPos.y, 'stamina', onPlus);
+        this.add(staminaPlus);
+        this.slots.push({ icon: staminaIconImg, text: this.staminaText, plus: staminaPlus });
+        // The width the stamina readout needs at its widest ("00/00"), measured once so that it does not make the rest jump about.
+        this.staminaText.setText('00/00');
+        this.staminaWidth = this.staminaText.width;
       }
+      this.slotRange = { left: width * (172 / 720), right: width - width * (20 / 720) };
     } else {
       const goldIcon = statIcon(scene, 'currency_coin', coinIcon(scene, 26), goldPos.x, goldPos.y, 30);
       const gemIconImg = statIcon(scene, 'currency_gem', gemIcon(scene, 22), gemPos.x, gemPos.y, 26);
@@ -218,6 +233,41 @@ export class ResourceBar extends Phaser.GameObjects.Container {
     this.save = save;
     this.showStamina();
     this.startTicker();
+    this.layoutSlots();
+  }
+
+  /** Spreads the three readouts along the plank by what their numbers need: the number of ゴールド can be 13 digits or
+   *  more (always shown in full), so it takes what the others leave and is only made smaller when even that is too little. */
+  private layoutSlots(): void {
+    if (!this.slots || this.slots.length < 3) return;
+    const [gold, gem, stamina] = this.slots;
+    const ICON = 38;
+    const PAD = 4;
+    const PLUS_GAP = 6;
+    const PLUS_W = PLUS_RADIUS * 2;
+    const MIN_GAP = 10;
+    const natural = (t: Phaser.GameObjects.Text): number => {
+      t.setScale(1);
+      return t.width;
+    };
+    const wGem = natural(gem.text);
+    const wStamina = Math.max(this.staminaWidth, natural(stamina.text));
+    const wGold = natural(gold.text);
+    const room = this.slotRange.right - this.slotRange.left;
+    const fixed = 3 * (ICON + PAD + PLUS_GAP + PLUS_W) + wGem + wStamina;
+    const goldBudget = room - fixed - 2 * MIN_GAP;
+    const k = wGold > 0 ? Math.max(0.45, Math.min(1, goldBudget / wGold)) : 1;
+    gold.text.setScale(k);
+    const widths = [wGold * k, wGem, wStamina];
+    // Whatever room is left is shared out between the slots (never more than a comfortable 70px).
+    const gap = Math.max(MIN_GAP, Math.min(70, (room - fixed - widths[0]) / 2));
+    let x = this.slotRange.left;
+    [gold, gem, stamina].forEach((slot, i) => {
+      slot.icon.x = x + ICON / 2;
+      slot.text.x = x + ICON + PAD;
+      slot.plus.x = x + ICON + PAD + widths[i] + PLUS_GAP + PLUS_W / 2;
+      x = slot.plus.x + PLUS_W / 2 + gap;
+    });
   }
 
   /** A gold arc around the level circle: how far to the next プレイヤーレベル. */

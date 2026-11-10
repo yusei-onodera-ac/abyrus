@@ -13,7 +13,7 @@ import type { Reward } from './rewards';
  * A few (`stage_cleared`, `player_level`, `hero_kinds`) are read from the save itself and
  * only make sense for 実績.
  */
-export type MissionKey = 'quest_clear' | 'stamina' | 'gacha_pull' | 'hero_enhance' | 'equip_enhance' | 'idle_claim' | 'infinite_run' | 'expedition' | 'village_build';
+export type MissionKey = 'quest_clear' | 'stamina' | 'gacha_pull' | 'hero_enhance' | 'equip_enhance' | 'idle_claim' | 'infinite_run' | 'expedition' | 'village_build' | 'supply';
 export type StatKey = 'stage_cleared' | 'player_level' | 'hero_kinds';
 
 export interface MissionDef {
@@ -51,6 +51,8 @@ const DAILY: MissionDef[] = [
   // Two: one on the way out in the morning, one on the way home in the evening.
   { id: 'expedition2', title: '遠征から2回帰還させる', key: 'expedition', target: 2, reward: { type: 'gems', amount: 30 } },
   { id: 'village1', title: '村の建物を建てる・強くする（1回）', key: 'village_build', target: 1, reward: { type: 'gems', amount: 30 } },
+  // Both of the day's 朝夕の補給 (data/supply.ts).
+  { id: 'supply2', title: '朝夕の補給を2回受け取る', key: 'supply', target: 2, reward: { type: 'gems', amount: 20 } },
 ];
 
 const WEEKLY: MissionDef[] = [
@@ -64,6 +66,7 @@ const WEEKLY: MissionDef[] = [
   { id: 'w_infinite5', title: '無限モードに5回挑戦する', key: 'infinite_run', target: 5, reward: { type: 'phaseMaterials', amount: 3 } },
   { id: 'w_expedition10', title: '遠征から10回帰還させる', key: 'expedition', target: 10, reward: { type: 'gems', amount: 100 } },
   { id: 'w_village5', title: '村の建物を建てる・強くする（5回）', key: 'village_build', target: 5, reward: { type: 'gems', amount: 100 } },
+  { id: 'w_supply10', title: '朝夕の補給を10回受け取る', key: 'supply', target: 10, reward: { type: 'gems', amount: 100 } },
 ];
 
 /** 実績: one-time goals, in the order they are met. */
@@ -98,6 +101,7 @@ const TOTAL: MissionDef[] = [
   { id: 't_expedition1', title: '遠征から初めて帰還させる', key: 'expedition', target: 1, reward: { type: 'gems', amount: 30 } },
   { id: 't_expedition20', title: '遠征から合計20回帰還させる', key: 'expedition', target: 20, reward: { type: 'item', item: 'equip_essence', amount: 200 } },
   { id: 't_expedition100', title: '遠征から合計100回帰還させる', key: 'expedition', target: 100, reward: { type: 'phaseMaterials', amount: 5 } },
+  { id: 't_supply30', title: '朝夕の補給を合計30回受け取る', key: 'supply', target: 30, reward: { type: 'gems', amount: 100 } },
   { id: 't_village1', title: '村で初めて建物を建てる', key: 'village_build', target: 1, reward: { type: 'gems', amount: 30 } },
   { id: 't_village30', title: '村の建物を合計30回、建てる・強くする', key: 'village_build', target: 30, reward: { type: 'item', item: 'equip_essence', amount: 200 } },
   { id: 't_village150', title: '村の建物を合計150回、建てる・強くする', key: 'village_build', target: 150, reward: { type: 'phaseMaterials', amount: 5 } },
