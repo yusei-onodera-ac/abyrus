@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { knownAudio } from './MusicSystem';
 import { SettingsSystem } from './SettingsSystem';
 import type { SaveData } from './SaveSystem';
 
@@ -70,6 +71,20 @@ const SFX: Record<Sfx, Tone[]> = {
   ],
 };
 
+/** A sound effect that has a file plays that instead of the tones above (SE: public/assets/audio/se/<name>.mp3; the
+ *  victory / defeat / level-up jingles: public/assets/audio/bgm/<name>.mp3). Until the file is known to exist, the tones play. */
+const SFX_FILES: Partial<Record<Sfx, string>> = {
+  tap: '/assets/audio/se/tap.mp3',
+  hit: '/assets/audio/se/hit.mp3',
+  crit: '/assets/audio/se/crit.mp3',
+  skill: '/assets/audio/se/skill.mp3',
+  heal: '/assets/audio/se/heal.mp3',
+  boom: '/assets/audio/se/boom.mp3',
+  victory: '/assets/audio/bgm/victory.mp3',
+  defeat: '/assets/audio/bgm/defeat.mp3',
+  levelup: '/assets/audio/bgm/levelup.mp3',
+};
+
 /** A sound that fires again within this many ms is skipped (a fight can ask for a hit sound every few frames). */
 const MIN_GAP_MS: Partial<Record<Sfx, number>> = { hit: 70, crit: 90, skill: 120, heal: 120, tap: 40, boom: 90 };
 /** Loudest the effects go at full volume (0..1 of the output). */
@@ -97,6 +112,15 @@ export const SoundSystem = {
     const gap = MIN_GAP_MS[sfx] ?? 0;
     if (now - (lastPlayed.get(sfx) ?? -Infinity) < gap) return;
     lastPlayed.set(sfx, now);
+
+    const file = SFX_FILES[sfx];
+    if (file && knownAudio(file)) {
+      const audio = new Audio(file);
+      audio.volume = Math.min(1, Math.pow(volume, 1.5));
+      audio.addEventListener('error', () => undefined);
+      void audio.play().catch(() => undefined);
+      return;
+    }
 
     const ac = audioContext();
     if (!ac) return;

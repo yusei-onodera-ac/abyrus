@@ -333,7 +333,37 @@ const construction = [
   },
 ];
 
-export const MANIFEST = [...items, ...gear, ...banners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction];
+// ---------------------------------------------------------------------------------------------- event banners (3) and a notice (1)
+const EVENT =
+  'A wide banner picture for an event card in a mobile fantasy RPG, painted by hand in a rich, glossy anime-game style with strong lighting and a sense of excitement. Keep the left third calmer so a title can be placed over it later. ' + NO_TEXT;
+const events = [
+  ['infinite', 'the Infinite Mode endless trial: a lone circular arena platform floating in a dark violet void, endless waves of glowing red-eyed shadow silhouettes approaching from the horizon, a huge glowing infinity-shaped rune ring in the sky, orange and violet light, tense and epic'],
+  ['premium', 'a royal premium pass: a gleaming golden crown on a velvet cushion surrounded by floating gems, golden wings of light and sparkling coins, a rich gold-and-royal-blue palette, luxurious'],
+  ['sample', 'a seasonal festival: a lively fantasy village square with colourful lanterns, banners, fireworks in a twilight sky and drifting petals, a warm green-and-gold palette, joyful'],
+].map(([id, what]) => ({
+  id: `event_${id}`,
+  group: 'events',
+  out: `events/${id}.jpg`,
+  mode: 'jpg',
+  size: [1050, 450],
+  aspect: '21:9',
+  refs: ['gacha/new_gacha.jpg'],
+  prompt: `${EVENT} The scene: ${what}.`,
+}));
+const notices = [
+  {
+    id: 'notice_welcome',
+    group: 'events',
+    out: 'notices/welcome.jpg',
+    mode: 'jpg',
+    size: [1024, 576],
+    aspect: '16:9',
+    refs: ['gacha/new_gacha.jpg'],
+    prompt: `${EVENT} The scene: a welcome to a new fantasy adventure - a vast green valley seen from a hill at sunrise, a small village far below, a distant tower and a trail leading to it, a small black crow flying in the sunlit sky, warm golden light, hopeful.`,
+  },
+];
+
+export const MANIFEST = [...items, ...gear, ...banners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...notices];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

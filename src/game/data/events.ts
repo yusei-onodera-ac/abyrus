@@ -41,6 +41,7 @@ export const EVENTS: EventEntry[] = [
     id: 'infinite',
     kind: 'infinite',
     title: '無限モード',
+    image: 'infinite.jpg',
     description: '編成したパーティで、どこまで耐えられるか。ランキングに挑め！',
     accent: 0xc7701c,
     emblem: '∞',
@@ -50,6 +51,7 @@ export const EVENTS: EventEntry[] = [
     kind: 'premium',
     actionLabel: '詳細・購入',
     title: 'プレミアムパス',
+    image: 'premium.jpg',
     description: '毎日魔晶石がもらえて、戦闘2倍速・連戦モード・放置報酬の上限アップも。',
     accent: 0xc79a2a,
     emblem: '♛',
@@ -59,6 +61,7 @@ export const EVENTS: EventEntry[] = [
   {
     id: 'sample-upcoming',
     title: '期間限定イベント（サンプル）',
+    image: 'sample.jpg',
     description: '開催予定のイベントは、期間つきでこのように表示されます。',
     accent: 0x3f7a3a,
     emblem: '祭',

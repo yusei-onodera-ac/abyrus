@@ -32,3 +32,5 @@ dist-ssr
 # Art generation (tools/art): raw model output and the review copies are not kept in git
 tools/art/raw/
 tools/art/out/
+tools/audio/raw/
+tools/audio/out/

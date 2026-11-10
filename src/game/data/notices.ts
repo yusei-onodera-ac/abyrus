@@ -33,6 +33,7 @@ export const NOTICES: NoticeEntry[] = [
     category: 'お知らせ',
     title: 'ABYRUSへようこそ',
     date: '2026/10/28',
+    image: 'welcome.jpg',
     body:
       'ABYRUSをご利用いただきありがとうございます。\n\n' +
       'クエストで経験値とゴールドを集め、ガチャで仲間を増やして、あなただけの編成を作りましょう。\n\n' +

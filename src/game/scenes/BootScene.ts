@@ -3,6 +3,7 @@ import { SaveSystem } from '../systems/SaveSystem';
 import { applyMockFromUrl, battleFromUrl } from '../systems/MockSave';
 import { openingRoute } from '../systems/QuestRoute';
 import { TutorialDirector } from '../systems/TutorialDirector';
+import { MusicDirector } from '../systems/MusicSystem';
 import { parseFriendInput } from '../systems/SocialSystem';
 import { HERO_ROSTER } from '../data/heroes';
 import { ENEMY_ART_IDS } from '../data/regions';
@@ -72,6 +73,7 @@ export class BootScene extends Phaser.Scene {
     const friendId = code ? parseFriendInput(code) : null;
     if (code) history.replaceState(null, '', location.pathname);
     TutorialDirector.install(this.game);
+    MusicDirector.install(this.game);
     const battle = battleFromUrl();
     if (battle) this.scene.start(battle.scene, battle.data);
     else if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
