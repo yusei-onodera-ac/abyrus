@@ -37,6 +37,16 @@ export const VILLAGE_ART_PREFIX = 'village_';
 export const VILLAGE_GROUND_KEY = `${VILLAGE_ART_PREFIX}ground`;
 const SITE_KEY = `${VILLAGE_ART_PREFIX}construction`;
 
+/** The village's own plot of land, one picture per stage of growth (public/assets/village/ground_<tier>.png): tier 1 is a
+ *  rural plot (castle Lv1-2), 2 a town (Lv3-4), 3 a royal city (Lv5-6). A transparent picture of the flat diamond. */
+export const VILLAGE_PLOT_TIERS = 3;
+export function villagePlotKey(tier: number): string {
+  return `${VILLAGE_ART_PREFIX}ground_${tier}`;
+}
+export function villagePlotTier(castleLevel: number): number {
+  return Math.max(1, Math.min(VILLAGE_PLOT_TIERS, Math.ceil(castleLevel / 2)));
+}
+
 export function villageArtKey(kind: BuildingKind, level: number): string {
   return `${VILLAGE_ART_PREFIX}${kind}_${level}`;
 }
@@ -46,6 +56,7 @@ export function preloadVillageArt(scene: Phaser.Scene): void {
   for (const def of BUILDINGS) for (let level = 1; level <= def.levels.length; level++) scene.load.image(villageArtKey(def.kind, level), `assets/village/${def.kind}_${level}.png`);
   scene.load.image(SITE_KEY, 'assets/village/construction.png');
   scene.load.image(VILLAGE_GROUND_KEY, 'assets/village/ground.png');
+  for (let tier = 1; tier <= VILLAGE_PLOT_TIERS; tier++) scene.load.image(villagePlotKey(tier), `assets/village/ground_${tier}.png`);
 }
 
 /** The picture for `kind` at `level`: that level's, else the nearest lower one, else the nearest higher one. */

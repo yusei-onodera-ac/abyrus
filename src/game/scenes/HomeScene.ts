@@ -10,6 +10,7 @@ import { clipboardIcon, expeditionIcon, hourglassIcon, supplyIcon, villageIcon }
 import { SUPPLY_SLOTS } from '../data/supply';
 import { SupplySystem } from '../systems/SupplySystem';
 import { openSupplyModal } from '../ui/SupplyModal';
+import { VillageGoals } from '../systems/VillageGoals';
 import { ExpeditionSystem } from '../systems/ExpeditionSystem';
 import { VillageSystem } from '../systems/VillageSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
@@ -376,6 +377,8 @@ export class HomeScene extends Phaser.Scene {
         const summary = VillageSystem.summary(save, now);
         const job = VillageSystem.hasJob(save, now);
         const need = VillageSystem.attention(save, now);
+        // 村の目標 that are met and not yet collected.
+        const goals = VillageGoals.claimable(save, now).length;
         // The most pressing thing first: a 襲撃 waiting, then broken buildings, 依頼 to collect, 行商人 / 宝箱 on the map.
         const state = need.raid
           ? { main: '襲撃！', mainColor: '#ff9a8a', sub: `あと ${StaminaSystem.formatDuration(VillageSystem.raidSecondsLeft(save, now))}` }
@@ -383,14 +386,16 @@ export class HomeScene extends Phaser.Scene {
             ? { main: '壊れています', mainColor: '#ffb07a', sub: `${need.broken}件　直しましょう` }
             : need.quests > 0
               ? { main: '依頼の報酬', mainColor: '#9fe39f', sub: `${need.quests}件　受け取れます` }
-              : need.wanderers > 0
+              : goals > 0
+                ? { main: '村の目標', mainColor: '#9fe39f', sub: `${goals}件　達成しています` }
+                : need.wanderers > 0
                 ? { main: '宝箱・行商人', mainColor: '#9fe39f', sub: '村で受け取れます' }
                 : job
                   ? { main: '建てられます', mainColor: '#9fe39f', sub: `売上 ×${summary.multiplier.toFixed(2)}` }
                   : summary.busy > 0
                     ? { main: `建築中 ${summary.busy}/${summary.builders}`, mainColor: '#fff4dc', sub: `あと ${StaminaSystem.formatDuration(summary.nextSeconds)}` }
                     : { main: `売上 ×${summary.multiplier.toFixed(2)}`, mainColor: '#fff4dc', sub: 'ゴールドをためよう' };
-        const dot = need.raid || need.broken > 0 || need.quests > 0 || need.wanderers > 0 || job;
+        const dot = need.raid || need.broken > 0 || need.quests > 0 || goals > 0 || need.wanderers > 0 || job;
         return { ...state, pips: Array.from({ length: summary.builders }, (_, i) => (i < summary.busy ? 'busy' : 'empty')), dot };
       },
     });

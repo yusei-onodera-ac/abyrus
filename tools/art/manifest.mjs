@@ -513,7 +513,63 @@ const logo = [
   },
 ];
 
-export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo];
+// ---------------------------------------------------------------------------------------------- village land (3 tiers) and people (2 sheets)
+const LAND =
+  'A game-map plot for a mobile base-building game, painted by hand in the same clean, bright, bold-outline style as the reference buildings (like Clash of Clans or Rise of Kingdoms). ' +
+  'ONE single flat diamond-shaped (rhombus, exactly 2:1 proportion) piece of ground seen from above at a 2:1 dimetric angle: its left and right corners touch the left and right edges of the picture, its top and bottom corners almost touch the top and bottom edges. ' +
+  'The ground is completely flat, with no cliff, no thickness, no walls rising up and no shadow outside the diamond; everything outside the diamond is plain pure white. ' +
+  'Soft, low-contrast detail only (the player will put buildings on it, so it must stay calm and readable): no buildings, no houses, no tents, no people, no animals, no large trees in the middle. ' + NO_TEXT + ' ';
+const land = [
+  ['1', 'a humble rural village plot (the castle is level 1-2): mostly plain grass in two close shades with soft darker and lighter patches, one thin winding dirt path, a few wildflowers and small stones, a tiny pond in one corner, and a border of low bushes and wooden stakes right at the diamond edge'],
+  ['2', 'a growing town plot (the castle is level 3-4): neat lawns with cobblestone paths crossing in the middle and a ring-shaped plaza, flower beds, a small stream with a wooden bridge along one edge, iron lantern posts along the paths, and a border of tidy hedges right at the diamond edge'],
+  ['3', 'a grand royal city plot (the castle is level 5-6): manicured lawns with trimmed topiary, wide white marble and gold-trimmed paved paths forming a large plaza, a long ornamental canal with clear water along one edge, golden lamp posts, and a border of white stone balustrade with gold finials right at the diamond edge'],
+].map(([tier, what]) => ({
+  id: `village_ground_${tier}`,
+  group: 'land',
+  out: `village/ground_${tier}.png`,
+  mode: 'cutout',
+  size: [3744, 1872],
+  fit: 'trim',
+  aspect: '16:9',
+  refs: ['village/castle_3.png', 'village/house_3.png'],
+  refNote: 'The reference pictures show only the painting style and colours of the buildings; do not draw any buildings.',
+  prompt: `${LAND}The ground: ${what}.`,
+}));
+
+const PEOPLE =
+  'A character sheet of tiny cute chibi fantasy villagers for an isometric mobile base-building game, painted by hand in a clean, bright, bold-outline style like the reference buildings. ' +
+  'Exactly eight different characters in two rows of four, evenly spaced on a plain pure white background, each fully visible head to toe, none touching or overlapping another, all about the same height, standing in a relaxed pose seen from a 3/4 front view (turned slightly to the right). ' + NO_TEXT + ' ';
+const peopleSheets = [
+  {
+    id: 'people_villagers',
+    group: 'people',
+    out: 'village/people/_sheet_villagers.png',
+    mode: 'sheet',
+    cells: ['p_farmer', 'p_woman', 'p_child', 'p_merchant', 'p_guard', 'p_builder', 'p_old', 'p_girl'],
+    cols: 4,
+    height: 256,
+    aspect: '16:9',
+    refs: ['village/house_2.png'],
+    prompt: `${PEOPLE}Row one, left to right: a farmer with a straw hat and a hoe; a village woman in an apron carrying a basket of bread; a small boy in simple clothes; a travelling merchant with a big backpack and a turban. Row two, left to right: a town guard in a helmet holding a spear; a builder in work clothes with a hammer over his shoulder; an elderly bearded man with a walking cane; a little girl with pigtails and a red dress.`,
+  },
+  {
+    id: 'people_animals',
+    group: 'people',
+    out: 'village/people/_sheet_animals.png',
+    mode: 'sheet',
+    cells: ['a_cat', 'a_dog', 'a_chicken', 'a_sheep', 'a_pig', 'a_cow'],
+    cols: 3,
+    height: 192,
+    aspect: '16:9',
+    refs: ['village/house_2.png'],
+    prompt:
+      'A character sheet of six cute chibi farm animals for an isometric mobile base-building game, painted by hand in a clean, bright, bold-outline style like the reference buildings. ' +
+      'Exactly six different animals in two rows of three, evenly spaced on a plain pure white background, each fully visible, none touching or overlapping another, all about the same size, standing seen from a 3/4 front view (turned slightly to the right). ' +
+      'Row one, left to right: an orange tabby cat; a brown and white dog; a white chicken with a red comb. Row two, left to right: a fluffy white sheep; a pink pig; a brown and white cow. ' + NO_TEXT,
+  },
+];
+
+export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

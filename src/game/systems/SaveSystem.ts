@@ -190,6 +190,13 @@ export interface VillageQuestState {
   claimed: string[];
 }
 
+/** 村の目標 (data/villageGoals.ts): which goals have been collected, and how much 素材 has come in all told (the one thing the
+ *  goals count that nothing else in the save remembers). */
+export interface VillageMilestones {
+  claimed: string[];
+  gathered: number;
+}
+
 export interface VillageState {
   buildings: PlacedBuilding[];
   /** Next number for a new building's id. */
@@ -201,6 +208,7 @@ export interface VillageState {
   quests: VillageQuestState;
   wanderers: { lastSpawnAt: number; items: Wanderer[] };
   raid: VillageRaid;
+  milestones: VillageMilestones;
 }
 
 export interface SaveData {
@@ -426,6 +434,7 @@ function defaultVillage(now = Date.now()): VillageState {
     quests: { day: '', counts: {}, claimed: [] },
     wanderers: { lastSpawnAt: now, items: [] },
     raid: { nextAt: now + RAID_INTERVAL_HOURS * 3600 * 1000, pending: null, report: null, won: 0 },
+    milestones: { claimed: [], gathered: 0 },
   };
 }
 
@@ -488,6 +497,14 @@ function restoreQuests(raw: Partial<VillageQuestState> | undefined): VillageQues
     day: typeof raw?.day === 'string' ? raw.day : '',
     counts,
     claimed: Array.isArray(raw?.claimed) ? raw.claimed.filter((id): id is string => typeof id === 'string') : [],
+  };
+}
+
+/** The saved 村の目標 record: ids once each (an id that no longer names a goal is kept: harmless), and a whole-number count. */
+function restoreMilestones(raw: Partial<VillageMilestones> | undefined): VillageMilestones {
+  return {
+    claimed: Array.isArray(raw?.claimed) ? [...new Set(raw.claimed.filter((id): id is string => typeof id === 'string'))] : [],
+    gathered: finiteNumber(raw?.gathered) ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(raw.gathered))) : 0,
   };
 }
 
@@ -561,6 +578,7 @@ function restoreVillage(raw: Partial<VillageState> | undefined): VillageState {
     quests: restoreQuests(raw.quests),
     wanderers: restoreWanderers(raw.wanderers, now),
     raid: restoreRaid(raw.raid, now),
+    milestones: restoreMilestones(raw.milestones),
   };
 }
 
@@ -729,7 +747,11 @@ export const SaveSystem = {
   addMaterials(data: SaveData, bundle: MaterialBundle): void {
     for (const { id } of VILLAGE_MATERIALS) {
       const amount = Math.floor(bundle[id] ?? 0);
-      if (amount > 0) data.village.materials[id] = Math.min(MATERIAL_CAP, (data.village.materials[id] ?? 0) + amount);
+      if (amount > 0) {
+        data.village.materials[id] = Math.min(MATERIAL_CAP, (data.village.materials[id] ?? 0) + amount);
+        // Counted for the 村の目標 ("素材を累計 N 集める").
+        data.village.milestones.gathered = Math.min(MATERIAL_CAP, data.village.milestones.gathered + amount);
+      }
     }
   },
 

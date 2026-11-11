@@ -199,6 +199,40 @@ def finish_logo(raw, entry):
     return img
 
 
+def finish_sheet(raw, entry, target_dir):
+    """A character sheet: every figure cut out and saved on its own (entry['cells'], reading order), each `height` px tall.
+    Returns the pictures made, for the contact sheet."""
+    img = cut_out(raw, min_speck=300, holes=True, hole_tol=3, hole_ring=False, hole_area=0.0004)
+    alpha = np.asarray(img.getchannel('A')) > 12
+    # Merge a figure's loose parts (a hat, a tool) into one blob, then label.
+    merged = ndimage.binary_dilation(alpha, iterations=14)
+    labels, n = ndimage.label(merged)
+    boxes = []
+    for i in range(1, n + 1):
+        ys, xs = np.where((labels == i) & alpha)
+        if len(xs) < 1500:
+            continue
+        boxes.append((xs.min(), ys.min(), xs.max() + 1, ys.max() + 1))
+    cells = entry['cells']
+    cols = entry['cols']
+    if len(boxes) != len(cells):
+        raise ValueError(f'found {len(boxes)} figures, expected {len(cells)}')
+    # Reading order: rows by vertical centre, then left to right.
+    boxes.sort(key=lambda b: (b[1] + b[3]) / 2)
+    rows = [sorted(boxes[r * cols:(r + 1) * cols], key=lambda b: b[0]) for r in range(len(cells) // cols)]
+    ordered = [b for row in rows for b in row]
+    made = []
+    for cell, box in zip(cells, ordered):
+        fig = img.crop(box)
+        h = entry['height']
+        fig = fig.resize((max(1, round(fig.width * h / fig.height)), h), Image.LANCZOS)
+        path = target_dir / f'{cell}.png'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fig.save(path, optimize=True)
+        made.append((cell, fig))
+    return made
+
+
 def finish_tile(raw, entry):
     img = cut_out(raw, min_speck=200)
     box = bbox_of(img)
@@ -270,6 +304,12 @@ def main():
         try:
             raw = Image.open(raw_path)
             raw.load()
+            if entry['mode'] == 'sheet':
+                made = finish_sheet(raw, entry, (ASSETS if INSTALL else OUT) / 'village' / 'people')
+                for cell, fig in made:
+                    done.setdefault(entry['group'], []).append(({'id': cell}, fig))
+                    print(f"ok   {cell} ({entry['id']})  {fig.size[0]}x{fig.size[1]}")
+                continue
             if entry['mode'] == 'cutout':
                 result = finish_cutout(raw, entry)
             elif entry['mode'] == 'tile':
