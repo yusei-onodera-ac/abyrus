@@ -488,7 +488,8 @@ const loading = [
     prompt:
       'A tall portrait key-art splash picture used as the loading screen of a Japanese mobile fantasy RPG named ABYRUS, painted by hand in a rich, glossy anime-game style with dramatic lighting. ' +
       'The five heroes from the first references stand together in the lower middle of the picture, heroic and ready for battle, while the giant monsters from the last references loom threateningly behind them in the dark stormy sky of a ruined tower landscape, with a huge glowing red-and-gold ring in the sky. ' +
-      'The top fifth of the picture is calm dark sky (a title will be placed there later) and the bottom tenth is a calm dark foreground (a loading bar will be placed there). ' + NO_TEXT,
+      'The picture is full-bleed: the scene runs to all four edges of the canvas, with NO black bars, NO letterbox bands, NO borders and NO empty margins anywhere. ' +
+      'The top fifth of the picture is calm, darker stormy sky and cloud (a title will be placed over it later) and the bottom tenth is calm dark rocky ground (a loading bar will be placed over it), both still painted scenery. ' + NO_TEXT,
   },
 ];
 
