@@ -21,7 +21,7 @@ import { GACHA_BANNERS } from '../data/gachaBanners';
 import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
-import { heading, caption, COLORS } from '../ui/theme';
+import { heading, caption, CHROME } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -88,33 +88,75 @@ export class BootScene extends Phaser.Scene {
 
   private buildLoadingUi(): void {
     this.cameras.main.setBackgroundColor('#0a0b12');
+    // Until the pictures below are in (they are the first things asked for), a plain centred title and bar.
     const title = heading(this, 360, 560, 'ABYRUS', { fontSize: '46px' }).setOrigin(0.5).setDepth(5);
     const tagline = caption(this, 360, 610, '無限算盤の子', { fontSize: '14px' }).setOrigin(0.5).setDepth(5);
 
-    const barWidth = 360;
-    const barHeight = 10;
-    const barY = 690;
-    const track = this.add.rectangle(360, barY, barWidth, barHeight, 0x1b1d29, 0.9).setStrokeStyle(1, COLORS.border).setDepth(5);
-    const fill = this.add.rectangle(360 - barWidth / 2, barY, barWidth, barHeight - 4, COLORS.accentBright).setOrigin(0, 0.5).setScale(0, 1).setDepth(6);
-    const percentLabel = caption(this, 360, barY + 26, '0%').setOrigin(0.5).setDepth(5);
+    const barW = 420;
+    const barH = 16;
+    let barY = 690;
+    let progress = 0;
+    const bar = this.add.graphics().setDepth(5);
+    const label = caption(this, 360, 0, '0%', { fontSize: '20px', color: '#f0dfb0', stroke: '#0a0b12', strokeThickness: 4 }).setOrigin(0.5).setDepth(6);
+    const left = 360 - barW / 2;
+    const drawBar = (): void => {
+      bar.clear();
+      bar.fillStyle(0x0a0b12, 0.85);
+      bar.fillRoundedRect(left - 5, barY - barH / 2 - 5, barW + 10, barH + 10, 13);
+      bar.fillStyle(0x1b1d29, 1);
+      bar.fillRoundedRect(left, barY - barH / 2, barW, barH, 8);
+      if (progress > 0) {
+        const w = Math.max(16, barW * progress);
+        bar.fillStyle(0xe0822a, 1);
+        bar.fillRoundedRect(left, barY - barH / 2, w, barH, 8);
+        bar.fillStyle(0xffffff, 0.28);
+        bar.fillRoundedRect(left + 2, barY - barH / 2 + 2, Math.max(12, w - 4), barH / 2 - 2, 4);
+      }
+      bar.lineStyle(2, CHROME.brass, 1);
+      bar.strokeRoundedRect(left - 1, barY - barH / 2 - 1, barW + 2, barH + 2, 9);
+      label.setY(barY + 32);
+    };
+    drawBar();
 
-    // The key art (public/assets/ui/loading.jpg) is the first thing asked for, so it is up within a moment: the title goes
-    // to the dark band at its top and the bar to the dark band at its bottom. Without it the plain centred layout stays.
+    // Key art (public/assets/ui/loading.jpg) behind everything, the bar on its dark band at the bottom; and the logo
+    // (public/assets/ui/logo.png) in place of the plain title, with a slow golden shimmer. Both are optional.
     const artKey = 'loading_art';
+    const logoKey = 'loading_logo';
+    let artReady = false;
+    let logo: Phaser.GameObjects.Image | undefined;
+    let shimmer: Phaser.GameObjects.Image | undefined;
+    const layout = (): void => {
+      if (artReady) barY = 1200;
+      if (logo && shimmer) {
+        const y = artReady ? 172 : 330;
+        logo.setY(y);
+        shimmer.setY(y);
+        tagline.setY(y + logo.displayHeight / 2 + 26);
+      }
+      drawBar();
+    };
     this.load.image(artKey, '/assets/ui/loading.jpg');
+    this.load.image(logoKey, '/assets/ui/logo.png');
     this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}image-${artKey}`, () => {
       this.add.image(360, 640, artKey).setDisplaySize(720, 1280).setDepth(-10);
-      title.setY(78).setFontSize(54);
-      tagline.setY(128).setFontSize(18);
-      const y = 1206;
-      track.setY(y);
-      fill.setY(y);
-      percentLabel.setY(y + 28).setFontSize(18);
+      artReady = true;
+      layout();
+    });
+    this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}image-${logoKey}`, () => {
+      title.setVisible(false);
+      const scale = 450 / this.textures.get(logoKey).getSourceImage().width;
+      logo = this.add.image(360, 172, logoKey).setScale(scale * 0.94).setAlpha(0).setDepth(7);
+      shimmer = this.add.image(360, 172, logoKey).setScale(scale * 0.94).setAlpha(0).setDepth(6).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd98a);
+      this.tweens.add({ targets: logo, alpha: 1, scale, duration: 600, ease: 'Cubic.easeOut' });
+      this.tweens.add({ targets: shimmer, alpha: { from: 0, to: 0.32 }, scale: scale * 1.03, duration: 1500, delay: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      tagline.setFontSize(24).setColor('#f0dfb0').setStroke('#0a0b12', 6);
+      layout();
     });
 
     this.load.on(Phaser.Loader.Events.PROGRESS, (value: number) => {
-      fill.setScale(value, 1);
-      percentLabel.setText(`${Math.round(value * 100)}%`);
+      progress = value;
+      label.setText(`${Math.round(value * 100)}%`);
+      drawBar();
     });
   }
 }

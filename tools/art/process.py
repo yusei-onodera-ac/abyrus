@@ -185,6 +185,20 @@ def finish_portrait(raw, entry):
     return canvas.resize(tuple(entry['size']), Image.LANCZOS)
 
 
+def finish_logo(raw, entry):
+    """A logo: cut out (the page and the enclosed page-white counters of the letters), cropped tight, width set to size[0]."""
+    img = cut_out(raw, min_speck=300, holes=True, hole_tol=16, hole_ring=False, hole_area=0.00002)
+    box = bbox_of(img)
+    if box is None:
+        raise ValueError('nothing left after the cut-out')
+    img = img.crop(box)
+    w, h = img.size
+    target_w = entry['size'][0]
+    if w > target_w:
+        img = img.resize((target_w, round(h * target_w / w)), Image.LANCZOS)
+    return img
+
+
 def finish_tile(raw, entry):
     img = cut_out(raw, min_speck=200)
     box = bbox_of(img)
@@ -262,6 +276,8 @@ def main():
                 result = finish_tile(raw, entry)
             elif entry['mode'] == 'portrait':
                 result = finish_portrait(raw, entry)
+            elif entry['mode'] == 'logo':
+                result = finish_logo(raw, entry)
             else:
                 result = finish_jpg(raw, entry)
         except Exception as e:  # noqa: BLE001 - report and go on with the rest

@@ -492,7 +492,27 @@ const loading = [
   },
 ];
 
-export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading];
+// ---------------------------------------------------------------------------------------------- the ABYRUS logo (pasted on the loading screen)
+const logo = [
+  {
+    id: 'logo_abyrus',
+    group: 'logo',
+    out: 'ui/logo.png',
+    mode: 'logo',
+    size: [1400, 700],
+    aspect: '16:9',
+    refs: ['ref:astra.jpg', 'ref:viara.jpg'],
+    refNote: 'The reference pictures only show the painting style and richness of the game; do not draw their characters.',
+    prompt:
+      'A game title logo for a Japanese mobile fantasy RPG named ABYRUS, painted by hand in a rich, glossy, high-end game-logo style. ' +
+      'The ONLY text in the picture is the single word ABYRUS (six capital letters A B Y R U S, spelled exactly like that, nothing else, no subtitle, no other words). ' +
+      'The letters are large, bold and elegant, carved from polished gold and steel with bevelled edges, bright highlights, fine engraved ornament and small deep-violet and blue gemstones set into them, with a bold dark navy outline around every letter. ' +
+      'Behind and around the letters grows a graceful ornament: a pair of spread golden wings, a glowing infinity-symbol loop and a few golden abacus beads on thin rods, all in the same polished metal, symmetrical and tidy. ' +
+      'The whole logo is a single compact shape centred in the picture with space around it. The background is perfectly flat plain pure white: no glow spilling into the background, no soft shadow, no haze, no particles, no frame. All edges are crisp.',
+  },
+];
+
+export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;
