@@ -43,6 +43,9 @@ export const VILLAGE_PLOT_TIERS = 3;
 export function villagePlotKey(tier: number): string {
   return `${VILLAGE_ART_PREFIX}ground_${tier}`;
 }
+export function villagePlotTierOf(castleLevel: number): number {
+  return Math.max(1, Math.min(VILLAGE_PLOT_TIERS, Math.ceil(castleLevel / 2)));
+}
 export function villagePlotTier(castleLevel: number): number {
   return Math.max(1, Math.min(VILLAGE_PLOT_TIERS, Math.ceil(castleLevel / 2)));
 }
@@ -57,6 +60,85 @@ export function preloadVillageArt(scene: Phaser.Scene): void {
   scene.load.image(SITE_KEY, 'assets/village/construction.png');
   scene.load.image(VILLAGE_GROUND_KEY, 'assets/village/ground.png');
   for (let tier = 1; tier <= VILLAGE_PLOT_TIERS; tier++) scene.load.image(villagePlotKey(tier), `assets/village/ground_${tier}.png`);
+  for (const surface of ROAD_SURFACES) scene.load.image(`${VILLAGE_ART_PREFIX}road_${surface}`, `assets/village/road_${surface}.jpg`);
+}
+
+// ---- 道: paving laid piece by piece ------------------------------------------------------------------------------
+// A road piece is a 1x1 tile whose shape depends on which of its four neighbours are roads too (a 4-bit mask): a
+// rounded patch in the middle with an arm to every neighbour, so that a line of pieces reads as one road with corners,
+// T-junctions and crossings. The paving itself is the generated sample picture (road_<surface>.jpg: dirt, stone,
+// marble - the surface follows the castle's level, like the plot), laid into the shape with a darker kerb round it.
+
+export const ROAD_SURFACES = ['dirt', 'stone', 'marble'] as const;
+/** A flat colour for a surface whose picture is missing. */
+const ROAD_COLOR = [0xb08a5a, 0x8a8a92, 0xe6e1d2];
+/** Half the width of the paving, in tiles (the whole tile is 1). */
+const ROAD_HALF = 0.31;
+const KERB = 0.05;
+/** Bits of a piece's mask: the neighbour at (x, y - 1), (x + 1, y), (x, y + 1), (x - 1, y). */
+export const ROAD_N = 1;
+export const ROAD_E = 2;
+export const ROAD_S = 4;
+export const ROAD_W = 8;
+
+/** The picture key of a road piece, made on first use. */
+export function roadTile(scene: Phaser.Scene, tier: number, mask: number): string {
+  const surface = Math.max(0, Math.min(ROAD_SURFACES.length - 1, tier - 1));
+  const key = `${VILLAGE_ART_PREFIX}roadtile_${surface}_${mask}`;
+  if (scene.textures.exists(key)) return key;
+  const w = ISO.tileW;
+  const h = ISO.tileH;
+  const canvas = scene.textures.createCanvas(key, w, h);
+  if (!canvas) return key;
+  const ctx = canvas.getContext();
+  // Tile coordinates (u right-down, v left-down, 0..1) to pixels.
+  const toPx = (u: number, v: number): [number, number] => [(u - v) * (w / 2) + w / 2, (u + v) * (h / 2)];
+  const shape = (half: number, kerb: number): void => {
+    ctx.beginPath();
+    const rect = (u0: number, v0: number, u1: number, v1: number): void => {
+      const pts = [toPx(u0, v0), toPx(u1, v0), toPx(u1, v1), toPx(u0, v1)];
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.closePath();
+    };
+    const lo = 0.5 - half - kerb;
+    const hi = 0.5 + half + kerb;
+    rect(lo, lo, hi, hi);
+    if (mask & ROAD_N) rect(lo, 0, hi, 0.5);
+    if (mask & ROAD_S) rect(lo, 0.5, hi, 1);
+    if (mask & ROAD_E) rect(0.5, lo, 1, hi);
+    if (mask & ROAD_W) rect(0, lo, 0.5, hi);
+  };
+  // Everything stays inside the tile's own diamond, so that neighbours meet exactly at the edge.
+  ctx.save();
+  ctx.beginPath();
+  const corners = [toPx(0, 0), toPx(1, 0), toPx(1, 1), toPx(0, 1)];
+  ctx.moveTo(corners[0][0], corners[0][1]);
+  for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+  ctx.closePath();
+  ctx.clip();
+  // The kerb: a darker, slightly wider shape (its arms' ends are cut by the tile's edge, so no line crosses a joint).
+  shape(ROAD_HALF, KERB);
+  ctx.fillStyle = 'rgba(48, 36, 24, 0.9)';
+  ctx.fill();
+  // The paving: the sample, a part of it stretched over one tile so that the stones are a good size.
+  shape(ROAD_HALF, 0);
+  ctx.save();
+  ctx.clip();
+  const sample = scene.textures.exists(`${VILLAGE_ART_PREFIX}road_${ROAD_SURFACES[surface]}`) ? scene.textures.get(`${VILLAGE_ART_PREFIX}road_${ROAD_SURFACES[surface]}`).getSourceImage() : undefined;
+  if (sample) {
+    ctx.imageSmoothingQuality = 'high';
+    // (u, v) -> pixels as a transform, then the sample (its middle half) drawn into the unit square.
+    ctx.setTransform(w / 2, h / 2, -w / 2, h / 2, w / 2, 0);
+    ctx.drawImage(sample as CanvasImageSource, sample.width * 0.25, sample.height * 0.25, sample.width * 0.5, sample.height * 0.5, 0, 0, 1, 1);
+  } else {
+    ctx.fillStyle = `#${ROAD_COLOR[surface].toString(16).padStart(6, '0')}`;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.restore();
+  ctx.restore();
+  canvas.refresh();
+  return key;
 }
 
 /** The picture for `kind` at `level`: that level's, else the nearest lower one, else the nearest higher one. */
@@ -384,6 +466,20 @@ function drawStatue(g: G, def: BuildingDef): void {
   g.lineBetween(head.x + 22, head.y - 52, head.x + 22, head.y - 104);
 }
 
+/** One paving piece as a small diamond (the build menu's card; the road on the map is drawn by roadTile below). */
+function drawRoadSample(g: G, _def: BuildingDef, tier: number): void {
+  const t = isoPoint(0, 0);
+  const r = isoPoint(1, 0);
+  const b = isoPoint(1, 1);
+  const l = isoPoint(0, 1);
+  const c = isoPoint(0.5, 0.5);
+  const pts = (k: number): Pt[] => [t, r, b, l].map((p) => ({ x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k }));
+  g.fillStyle(0x3a2e22, 1);
+  g.fillPoints(pts(0.86), true);
+  g.fillStyle(ROAD_COLOR[Math.min(ROAD_COLOR.length - 1, tier)], 1);
+  g.fillPoints(pts(0.74), true);
+}
+
 const DRAWERS: Record<BuildingKind, (g: G, def: BuildingDef, tier: number) => void> = {
   castle: drawCastle,
   shop: drawShop,
@@ -398,10 +494,11 @@ const DRAWERS: Record<BuildingKind, (g: G, def: BuildingDef, tier: number) => vo
   flowers: drawFlowers,
   fountain: drawFountain,
   statue: drawStatue,
+  road: drawRoadSample,
 };
 
 /** How far above the footprint's top corner the drawn building reaches (for its rectangle). */
-const DRAWN_HEIGHT: Record<BuildingKind, number> = { castle: 118, shop: 44, market: 36, house: 40, lumber: 44, quarry: 40, mine: 96, fence: 36, gate: 112, tree: 84, flowers: 34, fountain: 90, statue: 120 };
+const DRAWN_HEIGHT: Record<BuildingKind, number> = { castle: 118, shop: 44, market: 36, house: 40, lumber: 44, quarry: 40, mine: 96, fence: 36, gate: 112, tree: 84, flowers: 34, fountain: 90, statue: 120, road: 8 };
 
 /** 0 (plain) to 2 (fully gilded) for a building's level. */
 export function gildedTier(level: number): number {

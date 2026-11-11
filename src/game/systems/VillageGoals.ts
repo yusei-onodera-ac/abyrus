@@ -61,7 +61,7 @@ export const VillageGoals = {
       case 'castle':
         return castleLevel(save, now);
       case 'count':
-        return standing(save, now).filter((b) => (metric.of === 'decor' ? getBuilding(b.kind).decor === true : b.kind === metric.of)).length;
+        return standing(save, now).filter((b) => (metric.of === 'decor' ? getBuilding(b.kind).decor === true && !getBuilding(b.kind).road : b.kind === metric.of)).length;
       case 'topLevel':
         return standing(save, now).reduce((best, b) => (metric.of === 'any' || b.kind === metric.of ? Math.max(best, effectiveLevel(b, now)) : best), 0);
       case 'income':
@@ -75,7 +75,7 @@ export const VillageGoals = {
       case 'builders':
         return builderCount(save, now);
       case 'variety':
-        return new Set(standing(save, now).map((b) => b.kind)).size;
+        return new Set(standing(save, now).filter((b) => !getBuilding(b.kind).road).map((b) => b.kind)).size;
     }
   },
 

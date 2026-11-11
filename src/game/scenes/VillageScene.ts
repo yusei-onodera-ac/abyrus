@@ -7,7 +7,7 @@ import { SaveSystem, type PlacedBuilding, type SaveData, type Wanderer } from '.
 import { StaminaSystem } from '../systems/StaminaSystem';
 import { VillageSystem, settleChanged, type SettleResult, type WorkKind } from '../systems/VillageSystem';
 import { VillageQuests } from '../systems/VillageQuests';
-import { builderCount, busyBuilders, castleLevel, effectiveLevel, houseBonus, isMoving, levelValue, movePhase } from '../systems/VillageIncome';
+import { builderCount, busyBuilders, castleLevel, effectiveLevel, footprints, houseBonus, isMoving, levelValue, movePhase } from '../systems/VillageIncome';
 import { BackButton } from '../ui/BackButton';
 import { Button } from '../ui/Button';
 import { openConfirm } from '../ui/Dialogs';
@@ -22,7 +22,7 @@ import { tilesForVillageClaim, type RewardTile } from '../ui/RewardTiles';
 import { showToast } from '../ui/Toast';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
-import { ISO, VILLAGE_GROUND_KEY, VILLAGE_PLOT_TIERS, buildingArt, constructionArt, isoGrid, isoPoint, villagePlotKey, villagePlotTier, wandererArt, type Art, type Pt } from '../ui/VillageArt';
+import { ISO, ROAD_E, ROAD_N, ROAD_S, ROAD_W, VILLAGE_GROUND_KEY, VILLAGE_PLOT_TIERS, buildingArt, roadTile, constructionArt, isoGrid, isoPoint, villagePlotKey, villagePlotTier, wandererArt, type Art, type Pt } from '../ui/VillageArt';
 import { VillageLife } from '../ui/VillageLife';
 import { VillageFx, villageThumb } from '../ui/VillageFx';
 import { openVillageGoals } from '../ui/VillageGoalsModal';
@@ -54,7 +54,19 @@ const DOUBLE_TAP_PX = 44;
 /** The shorter bar along the bottom for the selected building / placing (the buttons float on the map). */
 const COMPACT = { h: 100, placeH: 146 };
 
-type Mode = 'browse' | 'place';
+type Mode = 'browse' | 'place' | 'road';
+
+/** 道づくり: what the finger does (敷く lays paving, 消す takes it up, 動かす looks around). */
+type RoadTool = 'draw' | 'erase' | 'pan';
+
+/** A stroke of the finger over the ground in road mode. */
+interface RoadStroke {
+  last?: { x: number; y: number };
+  laid: number;
+  erased: number;
+  /** Why nothing more could be laid (said once). */
+  stopped?: string;
+}
 
 /** One round button on the map (the ones floating round the selected building, or the ✓ / ✗ by the ghost). */
 interface RoundSpec {
@@ -202,6 +214,10 @@ export class VillageScene extends Phaser.Scene {
   private floatHalfW = 0;
   private floatConfirm?: Phaser.GameObjects.Container;
   private lift?: Lift;
+  private roadLayer!: Phaser.GameObjects.Container;
+  private roadTool: RoadTool = 'draw';
+  private roadStroke?: RoadStroke;
+  private roadCount?: Phaser.GameObjects.Text;
   private holdTimer?: Phaser.Time.TimerEvent;
   /** 連続配置: after a place is confirmed, the same kind is put up again straight away. */
   private repeat = false;
@@ -274,12 +290,13 @@ export class VillageScene extends Phaser.Scene {
     this.grid = this.add.graphics().setVisible(false);
     this.drawGrid();
     this.footprint = this.add.graphics();
+    this.roadLayer = this.add.container(0, 0);
     this.buildingLayer = this.add.container(0, 0);
     this.markers = this.add.container(0, 0);
     this.wandererLayer = this.add.container(0, 0);
     this.selection = this.add.container(0, 0);
     this.ghostLayer = this.add.container(0, 0);
-    this.world.add([this.grid, this.footprint, this.buildingLayer, this.markers, this.wandererLayer, this.selection, this.ghostLayer]);
+    this.world.add([this.grid, this.footprint, this.roadLayer, this.buildingLayer, this.markers, this.wandererLayer, this.selection, this.ghostLayer]);
     this.life = new VillageLife(this, {
       world: this.world,
       buildingLayer: this.buildingLayer,
@@ -702,7 +719,8 @@ export class VillageScene extends Phaser.Scene {
     this.views = new Map();
     this.ticking = [];
     const front = (b: PlacedBuilding): number => b.x + getBuilding(b.kind).w + b.y + getBuilding(b.kind).h;
-    for (const b of [...this.save.village.buildings].sort((a, c) => front(a) - front(c))) {
+    this.renderRoads(now);
+    for (const b of [...this.save.village.buildings].filter((x) => !getBuilding(x.kind).road).sort((a, c) => front(a) - front(c))) {
       const view = this.buildView(b);
       this.views.set(b.id, view);
       this.buildingLayer.add(view);
@@ -712,6 +730,132 @@ export class VillageScene extends Phaser.Scene {
     this.life?.afterRender(this.views);
     this.renderWanderers();
     this.drawSelection();
+  }
+
+  /** The paving: one picture per piece, the right shape for the pieces round it, under every building (a piece under a
+   *  building is hidden; the neighbours still lead up to it). */
+  private renderRoads(now = Date.now()): void {
+    this.roadLayer.removeAll(true);
+    const roads = this.save.village.buildings.filter((b) => getBuilding(b.kind).road);
+    if (roads.length === 0) return;
+    const has = new Set(roads.map((b) => `${b.x},${b.y}`));
+    const covered = new Set<string>();
+    for (const b of this.save.village.buildings) {
+      const def = getBuilding(b.kind);
+      if (def.road) continue;
+      for (const at of footprints(b, now)) for (let y = at.y; y < at.y + def.h; y++) for (let x = at.x; x < at.x + def.w; x++) covered.add(`${x},${y}`);
+    }
+    const tier = villagePlotTier(castleLevel(this.save, now));
+    // Back to front, so the kerbs of the nearer pieces lie over the farther ones.
+    for (const b of [...roads].sort((a, c) => a.x + a.y - (c.x + c.y))) {
+      if (covered.has(`${b.x},${b.y}`)) continue;
+      const mask = (has.has(`${b.x},${b.y - 1}`) ? ROAD_N : 0) | (has.has(`${b.x + 1},${b.y}`) ? ROAD_E : 0) | (has.has(`${b.x},${b.y + 1}`) ? ROAD_S : 0) | (has.has(`${b.x - 1},${b.y}`) ? ROAD_W : 0);
+      const top = this.pos(b.x, b.y);
+      this.roadLayer.add(this.add.image(top.x - ISO.tileW / 2, top.y, roadTile(this, tier, mask)).setOrigin(0, 0));
+    }
+  }
+
+  // ------------------------------------------------------------ 道づくり --
+
+  /** 道を敷く: the whole screen becomes a canvas - a finger drawn over the ground lays paving, 消す takes it up, 動かす looks around. */
+  private startRoadMode(): void {
+    this.mode = 'road';
+    this.roadTool = 'draw';
+    this.roadStroke = undefined;
+    this.selectedId = undefined;
+    this.drawSelection();
+    this.grid.setVisible(true);
+    this.renderDock();
+  }
+
+  private endRoadMode(): void {
+    this.roadStroke = undefined;
+    this.mode = 'browse';
+    this.grid.setVisible(false);
+    SaveSystem.save(this.save);
+    this.renderDock();
+  }
+
+  private setRoadTool(tool: RoadTool): void {
+    this.roadTool = tool;
+    this.roadStroke = undefined;
+    this.renderDock();
+  }
+
+  /** The bar along the bottom in road mode: what it costs, how many are laid, the three tools and 終わり. */
+  private renderRoadBar(): void {
+    const level = getBuilding('road').levels[0];
+    this.panelDock(176);
+    this.dock.add(heading(this, 18, 28, '道づくり', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    this.roadCount = caption(this, DOCK.w - 18, 28, '', { fontSize: '20px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5);
+    this.dock.add(this.roadCount);
+    const hint = this.roadTool === 'draw' ? '指でなぞると、道が敷けます' : this.roadTool === 'erase' ? 'なぞった道を消します' : '地図を動かして、見回せます';
+    this.dock.add(caption(this, 18, 60, hint, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    this.dock.add(caption(this, 18, 90, `1マス　ゴールド ${VillageSystem.cost(this.save, level).toString()}　${this.bundleText(VillageSystem.materialCost(level))}`, { fontSize: '17px', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const tools: [RoadTool, string][] = [['draw', '敷く'], ['erase', '消す'], ['pan', '動かす']];
+    tools.forEach(([tool, label], i) => {
+      this.dock.add(new Button(this, 62 + i * 110, 138, 104, 62, label, () => this.setRoadTool(tool), { variant: this.roadTool === tool ? 'gold' : 'wood', fontSize: '24px' }));
+    });
+    this.dock.add(new Button(this, DOCK.w - 72, 138, 124, 62, '終わり', () => this.endRoadMode(), { variant: 'wood', fontSize: '26px' }));
+    this.refreshRoadCount();
+  }
+
+  private refreshRoadCount(now = Date.now()): void {
+    this.roadCount?.setText(`${VillageSystem.count(this.save, 'road')} / ${VillageSystem.maxCount(this.save, 'road', now)}`);
+  }
+
+  /** The finger is at `p` in road mode: lays (or takes up) the tiles it has crossed since the last one. */
+  private strokeRoad(p: Phaser.Input.Pointer): void {
+    const stroke = this.roadStroke;
+    if (!stroke) return;
+    const g = this.gridAt(p);
+    const to = { x: Math.floor(g.gx), y: Math.floor(g.gy) };
+    const from = stroke.last ?? to;
+    // Every tile on the way (a fast finger skips tiles between two moves).
+    const steps = Math.max(Math.abs(to.x - from.x), Math.abs(to.y - from.y), 1);
+    let changed = false;
+    for (let i = stroke.last ? 1 : 0; i <= steps; i++) {
+      const x = Math.round(from.x + ((to.x - from.x) * i) / steps);
+      const y = Math.round(from.y + ((to.y - from.y) * i) / steps);
+      if (this.roadTool === 'draw' ? this.layRoad(stroke, x, y) : this.takeUpRoad(stroke, x, y)) changed = true;
+    }
+    stroke.last = to;
+    if (changed) {
+      this.renderRoads();
+      this.refreshRoadCount();
+    }
+  }
+
+  private layRoad(stroke: RoadStroke, x: number, y: number): boolean {
+    if (!VillageSystem.canPlace(this.save, 'road', x, y)) return false;
+    if (stroke.stopped) return false;
+    const reason = VillageSystem.checkStart(this.save, 'road', Date.now());
+    if (reason) {
+      stroke.stopped = reason;
+      showToast(this, reason, '#ffb0a0');
+      return false;
+    }
+    if (!VillageSystem.build(this.save, 'road', x, y)) return false;
+    stroke.laid += 1;
+    return true;
+  }
+
+  private takeUpRoad(stroke: RoadStroke, x: number, y: number): boolean {
+    const b = this.save.village.buildings.find((o) => o.kind === 'road' && o.x === x && o.y === y);
+    if (!b || !VillageSystem.remove(this.save, b)) return false;
+    stroke.erased += 1;
+    return true;
+  }
+
+  private endRoadStroke(): void {
+    const stroke = this.roadStroke;
+    this.roadStroke = undefined;
+    if (!stroke || stroke.laid + stroke.erased === 0) return;
+    SaveSystem.save(this.save);
+    this.refreshHeader();
+    this.refreshMaterials();
+    this.resourceBar.update(this.save);
+    showToast(this, stroke.laid > 0 ? `道を${stroke.laid}マス敷きました` : `道を${stroke.erased}マス消しました`, '#ffe9b8');
   }
 
   /** While a building is being taken down, the place it is going to is marked, and kept for it. */
@@ -900,8 +1044,8 @@ export class VillageScene extends Phaser.Scene {
 
   private onBuildingDown(b: PlacedBuilding, p: Phaser.Input.Pointer): void {
     if (this.blocked()) return;
-    if (this.mode === 'place') {
-      // While placing, a building is just ground: a drag looks around, a tap moves what is being placed.
+    if (this.mode === 'place' || this.mode === 'road') {
+      // While placing (or laying road), a building is just ground: a drag looks around, a tap moves what is being placed.
       this.onGroundDown(p);
       return;
     }
@@ -1007,6 +1151,12 @@ export class VillageScene extends Phaser.Scene {
 
   private onGroundDown(p: Phaser.Input.Pointer): void {
     if (this.blocked()) return;
+    if (this.mode === 'road' && this.roadTool !== 'pan') {
+      // A finger laid on the ground in road mode starts a stroke (with a tap, one tile).
+      this.roadStroke = { laid: 0, erased: 0 };
+      this.strokeRoad(p);
+      return;
+    }
     this.panning = { sx: p.x, sy: p.y, wx: this.world.x, wy: this.world.y, moved: false };
     this.lastPan = { t: this.time.now, x: p.x, y: p.y };
   }
@@ -1017,6 +1167,7 @@ export class VillageScene extends Phaser.Scene {
     const b = this.input.pointer2;
     this.drag = undefined;
     this.panning = undefined;
+    this.endRoadStroke();
     const mx = (a.x + b.x) / 2;
     const my = (a.y + b.y) / 2;
     this.pinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), zoom: this.zoom, lx: (mx - this.world.x) / this.zoom, ly: (my - this.world.y) / this.zoom };
@@ -1045,6 +1196,10 @@ export class VillageScene extends Phaser.Scene {
 
     if (this.lift) {
       this.dragLift(p);
+      return;
+    }
+    if (this.roadStroke) {
+      this.strokeRoad(p);
       return;
     }
 
@@ -1095,6 +1250,10 @@ export class VillageScene extends Phaser.Scene {
     }
     this.holdTimer?.remove(false);
     this.holdTimer = undefined;
+    if (this.roadStroke) {
+      this.endRoadStroke();
+      return;
+    }
     if (this.lift) {
       this.panning = undefined;
       this.drag = undefined;
@@ -1203,6 +1362,11 @@ export class VillageScene extends Phaser.Scene {
     this.dockTick = undefined;
     this.confirmButton = undefined;
     this.placeMessage = undefined;
+    if (this.mode === 'road') {
+      this.renderRoadBar();
+      this.renderFloat();
+      return;
+    }
     if (this.mode === 'place' && this.ghost) {
       this.panelDock(COMPACT.placeH);
       this.renderPlaceDock(this.ghost);
@@ -1786,6 +1950,7 @@ export class VillageScene extends Phaser.Scene {
 
   /** The one-line role of a building in the 建築 menu, and the colour of its chip. */
   private roleOf(def: (typeof BUILDINGS)[number]): { text: string; color: number } {
+    if (def.road) return { text: '道', color: 0x8a6a3a };
     if (def.decor) return { text: '見た目', color: 0x8a5aa8 };
     if (def.produces) return { text: `素材+ ${materialName(def.produces)}`, color: 0x4f8a3f };
     if (def.defense) return { text: '防衛', color: 0xb0482e };
@@ -1925,6 +2090,10 @@ export class VillageScene extends Phaser.Scene {
   /** Puts a new building on the map as a ghost to drag to where it should go; 建てる starts the work. */
   private startPlacing(kind: BuildingKind): void {
     const def = getBuilding(kind);
+    if (def.road) {
+      this.startRoadMode();
+      return;
+    }
     // Nearest the middle of what is on screen.
     const mid = this.gridAt({ x: 360, y: 560 });
     const spot = VillageSystem.findSpot(this.save, kind, Math.round(mid.gx - def.w / 2), Math.round(mid.gy - def.h / 2));

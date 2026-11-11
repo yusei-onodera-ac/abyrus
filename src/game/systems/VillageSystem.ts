@@ -132,12 +132,14 @@ export interface RaidWin {
 
 /** True when `w` x `h` tiles at (x, y) are on the map and clear of every building but `ignoreId` (the ones
  *  being moved count at their old place until it is taken down, and at the new one all along). */
-function fits(save: SaveData, def: { w: number; h: number }, x: number, y: number, ignoreId: string | undefined, now: number): boolean {
+function fits(save: SaveData, def: { w: number; h: number; road?: boolean }, x: number, y: number, ignoreId: string | undefined, now: number): boolean {
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
   if (x < 0 || y < 0 || x + def.w > VILLAGE_COLS || y + def.h > VILLAGE_ROWS) return false;
   for (const other of save.village.buildings) {
     if (other.id === ignoreId) continue;
     const o = getBuilding(other.kind);
+    // 道 lies on the ground: a building stands over it (it shows again if the building goes), and a road is only stopped by a building or another road.
+    if (o.road && !def.road) continue;
     for (const at of footprints(other, now)) {
       if (x < at.x + o.w && at.x < x + def.w && y < at.y + o.h && at.y < y + def.h) return false;
     }

@@ -569,7 +569,27 @@ const peopleSheets = [
   },
 ];
 
-export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets];
+// ---------------------------------------------------------------------------------------------- village roads (three surfaces, a seamless sample of each)
+const ROAD =
+  'A square, perfectly flat, top-down (straight from above, no perspective) seamless tileable sample of ground paving for a mobile base-building game, painted by hand in a clean, bright, bold-outline style like the reference buildings. ' +
+  'The pattern fills the entire square edge to edge and repeats seamlessly: no border, no frame, no vignette, no shadows, no objects, no people, no text. Calm, even lighting and moderate contrast so that the paving reads clearly but never distracts. ' + NO_TEXT + ' ';
+const road = [
+  ['dirt', 'a packed dirt village path: warm brown earth with a few small pebbles and faint cart-wheel marks'],
+  ['stone', 'grey cobblestones of mixed sizes, neatly fitted with dark mortar lines'],
+  ['marble', 'large pale marble paving slabs with thin gold inlay lines between them and subtle veining'],
+].map(([id, what]) => ({
+  id: `road_${id}`,
+  group: 'road',
+  out: `village/road_${id}.jpg`,
+  mode: 'jpg',
+  size: [512, 512],
+  aspect: '1:1',
+  refs: ['village/ground_2.png'],
+  refNote: 'The reference picture shows only the painting style and colours; draw just the flat paving pattern asked for.',
+  prompt: `${ROAD}The paving: ${what}.`,
+}));
+
+export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

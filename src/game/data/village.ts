@@ -17,7 +17,7 @@
 export const VILLAGE_COLS = 18;
 export const VILLAGE_ROWS = 18;
 
-export type BuildingKind = 'castle' | 'shop' | 'market' | 'house' | 'lumber' | 'quarry' | 'mine' | 'fence' | 'gate' | 'tree' | 'flowers' | 'fountain' | 'statue';
+export type BuildingKind = 'castle' | 'shop' | 'market' | 'house' | 'lumber' | 'quarry' | 'mine' | 'fence' | 'gate' | 'tree' | 'flowers' | 'fountain' | 'statue' | 'road';
 
 /** The tabs of the 建築 menu: 商い (what pays gold), 採集 (what gathers 素材), 防衛 (what keeps the 襲撃 out), 装飾 (looks only). */
 export type BuildTab = 'trade' | 'gather' | 'defend' | 'decor';
@@ -184,6 +184,9 @@ export interface BuildingDef {
   removable?: boolean;
   /** 装飾: looks only. It has one level, is put up at once with no builder, can be moved at once at no cost, and a 襲撃 never breaks it. */
   decor?: boolean;
+  /** 道: a 1x1 paving piece laid in lines (see the scene's road mode). It is a 装飾 that does not count as one for the goals, never
+   *  blocks a building (a building simply stands over it) and joins the pieces next to it. */
+  road?: boolean;
   /** How many may stand, by 城 level (index 0 = 城 Lv1). 0 = not yet. */
   maxCount: number[];
   /** Index 0 = reaching level 1 (building it), index 1 = level 2, ... */
@@ -420,6 +423,20 @@ export const BUILDINGS: BuildingDef[] = [
     movable: true,
     maxCount: [0, 0, 0, 1, 1, 2],
     levels: [{ costHours: 40, materials: { stone: 500, iron: 120 }, seconds: 0, needCastle: 4, value: 0 }],
+  },
+  {
+    kind: 'road',
+    name: '道',
+    description: '建物をつなぐ道。指でなぞって敷ける。城が育つと、土の道から石畳、大理石へと変わる。',
+    w: 1,
+    h: 1,
+    buildable: true,
+    tab: 'decor',
+    decor: true,
+    road: true,
+    movable: false,
+    maxCount: [30, 50, 80, 120, 170, 240],
+    levels: [{ costHours: 0.02, materials: { stone: 1 }, seconds: 0, needCastle: 1, value: 0 }],
   },
 ];
 

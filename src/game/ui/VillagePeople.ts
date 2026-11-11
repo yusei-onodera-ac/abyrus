@@ -199,6 +199,7 @@ export class VillageWalkers {
     this.rects = [];
     for (const b of save.village.buildings) {
       const def = getBuilding(b.kind);
+      if (def.road) continue; // paving is walked on
       for (const at of footprints(b, now)) {
         this.rects.push({ kind: b.kind, x: at.x, y: at.y, w: def.w, h: def.h });
         for (let y = at.y; y < at.y + def.h; y++) for (let x = at.x; x < at.x + def.w; x++) if (x >= 0 && y >= 0 && x < VILLAGE_COLS && y < VILLAGE_ROWS) this.free[this.cell(x, y)] = false;
