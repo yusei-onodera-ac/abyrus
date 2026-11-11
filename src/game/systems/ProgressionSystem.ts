@@ -311,8 +311,9 @@ export const ProgressionSystem = {
     const t = getWeekdayTier(tier);
     const tierIndex = WEEKDAY_TIERS.indexOf(t);
     const region = getRegion(Math.floor(t.likeStage / STAGES_PER_REGION));
-    const rng = mulberry32(31000 + dungeon.day * 53 + tierIndex * 7);
-    const difficulty = mainDifficulty(t.likeStage);
+    // A tier with its own fixed difficulty (超級, tuned against a fixed squad) has the same enemies every day of the week.
+    const rng = mulberry32(31000 + (t.difficulty === undefined ? dungeon.day * 53 : 0) + tierIndex * 7);
+    const difficulty = t.difficulty ?? mainDifficulty(t.likeStage);
     const count = Math.max(3, enemyCountForIndex(t.likeStage));
     const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
     return {
@@ -323,7 +324,7 @@ export const ProgressionSystem = {
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(dungeon.goldMul),
-      rewardExp: expRewardForLevel(levelAskedByStage(t.likeStage)),
+      rewardExp: expRewardForLevel(t.expLevel ?? levelAskedByStage(t.likeStage)),
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)) + (dungeon.skillEssence[tierIndex] ?? 0),
     };
   },

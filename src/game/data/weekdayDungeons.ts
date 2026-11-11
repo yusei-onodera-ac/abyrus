@@ -20,13 +20,26 @@ export interface WeekdayTier {
   stamina: number;
   /** The main stage whose enemies, region and gold / EXP it is set like (0-based). */
   likeStage: number;
+  /** Enemy strength (the same continuous scale as a stage's `difficulty`, see ProgressionSystem: 0.3 for the first stage,
+   *  47.5 for the last main stage), when it is not just that of `likeStage`. It also scales the gold and 技素. */
+  difficulty?: number;
+  /** The hero level whose EXP the clear pays, when it is not that of `likeStage`. */
+  expLevel?: number;
+  /** Shown on the tier's card instead of "クエストN層ほどの強さ" (a warning about how hard it is). */
+  note?: string;
 }
 
 export const WEEKDAY_TIERS: WeekdayTier[] = [
   { id: 'easy', name: '初級', needStage: 0, stamina: 10, likeStage: 8 },
   { id: 'normal', name: '中級', needStage: 30, stamina: 14, likeStage: 40 },
   { id: 'hard', name: '上級', needStage: 60, stamina: 18, likeStage: 75 },
-  { id: 'expert', name: '超級', needStage: 100, stamina: 22, likeStage: 115 },
+  // 超級: the enemies of the last region (five ★5-tier beasts) at difficulty 58 - well beyond the campaign's last stage (47.5).
+  // The squad is the same every day (3 mages, an archer, a healer). Measured with the battle engine (auto skills, no gear):
+  // five ★5 heroes at Lv100 win about 60% (about 80% with every skill at level 10, about 30% with none); at Lv95, or with
+  // five ★4 heroes at Lv100, they never win. So it takes ★5 or better at about the top level,
+  // Its rewards are the best of the four: the last amount of each list below is double the old scale, and the gold, 技素
+  // and EXP grow with the difficulty.
+  { id: 'expert', name: '超級', needStage: 100, stamina: 30, likeStage: 145, difficulty: 58, expLevel: 99, note: '★5・Lv100の編成で、やっと倒せる強さ' },
 ];
 
 export interface WeekdayDungeon {
@@ -53,18 +66,18 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '安息の祭壇',
     theme: '日曜日は、すべての素材が少しずつ手に入る',
     materials: [
-      { material: 'wood', amounts: [30, 80, 200, 500] },
-      { material: 'stone', amounts: [20, 50, 130, 320] },
-      { material: 'iron', amounts: [10, 30, 80, 200] },
+      { material: 'wood', amounts: [30, 80, 200, 1000] },
+      { material: 'stone', amounts: [20, 50, 130, 640] },
+      { material: 'iron', amounts: [10, 30, 80, 400] },
     ],
     goldMul: 3,
-    skillEssence: [100, 300, 700, 2000],
-    phaseMaterials: [0, 1, 1, 2],
+    skillEssence: [100, 300, 700, 4000],
+    phaseMaterials: [0, 1, 1, 4],
     items: [
       { item: 'exp_m', amounts: [5, 4, 2, 0] },
-      { item: 'exp_l', amounts: [0, 0, 1, 2] },
-      { item: 'exp_xl', amounts: [0, 0, 0, 1] },
-      { item: 'equip_essence', amounts: [30, 80, 200, 500] },
+      { item: 'exp_l', amounts: [0, 0, 1, 4] },
+      { item: 'exp_xl', amounts: [0, 0, 0, 2] },
+      { item: 'equip_essence', amounts: [30, 80, 200, 1000] },
     ],
   },
   {
@@ -72,16 +85,16 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '経験の洞窟',
     theme: '月曜日は、経験値素材がたくさん手に入る',
     materials: [
-      { material: 'stone', amounts: [60, 160, 400, 1000] },
+      { material: 'stone', amounts: [60, 160, 400, 2000] },
     ],
     goldMul: 1,
     skillEssence: [0, 0, 0, 0],
-    phaseMaterials: [0, 0, 0, 0],
+    phaseMaterials: [0, 0, 0, 1],
     items: [
       { item: 'exp_s', amounts: [20, 0, 0, 0] },
       { item: 'exp_m', amounts: [0, 10, 5, 0] },
-      { item: 'exp_l', amounts: [0, 0, 3, 5] },
-      { item: 'exp_xl', amounts: [0, 0, 0, 1] },
+      { item: 'exp_l', amounts: [0, 0, 3, 10] },
+      { item: 'exp_xl', amounts: [0, 0, 0, 2] },
     ],
   },
   {
@@ -89,23 +102,23 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '鍛冶の坑道',
     theme: '火曜日は、装備強化素材がたくさん手に入る',
     materials: [
-      { material: 'iron', amounts: [40, 110, 280, 700] },
+      { material: 'iron', amounts: [40, 110, 280, 1400] },
     ],
     goldMul: 1,
     skillEssence: [0, 0, 0, 0],
-    phaseMaterials: [0, 0, 0, 0],
-    items: [{ item: 'equip_essence', amounts: [60, 160, 400, 1000] }],
+    phaseMaterials: [0, 0, 0, 1],
+    items: [{ item: 'equip_essence', amounts: [60, 160, 400, 2000] }],
   },
   {
     day: 3,
     name: '技の書庫',
     theme: '水曜日は、技素がたくさん手に入る',
     materials: [
-      { material: 'wood', amounts: [60, 160, 400, 1000] },
+      { material: 'wood', amounts: [60, 160, 400, 2000] },
     ],
     goldMul: 1,
-    skillEssence: [200, 600, 1500, 4000],
-    phaseMaterials: [0, 0, 0, 0],
+    skillEssence: [200, 600, 1500, 8000],
+    phaseMaterials: [0, 0, 0, 1],
     items: [],
   },
   {
@@ -113,12 +126,12 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '位階の聖域',
     theme: '木曜日は、フェーズ素材が手に入る',
     materials: [
-      { material: 'wood', amounts: [30, 80, 200, 500] },
-      { material: 'stone', amounts: [30, 80, 200, 500] },
+      { material: 'wood', amounts: [30, 80, 200, 1000] },
+      { material: 'stone', amounts: [30, 80, 200, 1000] },
     ],
     goldMul: 1,
     skillEssence: [0, 0, 0, 0],
-    phaseMaterials: [1, 1, 2, 3],
+    phaseMaterials: [1, 1, 2, 6],
     items: [],
   },
   {
@@ -126,12 +139,12 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '黄金の宝物庫',
     theme: '金曜日は、ゴールドが8倍になる',
     materials: [
-      { material: 'iron', amounts: [20, 55, 140, 350] },
-      { material: 'stone', amounts: [30, 80, 200, 500] },
+      { material: 'iron', amounts: [20, 55, 140, 700] },
+      { material: 'stone', amounts: [30, 80, 200, 1000] },
     ],
     goldMul: 8,
     skillEssence: [0, 0, 0, 0],
-    phaseMaterials: [0, 0, 0, 0],
+    phaseMaterials: [0, 0, 0, 1],
     items: [],
   },
   {
@@ -139,17 +152,17 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     name: '修練の闘技場',
     theme: '土曜日は、経験値素材と装備強化素材が手に入る',
     materials: [
-      { material: 'wood', amounts: [30, 80, 200, 500] },
-      { material: 'iron', amounts: [20, 55, 140, 350] },
+      { material: 'wood', amounts: [30, 80, 200, 1000] },
+      { material: 'iron', amounts: [20, 55, 140, 700] },
     ],
     goldMul: 1,
     skillEssence: [0, 0, 0, 0],
-    phaseMaterials: [0, 0, 0, 0],
+    phaseMaterials: [0, 0, 0, 1],
     items: [
       { item: 'exp_s', amounts: [10, 0, 0, 0] },
       { item: 'exp_m', amounts: [0, 5, 3, 0] },
-      { item: 'exp_l', amounts: [0, 0, 1, 3] },
-      { item: 'equip_essence', amounts: [30, 80, 200, 500] },
+      { item: 'exp_l', amounts: [0, 0, 1, 6] },
+      { item: 'equip_essence', amounts: [30, 80, 200, 1000] },
     ],
   },
 ];

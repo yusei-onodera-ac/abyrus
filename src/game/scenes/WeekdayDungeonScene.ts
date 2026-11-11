@@ -67,7 +67,7 @@ export class WeekdayDungeonScene extends InboxScene {
     const cost = buildChip(this, 0, 34, `スタミナ ${tier.stamina}`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     cost.container.setX(CARD_WIDTH - PAD - cost.width);
     container.add(cost.container);
-    container.add(caption(this, PAD + 4, 76, `${ProgressionSystem.getWeekdayStage(this.day, index).enemies.length}体の敵　クエスト${tier.likeStage + 1}層ほどの強さ`, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 4, 76, `${ProgressionSystem.getWeekdayStage(this.day, index).enemies.length}体の敵　${tier.note ?? `クエスト${tier.likeStage + 1}層ほどの強さ`}`, { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     let y = gridTop;
     if (grid) {
