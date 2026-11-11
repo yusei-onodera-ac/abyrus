@@ -7,6 +7,9 @@ import { EQUIP_SLOTS, type CombatStats, type EquipSlot, type EquipmentItem, type
  * 1つの能力を上げる(武器=攻撃力、防具=HPか防御、装飾=会心率か素早さ)。効果は
  * レアリティで決まる基礎値に、レベルごとの伸びを足したもの。
  */
+/** Equipment comes in ★1-★5 (the ★6 tier is for heroes only). */
+export type EquipRarity = Exclude<Rarity, 6>;
+
 export type EquipStat = 'atkPct' | 'hpPct' | 'defFlat' | 'critRate' | 'spdFlat';
 
 export const EQUIP_STAT_LABEL: Record<EquipStat, string> = {
@@ -27,13 +30,13 @@ export interface EquipDef {
   id: string;
   name: string;
   slot: EquipSlot;
-  rarity: Rarity;
+  rarity: EquipRarity;
   stat: EquipStat;
   glyph: EquipGlyph;
 }
 
 /** Effect of a level-1 piece: percent for atk/hp/crit, points for def/spd. */
-const STAT_BASE: Record<EquipStat, Record<Rarity, number>> = {
+const STAT_BASE: Record<EquipStat, Record<EquipRarity, number>> = {
   atkPct: { 1: 3, 2: 6, 3: 9, 4: 12, 5: 15 },
   hpPct: { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20 },
   defFlat: { 1: 2, 2: 4, 3: 6, 4: 8, 5: 10 },
@@ -45,13 +48,13 @@ const STAT_BASE: Record<EquipStat, Record<Rarity, number>> = {
 const LEVEL_GROWTH = 0.1;
 
 /** Highest level a piece of each rarity can be raised to. */
-export const EQUIP_MAX_LEVEL: Record<Rarity, number> = { 1: 10, 2: 15, 3: 20, 4: 30, 5: 40 };
+export const EQUIP_MAX_LEVEL: Record<EquipRarity, number> = { 1: 10, 2: 15, 3: 20, 4: 30, 5: 40 };
 
 /** 装備強化素材 for raising a piece from level L to L+1 is `UP_BASE[rarity] * L`. */
-const UP_BASE: Record<Rarity, number> = { 1: 3, 2: 6, 3: 15, 4: 40, 5: 100 };
+const UP_BASE: Record<EquipRarity, number> = { 1: 3, 2: 6, 3: 15, 4: 40, 5: 100 };
 
 /** 装備強化素材 a piece is worth when 分解d (before the levels put into it come back). */
-const DISMANTLE_BASE: Record<Rarity, number> = { 1: 10, 2: 30, 3: 100, 4: 300, 5: 1000 };
+const DISMANTLE_BASE: Record<EquipRarity, number> = { 1: 10, 2: 30, 3: 100, 4: 300, 5: 1000 };
 
 /** Share of the 素材 spent on levels that 分解 gives back. */
 const REFUND_RATE = 0.5;
@@ -60,7 +63,7 @@ const REFUND_RATE = 0.5;
 // within that group in the order below - so new pieces go at the END of their group,
 // never in front of existing ones (saves refer to these ids).
 type Row = [name: string, stat: EquipStat, glyph: EquipGlyph];
-const GROUPS: [EquipSlot, Rarity, Row[]][] = [
+const GROUPS: [EquipSlot, EquipRarity, Row[]][] = [
   ['weapon', 1, [['木の棍棒', 'atkPct', 'staff'], ['錆びた短剣', 'atkPct', 'sword'], ['手斧', 'atkPct', 'axe']]],
   ['weapon', 2, [['鉄の剣', 'atkPct', 'sword'], ['狩人の短弓', 'atkPct', 'bow'], ['鉄の槍', 'atkPct', 'spear']]],
   ['weapon', 3, [['銀の長剣', 'atkPct', 'sword'], ['賢者の杖', 'atkPct', 'staff'], ['戦斧', 'atkPct', 'axe']]],

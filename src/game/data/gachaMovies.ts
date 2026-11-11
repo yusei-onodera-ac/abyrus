@@ -15,6 +15,8 @@ export const GACHA_MOVIE_BY_RARITY: Record<number, string> = {
   3: 'gacha_3',
   4: 'gacha_4',
   5: 'gacha_5',
+  // ★6 (the 特設ガチャ's star) plays the last movie too, until one of its own is made: add `6: 'gacha_6'` and the file.
+  6: 'gacha_5',
 };
 
 /** The movie id (see MovieSystem) for a pull whose best result is `bestRarity` stars. */

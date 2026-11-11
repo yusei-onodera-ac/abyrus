@@ -5,6 +5,7 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { SettingsSystem } from '../systems/SettingsSystem';
 import { BATTLE_CONTROL_POS, RoundControl } from './BattleControl';
 import { openConfirm } from './Dialogs';
+import { openOverFight } from './OverFight';
 
 /** The 2倍速 button beside オート in a fight: プレミアムパス members switch the fight
  *  to double speed (kept in the settings); anyone else gets told what the pass offers. */
@@ -17,6 +18,10 @@ export class SpeedToggle extends Phaser.GameObjects.Container {
     this.setDepth(30);
     this.render();
     scene.add.existing(this);
+    // Back from the premium pass: the button may now be a member's.
+    const onResume = (): void => this.render();
+    scene.events.on(Phaser.Scenes.Events.RESUME, onResume);
+    this.once(Phaser.GameObjects.Events.DESTROY, () => scene.events.off(Phaser.Scenes.Events.RESUME, onResume));
   }
 
   /** How many times faster the fight should run right now (1 or the pass's speed). */
@@ -38,7 +43,8 @@ export class SpeedToggle extends Phaser.GameObjects.Container {
         message: `プレミアムパスに加入すると、\nクエストも無限モードも${PREMIUM.battleSpeed}倍の速さで進められます。`,
         confirmLabel: 'パスを見る',
         confirmVariant: 'gold',
-        onConfirm: () => this.scene.scene.start('Premium'),
+        // Laid over the fight, which waits underneath (going there for good would throw the fight away).
+        onConfirm: () => openOverFight(this.scene, 'Premium'),
       });
       return;
     }

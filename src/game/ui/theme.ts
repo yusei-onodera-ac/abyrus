@@ -46,6 +46,7 @@ export const RARITY_GLOW: Record<Rarity, number> = {
   3: 0x2196f3,
   4: 0xab47bc,
   5: 0xffb300,
+  6: 0xff4fd8,
 };
 
 const FONT_SANS = 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif';

@@ -60,6 +60,8 @@ export class BootScene extends Phaser.Scene {
     // ルリ's expressions (public/assets/pet/<mood>.png), if supplied (otherwise she is drawn from code).
     preloadPetArt(this);
     preloadEventArt(this, EVENTS);
+    // The banner at the top of the プレミアムパス screen (optional, like the other pictures).
+    this.load.image('premium_header', '/assets/events/premium_header.jpg');
   }
 
   create(): void {
@@ -86,15 +88,29 @@ export class BootScene extends Phaser.Scene {
 
   private buildLoadingUi(): void {
     this.cameras.main.setBackgroundColor('#0a0b12');
-    heading(this, 360, 560, 'ABYRUS', { fontSize: '46px' }).setOrigin(0.5);
-    caption(this, 360, 610, '無限算盤の子', { fontSize: '14px' }).setOrigin(0.5);
+    const title = heading(this, 360, 560, 'ABYRUS', { fontSize: '46px' }).setOrigin(0.5).setDepth(5);
+    const tagline = caption(this, 360, 610, '無限算盤の子', { fontSize: '14px' }).setOrigin(0.5).setDepth(5);
 
     const barWidth = 360;
     const barHeight = 10;
     const barY = 690;
-    this.add.rectangle(360, barY, barWidth, barHeight, 0x1b1d29, 0.9).setStrokeStyle(1, COLORS.border);
-    const fill = this.add.rectangle(360 - barWidth / 2, barY, barWidth, barHeight - 4, COLORS.accentBright).setOrigin(0, 0.5).setScale(0, 1);
-    const percentLabel = caption(this, 360, barY + 26, '0%').setOrigin(0.5);
+    const track = this.add.rectangle(360, barY, barWidth, barHeight, 0x1b1d29, 0.9).setStrokeStyle(1, COLORS.border).setDepth(5);
+    const fill = this.add.rectangle(360 - barWidth / 2, barY, barWidth, barHeight - 4, COLORS.accentBright).setOrigin(0, 0.5).setScale(0, 1).setDepth(6);
+    const percentLabel = caption(this, 360, barY + 26, '0%').setOrigin(0.5).setDepth(5);
+
+    // The key art (public/assets/ui/loading.jpg) is the first thing asked for, so it is up within a moment: the title goes
+    // to the dark band at its top and the bar to the dark band at its bottom. Without it the plain centred layout stays.
+    const artKey = 'loading_art';
+    this.load.image(artKey, '/assets/ui/loading.jpg');
+    this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}image-${artKey}`, () => {
+      this.add.image(360, 640, artKey).setDisplaySize(720, 1280).setDepth(-10);
+      title.setY(78).setFontSize(54);
+      tagline.setY(128).setFontSize(18);
+      const y = 1206;
+      track.setY(y);
+      fill.setY(y);
+      percentLabel.setY(y + 28).setFontSize(18);
+    });
 
     this.load.on(Phaser.Loader.Events.PROGRESS, (value: number) => {
       fill.setScale(value, 1);

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { hex, RARITY_COLORS, type HeroData } from '../types';
 import type { CharacterGenerator } from '../characters/CharacterGenerator';
 import { createPanel } from './Panel';
+import { addRainbowFrame } from './Rainbow';
 import { COLORS } from './theme';
 
 /** Portrait card used in the roster grid and gacha reveal: a rarity-framed
@@ -44,6 +45,7 @@ export class HeroCard extends Phaser.GameObjects.Container {
     this.add([frame, this.portrait, stars, nameText, hpBg, this.hpFill, this.ultFill]);
     this.setSize(width, width);
 
+    if (hero.rarity === 6) addRainbowFrame(scene, this, width, Math.max(10, width * 0.14), 5);
     if (hero.rarity >= 4) {
       const pulseRing = scene.add.graphics();
       pulseRing.lineStyle(2, rarityColor, 0.8);

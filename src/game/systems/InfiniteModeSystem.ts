@@ -2,6 +2,7 @@ import { BigNumber } from './BigNumber';
 import { BattleSystem, ULT_GAIN, ULT_MAX, type UnitInstance } from './BattleSystem';
 import { castSkill, effectiveAtk, effectiveDef, isInvincible, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
 import { getRegion } from '../data/regions';
+import { getUnlockedSkillsForHero } from '../data/skills';
 import { rollEnemy, type EnemyUnitDef } from './ProgressionSystem';
 import type { HeroData, Rarity, Row } from '../types';
 
@@ -80,6 +81,137 @@ export interface InfiniteRunSnapshot {
   difficultyIndex: number;
 }
 
+// --- A run set aside (一時停止 / 中断) and picked up again ----------------------------
+// Everything the fight needs to go on exactly where it was, as plain JSON (BigNumbers as mantissa/exponent), kept in the
+// save (`infiniteMode.suspended`). The party is stored with the numbers it had; only the skills are read from the hero.
+
+interface BigState {
+  m: number;
+  e: number;
+}
+
+interface UnitState {
+  id: string;
+  name: string;
+  isPlayer: boolean;
+  row: Row;
+  slot: number;
+  heroClass: UnitInstance['heroClass'];
+  rarity: Rarity;
+  seed: number;
+  heroId?: string;
+  art?: string;
+  isBoss?: boolean;
+  maxHp: BigState;
+  hp: BigState;
+  atk: BigState;
+  def: number;
+  spd: number;
+  critRate: number;
+  critMul: number;
+  ultGauge: number;
+  cooldown: number;
+  baseCooldown: number;
+  alive: boolean;
+  nextSkillIndex: number;
+  atkStatusMul: number;
+  atkStatusUntil: number;
+  defStatusMul: number;
+  defStatusUntil: number;
+  stunnedUntil: number;
+  invincibleUntil: number;
+}
+
+export interface InfiniteRunState {
+  version: 1;
+  savedAt: number;
+  elapsedMs: number;
+  enemiesDefeated: number;
+  killPoints: number;
+  nextSpawnAt: number[];
+  players: UnitState[];
+  enemies: (UnitState | null)[];
+}
+
+const toBig = (b: BigNumber): BigState => ({ m: b.mantissa, e: b.exponent });
+const fromBig = (s: BigState): BigNumber => new BigNumber(s.m, s.e);
+
+function unitToState(u: UnitInstance): UnitState {
+  return {
+    id: u.id,
+    name: u.name,
+    isPlayer: u.isPlayer,
+    row: u.row,
+    slot: u.slot,
+    heroClass: u.heroClass,
+    rarity: u.rarity,
+    seed: u.seed,
+    heroId: u.heroId,
+    art: u.art,
+    isBoss: u.isBoss,
+    maxHp: toBig(u.maxHp),
+    hp: toBig(u.hp),
+    atk: toBig(u.atk),
+    def: u.def,
+    spd: u.spd,
+    critRate: u.critRate,
+    critMul: u.critMul,
+    ultGauge: u.ultGauge,
+    cooldown: u.cooldown,
+    baseCooldown: u.baseCooldown,
+    alive: u.alive,
+    nextSkillIndex: u.nextSkillIndex,
+    atkStatusMul: u.atkStatusMul,
+    atkStatusUntil: u.atkStatusUntil,
+    defStatusMul: u.defStatusMul,
+    defStatusUntil: u.defStatusUntil,
+    stunnedUntil: u.stunnedUntil,
+    invincibleUntil: u.invincibleUntil,
+  };
+}
+
+const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+const isBigState = (v: unknown): v is BigState => !!v && isNum((v as BigState).m) && isNum((v as BigState).e);
+
+function isUnitState(v: unknown): v is UnitState {
+  const u = v as UnitState | null;
+  return (
+    !!u &&
+    typeof u.id === 'string' &&
+    typeof u.name === 'string' &&
+    typeof u.isPlayer === 'boolean' &&
+    (u.row === 'front' || u.row === 'back') &&
+    isNum(u.slot) &&
+    isNum(u.rarity) &&
+    isNum(u.seed) &&
+    isBigState(u.maxHp) &&
+    isBigState(u.hp) &&
+    isBigState(u.atk) &&
+    [u.def, u.spd, u.critRate, u.critMul, u.ultGauge, u.cooldown, u.baseCooldown, u.nextSkillIndex, u.atkStatusMul, u.atkStatusUntil, u.defStatusMul, u.defStatusUntil, u.stunnedUntil, u.invincibleUntil].every(isNum) &&
+    typeof u.alive === 'boolean'
+  );
+}
+
+/** The saved run, if it is a well-formed one (anything else - an old format, a damaged save - is not worth resuming). */
+export function readSuspendedRun(raw: unknown): InfiniteRunState | null {
+  const s = raw as InfiniteRunState | null | undefined;
+  if (!s || s.version !== 1 || !isNum(s.elapsedMs) || !isNum(s.enemiesDefeated) || !isNum(s.killPoints)) return null;
+  if (!Array.isArray(s.nextSpawnAt) || s.nextSpawnAt.length !== ENEMY_SLOT_COUNT || !s.nextSpawnAt.every(isNum)) return null;
+  if (!Array.isArray(s.players) || s.players.length === 0 || !s.players.every(isUnitState) || !s.players.every((u) => u.isPlayer)) return null;
+  if (!Array.isArray(s.enemies) || s.enemies.length !== ENEMY_SLOT_COUNT || !s.enemies.every((u) => u === null || (isUnitState(u) && !u.isPlayer))) return null;
+  return s;
+}
+
+/** What the lobby shows for a run set aside: how far it got. */
+export function describeSuspendedRun(state: InfiniteRunState): { survivalSeconds: number; score: number; enemiesDefeated: number; difficultyIndex: number } {
+  return {
+    survivalSeconds: state.elapsedMs / 1000,
+    score: Math.round(state.killPoints),
+    enemiesDefeated: state.enemiesDefeated,
+    difficultyIndex: getDifficultyIndex(state.elapsedMs),
+  };
+}
+
 export type InfiniteBattleEvent =
   | { kind: 'attack'; attackerId: string; targetId: string; damage: BigNumber; crit: boolean; blocked?: boolean }
   | { kind: 'skillCast'; casterId: string; skillName: string; effectKind: string; results: SkillTargetResult[] }
@@ -122,6 +254,72 @@ export class InfiniteRunEngine {
 
   isOver(): boolean {
     return this.over;
+  }
+
+  /** The run as it stands, to be set aside and picked up again with `InfiniteRunEngine.restore`. */
+  serialize(): InfiniteRunState {
+    return {
+      version: 1,
+      savedAt: Date.now(),
+      elapsedMs: this.elapsedMs,
+      enemiesDefeated: this.enemiesDefeated,
+      killPoints: this.killPoints,
+      nextSpawnAt: [...this.nextSpawnAt],
+      players: this.playerUnits.map(unitToState),
+      enemies: this.enemySlotUnits.map((u) => (u && u.alive ? unitToState(u) : null)),
+    };
+  }
+
+  /** A run picked up again where it stopped. Null when the saved run cannot be used (damaged, or one of its heroes is gone). */
+  static restore(raw: unknown, heroOf: (heroInstanceId: string) => HeroData | undefined): InfiniteRunEngine | null {
+    const state = readSuspendedRun(raw);
+    if (!state) return null;
+    const rebuild = (s: UnitState, skills: UnitInstance['skills']): UnitInstance => ({
+      id: s.id,
+      name: s.name,
+      isPlayer: s.isPlayer,
+      row: s.row,
+      slot: s.slot,
+      heroClass: s.heroClass,
+      rarity: s.rarity,
+      seed: s.seed,
+      heroId: s.heroId,
+      art: s.art,
+      isBoss: s.isBoss,
+      maxHp: fromBig(s.maxHp),
+      hp: fromBig(s.hp),
+      atk: fromBig(s.atk),
+      def: s.def,
+      spd: s.spd,
+      critRate: s.critRate,
+      critMul: s.critMul,
+      ultGauge: s.ultGauge,
+      cooldown: s.cooldown,
+      baseCooldown: s.baseCooldown,
+      alive: s.alive,
+      skills,
+      nextSkillIndex: s.nextSkillIndex,
+      atkStatusMul: s.atkStatusMul,
+      atkStatusUntil: s.atkStatusUntil,
+      defStatusMul: s.defStatusMul,
+      defStatusUntil: s.defStatusUntil,
+      stunnedUntil: s.stunnedUntil,
+      invincibleUntil: s.invincibleUntil,
+    });
+    const players: UnitInstance[] = [];
+    for (const s of state.players) {
+      const hero = heroOf(s.id);
+      if (!hero) return null;
+      players.push(rebuild(s, getUnlockedSkillsForHero(hero)));
+    }
+    const engine = new InfiniteRunEngine({ front: [], back: [] });
+    engine.playerUnits.push(...players);
+    engine.enemySlotUnits = state.enemies.map((s) => (s ? rebuild(s, []) : null));
+    engine.nextSpawnAt = [...state.nextSpawnAt];
+    engine.elapsedMs = state.elapsedMs;
+    engine.enemiesDefeated = state.enemiesDefeated;
+    engine.killPoints = state.killPoints;
+    return engine;
   }
 
   getSnapshot(): InfiniteRunSnapshot {

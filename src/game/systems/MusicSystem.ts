@@ -185,10 +185,13 @@ export const MusicDirector = {
     game = g;
     for (const scene of g.scene.scenes) {
       if (scene.scene.key === 'Boot') continue;
-      scene.events.on(Phaser.Scenes.Events.CREATE, () => {
+      // Created, or resumed (a fight carried on after the premium pass was looked at over it): its own piece again.
+      const play = (): void => {
         const track = MusicSystem.trackFor(scene);
         if (track) MusicSystem.play(track);
-      });
+      };
+      scene.events.on(Phaser.Scenes.Events.CREATE, play);
+      scene.events.on(Phaser.Scenes.Events.RESUME, play);
     }
     if (timer === undefined) timer = window.setInterval(tick, 250);
   },

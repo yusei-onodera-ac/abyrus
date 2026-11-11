@@ -6,7 +6,7 @@
   python tools/art/process.py --compare       all the tries of each picture side by side (several tries: generate.mjs --variants 3)
   tools/art/pick.json  { "village_castle_1": 2 }  chooses which try is finished and installed (the first by default)
 
-Modes (see manifest.mjs): 'cutout' turns the white page transparent and crops to the figure (square icon or trimmed to the
+Modes (see manifest.mjs): 'portrait' cuts a character out and sets it on a 3:4 canvas; 'cutout' turns the white page transparent and crops to the figure (square icon or trimmed to the
 figure for village pictures), 'tile' does the same for a framed tile, 'jpg' crops/resizes a background.
 """
 import json
@@ -95,12 +95,12 @@ def page_mask(rgb, tolerance=26):
     return np.isin(labels, border) & close
 
 
-def hole_mask(rgb, bg, min_area_ratio=0.0003):
+def hole_mask(rgb, bg, min_area_ratio=0.0003, tol=7, ring_check=True):
     """Big flat page-white areas that the figure encloses (the inside of a ring, a chain loop): the page shows through
     them. Only pure page white counts, so silver and shaded white parts of the art itself are kept."""
     edge = np.concatenate([rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1]]).astype(np.float32)
     page = np.median(edge, axis=0)
-    flat = np.abs(rgb.astype(np.float32) - page).max(axis=2) <= 7
+    flat = np.abs(rgb.astype(np.float32) - page).max(axis=2) <= tol
     labels, n = ndimage.label(flat & ~bg)
     if n == 0:
         return np.zeros_like(bg)
@@ -113,16 +113,18 @@ def hole_mask(rgb, bg, min_area_ratio=0.0003):
         # The page seen through a ring or a chain loop is bordered by the figure's dark outline; a white highlight on
         # silver is bordered by bright metal. Only the first is a hole.
         ring = ndimage.binary_dilation(region, iterations=4) & ~region
-        if ring.any() and luminance[ring].mean() < 120:
+        # (A character is cut with ring_check off and a strict tol: an enclosed region of exactly the page white is always
+        # the page, never white clothing, which is never flat pure white over a large area.)
+        if not ring_check or (ring.any() and luminance[ring].mean() < 120):
             holes |= region
     return holes
 
 
-def cut_out(img, min_speck=40, holes=False):
+def cut_out(img, min_speck=40, holes=False, hole_tol=7, hole_ring=True, hole_area=0.0003):
     rgb = np.asarray(img.convert('RGB'))
     bg = page_mask(rgb)
     if holes:
-        bg = bg | hole_mask(rgb, bg)
+        bg = bg | hole_mask(rgb, bg, min_area_ratio=hole_area, tol=hole_tol, ring_check=hole_ring)
     keep = ~bg
     # Drop specks of leftover page-coloured noise: tiny islands.
     labels, n = ndimage.label(keep)
@@ -163,6 +165,24 @@ def finish_cutout(raw, entry):
     if w > max_w:
         img = img.resize((max_w, round(h * max_w / w)), Image.LANCZOS)
     return img
+
+
+def finish_portrait(raw, entry):
+    """A character: cut out, cropped to the figure and set on a 3:4 canvas (a little air above, the feet near the bottom)."""
+    img = cut_out(raw, min_speck=300, holes=True, hole_tol=1, hole_ring=False, hole_area=0.00038)
+    box = bbox_of(img)
+    if box is None:
+        raise ValueError('nothing left after the cut-out')
+    img = img.crop(box)
+    w, h = img.size
+    canvas_h = h / 0.955
+    canvas_w = canvas_h * 0.75
+    if w > canvas_w * 0.94:
+        canvas_w = w / 0.94
+        canvas_h = canvas_w / 0.75
+    canvas = Image.new('RGBA', (round(canvas_w), round(canvas_h)), (0, 0, 0, 0))
+    canvas.paste(img, (round((canvas_w - w) / 2), round(canvas_h - h - 0.015 * canvas_h)), img)
+    return canvas.resize(tuple(entry['size']), Image.LANCZOS)
 
 
 def finish_tile(raw, entry):
@@ -240,6 +260,8 @@ def main():
                 result = finish_cutout(raw, entry)
             elif entry['mode'] == 'tile':
                 result = finish_tile(raw, entry)
+            elif entry['mode'] == 'portrait':
+                result = finish_portrait(raw, entry)
             else:
                 result = finish_jpg(raw, entry)
         except Exception as e:  # noqa: BLE001 - report and go on with the rest
@@ -252,6 +274,10 @@ def main():
         else:
             result.save(target, optimize=True)
         done.setdefault(entry['group'], []).append((entry, result))
+        for extra in entry.get('also', []):
+            copy = (ASSETS if INSTALL else OUT) / extra
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            result.save(copy, quality=82, optimize=True, progressive=True) if entry['mode'] == 'jpg' else result.save(copy, optimize=True)
         print(f"ok   {entry['id']} -> {target.relative_to(ROOT)}  {result.size[0]}x{result.size[1]}  {target.stat().st_size // 1024} KB")
     for group, items in done.items():
         print('sheet:', sheet(group, items).relative_to(ROOT))

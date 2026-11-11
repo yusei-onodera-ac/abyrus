@@ -21,7 +21,7 @@ const CLASS_BASE: Record<HeroClass, ClassBase> = {
   healer: { hp: 1.0, atk: 0.8, spd: 90, def: 10 },
 };
 
-const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2 };
+const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2, 6: 4.8 };
 
 // Exported so InfiniteModeSystem can generate its own continuously-scaling
 // enemy defs from the same class pool instead of duplicating it. It is the

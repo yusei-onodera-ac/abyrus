@@ -23,6 +23,8 @@ import { openModal, type ModalHandle } from '../ui/Modal';
 import { applyBackground } from '../ui/Background';
 import { caption } from '../ui/theme';
 import { RARITY_COLORS } from '../types';
+import { BattleFx } from '../characters/BattleFx';
+import { rainbow } from '../ui/Rainbow';
 import { enter, enterStagger } from '../ui/Transitions';
 
 const LIST_GAP = 14;
@@ -180,7 +182,8 @@ export class GachaScene extends Phaser.Scene {
       const x = 360 - ((cols - 1) * 140) / 2 + col * 140;
       const y = startY + row * 180;
 
-      if (hero.rarity >= 5) this.spawnBurst(x, y, RARITY_COLORS[hero.rarity], 120 * i);
+      if (hero.rarity >= 6) this.spawnGrandBurst(x, y, 120 * i);
+      else if (hero.rarity >= 5) this.spawnBurst(x, y, RARITY_COLORS[hero.rarity], 120 * i);
 
       const card = new HeroCard(this, x, y, hero, this.generator, 110);
       card.setScale(0);
@@ -196,7 +199,11 @@ export class GachaScene extends Phaser.Scene {
         delay: 120 * i,
         ease: 'Back.easeOut',
         onStart: () => {
-          if (hero.rarity >= 4) this.cameras.main.flash(150, 255, 230, 150, false);
+          if (hero.rarity >= 6) {
+            // ★6: a long white-gold flash and a shake, the biggest moment of the whole screen.
+            this.cameras.main.flash(420, 255, 240, 200, false);
+            this.cameras.main.shake(520, 0.007);
+          } else if (hero.rarity >= 4) this.cameras.main.flash(150, 255, 230, 150, false);
         },
       });
     });
@@ -215,6 +222,38 @@ export class GachaScene extends Phaser.Scene {
     const owned = SaveSystem.getHero(save, outcome.hero.id) ?? [...SaveSystem.getCopies(save, outcome.hero)].sort((a, b) => b.phase - a.phase || b.level - a.level)[0];
     if (!owned) return;
     this.scene.start('HeroDetail', { heroId: owned.id, from: 'Gacha' });
+  }
+
+  /** The ★6 reveal: three turns of rainbow rays going out much further than a ★5's, with gold rings spreading behind
+   *  them and a shower of sparks - longer and bigger than anything else the screen does. */
+  private spawnGrandBurst(x: number, y: number, delay: number): void {
+    const layer = this.add.graphics({ x, y }).setDepth(250);
+    const rays = 24;
+    for (let round = 0; round < 3; round++) {
+      for (let i = 0; i < rays; i++) {
+        const angle = (Math.PI * 2 * (i + round / 3)) / rays;
+        const inner = 14 + round * 10;
+        const outer = 90 + round * 55 + (i % 2) * 28;
+        layer.lineStyle(round === 0 ? 5 : 3, rainbow(i / rays + round * 0.11, 0.6), 0.95);
+        layer.beginPath();
+        layer.moveTo(Math.cos(angle) * inner, Math.sin(angle) * inner);
+        layer.lineTo(Math.cos(angle) * outer, Math.sin(angle) * outer);
+        layer.strokePath();
+      }
+    }
+    layer.setScale(0.25).setAlpha(0);
+    this.tweens.add({ targets: layer, scale: 2.1, alpha: { from: 1, to: 0 }, angle: 40, duration: 1100, delay, ease: 'Quad.easeOut', onComplete: () => layer.destroy() });
+
+    for (let k = 0; k < 3; k++) {
+      const ring = this.add.circle(x, y, 40, 0xffd23f, 0).setStrokeStyle(6 - k * 1.5, k === 1 ? 0xff4fd8 : 0xffd23f, 0.95).setDepth(249).setAlpha(0);
+      this.tweens.add({ targets: ring, scale: 4.2, alpha: { from: 0.95, to: 0 }, duration: 900, delay: delay + k * 180, ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+    }
+
+    const fx = new BattleFx(this);
+    this.time.delayedCall(delay, () => {
+      fx.celebrate(x, y, 'gold', true);
+      fx.celebrate(x, y, 'violet', true);
+    });
   }
 
   /** Radial burst of fading lines for the biggest pulls, so a 5-star

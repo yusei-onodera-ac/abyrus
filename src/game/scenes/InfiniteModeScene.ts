@@ -90,9 +90,18 @@ export class InfiniteModeScene extends Phaser.Scene {
   private autoSkill?: AutoSkillToggle;
   private speed?: SpeedToggle;
   private partyBar?: PartyBar;
+  /** Opened from the lobby's 続きから: pick the saved run up instead of starting a new one. */
+  private resumeRun = false;
+  /** Real milliseconds since the run was last written to the save (see autosave). */
+  private saveClock = 0;
+  private readonly onPageHide = (): void => this.saveSuspended();
 
   constructor() {
     super('InfiniteRun');
+  }
+
+  init(data?: { resume?: boolean }): void {
+    this.resumeRun = data?.resume === true;
   }
 
   create(): void {
@@ -110,6 +119,15 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.autoSkill = undefined;
     this.speed = undefined;
     this.partyBar = undefined;
+    this.saveClock = 0;
+
+    // The run is written to the save every few seconds, when the scene is left and when the page is closed or hidden,
+    // so a run is never lost: it can be picked up again from the lobby.
+    window.addEventListener('pagehide', this.onPageHide);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      window.removeEventListener('pagehide', this.onPageHide);
+      this.saveSuspended();
+    });
 
     this.cameras.main.setBackgroundColor('#10121c');
     applyBattleBackground(this, 'infinite', ARENA_TINT);
@@ -137,6 +155,34 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (this.autoSkill?.isOn()) this.castReadySkills();
     this.refreshBars();
     this.refreshHud();
+    this.saveClock += delta;
+    if (this.saveClock >= 3000) this.saveSuspended();
+  }
+
+  /** Writes the run as it stands into the save (only while it is being fought: a finished run is not kept). */
+  private saveSuspended(): void {
+    this.saveClock = 0;
+    const engine = this.engine;
+    if (!engine || this.state !== 'running' || !this.ready || engine.isOver()) return;
+    this.save.infiniteMode.suspended = engine.serialize();
+    SaveSystem.save(this.save);
+  }
+
+  /** 一時停止: the fight stands still under a popup (再開 / 中断して戻る / リタイア). */
+  private openPause(): void {
+    if (this.state !== 'running' || !this.ready || !this.engine || this.scene.isPaused()) return;
+    this.saveSuspended();
+    this.scene.pause();
+    this.scene.launch('Pause', {
+      of: 'InfiniteRun',
+      lines: ['戦闘はここで止まっています。'],
+      onSuspend: () => {
+        this.saveSuspended();
+        this.scene.start('InfiniteMode');
+      },
+      onRetire: () => this.retreat(),
+    });
+    this.scene.bringToTop('Pause');
   }
 
   /** オート: every hero whose gauge is full casts its next skill right away. */
@@ -161,13 +207,21 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private startRun(): void {
     this.enterState('running');
-    const { front, back } = SaveSystem.getPartyHeroes(this.save);
-    const engine = new InfiniteRunEngine({ front, back });
+    // 続きから: the saved run (when it can still be used), otherwise a new one.
+    let engine = this.resumeRun ? InfiniteRunEngine.restore(this.save.infiniteMode.suspended, (id) => SaveSystem.getHero(this.save, id)) : null;
+    const resumed = engine !== null;
+    if (!engine) {
+      const { front, back } = SaveSystem.getPartyHeroes(this.save);
+      engine = new InfiniteRunEngine({ front, back });
+    }
+    // A new run replaces whatever was set aside; its own copy is written within a few seconds.
+    delete this.save.infiniteMode.suspended;
     this.engine = engine;
 
     this.ready = false;
     this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'front'), PARTY_ROW_Y.front);
     this.placePlayerRow(engine.playerUnits.filter((u) => u.row === 'back'), PARTY_ROW_Y.back);
+    if (resumed) for (const { position, unit } of engine.getEnemySlots()) if (unit && unit.alive) this.onEnemySpawned(unit, position);
     this.partyBar = new PartyBar(this, {
       generator: this.generator,
       units: engine.playerUnits,
@@ -180,7 +234,10 @@ export class InfiniteModeScene extends Phaser.Scene {
 
   private placePlayerRow(units: UnitInstance[], y: number): void {
     const startX = 360 - ((units.length - 1) * PARTY_SPACING) / 2;
-    units.forEach((unit, i) => this.createUnitView(unit, startX + i * PARTY_SPACING, y, true, true));
+    // A hero already down (in a run picked up again) has no figure, but keeps its place in the row.
+    units.forEach((unit, i) => {
+      if (unit.alive) this.createUnitView(unit, startX + i * PARTY_SPACING, y, true, true);
+    });
   }
 
   /** The party rises in from below the screen; the run begins once they are up. */
@@ -206,10 +263,12 @@ export class InfiniteModeScene extends Phaser.Scene {
     container.add(createPanel(this, 360, 72, 696, 116, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
     const retreatBtn = new Button(this, 104, 72, 160, 64, 'リタイア', () => this.retreat(), { variant: 'wood', fontSize: '24px' });
     container.add(retreatBtn);
+    const pauseBtn = new Button(this, 236, 72, 92, 64, '一時停止', () => this.openPause(), { variant: 'wood', fontSize: '19px' });
+    container.add(pauseBtn);
 
     const style = (size: number, color: string) => ({ fontSize: `${size}px`, fontStyle: 'bold', color, stroke: INK, strokeThickness: 5 });
-    const timeText = body(this, 330, 50, '0:00', style(36, '#ffe9b8')).setOrigin(0.5);
-    const scoreText = body(this, 330, 92, 'スコア 0', style(24, '#fff4dc')).setOrigin(0.5);
+    const timeText = body(this, 356, 50, '0:00', style(36, '#ffe9b8')).setOrigin(0.5);
+    const scoreText = body(this, 356, 92, 'スコア 0', style(24, '#fff4dc')).setOrigin(0.5);
     const diffText = body(this, 694, 50, '難易度 Lv.1', style(24, '#ffd9a0')).setOrigin(1, 0.5);
     const killText = body(this, 694, 92, '撃破 0体', style(24, '#fff4dc')).setOrigin(1, 0.5);
     container.add([timeText, diffText, killText, scoreText]);
@@ -462,6 +521,7 @@ export class InfiniteModeScene extends Phaser.Scene {
       difficultyReached: snapshot.difficultyIndex,
     };
 
+    delete this.save.infiniteMode.suspended;
     const previousBestScore = this.save.infiniteMode.bestScore;
     SaveSystem.recordInfiniteModeResult(this.save, result);
     recordMission(this.save, 'infinite_run');

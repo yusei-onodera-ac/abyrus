@@ -26,6 +26,9 @@ export interface GachaBannerEntry {
   /** 天井: the `at`-th pull counted since the last ★minRarity-or-better is certain to be one,
    *  and the count starts over whenever one comes out. Leave out for no 天井. */
   pity?: { at: number; minRarity: Rarity };
+  /** 10連の保証: a ten-pull always contains at least one hero of this ★ or better (if none came, the last pull of
+   *  the batch is raised to one). A single pull is not affected. Leave out for no such promise. */
+  tenMin?: Rarity;
   /** 魔晶石 for one pull / a ten-pull. Leave out for the standard prices of its kind. */
   singleCost?: number;
   tenCost?: number;
@@ -41,6 +44,25 @@ export interface GachaBannerEntry {
  * GachaSystem) - an entry changes what's shown, not what's rolled.
  */
 export const GACHA_BANNERS: GachaBannerEntry[] = [
+  {
+    id: 'special',
+    title: '特設ガチャ',
+    image: 'special.jpg',
+    description: '新★6「無限帝アイオーン」登場！',
+    accent: 0xd9367f,
+    emblem: '∞',
+    // 仮の数字: ★6 is rare (0.4%); the 天井 and the 10連 promise below keep a bad run from going on for ever.
+    rates: [
+      { rarity: 6, rate: 0.004 },
+      { rarity: 5, rate: 0.03 },
+      { rarity: 4, rate: 0.1 },
+      { rarity: 3, rate: 0.25 },
+      { rarity: 2, rate: 0.3 },
+      { rarity: 1, rate: 0.316 },
+    ],
+    pity: { at: 40, minRarity: 5 },
+    tenMin: 3,
+  },
   {
     id: 'first',
     title: 'はじめてのガチャ',
@@ -59,13 +81,6 @@ export const GACHA_BANNERS: GachaBannerEntry[] = [
     pity: { at: 30, minRarity: 4 },
   },
   {
-    id: 'new-gacha',
-    title: '新ガチャ開催！',
-    image: 'new_gacha.jpg',
-    description: '新キャラクター登場！',
-    endsAt: '2026-11-11T23:59:00',
-  },
-  {
     id: 'equip-standard',
     kind: 'equipment',
     title: '装備ガチャ',
@@ -78,7 +93,7 @@ export const GACHA_BANNERS: GachaBannerEntry[] = [
     id: 'standard',
     title: '通常ガチャ',
     image: 'standard.jpg',
-    description: '全キャラクターが排出対象',
+    description: '★5以下の全キャラクターが排出対象',
   },
 ];
 

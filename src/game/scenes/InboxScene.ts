@@ -74,8 +74,13 @@ export abstract class InboxScene extends Phaser.Scene {
       line.setAlpha(0.8);
     }
     this.render(true);
-    new BottomNavBar(this, 720, 1280, this.navTab);
+    if (this.showBottomNav()) new BottomNavBar(this, 720, 1280, this.navTab);
     if (this.navTab === null) enter(this, new BackButton(this, () => this.goBack()), { dx: -40, dy: 0, duration: 300, delay: 250 });
+  }
+
+  /** False for a screen laid over a paused fight (the premium pass opened from the 2倍速 button): leaving by the tabs would abandon it. */
+  protected showBottomNav(): boolean {
+    return true;
   }
 
   /** Where 戻る goes (a screen without a bottom tab). Home unless a subclass says otherwise. */

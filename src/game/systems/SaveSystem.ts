@@ -8,6 +8,7 @@ import { EXPEDITION_SLOTS, getExpedition } from '../data/expeditions';
 import { EXTRA_BUILDER_GEMS, RAID_INTERVAL_HOURS, VILLAGE_COLS, VILLAGE_MATERIALS, VILLAGE_ROWS, VILLAGE_START, VILLAGE_START_MATERIALS, WANDERERS, getBuilding, isBuildingKind, type BuildingKind, type MaterialBundle, type VillageMaterial, type WandererKind } from '../data/village';
 import { isItemId, type ItemId } from '../data/items';
 import { getSupplySlot } from '../data/supply';
+import type { InfiniteRunState } from './InfiniteModeSystem';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
@@ -265,6 +266,9 @@ export interface SaveData {
     bestEnemiesDefeated: number;
     bestDifficultyReached: number;
     totalRuns: number;
+    /** A run that was paused (or left) part-way, kept to be picked up again from the lobby (systems/InfiniteModeSystem.ts
+     *  reads it back and ignores anything that is not a well-formed one). Cleared when a run ends. */
+    suspended?: InfiniteRunState;
   };
   /** Spent one at a time to raise a hero's phase directly (see MAX_PHASE in
    *  types.ts) - no source grants these yet (no stage-reward wiring), so

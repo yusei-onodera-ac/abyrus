@@ -41,7 +41,10 @@ const isEquipment = (banner: GachaBannerEntry): boolean => banner.kind === 'equi
 
 /** Who (or what) can come out of a banner: the heroes of its pool, or the pieces of equipment. */
 export function heroPoolOf(banner: GachaBannerEntry): HeroDefinition[] {
-  return banner.pool ? HERO_ROSTER.filter((h) => banner.pool!.includes(h.id)) : HERO_ROSTER;
+  if (banner.pool) return HERO_ROSTER.filter((h) => banner.pool!.includes(h.id));
+  // Everyone - except that a ★6 (the 特設ガチャ's star) is only in a banner whose own rates have a ★6 in them.
+  const offered = new Set((banner.rates ?? GACHA_RATES).filter((r) => r.rate > 0).map((r) => r.rarity));
+  return HERO_ROSTER.filter((h) => h.rarity < 6 || offered.has(h.rarity));
 }
 
 export function equipPoolOf(): EquipDef[] {
@@ -73,6 +76,11 @@ export function ratesOf(banner: GachaBannerEntry): RateRow[] {
   return out;
 }
 
+/** The ten-pull promise of a banner as a sentence for the player, or null for a banner without one. */
+export function tenPullNote(banner: GachaBannerEntry): string | null {
+  return banner.tenMin ? `10連のうち1体は、必ず★${banner.tenMin}以上です。` : null;
+}
+
 export function costOf(banner: GachaBannerEntry, count: 1 | 10): number {
   if (count === 1) return banner.singleCost ?? (isEquipment(banner) ? EQUIP_SINGLE_COST : SINGLE_PULL_COST);
   return banner.tenCost ?? (isEquipment(banner) ? EQUIP_TEN_COST : TEN_PULL_COST);
@@ -98,6 +106,8 @@ function rollFrom(rows: RateRow[], rng: () => number): Rarity {
 function rollRarities(save: SaveData, banner: GachaBannerEntry, count: number, rng: () => number): Rarity[] {
   const rows = ratesOf(banner);
   const pity = banner.pity;
+  // 10連 only: the batch holds at least one pull of this ★ or better (the last pull is raised if none came).
+  const tenMin = count === 10 ? banner.tenMin : undefined;
   let counter = save.gachaPity[banner.id] ?? 0;
   const out: Rarity[] = [];
   for (let i = 0; i < count; i++) {
@@ -108,6 +118,11 @@ function rollRarities(save: SaveData, banner: GachaBannerEntry, count: number, r
       const good = rows.filter((r) => r.rarity >= pity.minRarity);
       rarity = good.length > 0 ? rollFrom(good, rng) : rows[0].rarity;
     }
+    if (tenMin && i === count - 1 && rarity < tenMin && !out.some((r) => r >= tenMin)) {
+      const good = rows.filter((r) => r.rarity >= tenMin);
+      if (good.length > 0) rarity = rollFrom(good, rng);
+    }
+    // (A pull raised above counts for the 天井 like any other: it is checked after.)
     if (pity && rarity >= pity.minRarity) counter = 0;
     out.push(rarity);
   }

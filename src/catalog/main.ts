@@ -17,7 +17,7 @@ import { phaseMaterialIcon } from '../game/ui/Icons';
  */
 
 const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const stars = (n: number): string => `<span class="star">${'★'.repeat(n)}</span>`;
+const stars = (n: number): string => `<span class="${n >= 6 ? 'star6' : 'star'}">${'★'.repeat(n)}</span>`;
 const pct = (v: number): string => `${Math.round(v * 1000) / 10}%`;
 const attr = (text: string, rarity?: number): string => `data-text="${esc(text.toLowerCase())}"${rarity ? ` data-rarity="${rarity}"` : ''}`;
 

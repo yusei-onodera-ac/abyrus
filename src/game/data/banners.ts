@@ -14,6 +14,6 @@ export interface BannerEntry {
  * Expected to turn over roughly every two weeks.
  */
 export const BANNERS: BannerEntry[] = [
-  { id: 'new-gacha', image: 'new_gacha.jpg', target: 'Gacha' },
+  { id: 'special', image: 'special.jpg', target: 'Gacha' },
   { id: 'starter-pack', image: 'starter_pack.jpg', target: 'Shop' },
 ];

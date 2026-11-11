@@ -9,7 +9,7 @@ import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem'
 import { clipboardIcon, expeditionIcon, hourglassIcon, supplyIcon, villageIcon } from '../ui/ItemIcons';
 import { SUPPLY_SLOTS } from '../data/supply';
 import { SupplySystem } from '../systems/SupplySystem';
-import { openSupplyModal, supplyHours } from '../ui/SupplyModal';
+import { openSupplyModal } from '../ui/SupplyModal';
 import { ExpeditionSystem } from '../systems/ExpeditionSystem';
 import { VillageSystem } from '../systems/VillageSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
@@ -44,6 +44,10 @@ import { RARITY_COLORS, type HeroData } from '../types';
 /** Promo banner frame, top-left under the resource bar. The quest/roster
  *  diamonds line their left edge up with this one's. */
 const BANNER = { x: 28, y: 138, w: 336, h: 188 };
+
+/** The 遠征 / 村 / 朝夕の補給 boxes: a column on the right, below the round buttons, over the hero's body - the face
+ *  (upper right, behind the old position of these boxes) is left clear. */
+const STATUS = { x: 476, w: 232, h: 84, y: 498, step: 92 };
 
 /** Where the Home hero's speech bubble sits: centred over the head, its lower edge here. */
 const BUBBLE_X = 494;
@@ -283,9 +287,9 @@ export class HomeScene extends Phaser.Scene {
     read: (now: number) => { main: string; mainColor: string; sub: string; pips: ('empty' | 'busy' | 'ready')[]; dot: boolean };
     delay: number;
   }): void {
-    const x = BANNER.x + BANNER.w + 12;
-    const w = 608 - x;
-    const h = 84;
+    const x = STATUS.x;
+    const w = STATUS.w;
+    const h = STATUS.h;
     const box = this.add.container(x, opts.y);
     box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
     box.add(this.add.image(38, h / 2, opts.icon).setDisplaySize(52, 52));
@@ -331,7 +335,7 @@ export class HomeScene extends Phaser.Scene {
    *  someone out. The three pips are the three slots (empty / away / back). */
   private buildExpeditionBox(save: SaveData): void {
     this.buildStatusBox({
-      y: BANNER.y,
+      y: STATUS.y,
       icon: expeditionIcon(this, 52),
       label: '遠征',
       delay: 240,
@@ -361,7 +365,7 @@ export class HomeScene extends Phaser.Scene {
    *  going. The pips are the builders (dark = free). */
   private buildVillageBox(save: SaveData): void {
     this.buildStatusBox({
-      y: BANNER.y + 84 + 8,
+      y: STATUS.y + STATUS.step,
       icon: villageIcon(this, 52),
       label: '村',
       delay: 260,
@@ -397,7 +401,7 @@ export class HomeScene extends Phaser.Scene {
    *  opens the list to take them from. */
   private buildSupplyBox(save: SaveData): void {
     this.buildStatusBox({
-      y: BANNER.y + (84 + 8) * 2,
+      y: STATUS.y + STATUS.step * 2,
       icon: supplyIcon(this, 52),
       label: '朝夕の補給',
       delay: 270,
@@ -405,11 +409,11 @@ export class HomeScene extends Phaser.Scene {
       read: (now) => {
         const next = SupplySystem.next(save, now);
         let state: { main: string; mainColor: string; sub: string };
-        if (next?.state === 'open') state = { main: next.slot.name, mainColor: '#ffd23f', sub: `受け取れます　あと${StaminaSystem.formatDuration(next.seconds)}` };
-        else if (next) state = { main: next.slot.name, mainColor: '#fff4dc', sub: `${supplyHours(next.slot)}　あと${StaminaSystem.formatDuration(next.seconds)}` };
+        if (next?.state === 'open') state = { main: next.slot.name, mainColor: '#ffd23f', sub: `あと${StaminaSystem.formatDuration(next.seconds)}で終了` };
+        else if (next) state = { main: next.slot.name, mainColor: '#fff4dc', sub: `あと${StaminaSystem.formatDuration(next.seconds)}で開始` };
         else {
           const first = SUPPLY_SLOTS[0];
-          state = { main: SupplySystem.allTaken(save, now) ? '本日分 完了' : '本日は終了', mainColor: SupplySystem.allTaken(save, now) ? '#9fe39f' : '#cdbb94', sub: `次は ${first.name} ${first.startHour}:00` };
+          state = { main: SupplySystem.allTaken(save, now) ? '本日分 完了' : '本日は終了', mainColor: SupplySystem.allTaken(save, now) ? '#9fe39f' : '#cdbb94', sub: `次は ${first.startHour}:00から` };
         }
         return {
           ...state,

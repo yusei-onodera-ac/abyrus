@@ -94,8 +94,6 @@ const BANNER =
 const banners = [
   ['first', 'a first-time summoning: a grand glowing golden magic circle in the centre with a rising pillar of light, a treasure chest overflowing with gems and gold coins, confetti and sparkles, a warm celebratory gold-and-pink palette'],
   ['equip_standard', 'an armory summoning: legendary swords, shields and armor floating around a glowing blue-and-gold magic circle above an anvil, sparks flying, a cool steel-blue and gold palette'],
-  ['standard', 'a standard summoning: a mystical glowing violet-and-blue magic circle with floating crystals and star dust above an ancient stone altar, a calm mysterious palette'],
-  ['friend_gacha', 'a friendship summoning: two warm glowing hands-shaped rays of light meeting above a magic circle, with heart-shaped sparkles, flower petals and ribbons, a friendly warm orange-and-pink palette'],
 ].map(([id, what]) => ({
   id: `banner_${id}`,
   group: 'banners',
@@ -336,20 +334,35 @@ const construction = [
 // ---------------------------------------------------------------------------------------------- event banners (3) and a notice (1)
 const EVENT =
   'A wide banner picture for an event card in a mobile fantasy RPG, painted by hand in a rich, glossy anime-game style with strong lighting and a sense of excitement. Keep the left third calmer so a title can be placed over it later. ' + NO_TEXT;
+const SHOW_CHARS = 'The heroes and monsters shown must be the SAME characters as in the reference pictures (same faces, hair, outfits, weapons and creature designs), only posed differently - do not invent other characters.';
 const events = [
-  ['infinite', 'the Infinite Mode endless trial: a lone circular arena platform floating in a dark violet void, endless waves of glowing red-eyed shadow silhouettes approaching from the horizon, a huge glowing infinity-shaped rune ring in the sky, orange and violet light, tense and epic'],
-  ['premium', 'a royal premium pass: a gleaming golden crown on a velvet cushion surrounded by floating gems, golden wings of light and sparkling coins, a rich gold-and-royal-blue palette, luxurious'],
-  ['sample', 'a seasonal festival: a lively fantasy village square with colourful lanterns, banners, fireworks in a twilight sky and drifting petals, a warm green-and-gold palette, joyful'],
-].map(([id, what]) => ({
+  ['infinite', ['viara', 'dias', 'astra', 'e_necrodraco', 'e_garumudo'], 'the Infinite Mode endless trial: the heroes from the references stand together on a circular arena platform floating in a dark violet void, ready to fight, while endless waves of dark shadow-versions of the monsters from the references approach from the horizon; a huge glowing infinity-shaped rune ring in the sky, orange and violet light, tense and epic'],
+  ['premium', ['astra', 'aria', 'zeno', 'gauss'], 'a royal premium pass: the heroes from the references in a gleaming golden hall, striking proud poses around a golden crown on a velvet cushion, floating gems, golden wings of light and sparkling coins, a rich gold-and-royal-blue palette, luxurious'],
+  ['sample', ['nova', 'seira', 'ren', 'celes'], 'a seasonal festival: the heroes from the references enjoying a lively fantasy village square with colourful lanterns, banners, fireworks in a twilight sky and drifting petals, a warm green-and-gold palette, joyful'],
+].map(([id, who, what]) => ({
   id: `event_${id}`,
   group: 'events',
   out: `events/${id}.jpg`,
   mode: 'jpg',
   size: [1050, 450],
   aspect: '21:9',
-  refs: ['gacha/new_gacha.jpg'],
+  refs: who.map((n) => `ref:${n}.jpg`),
+  refNote: SHOW_CHARS,
   prompt: `${EVENT} The scene: ${what}.`,
 }));
+const premiumHeader = [
+  {
+    id: 'event_premium_header',
+    group: 'events',
+    out: 'events/premium_header.jpg',
+    mode: 'jpg',
+    size: [1050, 450],
+    aspect: '21:9',
+    refs: ['astra', 'viara', 'zeno', 'aria'].map((n) => `ref:${n}.jpg`),
+    refNote: SHOW_CHARS,
+    prompt: `${EVENT} The scene: the premium pass header - the heroes from the references standing in a row on a golden stage under a huge radiant golden crown emblem with wings of light, a shower of gold coins and gems, royal-blue and gold, regal and grand.`,
+  },
+];
 const notices = [
   {
     id: 'notice_welcome',
@@ -363,7 +376,123 @@ const notices = [
   },
 ];
 
-export const MANIFEST = [...items, ...gear, ...banners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...notices];
+// ---------------------------------------------------------------------------------------------- new characters (31)
+const CHAR =
+  'A full-body character illustration for a Japanese mobile fantasy gacha RPG in the same style as the reference pictures: polished anime-game character art with clean fine linework, rich detailed costume design, soft cel shading and a natural standing pose, ' +
+  'the whole figure visible from head to toe, facing the viewer, with a little space around it. A bold dark outline runs around the whole figure, including white clothing. Plain pure white background, no ground shadow, no frame, no text. ' + NO_TEXT + ' ';
+const CHAR_NOTE =
+  'The reference pictures show the target art style, body proportions and level of finish ONLY. Draw a completely different, brand-new original character as described: do not reuse their faces, hair, outfits or weapons.';
+const CHAR_QUALITY = {
+  3: 'A capable everyday adventurer: practical, well-made gear with a few nice touches, a relatable down-to-earth look, modest ornament and no magical glow.',
+  4: 'A strong, impressive hero: an elaborate costume, a striking silhouette, a large weapon or magic with crisp details and a hint of glow.',
+  6: 'THE MOST SPECTACULAR, FLASHIEST AND MOST LUXURIOUS CHARACTER IN THE WHOLE GAME, a legendary ultimate-rarity hero: the richest, most ornate costume imaginable, huge, dazzling and instantly eye-catching. All the effects (wings, rings, orbiting jewels, sparkles) are crisp hard-edged painted shapes with outlines, not soft glow or haze, so the figure stays cleanly separated from the white background.',
+};
+const CHAR_REFS = { 3: ['ref:celes.jpg', 'ref:noct.jpg'], 4: ['ref:dias.jpg', 'ref:nova.jpg'], 6: ['ref:astra.jpg', 'ref:viara.jpg'] };
+// [id, rarity, description]
+const characters = [
+  // 6 stars: the 特設ガチャ star
+  ['aion', 6, 'Aion, the Infinity Sovereign: a majestic celestial empress-mage. Very long flowing hair that shades from gold to rainbow prism colours; a huge crown-halo of golden rotating abacus-bead rings with a glowing infinity symbol; an extremely ornate white-and-gold armored gown with prismatic crystal panels and jewelled filigree; three pairs of large feathered wings in white, gold and rainbow; a long cape with a galaxy pattern; golden abacus beads, shards of crystal and stars orbiting around her; a tall ornate staff topped with a giant infinity-shaped crystal; layers of jewellery; a confident, regal smile'],
+  // 4 stars: strong-looking
+  ['kurenai', 4, 'Kurenai, a fierce young woman samurai swordmaster in crimson-and-black lacquered armor with a flowing red haori, a long katana with flame-shaped ornaments, a spiky black ponytail tied with a red ribbon, a confident grin'],
+  ['sieg', 4, 'Sieg, a noble young paladin knight in white-and-gold plate armor with a long blue cape and a winged helmet crest, holding a huge holy greatsword with a golden cross guard, short blond hair, a righteous stance'],
+  ['thorne', 4, 'Thorne, a dragoon lancer in dark-teal dragon-scale armor with a horned helmet, a long spear with a dragon-fang blade, small dragon-wing shoulder ornaments, silver hair, a stern look'],
+  ['gale', 4, 'Gale, a lithe young wind ranger in sky-blue and white feathered clothes, a huge ornate composite bow with streaming wind ribbons, windswept teal hair, goggles on his forehead, a long scarf billowing, a bold smile'],
+  ['ivy', 4, 'Ivy, an elegant rose-thorn huntress in a dark-green and crimson corset-coat with rose motifs, a vine-wrapped longbow with thorns, long wavy burgundy hair with a rose crown, a cool smile'],
+  ['lilith', 4, 'Lilith, a dark sorceress in a black-and-violet gown with a high collar and a bat-wing-like cape, a crescent-moon staff, long silver hair with horn-like hair ornaments, red eyes, a mysterious smile, floating purple flames'],
+  ['quartz', 4, 'Quartz, a crystal mage girl whose armor and staff are made of translucent pink and cyan crystals, crystal shards floating around her, pastel gradient hair, a cheerful pose'],
+  ['brann', 4, 'Brann, a stocky bearded dwarf knight in thick riveted steel plate armor with a huge tower shield carved with a fortress emblem and a short warhammer, a plumed helmet, heroic and sturdy'],
+  ['raijin', 4, 'Raijin, a muscular thunder warrior in yellow-and-black armor with drum-like shoulder guards and a giant war hammer crackling with lightning, spiky white hair, a wide fierce grin'],
+  ['ouka', 4, 'Ouka, a graceful shrine-maiden priestess in a white-and-pink miko outfit with cherry-blossom embroidery, long flowing pink hair with a gold hair ornament, a bell staff, cherry petals swirling, a gentle smile'],
+  // 3 stars: everyday adventurers
+  ['haruka', 3, 'Haruka, a cheerful young woman traveler-swordswoman in a practical brown leather jacket, scarf and short skirt over leggings, a straight sword at her hip and a travel pack, short brown hair with a hair clip'],
+  ['jin', 3, 'Jin, a rugged mercenary man in his thirties with stubble, wearing a worn chainmail vest and a red bandana, a big broadsword over his shoulder'],
+  ['sora', 3, 'Sora, a boyish sky pirate in a long blue coat and a tricorn hat with goggles, a curved cutlass and a flintlock pistol, a cheeky grin'],
+  ['gen', 3, 'Gen, a barefoot martial-arts monk with a shaved head and prayer beads, an orange robe tied at the waist, wrapped fists, calm and strong'],
+  ['rosa', 3, 'Rosa, an elegant fencer woman in a burgundy doublet and a white ruffled shirt, a slim rapier, long wavy dark-red hair tied back'],
+  ['taiga', 3, 'Taiga, a young barbarian in a wolf-pelt mantle and fur boots, a big bone-handled axe, messy grey-brown hair, a wild look'],
+  ['miru', 3, 'Miru, a dreamy girl astrologer in a navy robe sprinkled with small stars, a telescope-like staff and a star-chart scroll, big round glasses, twin braids'],
+  ['orga', 3, 'Orga, a confident alchemist woman with goggles pushed up on her head, a stained leather apron over a blouse, potion vials on a bandolier, a flask in her hand, a ponytail'],
+  ['lune', 3, 'Lune, a quiet moon witch in a pale-lavender hooded cloak with a crescent-moon brooch and a pointed hat, a lantern staff, long silver-lilac hair'],
+  ['felix', 3, 'Felix, a young summoner boy in a green coat with a big open spellbook, a tiny glowing spirit familiar floating beside him, tousled orange hair, a curious smile'],
+  ['tsubame', 3, 'Tsubame, a nimble scout girl in a short dark-blue ninja-style outfit with a scarf, a small recurve bow and a quiver, a swallow-tail ponytail'],
+  ['robin', 3, 'Robin, a roguish outlaw archer man in a green hood and leather vest with a feather in the cap, a longbow, laughing'],
+  ['ines', 3, 'Ines, a desert archer woman in a cream-and-turquoise wrap outfit with a long face-veil scarf and bangles, a curved bow, tanned skin, a long black braid'],
+  ['kaede', 3, 'Kaede, a calm kyudo archer girl in a white-and-red archery hakama with a glove and a tall Japanese yumi bow, black hair in a high ponytail with a maple-leaf ornament'],
+  ['gustav', 3, 'Gustav, a burly middle-aged gate guard with a moustache in plain steel half-armor and a kettle helmet, a big wooden-and-iron round shield and a halberd'],
+  ['bruno', 3, 'Bruno, a broad blacksmith man in a leather apron with a soot-smudged face, carrying an anvil-shaped tower shield and a big hammer, rolled-up sleeves, a kind smile'],
+  ['doris', 3, 'Doris, a sturdy young nun in a navy-and-white habit with chain mail underneath, carrying a large cross-emblazoned shield and a mace, a determined look'],
+  ['lena', 3, 'Lena, a gentle herbalist girl in a green apron-dress with a basket of herbs and flowers, a leaf-topped wooden staff, a satchel, light brown hair with a flower'],
+  ['noel', 3, 'Noel, a young choir-boy cleric in a white-and-blue surplice with a small golden bell staff and a hymn book, soft blond curls'],
+  ['mimi', 3, 'Mimi, a kind animal-healer girl in a cream coat with a medical cross badge, a small white fox sitting on her shoulder, a staff with a green gem, long wavy light-pink hair'],
+].map(([id, rarity, what]) => ({
+  id: `hero_${id}`,
+  group: 'chars',
+  out: `characters/${id}.png`,
+  mode: 'portrait',
+  size: [1008, 1344],
+  aspect: '3:4',
+  refs: CHAR_REFS[rarity],
+  refNote: CHAR_NOTE,
+  prompt: `${CHAR}${CHAR_QUALITY[rarity]} The character: ${what}.`,
+}));
+
+// ---------------------------------------------------------------------------------------------- 特設ガチャ banner, 通常ガチャ banner, loading screen
+const GACHA_CHARS = 'The characters shown must be the SAME characters as in the reference pictures (same faces, hair, outfits and weapons), only posed differently - do not invent other characters.';
+const castBanners = [
+  {
+    id: 'banner_friend_gacha',
+    group: 'banners',
+    out: 'gacha/friend_gacha.jpg',
+    mode: 'jpg',
+    size: [1290, 280],
+    aspect: '21:9',
+    refs: ['nova', 'celes', 'ren'].map((n) => `ref:${n}.jpg`),
+    refNote: GACHA_CHARS,
+    prompt: `${BANNER} The picture is a very wide, thin strip: keep everything important inside a narrow horizontal band across the middle and let the top and bottom be soft background. The scene: a friendship summoning: the three heroes from the references shown as bust-up portraits only (head and shoulders, cut off at the chest, NO legs or feet), shoulder to shoulder, smiling and waving, their faces exactly at the vertical middle of the picture, a warm glowing magic circle glowing behind them, heart-shaped sparkles, flower petals and ribbons floating, a friendly warm orange-and-pink palette.`,
+  },
+  {
+    id: 'banner_special',
+    group: 'banners',
+    out: 'gacha/special.jpg',
+    also: ['banners/special.jpg'],
+    mode: 'jpg',
+    size: [1024, 576],
+    aspect: '16:9',
+    refRaw: ['hero_aion'],
+    refs: ['ref:astra.jpg', 'ref:viara.jpg', 'ref:zeno.jpg'],
+    refNote: `${GACHA_CHARS} The FIRST reference picture is the new star character: show her biggest, in the centre, with her wings spread and a huge blazing golden light behind her. The other reference characters stand smaller on her left and right.`,
+    prompt: `${BANNER} The scene: a special limited summoning banner: the star character from the first reference rising in a pillar of golden-rainbow light above a gigantic glowing golden magic circle, golden and rainbow rays bursting behind her, falling gold petals and crystal shards, the other powerful heroes striking poses beside her, the most dazzling, luxurious and exciting composition possible, a gold-white-and-violet palette.`,
+  },
+  {
+    id: 'banner_standard',
+    group: 'banners',
+    out: 'gacha/standard.jpg',
+    mode: 'jpg',
+    size: [1024, 576],
+    aspect: '16:9',
+    refs: ['dias', 'seira', 'ignis', 'sylva', 'nova', 'noct'].map((n) => `ref:${n}.jpg`),
+    refNote: GACHA_CHARS,
+    prompt: `${BANNER} The scene: the standard summoning: six of the heroes from the references stand side by side in a confident line-up before a glowing violet-and-blue magic circle with floating crystals and star dust, a calm but heroic mood.`,
+  },
+];
+const loading = [
+  {
+    id: 'loading_screen',
+    group: 'loading',
+    out: 'ui/loading.jpg',
+    mode: 'jpg',
+    size: [720, 1280],
+    aspect: '9:16',
+    refs: ['viara', 'astra', 'dias', 'seira', 'zeno'].map((n) => `ref:${n}.jpg`).concat(['e_necrodraco', 'e_garumudo', 'e_arachnea', 'e_kongo'].map((n) => `ref:${n}.jpg`)),
+    refNote: 'The heroes and monsters shown must be the SAME characters and creatures as in the reference pictures (same faces, hair, outfits, weapons and designs), only posed differently - do not invent other characters.',
+    prompt:
+      'A tall portrait key-art splash picture used as the loading screen of a Japanese mobile fantasy RPG named ABYRUS, painted by hand in a rich, glossy anime-game style with dramatic lighting. ' +
+      'The five heroes from the first references stand together in the lower middle of the picture, heroic and ready for battle, while the giant monsters from the last references loom threateningly behind them in the dark stormy sky of a ruined tower landscape, with a huge glowing red-and-gold ring in the sky. ' +
+      'The top fifth of the picture is calm dark sky (a title will be placed there later) and the bottom tenth is a calm dark foreground (a loading bar will be placed there). ' + NO_TEXT,
+  },
+];
+
+export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

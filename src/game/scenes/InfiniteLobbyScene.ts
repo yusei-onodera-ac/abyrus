@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { LeaderboardSystem } from '../systems/LeaderboardSystem';
+import { describeSuspendedRun, readSuspendedRun } from '../systems/InfiniteModeSystem';
+import { openConfirm } from '../ui/Dialogs';
 import { applyBackground } from '../ui/Background';
 import { BackButton } from '../ui/BackButton';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -71,7 +73,9 @@ export class InfiniteLobbyScene extends Phaser.Scene {
     // 挑戦開始 comes right after who is fighting, so it is on screen without scrolling.
     stack(this.buildRulesCard());
     stack(this.buildPartyCard(save, guard));
-    stack(this.buildStartRow(save, guard));
+    const suspended = this.suspendedRun(save);
+    if (suspended) stack(this.buildResumeCard(suspended, guard));
+    stack(this.buildStartRow(save, guard, suspended !== null));
     stack(this.buildBestCard(save));
     stack(this.buildRankingCard());
 
@@ -170,14 +174,64 @@ export class InfiniteLobbyScene extends Phaser.Scene {
     });
   }
 
-  /** 挑戦開始, or why it cannot be pressed. */
-  private buildStartRow(save: SaveData, guard: () => boolean): { container: Phaser.GameObjects.Container; height: number } {
+  /** A run that was paused or left part-way, if there is one that can still be picked up (every hero in it is still around). */
+  private suspendedRun(save: SaveData): ReturnType<typeof readSuspendedRun> {
+    const state = readSuspendedRun(save.infiniteMode.suspended);
+    if (state && state.players.every((u) => SaveSystem.getHero(save, u.id))) return state;
+    if (save.infiniteMode.suspended) {
+      delete save.infiniteMode.suspended;
+      SaveSystem.save(save);
+    }
+    return null;
+  }
+
+  /** 中断中の挑戦: how far it got, and 続きから. */
+  private buildResumeCard(state: NonNullable<ReturnType<typeof readSuspendedRun>>, guard: () => boolean): { container: Phaser.GameObjects.Container; height: number } {
+    const info = describeSuspendedRun(state);
+    const h = 194;
+    const panel = buildInfoPanel(this, CARD_WIDTH, h, '中断中の挑戦', 0xe0822a);
+    const top = panel.bodyTop;
+    const cells: [string, string][] = [
+      ['生存時間', formatSurvival(info.survivalSeconds)],
+      ['スコア', info.score.toLocaleString('ja-JP')],
+      ['撃破数', `${info.enemiesDefeated.toLocaleString('ja-JP')}体`],
+      ['難易度', `Lv.${Math.floor(info.difficultyIndex) + 1}`],
+    ];
+    cells.forEach(([label, value], i) => {
+      const x = PAD + (i % 2) * (CARD_WIDTH / 2);
+      const y = top + 10 + Math.floor(i / 2) * 46;
+      panel.container.add(caption(this, x, y + 12, label, { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      panel.container.add(body(this, x + 104, y + 12, value, { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    });
+    panel.container.add(new Button(this, CARD_WIDTH / 2, top + 130, CARD_WIDTH - PAD * 2, 76, '続きから', () => this.scene.start('InfiniteRun', { resume: true }), { variant: 'gold', fontSize: '32px', guard }));
+    return { container: panel.container, height: panel.height };
+  }
+
+  /** 挑戦開始, or why it cannot be pressed. With a run set aside it starts over instead (after asking). */
+  private buildStartRow(save: SaveData, guard: () => boolean, hasSuspended = false): { container: Phaser.GameObjects.Container; height: number } {
     const { front, back } = SaveSystem.getPartyHeroes(save);
     const hasParty = front.length + back.length > 0;
     const h = 92;
     const container = this.add.container(0, 0);
-    const button = new Button(this, CARD_WIDTH / 2, h / 2, CARD_WIDTH, h, hasParty ? '挑戦開始' : '編成が空です', () => this.scene.start('InfiniteRun'), {
-      variant: hasParty ? 'gold' : 'wood',
+    const start = (): void => {
+      if (!hasSuspended) {
+        this.scene.start('InfiniteRun');
+        return;
+      }
+      openConfirm(this, this.scroll, {
+        title: '最初からやり直しますか？',
+        message: '中断中の挑戦は消えて、\n新しく始めます。',
+        confirmLabel: '新しく始める',
+        confirmVariant: 'gold',
+        onConfirm: () => {
+          delete save.infiniteMode.suspended;
+          SaveSystem.save(save);
+          this.scene.start('InfiniteRun');
+        },
+      });
+    };
+    const button = new Button(this, CARD_WIDTH / 2, h / 2, CARD_WIDTH, h, !hasParty ? '編成が空です' : hasSuspended ? '新しく挑戦する' : '挑戦開始', start, {
+      variant: hasParty && !hasSuspended ? 'gold' : 'wood',
       fontSize: '34px',
       guard,
     });

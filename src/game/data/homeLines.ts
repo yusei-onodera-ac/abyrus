@@ -16,6 +16,7 @@ import type { HeroClass } from '../types';
 export const HERO_LINES: Record<string, string[]> = {
   // 専用のセリフを足すときは、ここに書く。例:
   // gauss: ['算盤の音が聞こえるか？ 全て計算どおりだ。', '数字は嘘をつかん。信じるがいい。', '守りは任せろ。'],
+  aion: ['無限の果てまで、ついていらっしゃい。', 'すべての桁を超えて、わたくしが導きましょう。', 'ふふ、ひざまずくには、まだ早いですわ。'],
 };
 
 export const CLASS_LINES: Record<HeroClass, string[]> = {

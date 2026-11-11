@@ -111,11 +111,19 @@ async function request(entry) {
   // A level is built on the picked (else first) try of the level before it.
   const prev = entry.refPrev ? rawPath(entry.refPrev, pickedVariant(entry.refPrev)) ?? rawPath(entry.refPrev) : undefined;
   if (prev) parts.push(refPart(prev));
+  // `refRaw`: raw pictures of other entries (a banner showing a character just made). They come first: "the first
+  // reference" in a prompt is the picture that matters most.
+  for (const id of entry.refRaw ?? []) {
+    const file = rawPath(id, pickedVariant(id)) ?? rawPath(id);
+    if (file) parts.push(refPart(file));
+  }
+  // 'ref:<name>' is a small copy made by make_refs.py (tools/art/refs); anything else is a finished picture under public/assets.
   for (const ref of entry.refs ?? []) {
-    const file = path.join(ASSETS, ref);
+    const file = ref.startsWith('ref:') ? path.join(HERE, 'refs', ref.slice(4)) : path.join(ASSETS, ref);
     if (fs.existsSync(file)) parts.push(refPart(file));
   }
-  const text = parts.length > 0 ? `${entry.prompt}\n\nThe reference picture(s) above show the target art style${prev ? ' and the previous level' : ''}; copy their painting style, not their subject.` : entry.prompt;
+  const note = entry.refNote ?? `The reference picture(s) above show the target art style${prev ? ' and the previous level' : ''}; copy their painting style, not their subject.`;
+  const text = parts.length > 0 ? `${entry.prompt}\n\n${note}` : entry.prompt;
   parts.push({ text });
   for (let attempt = 1; attempt <= 12; attempt++) {
     const body = {

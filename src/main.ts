@@ -28,6 +28,7 @@ import { ExpeditionScene } from './game/scenes/ExpeditionScene';
 import { WeekdayDungeonScene } from './game/scenes/WeekdayDungeonScene';
 import { VillageScene } from './game/scenes/VillageScene';
 import { PremiumScene } from './game/scenes/PremiumScene';
+import { PauseScene } from './game/scenes/PauseScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
 import { showDevNotice } from './devNotice';
@@ -74,6 +75,7 @@ const config: Phaser.Types.Core.GameConfig = {
     WeekdayDungeonScene,
     VillageScene,
     PremiumScene,
+    PauseScene,
     ShopScene,
     SettingsScene,
   ],

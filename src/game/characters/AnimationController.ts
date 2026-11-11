@@ -50,7 +50,8 @@ export class AnimationController {
       alpha: { start: 0.7, end: 0 },
       lifespan: 800,
       frequency: Math.max(60, 260 - rarity * 45),
-      tint: color,
+      // ★6: gold, magenta, cyan and violet sparks instead of one colour.
+      tint: rarity >= 6 ? [0xffd23f, 0xff4fd8, 0x6be3ff, 0xa97bff] : color,
       blendMode: 'ADD',
       follow: sprite,
       followOffset: { x: 0, y: 20 },

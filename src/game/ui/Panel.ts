@@ -66,6 +66,13 @@ export function createPanel(
   body.strokeRoundedRect(-halfW, -halfH, width, height, radius);
   container.add(body);
 
+  if (rarity === 6) {
+    const gold = scene.add.graphics();
+    gold.lineStyle(2, 0xffd23f, 0.95);
+    gold.strokeRoundedRect(-halfW - 2, -halfH - 2, width + 4, height + 4, radius + 2);
+    container.add(gold);
+  }
+
   if (rarity && rarity >= 4) {
     const corners: [number, number][] = [
       [-halfW + 12, -halfH + 12],
@@ -73,7 +80,7 @@ export function createPanel(
       [-halfW + 12, halfH - 12],
       [halfW - 12, halfH - 12],
     ];
-    const accentColor = glowColor;
+    const accentColor = rarity === 6 ? 0xffd23f : glowColor;
     const deco = scene.add.graphics();
     deco.fillStyle(accentColor, 0.85);
     for (const [cx, cy] of corners) {

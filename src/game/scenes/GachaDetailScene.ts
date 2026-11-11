@@ -2,7 +2,7 @@ import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { EQUIP_DEFS, describeEquip } from '../data/equipment';
 import { getActiveGachaBanners, formatGachaEnd, type GachaBannerEntry } from '../data/gachaBanners';
 import { createHeroInstance } from '../data/heroes';
-import { costOf, heroPoolOf, pityLeft, ratesOf, type RateRow } from '../systems/GachaSystem';
+import { costOf, heroPoolOf, pityLeft, ratesOf, tenPullNote, type RateRow } from '../systems/GachaSystem';
 import { RARITY_COLORS, hex, type Rarity } from '../types';
 import { buildCardPanel, wrappedText } from '../ui/CardParts';
 import { HeroSlot } from '../ui/HeroSlot';
@@ -82,6 +82,8 @@ export class GachaDetailScene extends InboxScene {
     } else {
       lines.push({ text: 'このガチャに天井はありません。', color: '#cdbb94', size: 19 });
     }
+    const ten = tenPullNote(banner);
+    if (ten) lines.push({ text: `【10連保証】${ten}`, color: '#ffd23f', size: 21, bold: true });
     if (banner.kind !== 'equipment') lines.push({ text: 'キャラをタップすると、レベル・フェーズ・スキルが最大のときの姿を見られます。', color: '#9fe39f', size: 19, bold: true });
     if (banner.kind !== 'equipment') lines.push({ text: 'すでに持っているキャラも、名鑑に増えます。（編成に入れられるのは、同じキャラ1体まで）', color: '#cdbb94', size: 18 });
 

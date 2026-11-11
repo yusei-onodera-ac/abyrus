@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { CharacterGenerator } from '../characters/CharacterGenerator';
 import { hex, RARITY_COLORS, type HeroData } from '../types';
+import { addRainbowFrame } from './Rainbow';
 import { CHROME } from './theme';
 
 export const HERO_SLOT_SIZE = 108;
@@ -65,6 +66,7 @@ export class HeroSlot extends Phaser.GameObjects.Container {
     border.lineStyle(1, 0x000000, 0.5);
     border.strokeRoundedRect(-half + 2, -half + 2, size - 4, size - 4, radius - 2);
     this.add(border);
+    if (hero?.rarity === 6) addRainbowFrame(scene, this, size, radius);
 
     if (hero) {
       const chip = scene.add.graphics();

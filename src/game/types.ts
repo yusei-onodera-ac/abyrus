@@ -1,6 +1,6 @@
 import type { BigNumber } from './systems/BigNumber';
 
-export type Rarity = 1 | 2 | 3 | 4 | 5;
+export type Rarity = 1 | 2 | 3 | 4 | 5 | 6;
 export type HeroClass = 'warrior' | 'mage' | 'archer' | 'tank' | 'healer';
 export type Row = 'front' | 'back';
 
@@ -18,6 +18,8 @@ export const RARITY_COLORS: Record<Rarity, number> = {
   3: 0x2196f3,
   4: 0xab47bc,
   5: 0xffb300,
+  // ★6 is magenta-pink: nothing else is, and the screens that show a ★6 add gold and rainbow on top of it.
+  6: 0xff4fd8,
 };
 
 export function hex(color: number): string {
