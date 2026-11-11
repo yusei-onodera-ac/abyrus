@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { GAME_EMOJI_IDS, type EmojiId } from '../data/emoji';
-import { ChatSystem, GLOBAL_CHANNEL, MAX_TEXT, SELF_ID, SYSTEM_ID, dmChannel, groupChannel, plainPreview, stripForbidden } from '../systems/ChatSystem';
+import { ChatSystem, GLOBAL_CHANNEL, MAX_TEXT, SELF_ID, SYSTEM_ID, dmChannel, plainPreview, stripForbidden } from '../systems/ChatSystem';
 import { SaveSystem, type ChatMessage, type SaveData } from '../systems/SaveSystem';
 import { applyBackground } from '../ui/Background';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -17,12 +17,13 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { enter } from '../ui/Transitions';
+import { AllianceService } from '../alliance/AllianceService';
 
 type MessageTab = 'global' | 'groups' | 'friends';
 
 interface MessageSceneData {
   tab?: MessageTab;
-  /** Open this 軍団's chat straight away. */
+  /** (A 軍団 chat is no longer reachable here: the 軍団 tab opens the 同盟's chat.) */
   groupId?: string;
   /** Open this friend's DM straight away. */
   friendId?: string;
@@ -45,7 +46,6 @@ const ROW_H = 96;
 export class MessageScene extends Phaser.Scene {
   private save!: SaveData;
   private tab: MessageTab = 'global';
-  private openGroupId: string | null = null;
   private openFriendId: string | null = null;
   private channel: string | null = null;
 
@@ -61,7 +61,6 @@ export class MessageScene extends Phaser.Scene {
 
   init(data: MessageSceneData): void {
     this.tab = data?.tab ?? 'global';
-    this.openGroupId = data?.groupId ?? null;
     this.openFriendId = data?.friendId ?? null;
     this.channel = null;
     this.view = undefined;
@@ -102,16 +101,21 @@ export class MessageScene extends Phaser.Scene {
   /** Rebuilds whatever the current tab/thread shows. Taps go through
    *  queueShow(): rebuilding inside a tap handler would destroy its own zone. */
   private show(): void {
+    // The 軍団 tab is now the 同盟's chat, a screen of its own (without a 同盟: the search).
+    if (this.tab === 'groups') {
+      this.scene.start(AllianceService.cached(this.save) === null ? 'AllianceFind' : 'AllianceChat');
+      return;
+    }
     this.teardown();
     const view = this.add.container(0, 0);
     this.view = view;
 
-    const { groups, friends } = this.save.social;
+    const { friends } = this.save.social;
     const strip = buildTabStrip(
       this,
       [
         { key: 'global', label: '全体' },
-        { key: 'groups', label: '軍団' },
+        { key: 'groups', label: '同盟' },
         { key: 'friends', label: 'フレンド' },
       ],
       this.tab,
@@ -119,7 +123,6 @@ export class MessageScene extends Phaser.Scene {
       TAB_H,
       (key) => {
         this.tab = key as MessageTab;
-        this.openGroupId = null;
         this.openFriendId = null;
         this.queueShow();
       },
@@ -130,10 +133,6 @@ export class MessageScene extends Phaser.Scene {
     const top = VIEW_TOP + TAB_H + 10;
     if (this.tab === 'global') {
       this.buildThread(GLOBAL_CHANNEL, top, null);
-    } else if (this.tab === 'groups') {
-      const group = groups.find((g) => g.id === this.openGroupId);
-      if (group) this.buildThread(groupChannel(group.id), top, { title: `${group.name}（${group.memberIds.length + 1}人）` });
-      else this.buildGroupList(top);
     } else {
       const friend = friends.find((f) => f.id === this.openFriendId);
       if (friend) this.buildThread(dmChannel(friend.id), top, { title: friend.name });
@@ -146,25 +145,6 @@ export class MessageScene extends Phaser.Scene {
   }
 
   // --- lists of 軍団 / friends -----------------------------------------------
-
-  private buildGroupList(top: number): void {
-    const { groups } = this.save.social;
-    this.channel = null;
-    if (groups.length === 0) {
-      this.emptyState(top, '軍団がありません', '「フレンド」画面の「軍団」タブで作成できます', '軍団を作る', () => this.scene.start('Friend', { tab: 'groups' }));
-      return;
-    }
-    const rows = groups.map((group) => ({
-      name: group.name,
-      sub: `${group.memberIds.length + 1}人`,
-      last: ChatSystem.lastMessage(this.save, groupChannel(group.id)),
-      open: () => {
-        this.openGroupId = group.id;
-        this.queueShow();
-      },
-    }));
-    this.buildRows(top, rows);
-  }
 
   private buildFriendList(top: number): void {
     const { friends } = this.save.social;
@@ -224,7 +204,6 @@ export class MessageScene extends Phaser.Scene {
     let y = top;
     if (header) {
       view.add(new Button(this, SCREEN_VIEW.x + 70, y + 24, 140, 48, '◀ 一覧', () => {
-        this.openGroupId = null;
         this.openFriendId = null;
         this.queueShow();
       }, { variant: 'wood', fontSize: '21px' }));

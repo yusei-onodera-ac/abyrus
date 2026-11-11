@@ -9,6 +9,8 @@ import { EXTRA_BUILDER_GEMS, RAID_INTERVAL_HOURS, VILLAGE_COLS, VILLAGE_MATERIAL
 import { isItemId, type ItemId } from '../data/items';
 import { getSupplySlot } from '../data/supply';
 import type { InfiniteRunState } from './InfiniteModeSystem';
+import { defaultAlliancePlayerState, restoreAlliance, type AlliancePlayerState } from '../alliance/AllianceSave';
+import { allianceStaminaBonus } from '../data/alliance';
 import { ChatSystem } from './ChatSystem';
 import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
@@ -317,6 +319,8 @@ export interface SaveData {
   expeditions: { slots: (ExpeditionRun | null)[] };
   /** 村: the buildings standing in it. */
   village: VillageState;
+  /** 同盟 (alliance/AllianceSave.ts): which one the player is in, the pending points, the shop's weekly count, and - without a server - the whole offline world of simulated members. */
+  alliance: AlliancePlayerState;
 }
 
 export interface InfiniteModeRunResult {
@@ -667,6 +671,7 @@ export const SaveSystem = {
       idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
       expeditions: { slots: Array.from({ length: EXPEDITION_SLOTS }, () => null) },
       village: defaultVillage(),
+      alliance: defaultAlliancePlayerState(),
     };
   },
 
@@ -681,6 +686,8 @@ export const SaveSystem = {
       const merged = { ...this.createDefault(), ...parsed } as SaveData & { party?: PartyFormation; unread?: unknown };
       merged.decks = restoreDecks(parsed, merged.decks);
       merged.social = restoreSocial(parsed.social, merged.social);
+      // (before the stamina maximum below, which a 同盟 adds to)
+      merged.alliance = restoreAlliance(parsed.alliance);
       merged.chat = Array.isArray(parsed.chat?.messages) ? { messages: parsed.chat.messages } : merged.chat;
       merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
       merged.settings = SettingsSystem.restore(parsed.settings);
@@ -699,7 +706,9 @@ export const SaveSystem = {
       merged.homeHeroId = typeof parsed.homeHeroId === 'string' ? parsed.homeHeroId : '';
       merged.playerExp = typeof parsed.playerExp === 'number' && parsed.playerExp >= 0 ? Math.floor(parsed.playerExp) : 0;
       // The stamina maximum follows the level (a save from before levels still holds 50).
-      merged.stamina = [Math.min(merged.stamina[0], Math.max(merged.stamina[1], staminaMaxFor(merged.playerLevel))), Math.max(merged.stamina[1], staminaMaxFor(merged.playerLevel))];
+      // (A 同盟's bonus is on top of that: it goes with the alliance, so the maximum is the level's plus it, exactly.)
+      const staminaMax = staminaMaxFor(merged.playerLevel) + allianceStaminaBonus(merged);
+      merged.stamina = [Math.min(merged.stamina[0], Math.max(merged.stamina[1], staminaMax)), Math.max(merged.stamina[1], staminaMax)];
       merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
       // A hero saved before phase / skills existed lacks those fields.
       merged.heroes = merged.heroes.map((hero) => ({
@@ -1010,7 +1019,11 @@ export const SaveSystem = {
   },
 
   clearStage(data: SaveData, stageIndex: number): void {
-    if (stageIndex >= data.stageProgress) data.stageProgress = stageIndex + 1;
+    if (stageIndex >= data.stageProgress) {
+      data.stageProgress = stageIndex + 1;
+      // 同盟の対抗戦: a stage cleared for the first time is a point for the alliance (sent on the next AllianceService call).
+      if (data.alliance.allianceId) data.alliance.pendingStagePoints = Math.min(9999, data.alliance.pendingStagePoints + 1);
+    }
   },
 
   /** Mirrors clearStage() but advances the separate Extra index space

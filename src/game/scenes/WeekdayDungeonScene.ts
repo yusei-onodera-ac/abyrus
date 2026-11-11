@@ -6,6 +6,7 @@ import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { Button } from '../ui/Button';
 import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
+import { addHelperRow, canBorrowHelpers, HELPER_ROW_HEIGHT, launchWithHelper, type HelperChoice } from '../ui/HelperRow';
 import { buildRewardGrid, tileForReward } from '../ui/RewardTiles';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading } from '../ui/theme';
@@ -142,15 +143,19 @@ export class WeekdayDungeonScene extends InboxScene {
       return;
     }
     const have = this.save.stamina[0];
+    // 助っ人: a member's hero can be borrowed for this fight (offered only in a 同盟 that has some).
+    const choice: HelperChoice = { helper: null };
+    const helpers = canBorrowHelpers(this.save);
     this.openDialog({
       title: name,
       message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
       confirmLabel: '出撃',
       confirmVariant: 'gold',
+      extra: helpers ? { height: HELPER_ROW_HEIGHT, build: (container, y) => addHelperRow(this, container, y, this.save, choice) } : undefined,
       onConfirm: () => {
         if (!StaminaSystem.spend(this.save, cost)) return;
         SaveSystem.save(this.save);
-        this.scene.start('Battle', { stageIndex: tier, mode: 'weekday', day: this.day });
+        void launchWithHelper(this, this.save, { scene: 'Battle', data: { stageIndex: tier, mode: 'weekday', day: this.day } }, choice.helper);
       },
     });
   }

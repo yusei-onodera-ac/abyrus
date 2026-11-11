@@ -57,6 +57,8 @@ export class PartyBar {
   private readonly scene: Phaser.Scene;
   private readonly opts: PartyBarOptions;
   private enabled = true;
+  /** 1 for up to five cards; less when a sixth (a borrowed 助っ人) is squeezed in. */
+  private fit = 1;
 
   constructor(scene: Phaser.Scene, opts: PartyBarOptions) {
     this.scene = scene;
@@ -64,8 +66,12 @@ export class PartyBar {
     this.container = scene.add.container(0, 0).setDepth(25);
     this.container.add(this.buildPanel());
     const n = opts.units.length;
-    const startX = 360 - (n * CARD_W + (n - 1) * GAP) / 2 + CARD_W / 2;
-    this.cards = opts.units.map((unit, i) => this.buildCard(unit, startX + i * (CARD_W + GAP)));
+    // A sixth card (a borrowed 助っ人) does not fit at full size: the cards shrink together, about the bar's centre line.
+    const fit = Math.min(1, 704 / (n * CARD_W + (n - 1) * GAP));
+    this.fit = fit;
+    const startX = 360 - ((n * CARD_W + (n - 1) * GAP) * fit) / 2 + (CARD_W * fit) / 2;
+    this.cards = opts.units.map((unit, i) => this.buildCard(unit, startX + i * (CARD_W + GAP) * fit));
+    if (fit < 1) for (const card of this.cards) card.container.setScale(fit);
     this.cards.forEach((card) => this.refreshCard(card));
     // The bar comes up from below with the party.
     const rest = this.container.y;
@@ -84,7 +90,7 @@ export class PartyBar {
     if (!card) return;
     card.flash.setAlpha(0.75);
     this.scene.tweens.add({ targets: card.flash, alpha: 0, duration: 380, ease: 'Cubic.easeOut' });
-    this.scene.tweens.add({ targets: card.container, scale: { from: 1.1, to: 1 }, duration: 260, ease: 'Back.easeOut' });
+    this.scene.tweens.add({ targets: card.container, scale: { from: 1.1 * this.fit, to: this.fit }, duration: 260, ease: 'Back.easeOut' });
   }
 
   /** After the fight: the cards drop away and stop answering taps. */
@@ -180,8 +186,8 @@ export class PartyBar {
 
     const card: Card = { unit, container, plate, glow, bars, gaugeLabel, badge, down, flash, zone, key: '', ready: false, tweens: [] };
     zone.on('pointerdown', () => this.press(card));
-    zone.on('pointerup', () => scene.tweens.add({ targets: container, scale: 1, duration: 90, ease: 'Sine.easeOut' }));
-    zone.on('pointerout', () => scene.tweens.add({ targets: container, scale: 1, duration: 120, ease: 'Sine.easeOut' }));
+    zone.on('pointerup', () => scene.tweens.add({ targets: container, scale: this.fit, duration: 90, ease: 'Sine.easeOut' }));
+    zone.on('pointerout', () => scene.tweens.add({ targets: container, scale: this.fit, duration: 120, ease: 'Sine.easeOut' }));
     this.drawPlate(card, false);
     return card;
   }
@@ -195,7 +201,7 @@ export class PartyBar {
       return;
     }
     // Not charged yet: a small shake of the gauge says so.
-    this.scene.tweens.add({ targets: card.container, scale: 0.95, duration: 70, yoyo: true, ease: 'Sine.easeOut' });
+    this.scene.tweens.add({ targets: card.container, scale: 0.95 * this.fit, duration: 70, yoyo: true, ease: 'Sine.easeOut' });
     this.scene.tweens.add({ targets: card.gaugeLabel, x: card.gaugeLabel.x + 5, duration: 45, yoyo: true, repeat: 2 });
   }
 
@@ -261,7 +267,7 @@ export class PartyBar {
     // The card jumps once as it becomes ready, and a ping says so.
     card.flash.setAlpha(0.5);
     scene.tweens.add({ targets: card.flash, alpha: 0, duration: 320 });
-    scene.tweens.add({ targets: card.container, scale: { from: 1.08, to: 1 }, duration: 240, ease: 'Back.easeOut' });
+    scene.tweens.add({ targets: card.container, scale: { from: 1.08 * this.fit, to: this.fit }, duration: 240, ease: 'Back.easeOut' });
   }
 }
 

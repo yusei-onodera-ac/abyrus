@@ -25,6 +25,8 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { AllianceService } from '../alliance/AllianceService';
+import { allianceAttention } from '../ui/AllianceParts';
 
 export type FriendTab = 'friends' | 'requests' | 'groups' | 'add';
 
@@ -78,13 +80,18 @@ export class FriendScene extends InboxScene {
       [
         { key: 'friends', label: 'フレンド' },
         { key: 'requests', label: '申請', badge: incoming.length },
-        { key: 'groups', label: '軍団' },
+        { key: 'groups', label: '同盟', badge: allianceAttention(AllianceService.cached(this.save)) },
         { key: 'add', label: '追加' },
       ],
       this.tab,
       SCREEN_VIEW.w,
       56,
       (key) => {
+        // 同盟 is a set of screens of its own (it used to be a group chat of friends here).
+        if (key === 'groups') {
+          this.scene.start(AllianceService.cached(this.save) === null ? 'AllianceFind' : 'AllianceHome');
+          return;
+        }
         this.tab = key as FriendTab;
         this.scroll.scrollTo(0);
         this.queueRender();

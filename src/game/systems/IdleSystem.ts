@@ -1,3 +1,4 @@
+import { allianceIdleGoldBonus } from '../data/alliance';
 import {
   IDLE_AD_BOOSTS_PER_DAY,
   IDLE_AD_BOOST_HOURS,
@@ -105,7 +106,8 @@ export const IdleSystem = {
     const expPerHour = IDLE_EXP_LEVELS_PER_HOUR * expToNextLevel(level);
     for (const { item, share } of IDLE_EXP_SPLIT[region] ?? []) items[item] += (expPerHour * share) / (ITEMS[item].exp ?? 1);
     return {
-      gold: this.baseGoldPerHour(save).mul(incomeMultiplier(save, now)),
+      // (the 同盟's bonus on top of the village's 売上倍率; the village's prices are counted in the base rate, so they do not move)
+      gold: this.baseGoldPerHour(save).mul(incomeMultiplier(save, now) * (1 + allianceIdleGoldBonus(save))),
       skillEssence: stage.rewardSkillEssence * IDLE_ESSENCE_CLEARS_PER_HOUR,
       phaseMaterials: IDLE_PHASE_PER_HOUR,
       items,

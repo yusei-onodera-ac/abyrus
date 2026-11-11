@@ -168,7 +168,7 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private showResults(outcomes: HeroPullOutcome[]): void {
-    SoundSystem.play(this, outcomes.some((o) => o.hero.rarity >= 4) ? 'reveal' : 'confirm');
+    SoundSystem.play(this, outcomes.some((o) => o.hero.rarity >= 5) ? 'reveal5' : outcomes.some((o) => o.hero.rarity >= 4) ? 'reveal' : 'confirm');
     const container = this.openModal(0.78);
 
     const cols = Math.min(5, outcomes.length);

@@ -1,4 +1,5 @@
 import { addChainRow, CHAIN_ROW_HEIGHT, stopAutoAdvance } from '../ui/AutoAdvanceToggle';
+import { addHelperRow, canBorrowHelpers, HELPER_ROW_HEIGHT, launchWithHelper, type HelperChoice } from '../ui/HelperRow';
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT } from '../systems/ProgressionSystem';
@@ -372,18 +373,36 @@ export class StageSelectScene extends Phaser.Scene {
     }
 
     const have = save.stamina[0];
+    // 助っ人: a member's hero can be borrowed for this fight (offered only in a 同盟 that has some).
+    const choice: HelperChoice = { helper: null };
+    const helpers = canBorrowHelpers(save);
+    const chain = stage.kind !== 'final';
+    const extraHeight = (chain ? CHAIN_ROW_HEIGHT : 0) + (helpers ? HELPER_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
       message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
       confirmLabel: '出撃',
       confirmVariant: 'gold',
       // The final battle has no next stage to chain on to.
-      extra: stage.kind === 'final' ? undefined : { height: CHAIN_ROW_HEIGHT, build: (container, y) => addChainRow(this, container, y, save) },
+      extra:
+        extraHeight === 0
+          ? undefined
+          : {
+              height: extraHeight,
+              build: (container, y) => {
+                let top = y - extraHeight / 2;
+                if (chain) {
+                  addChainRow(this, container, top + CHAIN_ROW_HEIGHT / 2, save);
+                  top += CHAIN_ROW_HEIGHT;
+                }
+                if (helpers) addHelperRow(this, container, top + HELPER_ROW_HEIGHT / 2, save, choice);
+              },
+            },
       onConfirm: () => {
         if (!StaminaSystem.spend(save, cost)) return;
         SaveSystem.save(save);
         const route = questRoute(save, stage);
-        this.scene.start(route.scene, route.data);
+        void launchWithHelper(this, save, route, choice.helper);
       },
     });
   }

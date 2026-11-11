@@ -49,3 +49,18 @@ export function isLeaderboardConfigured(): boolean {
 export function getFirebaseConfig(): FirebaseWebConfig {
   return readConfig();
 }
+
+/**
+ * 同盟 (src/game/alliance) をサーバーで動かせるか。ランキングと同じ Firebase プロジェクトを使うので、条件は同じ:
+ * VITE_FIREBASE_* がそろっていれば、同盟は Firestore (OnlineAllianceBackend) で動く。そろっていなければ、疑似メンバーの
+ * ローカル版 (LocalAllianceBackend) で動く。
+ */
+export function isAllianceConfigured(): boolean {
+  return isLeaderboardConfigured();
+}
+
+/** Cloud Functions (functions/) を置いた地域。`.env` の VITE_FIREBASE_FUNCTIONS_REGION で変えられる (既定: 東京)。 */
+export function getFunctionsRegion(): string {
+  const value = import.meta.env.VITE_FIREBASE_FUNCTIONS_REGION ?? '';
+  return value.trim() || 'asia-northeast1';
+}

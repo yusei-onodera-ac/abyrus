@@ -42,7 +42,25 @@ const TRACK_BY_SCENE: Record<string, Track> = {
   Story: 'story',
   InfiniteMode: 'infinite',
   InfiniteRun: 'infinite',
+  AllianceFind: 'home',
+  AllianceHome: 'home',
+  AllianceMembers: 'home',
+  AllianceDonate: 'home',
+  AllianceShop: 'shop',
+  AllianceChat: 'home',
+  AllianceRaid: 'map',
+  AllianceRaidBattle: 'boss',
+  AllianceWar: 'map',
+  AllianceHelper: 'home',
 };
+
+/** Screens with no music at all: the 召喚 screens (the pull's movie has its own music and sound, and the results are heard on their own). */
+const SILENT_SCENES = new Set(['Gacha', 'GachaDetail']);
+
+/** While anything is in this set the music is held down to nothing (it fades away quickly and comes back slowly): a voice
+ *  speaking, a jingle playing, a movie. `duckLevel` is how far up it is right now (1 = untouched). */
+const duckReasons = new Set<string>();
+let duckLevel = 1;
 
 const exists = new Map<string, boolean>();
 const probing = new Map<string, Promise<boolean>>();
@@ -97,15 +115,24 @@ function targetVolume(): number {
   return s ? Math.min(1, SettingsSystem.getVolume(s, 'bgm')) * MASTER : 0;
 }
 
+/** Eases `duckLevel` towards where the reasons want it: down in well under half a second, back up over about a second. */
+function easeDuck(): void {
+  const goal = duckReasons.size > 0 ? 0 : 1;
+  duckLevel = Math.max(0, Math.min(1, duckLevel + Math.max(-0.6, Math.min(0.28, goal - duckLevel))));
+}
+
 /** Once a second-ish: follows the volume setting, fades pieces in and out, and starts again after the browser let go. */
 function tick(): void {
-  const v = targetVolume();
+  easeDuck();
+  const v = targetVolume() * duckLevel;
   const step = 250 / FADE_MS;
   if (playing) {
     playing.fade = Math.min(1, playing.fade + step);
     playing.audio.volume = Math.max(0, Math.min(1, v * playing.fade));
-    if (v <= 0 && !playing.audio.paused) playing.audio.pause();
-    else if (v > 0 && playing.audio.paused && !blocked) void playing.audio.play().catch(() => undefined);
+    // Held down by a voice / jingle (v is 0 only because of that): keep it running, silent, so it comes back where it was.
+    const setting = targetVolume();
+    if (setting <= 0 && !playing.audio.paused) playing.audio.pause();
+    else if (setting > 0 && playing.audio.paused && !blocked) void playing.audio.play().catch(() => undefined);
   }
   for (const old of leaving) {
     old.fade = Math.max(0, old.fade - step);
@@ -150,6 +177,18 @@ function startPlaying(track: Track): void {
 }
 
 export const MusicSystem = {
+  /** Holds the music down while `reason` is on (a voice speaking, a jingle, a movie); several reasons may be on at once. */
+  duck(reason: string, on: boolean): void {
+    if (on) duckReasons.add(reason);
+    else duckReasons.delete(reason);
+  },
+
+  /** The same for `ms` milliseconds (a sound whose length is not known to be tracked). */
+  duckFor(reason: string, ms: number): void {
+    MusicSystem.duck(reason, true);
+    window.setTimeout(() => MusicSystem.duck(reason, false), ms);
+  },
+
   /** Wants `track` to be playing: it fades in (and the one before fades out); asking for the one already playing does nothing. */
   play(track: Track | undefined): void {
     wanted = track;
@@ -187,6 +226,10 @@ export const MusicDirector = {
       if (scene.scene.key === 'Boot') continue;
       // Created, or resumed (a fight carried on after the premium pass was looked at over it): its own piece again.
       const play = (): void => {
+        if (SILENT_SCENES.has(scene.scene.key)) {
+          MusicSystem.play(undefined);
+          return;
+        }
         const track = MusicSystem.trackFor(scene);
         if (track) MusicSystem.play(track);
       };

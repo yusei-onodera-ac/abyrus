@@ -29,6 +29,16 @@ import { WeekdayDungeonScene } from './game/scenes/WeekdayDungeonScene';
 import { VillageScene } from './game/scenes/VillageScene';
 import { PremiumScene } from './game/scenes/PremiumScene';
 import { PauseScene } from './game/scenes/PauseScene';
+import { AllianceFindScene } from './game/scenes/AllianceFindScene';
+import { AllianceHomeScene } from './game/scenes/AllianceHomeScene';
+import { AllianceMembersScene } from './game/scenes/AllianceMembersScene';
+import { AllianceDonateScene } from './game/scenes/AllianceDonateScene';
+import { AllianceShopScene } from './game/scenes/AllianceShopScene';
+import { AllianceChatScene } from './game/scenes/AllianceChatScene';
+import { AllianceRaidScene } from './game/scenes/AllianceRaidScene';
+import { AllianceRaidBattleScene } from './game/scenes/AllianceRaidBattleScene';
+import { AllianceWarScene } from './game/scenes/AllianceWarScene';
+import { AllianceHelperScene } from './game/scenes/AllianceHelperScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
 import { showDevNotice } from './devNotice';
@@ -76,6 +86,16 @@ const config: Phaser.Types.Core.GameConfig = {
     VillageScene,
     PremiumScene,
     PauseScene,
+    AllianceFindScene,
+    AllianceHomeScene,
+    AllianceMembersScene,
+    AllianceDonateScene,
+    AllianceShopScene,
+    AllianceChatScene,
+    AllianceRaidScene,
+    AllianceRaidBattleScene,
+    AllianceWarScene,
+    AllianceHelperScene,
     ShopScene,
     SettingsScene,
   ],

@@ -26,6 +26,8 @@ import { SoundSystem } from '../systems/SoundSystem';
 import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { AllianceService } from '../alliance/AllianceService';
+import type { HelperHero } from '../alliance/AllianceBackend';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { fitPartyArt, PARTY_ROW_Y, PARTY_SPACING } from '../characters/PartyLayout';
 import { AnimationController } from '../characters/AnimationController';
@@ -95,6 +97,8 @@ export class BattleScene extends Phaser.Scene {
   private speed?: SpeedToggle;
   private partyBar?: PartyBar;
   private modal?: ModalHandle;
+  /** A member's hero borrowed for this fight (助っ人): stands in the back row as one more unit; it earns no EXP. */
+  private helper?: HelperHero;
 
   private currentStageDef?: StageDef;
   private finalStage?: FinalStageDef;
@@ -107,7 +111,8 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number }): void {
+  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number; helper?: HelperHero }): void {
+    this.helper = data.helper;
     this.stageIndex = data.stageIndex ?? 0;
     this.mode = data.mode;
     this.weekdayDay = data.day ?? 0;
@@ -194,11 +199,13 @@ export class BattleScene extends Phaser.Scene {
       ...pFront.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i)),
       ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
     ];
+    const helperHero = this.helper ? AllianceService.helperToHeroData(this.helper) : undefined;
+    if (helperHero) playerUnits.push(BattleSystem.createPlayerUnit(helperHero, 'back', pBack.length));
     this.layoutUnits(playerUnits, true, true);
     this.partyBar = new PartyBar(this, {
       generator: this.generator,
       units: playerUnits,
-      heroOf: (u) => SaveSystem.getHero(this.save, u.id),
+      heroOf: (u) => SaveSystem.getHero(this.save, u.id) ?? (helperHero && u.id === helperHero.id ? helperHero : undefined),
       onTap: (u) => this.onHeroTap(u.id),
     });
     this.riseParty();

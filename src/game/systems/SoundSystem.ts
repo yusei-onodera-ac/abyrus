@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { knownAudio } from './MusicSystem';
+import { knownAudio, MusicSystem } from './MusicSystem';
 import { SettingsSystem } from './SettingsSystem';
 import type { SaveData } from './SaveSystem';
 
@@ -7,7 +7,7 @@ import type { SaveData } from './SaveSystem';
  *  short tones each) - there are no audio files yet. Placeholders: when real
  *  files exist, play them from `play` and keep the names. Volume is the SE
  *  setting (設定), 0 being off. No BGM yet. */
-export type Sfx = 'tap' | 'confirm' | 'hit' | 'crit' | 'skill' | 'heal' | 'reveal' | 'victory' | 'defeat' | 'boom' | 'levelup';
+export type Sfx = 'tap' | 'confirm' | 'hit' | 'crit' | 'skill' | 'heal' | 'reveal' | 'reveal5' | 'victory' | 'defeat' | 'boom' | 'levelup';
 
 interface Tone {
   /** Hz. */
@@ -58,6 +58,12 @@ const SFX: Record<Sfx, Tone[]> = {
     { freq: 1568, at: 0.08, dur: 0.1, type: 'sine', gain: 0.45 },
     { freq: 2093, at: 0.16, dur: 0.28, type: 'sine', gain: 0.45 },
   ],
+  reveal5: [
+    { freq: 1047, at: 0, dur: 0.12, type: 'sine', gain: 0.45 },
+    { freq: 1318, at: 0.1, dur: 0.12, type: 'sine', gain: 0.45 },
+    { freq: 1568, at: 0.2, dur: 0.12, type: 'sine', gain: 0.45 },
+    { freq: 2093, at: 0.3, dur: 0.5, type: 'sine', gain: 0.5 },
+  ],
   victory: [
     { freq: 523, at: 0, dur: 0.14, type: 'triangle', gain: 0.5 },
     { freq: 659, at: 0.13, dur: 0.14, type: 'triangle', gain: 0.5 },
@@ -83,7 +89,12 @@ const SFX_FILES: Partial<Record<Sfx, string>> = {
   victory: '/assets/audio/bgm/victory.mp3',
   defeat: '/assets/audio/bgm/defeat.mp3',
   levelup: '/assets/audio/bgm/levelup.mp3',
+  reveal5: '/assets/audio/bgm/reveal5.mp3',
 };
+
+/** The jingles: while one plays the music is held down, and after a fight is won or lost the fight's music is not wanted any more. */
+const JINGLES = new Set<Sfx>(['victory', 'defeat', 'levelup', 'reveal5']);
+const ENDS_THE_FIGHT = new Set<Sfx>(['victory', 'defeat']);
 
 /** A sound that fires again within this many ms is skipped (a fight can ask for a hit sound every few frames). */
 const MIN_GAP_MS: Partial<Record<Sfx, number>> = { hit: 70, crit: 90, skill: 120, heal: 120, tap: 40, boom: 90 };
@@ -117,9 +128,24 @@ export const SoundSystem = {
     if (file && knownAudio(file)) {
       const audio = new Audio(file);
       audio.volume = Math.min(1, Math.pow(volume, 1.5));
-      audio.addEventListener('error', () => undefined);
-      void audio.play().catch(() => undefined);
+      if (JINGLES.has(sfx)) {
+        const release = (): void => MusicSystem.duck(`jingle:${sfx}`, false);
+        MusicSystem.duck(`jingle:${sfx}`, true);
+        audio.addEventListener('ended', release);
+        audio.addEventListener('error', release);
+        window.setTimeout(release, 15000);
+        if (ENDS_THE_FIGHT.has(sfx)) MusicSystem.play(undefined);
+        void audio.play().catch(release);
+      } else {
+        audio.addEventListener('error', () => undefined);
+        void audio.play().catch(() => undefined);
+      }
       return;
+    }
+    // The tones of a jingle (no file): the music keeps quiet for their length.
+    if (JINGLES.has(sfx)) {
+      MusicSystem.duckFor(`jingle:${sfx}`, 2200);
+      if (ENDS_THE_FIGHT.has(sfx)) MusicSystem.play(undefined);
     }
 
     const ac = audioContext();

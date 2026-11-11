@@ -18,7 +18,7 @@ export const TILE_H = 132;
 const GAP = 10;
 const PER_ROW = 5;
 
-export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'item' | 'equipment' | 'material';
+export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'coin' | 'item' | 'equipment' | 'material';
 
 export interface RewardTile {
   kind: RewardTileKind;
@@ -35,7 +35,8 @@ export interface RewardTile {
 }
 
 /** EXP and 技素 have no illustration of their own: a brass-ringed disc with a kanji. */
-const BADGE: Record<'exp' | 'essence' | 'rank', { color: number; glyph: string; label: string }> = {
+const BADGE: Record<'exp' | 'essence' | 'rank' | 'coin', { color: number; glyph: string; label: string }> = {
+  coin: { color: 0x8a5a1c, glyph: '盟', label: '同盟コイン' },
   rank: { color: 0xc7701c, glyph: 'Lv', label: 'プレイヤー' },
   exp: { color: 0x3a7fd6, glyph: '経', label: 'EXP' },
   essence: { color: 0x3f9a5a, glyph: '技', label: '技素' },
@@ -67,7 +68,7 @@ export function tilesForGranted(granted: GrantedReward[]): RewardTile[] {
 
 /** The tile's illustration - a supplied/drawn icon, or a disc with a kanji - centered at (x, y), `size` px across. Returns its label. */
 export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.Container, tile: RewardTile, x: number, y: number, size: number): string {
-  if (tile.kind === 'exp' || tile.kind === 'essence' || tile.kind === 'rank') {
+  if (tile.kind === 'exp' || tile.kind === 'essence' || tile.kind === 'rank' || tile.kind === 'coin') {
     const badge = BADGE[tile.kind];
     const r = size / 2;
     const g = scene.add.graphics();

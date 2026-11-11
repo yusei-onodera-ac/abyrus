@@ -1,0 +1,492 @@
+// ABYRUS の Firestore ルール: 無限モードのランキング + 同盟（アライアンス）。
+// 同盟の設計と、各ルールが何を守るかは、docs/ALLIANCE_SERVER.md に書いてある。
+// ※ 未検証。Firebase プロジェクトにつないで、エミュレーターか本番で、試してから公開すること。
+//
+// 考え方:
+//   - プレイヤーの手元の持ち物（ゴールド・素材・魔晶石）は、端末のセーブにあり、サーバーは検証できない。
+//     だから、ここで守るのは「他のプレイヤーと、みんなの共有の状態」。1人が1日に与えられる影響に、上限を置く。
+//   - ボスへのダメージと、切符 (tickets) は、Cloud Functions (Admin SDK = ルールの外) だけが書く。クライアントは書けない。
+//   - 1日の回数は、`members/{自分}/daily/{その日}` の1つのドキュメントで数える。ドキュメントIDが「今日」でなければ書けない。
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ====================================================================== 共通の道具
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function uid() {
+      return request.auth.uid;
+    }
+    function userPath(u) {
+      return /databases/$(database)/documents/users/$(u);
+    }
+    function alliancePath(a) {
+      return /databases/$(database)/documents/alliances/$(a);
+    }
+    function memberPath(a, u) {
+      return /databases/$(database)/documents/alliances/$(a)/members/$(u);
+    }
+    function isMember(a) {
+      return signedIn() && exists(memberPath(a, uid()));
+    }
+    function roleOf(a) {
+      return get(memberPath(a, uid())).data.role;
+    }
+    function isLeader(a) {
+      return isMember(a) && roleOf(a) == 'leader';
+    }
+    function isOfficerUp(a) {
+      return isMember(a) && (roleOf(a) == 'leader' || roleOf(a) == 'officer');
+    }
+    // 4:00 (日本時間) 区切りの日付。UTC に 5 時間足した暦の年月日 (桁はそろえない)。
+    // src/game/alliance/onlineLogic.ts の dayKey() と同じ形。
+    function dayKey() {
+      let t = request.time + duration.value(5, 'h');
+      return string(t.year()) + '-' + string(t.month()) + '-' + string(t.day());
+    }
+    function dailyPath(a, u) {
+      return /databases/$(database)/documents/alliances/$(a)/members/$(u)/daily/$(dayKey());
+    }
+    function memberMaxFor(level) {
+      return level >= 10 ? 30 : (level >= 5 ? 25 : 20);
+    }
+
+    // ====================================================================== 無限モードのランキング（BACKEND_SETUP.md のとおり。変えない）
+
+    match /infiniteModeScores/{entryId} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+        && request.auth.uid == entryId
+        && isValidEntry(request.resource.data);
+
+      allow update: if request.auth != null
+        && request.auth.uid == entryId
+        && isValidEntry(request.resource.data)
+        && request.resource.data.score >= resource.data.score;
+
+      allow delete: if false;
+    }
+
+    function isValidEntry(data) {
+      return data.score is number
+        && data.score >= 0
+        && data.score <= 100000000
+        && data.survivalSeconds is number
+        && data.survivalSeconds >= 0
+        && data.survivalSeconds <= 86400
+        && data.enemiesDefeated is number
+        && data.enemiesDefeated >= 0
+        && data.enemiesDefeated <= 1000000
+        && data.difficultyReached is number
+        && data.difficultyReached >= 0
+        && data.playerName is string
+        && data.playerName.size() <= 24
+        && data.updatedAt == request.time;
+    }
+
+    // ====================================================================== プレイヤー
+
+    // users/{認証uid}: 自分のプロフィール。playerId (フレンドID) は、いちど決めたら変えられない。
+    // leftAt (同盟を抜けた時刻) は、自分で「いまの時刻」にしかできない (消して、24時間の待ちを逃れることはできない)。
+    function validUser(d) {
+      return d.keys().hasOnly(['playerId', 'name', 'level', 'power', 'allianceId', 'leftAt', 'updatedAt'])
+        && d.playerId is string && d.playerId.size() == 8
+        && d.name is string && d.name.size() <= 24
+        && d.level is number && d.level >= 1 && d.level <= 999
+        && d.power is number && d.power >= 0
+        && (d.allianceId == null || d.allianceId is string)
+        && d.updatedAt == request.time;
+    }
+
+    match /users/{authUid} {
+      allow read: if signedIn();
+
+      allow create: if signedIn() && authUid == uid()
+        && validUser(request.resource.data)
+        && request.resource.data.allianceId == null
+        && request.resource.data.leftAt == null;
+
+      allow update: if signedIn() && authUid == uid()
+        && validUser(request.resource.data)
+        && request.resource.data.playerId == resource.data.playerId
+        && (request.resource.data.leftAt == resource.data.leftAt || request.resource.data.leftAt == request.time)
+        // allianceId は、null (抜けた・直した) か、いまのまま、か、同じバッチで自分のメンバー文書ができるときだけ。
+        && (request.resource.data.allianceId == null
+            || request.resource.data.allianceId == resource.data.allianceId
+            || existsAfter(memberPath(request.resource.data.allianceId, uid())));
+
+      allow delete: if false;
+
+      // 自分あての招待 (users/{自分}/invites/{同盟ID})。幹部以上が書く。同じ人に同じ同盟から、1日に1回まで。
+      match /invites/{inviteAlliance} {
+        allow read: if signedIn() && authUid == uid();
+        allow create: if signedIn() && isOfficerUp(inviteAlliance)
+          && request.resource.data.keys().hasOnly(['allianceName', 'emblem', 'fromAuth', 'fromName', 'at'])
+          && request.resource.data.fromAuth == uid()
+          && request.resource.data.at == request.time;
+        allow update: if signedIn() && isOfficerUp(inviteAlliance)
+          && request.resource.data.keys().hasOnly(['allianceName', 'emblem', 'fromAuth', 'fromName', 'at'])
+          && request.resource.data.fromAuth == uid()
+          && request.resource.data.at == request.time
+          && resource.data.at + duration.value(1, 'd') < request.time;
+        allow delete: if signedIn() && authUid == uid();
+      }
+
+      // 自分が出した参加申請の控え (users/{自分}/requestsOut/{同盟ID})。
+      match /requestsOut/{outAlliance} {
+        allow read, create, delete: if signedIn() && authUid == uid();
+        allow update: if false;
+      }
+    }
+
+    // playerIndex/{フレンドID}: フレンドID -> 認証uid。いちど決めたら、変えられない (先着)。
+    match /playerIndex/{playerId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['authUid'])
+        && request.resource.data.authUid == uid()
+        && getAfter(userPath(uid())).data.playerId == playerId;
+      allow update, delete: if false;
+    }
+
+    // ====================================================================== 同盟
+
+    // allianceNames/{名前を小文字にしたもの}: 名前の重複を防ぐ。同盟長が、同盟の作成・改名・解散と同じバッチで書く。
+    match /allianceNames/{nameLower} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['allianceId'])
+        && request.resource.data.allianceId is string
+        && getAfter(alliancePath(request.resource.data.allianceId)).data.nameLower == nameLower
+        && getAfter(alliancePath(request.resource.data.allianceId)).data.leaderAuth == uid();
+      allow delete: if signedIn() && get(alliancePath(resource.data.allianceId)).data.leaderAuth == uid();
+      allow update: if false;
+    }
+
+    function validNewAlliance(d) {
+      return d.keys().hasOnly(['name', 'nameLower', 'emblem', 'description', 'level', 'exp', 'memberCount', 'memberMax', 'joinPolicy', 'minPlayerLevel', 'leaderName', 'leaderAuth', 'weekPoints', 'power', 'league', 'createdAt', 'updatedAt'])
+        && d.name is string && d.name.size() >= 2 && d.name.size() <= 10
+        && d.nameLower is string && d.nameLower.size() >= 1 && d.nameLower.size() <= 40
+        && d.emblem is int && d.emblem >= 0 && d.emblem < 12
+        && d.description is string && d.description.size() <= 60
+        && d.joinPolicy in ['open', 'approval', 'invite']
+        && d.minPlayerLevel is int && d.minPlayerLevel >= 0 && d.minPlayerLevel <= 50
+        && d.level == 1 && d.exp == 0 && d.memberCount == 1 && d.memberMax == 20 && d.weekPoints == 0
+        && d.power is number && d.power >= 0
+        && d.league == 'bronze'
+        && d.leaderAuth == uid() && d.leaderName is string && d.leaderName.size() <= 24
+        && d.createdAt == request.time && d.updatedAt == request.time;
+    }
+
+    // 同盟長が、設定を変える (名前・紋章・説明・参加方式・条件)、または、同盟長を譲る。
+    function isLeaderSettingsUpdate(a) {
+      let n = request.resource.data;
+      let o = resource.data;
+      return isLeader(a)
+        && n.diff(o).affectedKeys().hasOnly(['name', 'nameLower', 'emblem', 'description', 'joinPolicy', 'minPlayerLevel', 'leaderName', 'leaderAuth', 'updatedAt'])
+        && n.name.size() >= 2 && n.name.size() <= 10 && n.nameLower is string && n.nameLower.size() >= 1 && n.nameLower.size() <= 40
+        && n.emblem is int && n.emblem >= 0 && n.emblem < 12
+        && n.description.size() <= 60
+        && n.joinPolicy in ['open', 'approval', 'invite']
+        && n.minPlayerLevel is int && n.minPlayerLevel >= 0 && n.minPlayerLevel <= 50
+        && (n.leaderAuth == o.leaderAuth || getAfter(memberPath(a, n.leaderAuth)).data.role == 'leader')
+        && n.updatedAt == request.time;
+    }
+
+    // 人数が1人ふえる (自分が入る) / 1人へる (自分が抜ける、または、幹部以上が外す)。
+    function isMemberCountUpdate(a) {
+      let n = request.resource.data;
+      let o = resource.data;
+      return n.diff(o).affectedKeys().hasOnly(['memberCount', 'updatedAt'])
+        && n.updatedAt == request.time
+        && ((n.memberCount == o.memberCount + 1
+              && n.memberCount <= o.memberMax
+              && existsAfter(memberPath(a, uid()))
+              && !exists(memberPath(a, uid())))
+            || (n.memberCount == o.memberCount - 1
+              && n.memberCount >= 1
+              && ((exists(memberPath(a, uid())) && !existsAfter(memberPath(a, uid()))) || isOfficerUp(a))));
+    }
+
+    // 寄付: 同盟EXPと同盟Lv、今週のポイント。同じバッチで、自分の「今日の寄付」が1つ増えるときだけ。
+    // Lvは1つずつしか上がらず、上がれるのは、EXPが足りる (あと300で届く) ときだけ。
+    function isDonationUpdate(a) {
+      let n = request.resource.data;
+      let o = resource.data;
+      let need = [1000, 1600, 2560, 4096, 6554, 10486, 16777, 26844, 42950];
+      let d = dailyPath(a, uid());
+      let before = exists(d) ? get(d).data.get('total', 0) : 0;
+      return isMember(a)
+        && n.diff(o).affectedKeys().hasOnly(['exp', 'level', 'memberMax', 'weekPoints', 'updatedAt'])
+        && n.updatedAt == request.time
+        && n.memberMax == memberMaxFor(n.level)
+        && n.weekPoints >= o.weekPoints && n.weekPoints - o.weekPoints <= 30
+        && ((n.level == o.level && n.exp >= o.exp && n.exp - o.exp <= 300)
+            || (o.level < 10 && n.level == o.level + 1 && n.exp >= 0 && n.exp < 300 && o.exp + 300 >= need[o.level - 1]))
+        && existsAfter(d)
+        && getAfter(d).data.get('total', 0) == before + 1;
+    }
+
+    match /alliances/{allianceId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && validNewAlliance(request.resource.data)
+        && !exists(alliancePath(allianceId))
+        && existsAfter(memberPath(allianceId, uid()))
+        && getAfter(memberPath(allianceId, uid())).data.role == 'leader'
+        && existsAfter(/databases/$(database)/documents/allianceNames/$(request.resource.data.nameLower));
+
+      allow update: if signedIn()
+        && (isLeaderSettingsUpdate(allianceId) || isMemberCountUpdate(allianceId) || isDonationUpdate(allianceId));
+
+      // 解散。ほかのメンバーの文書と、サブコレクションは、Cloud Functions (onAllianceDeleted) が消す。
+      allow delete: if signedIn() && isLeader(allianceId);
+
+      // ---------------------------------------------------------------- メンバー
+      function validMemberFields(d) {
+        return d.name is string && d.name.size() <= 24
+          && d.level is number && d.level >= 1 && d.level <= 999
+          && d.power is number && d.power >= 0
+          && (d.helper == null || (d.helper is map
+              && d.helper.heroId is string && d.helper.heroId.size() <= 40
+              && d.helper.level is number && d.helper.power is number && d.helper.power >= 0
+              && d.helper.skillLevels is list && d.helper.skillLevels.size() <= 4));
+      }
+
+      match /members/{memberAuth} {
+        // 自分の文書は、(外されたあとでも) 読める (「ない」と分かるため)。一覧と、ほかの人の文書は、メンバーだけ。
+        allow get: if signedIn() && (memberAuth == uid() || isMember(allianceId));
+        allow list: if signedIn() && isMember(allianceId);
+
+        // 同盟を作った人 (同じバッチで、同盟の文書もできる)。
+        allow create: if signedIn() && memberAuth == uid()
+          && !exists(alliancePath(allianceId))
+          && existsAfter(alliancePath(allianceId))
+          && request.resource.data.role == 'leader'
+          && request.resource.data.keys().hasOnly(['playerId', 'name', 'level', 'power', 'role', 'contribution', 'weekContribution', 'weekId', 'coins', 'lastActiveAt', 'joinedAt', 'helper'])
+          && validMemberFields(request.resource.data)
+          && request.resource.data.playerId == get(userPath(uid())).data.playerId
+          && request.resource.data.contribution == 0 && request.resource.data.coins == 0
+          && request.resource.data.joinedAt == request.time && request.resource.data.lastActiveAt == request.time;
+
+        // 入る。いまの人数が上限未満で、24時間の待ちが済み、どこにも入っていなくて、(自由参加で条件を満たす / 承認された / 招待された)。
+        allow create: if signedIn() && memberAuth == uid()
+          && exists(alliancePath(allianceId))
+          && request.resource.data.role == 'member'
+          && request.resource.data.keys().hasOnly(['playerId', 'name', 'level', 'power', 'role', 'contribution', 'weekContribution', 'weekId', 'coins', 'lastActiveAt', 'joinedAt', 'helper'])
+          && validMemberFields(request.resource.data)
+          && request.resource.data.playerId == get(userPath(uid())).data.playerId
+          && request.resource.data.contribution == 0 && request.resource.data.coins == 0
+          && request.resource.data.joinedAt == request.time && request.resource.data.lastActiveAt == request.time
+          && get(alliancePath(allianceId)).data.memberCount < get(alliancePath(allianceId)).data.memberMax
+          && (get(userPath(uid())).data.get('leftAt', null) == null
+              || get(userPath(uid())).data.leftAt + duration.value(24, 'h') < request.time)
+          && (get(userPath(uid())).data.get('allianceId', null) == null)
+          && ((get(alliancePath(allianceId)).data.joinPolicy == 'open'
+                && request.resource.data.level >= get(alliancePath(allianceId)).data.minPlayerLevel)
+              || (exists(/databases/$(database)/documents/alliances/$(allianceId)/requests/$(uid()))
+                  && get(/databases/$(database)/documents/alliances/$(allianceId)/requests/$(uid())).data.status == 'approved')
+              || exists(/databases/$(database)/documents/users/$(uid())/invites/$(allianceId)));
+
+        // 自分の情報 (名前・Lv・総合力・助っ人・最終ログイン・貢献・コイン)。1回の書き込みで増えるのは、上限つき。役職は、ここでは変えられない。
+        allow update: if signedIn() && memberAuth == uid()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'level', 'power', 'helper', 'lastActiveAt', 'contribution', 'weekContribution', 'weekId', 'coins'])
+          && validMemberFields(request.resource.data)
+          && request.resource.data.contribution >= resource.data.contribution
+          && request.resource.data.contribution - resource.data.contribution <= 30
+          && request.resource.data.coins - resource.data.coins <= 100;
+
+        // 役職の変更 (同盟長だけ)。
+        allow update: if signedIn() && isLeader(allianceId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+          && request.resource.data.role in ['leader', 'officer', 'member'];
+
+        // 抜ける (自分)。同盟長は、ほかに人がいなければ (解散)。外す (幹部以上): 幹部は、メンバーだけ。
+        allow delete: if signedIn()
+          && ((memberAuth == uid()
+                && (resource.data.role != 'leader' || get(alliancePath(allianceId)).data.memberCount == 1))
+              || (isLeader(allianceId) && memberAuth != uid())
+              || (isOfficerUp(allianceId) && resource.data.role == 'member'));
+
+        // 1日ごとの回数 (寄付・ステージ・返事・スタミナ)。ドキュメントIDが「今日」のものだけ。
+        // raidAttempts (ボスへの挑戦回数) は、サーバーだけが数える (クライアントが作るときは 0、更新では変えられない)。
+        match /daily/{dayId} {
+          allow read: if signedIn() && memberAuth == uid();
+          allow create, update: if signedIn() && memberAuth == uid() && isMember(allianceId)
+            && dayId == dayKey()
+            && request.resource.data.keys().hasOnly(['donGold', 'donMaterials', 'donGems', 'total', 'stages', 'answers', 'staminaSent', 'staminaReceived', 'lendCoinsClaimed', 'raidAttempts', 'updatedAt'])
+            && request.resource.data.get('donGold', 0) <= 5
+            && request.resource.data.get('donMaterials', 0) <= 5
+            && request.resource.data.get('donGems', 0) <= 3
+            && request.resource.data.get('total', 0) == request.resource.data.get('donGold', 0) + request.resource.data.get('donMaterials', 0) + request.resource.data.get('donGems', 0)
+            && request.resource.data.get('stages', 0) <= 200
+            && request.resource.data.get('answers', 0) <= 5
+            && request.resource.data.get('staminaSent', 0) <= 5
+            && request.resource.data.get('staminaReceived', 0) <= 10
+            && request.resource.data.get('lendCoinsClaimed', 0) <= 15
+            && request.resource.data.updatedAt == request.time
+            && (request.method == 'create'
+                ? request.resource.data.get('raidAttempts', 0) == 0
+                : (request.resource.data.get('raidAttempts', 0) == resource.data.get('raidAttempts', 0)
+                   && request.resource.data.get('donGold', 0) >= resource.data.get('donGold', 0)
+                   && request.resource.data.get('donMaterials', 0) >= resource.data.get('donMaterials', 0)
+                   && request.resource.data.get('donGems', 0) >= resource.data.get('donGems', 0)
+                   && request.resource.data.get('stages', 0) >= resource.data.get('stages', 0)
+                   && request.resource.data.get('answers', 0) >= resource.data.get('answers', 0)
+                   && request.resource.data.get('staminaSent', 0) >= resource.data.get('staminaSent', 0)
+                   && request.resource.data.get('staminaReceived', 0) >= resource.data.get('staminaReceived', 0)
+                   && request.resource.data.get('lendCoinsClaimed', 0) >= resource.data.get('lendCoinsClaimed', 0)));
+          allow delete: if false;
+        }
+
+        // 受け取り箱: 同盟のメンバーが入れる (スタミナの支援・助っ人を貸したお礼)。持ち主だけが読んで、消せる。
+        match /inbox/{itemId} {
+          allow read, delete: if signedIn() && memberAuth == uid();
+          allow create: if signedIn() && isMember(allianceId)
+            && request.resource.data.keys().hasOnly(['kind', 'amount', 'fromAuth', 'fromName', 'at'])
+            && request.resource.data.fromAuth == uid()
+            && request.resource.data.at == request.time
+            && ((request.resource.data.kind == 'stamina' && request.resource.data.amount == 10)
+                || (request.resource.data.kind == 'lend' && request.resource.data.amount == 5));
+          allow update: if false;
+        }
+      }
+
+      // ---------------------------------------------------------------- 参加申請 (承認制)
+      match /requests/{requestAuth} {
+        allow read: if signedIn() && (requestAuth == uid() || isOfficerUp(allianceId));
+        allow create: if signedIn() && requestAuth == uid()
+          && !isMember(allianceId)
+          && get(alliancePath(allianceId)).data.joinPolicy == 'approval'
+          && request.resource.data.keys().hasOnly(['playerId', 'name', 'level', 'power', 'at', 'status'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.at == request.time
+          && request.resource.data.level >= get(alliancePath(allianceId)).data.minPlayerLevel
+          && request.resource.data.playerId == get(userPath(uid())).data.playerId;
+        // 承認 (幹部以上): 申請した本人が、次に開いたときに、自分で入る。
+        allow update: if signedIn() && isOfficerUp(allianceId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status == 'approved';
+        allow delete: if signedIn() && (requestAuth == uid() || isOfficerUp(allianceId));
+      }
+
+      // ---------------------------------------------------------------- 共闘ボス (書くのは Cloud Functions だけ)
+      match /raid/{raidWeek} {
+        allow read: if signedIn() && isMember(allianceId);
+        allow write: if false;
+
+        match /damage/{damageAuth} {
+          allow read: if signedIn() && isMember(allianceId);
+          allow write: if false;
+        }
+        match /hits/{hitId} {
+          allow read, write: if false;
+        }
+        // 報酬の受け取り: 1人1回 (ドキュメントIDが自分)。ダメージを与えていて、撃破済み、または、週が終わっているときだけ。
+        match /claims/{claimAuth} {
+          allow read: if signedIn() && claimAuth == uid();
+          allow create: if signedIn() && claimAuth == uid() && isMember(allianceId)
+            && request.resource.data.keys().hasOnly(['at', 'rank'])
+            && request.resource.data.at == request.time
+            && exists(/databases/$(database)/documents/alliances/$(allianceId)/raid/$(raidWeek)/damage/$(uid()))
+            && (get(/databases/$(database)/documents/alliances/$(allianceId)/raid/$(raidWeek)).data.defeatedAt != null
+                || get(/databases/$(database)/documents/alliances/$(allianceId)/raid/$(raidWeek)).data.endsAt < request.time);
+          allow update, delete: if false;
+        }
+      }
+
+      // 切符: サーバーだけ。
+      match /tickets/{ticketId} {
+        allow read, write: if false;
+      }
+
+      // 助っ人を貸した回数 (貸した人 × 今日)。ID は「{貸した人}_{今日}」。1日に、お礼の対象になるのは3回まで。
+      match /lends/{lendId} {
+        allow read: if signedIn() && isMember(allianceId);
+        allow create: if signedIn() && isMember(allianceId)
+          && lendId.split('_')[1] == dayKey()
+          && request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == 1;
+        allow update: if signedIn() && isMember(allianceId)
+          && lendId.split('_')[1] == dayKey()
+          && request.resource.data.keys().hasOnly(['n'])
+          && request.resource.data.n == resource.data.n + 1
+          && request.resource.data.n <= 3;
+        allow delete: if false;
+      }
+
+      // ---------------------------------------------------------------- チャット
+      // text と help は、メンバーが書く。system (加入・脱退・撃破など) は、Cloud Functions だけが書く。
+      match /chat/{messageId} {
+        allow read: if signedIn() && isMember(allianceId);
+        allow create: if signedIn() && isMember(allianceId)
+          && request.resource.data.keys().hasOnly(['kind', 'senderAuth', 'senderPlayerId', 'senderName', 'text', 'sentAt', 'help'])
+          && request.resource.data.kind in ['text', 'help']
+          && request.resource.data.senderAuth == uid()
+          && request.resource.data.senderPlayerId == get(userPath(uid())).data.playerId
+          && request.resource.data.senderName is string && request.resource.data.senderName.size() <= 24
+          && request.resource.data.text is string && request.resource.data.text.size() >= 1 && request.resource.data.text.size() <= 200
+          && request.resource.data.sentAt == request.time
+          && (request.resource.data.kind == 'text'
+              ? !('help' in request.resource.data)
+              : (request.resource.data.help.what in ['raid', 'village']
+                 && request.resource.data.help.open == true
+                 && request.resource.data.help.helpers.size() == 0));
+        // 救援への返事: 助けた人の名前が、1人ふえる。
+        allow update: if signedIn() && isMember(allianceId)
+          && resource.data.kind == 'help'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['help'])
+          && request.resource.data.help.what == resource.data.help.what
+          && request.resource.data.help.helpers.size() == resource.data.help.helpers.size() + 1
+          && request.resource.data.help.helpers.size() <= 30;
+        allow delete: if false;
+      }
+    }
+
+    // ====================================================================== 対抗戦 (シーズンは、週のID)
+
+    match /seasons/{seasonId} {
+      // リーグ表の1行 (同盟ごと)。作る・消す・ボスのポイントは Cloud Functions だけ。
+      // メンバーが足せるのは、寄付・ステージ・助っ人のポイントだけ (1回の書き込みで、最大30)。
+      match /entries/{entryAlliance} {
+        allow read: if signedIn();
+        allow create, delete: if false;
+        allow update: if signedIn() && isMember(entryAlliance)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points', 'donation', 'stages', 'helpers', 'updatedAt'])
+          && request.resource.data.donation >= resource.data.donation
+          && request.resource.data.stages >= resource.data.stages
+          && request.resource.data.helpers >= resource.data.helpers
+          && request.resource.data.donation - resource.data.donation <= 30
+          && request.resource.data.stages - resource.data.stages <= 20
+          && request.resource.data.helpers - resource.data.helpers <= 5
+          && request.resource.data.points - resource.data.points
+              == (request.resource.data.donation - resource.data.donation)
+               + (request.resource.data.stages - resource.data.stages)
+               + (request.resource.data.helpers - resource.data.helpers)
+          && request.resource.data.updatedAt == request.time;
+      }
+
+      // 前のシーズンの結果 (順位・昇降格)。サーバーが書く。
+      match /results/{resultAlliance} {
+        allow read: if signedIn();
+        allow write: if false;
+      }
+
+      // 結果の報酬の受け取り: 1人1回 (ID は「{同盟ID}_{認証uid}」)。
+      match /claims/{claimId} {
+        allow read: if signedIn() && claimId.split('_')[1] == uid();
+        allow create: if signedIn()
+          && claimId.split('_')[1] == uid()
+          && isMember(claimId.split('_')[0])
+          && exists(/databases/$(database)/documents/seasons/$(seasonId)/results/$(claimId.split('_')[0]))
+          && request.resource.data.keys().hasOnly(['at', 'rank'])
+          && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

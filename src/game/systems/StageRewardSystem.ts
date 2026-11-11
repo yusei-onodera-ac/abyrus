@@ -1,5 +1,6 @@
 import { BOSS_DROP_MULTIPLIER, FINAL_ITEM_DROPS, STAGE_BONUS, STAGE_ITEM_DROPS, type ItemDrop, type StageTier } from '../data/stageRewards';
-import { ITEMS, type ItemId } from '../data/items';
+import { EXP_ITEMS, ITEMS, type ItemId } from '../data/items';
+import { allianceExpDropBonus } from '../data/alliance';
 import { VILLAGE_STAGE_DROPS, type MaterialBundle } from '../data/village';
 import type { QuestStage } from './QuestRoute';
 import { EXTRA_STAGES_PER_REGION, FINAL_STAGE_INDEX, STAGES_PER_REGION } from './ProgressionSystem';
@@ -21,6 +22,9 @@ export function stageTier(stage: QuestStage): StageTier {
   if (stage.kind === 'extra') return stage.index % EXTRA_STAGES_PER_REGION === EXTRA_STAGES_PER_REGION - 1 ? 'extraBoss' : 'extra';
   return stage.index % STAGES_PER_REGION === STAGES_PER_REGION - 1 ? 'regionEnd' : 'normal';
 }
+
+/** The bonuses whose 経験値素材 have already been raised by the 同盟's bonus (a bonus is granted once, but never raise twice). */
+const boosted = new WeakSet<StageBonus>();
 
 export const StageRewardSystem = {
   /** True when clearing `stage` now would be its first clear - ask before the
@@ -63,6 +67,12 @@ export const StageRewardSystem = {
   grant(save: SaveData, bonus: StageBonus): void {
     SaveSystem.addGems(save, bonus.gems);
     SaveSystem.addPhaseMaterials(save, bonus.phaseMaterials);
+    // 同盟の恩恵: 経験値素材が増える (the amounts in `bonus` are raised once, so the result screen shows what was really given).
+    const expBonus = allianceExpDropBonus(save);
+    if (expBonus > 0 && !boosted.has(bonus)) {
+      boosted.add(bonus);
+      for (const drop of bonus.items) if (EXP_ITEMS.includes(drop.item)) drop.amount = Math.round(drop.amount * (1 + expBonus));
+    }
     for (const { item, amount } of bonus.items) SaveSystem.addItem(save, item, amount);
     SaveSystem.addMaterials(save, bonus.materials);
   },

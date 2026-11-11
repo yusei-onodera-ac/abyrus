@@ -1,3 +1,4 @@
+import { allianceStaminaBonus } from '../data/alliance';
 import { MAX_PLAYER_LEVEL, levelUpGems, playerExpToNext, staminaMaxFor } from '../data/playerLevel';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import { StaminaSystem } from './StaminaSystem';
@@ -34,7 +35,9 @@ export const PlayerLevelSystem = {
     SaveSystem.addGems(save, gems);
     // A new level fills stamina right up to its (larger) maximum.
     StaminaSystem.refresh(save);
-    save.stamina = [staminaMaxFor(save.playerLevel), staminaMaxFor(save.playerLevel)];
+    // (plus what the 同盟 adds to the maximum)
+    const staminaMax = staminaMaxFor(save.playerLevel) + allianceStaminaBonus(save);
+    save.stamina = [staminaMax, staminaMax];
     save.staminaAt = Date.now();
     return { from, to: save.playerLevel, gems };
   },
