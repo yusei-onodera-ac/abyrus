@@ -313,6 +313,8 @@ export interface SaveData {
   /** 朝夕の補給 (data/supply.ts): the local day ("2026-11-10") the record is for, the slots taken that day and whether that
    *  day's both-slots bonus was paid. A record of an earlier day counts as nothing taken. */
   supply: { day: string; claimed: string[]; bonus: boolean };
+  /** 図鑑 (data/collection.ts): the milestone counts whose reward has been taken. */
+  collection: { claimed: number[] };
   /** 放置報酬: epoch ms it has been piling up from, and today's count of ads watched to speed it. */
   idle: { lastClaimAt: number; adDay: string; adCount: number };
   /** 遠征: one entry per slot (EXPEDITION_SLOTS), null where nothing is out. */
@@ -417,6 +419,10 @@ function restoreInventory(merged: SaveData, parsed: Partial<SaveData>): void {
     day: typeof supply?.day === 'string' ? supply.day : '',
     claimed: Array.isArray(supply?.claimed) ? [...new Set(supply.claimed.filter((id): id is string => typeof id === 'string' && !!getSupplySlot(id)))] : [],
     bonus: supply?.bonus === true,
+  };
+  const collection = parsed.collection;
+  merged.collection = {
+    claimed: Array.isArray(collection?.claimed) ? [...new Set(collection.claimed.filter((n): n is number => Number.isInteger(n) && n > 0))] : [],
   };
   const idle = parsed.idle;
   merged.idle = {
@@ -668,6 +674,7 @@ export const SaveSystem = {
       premium: { expiresAt: 0, dailyDay: '' },
       loginBonus: { month: '', claimed: [] },
       supply: { day: '', claimed: [], bonus: false },
+      collection: { claimed: [] },
       idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
       expeditions: { slots: Array.from({ length: EXPEDITION_SLOTS }, () => null) },
       village: defaultVillage(),

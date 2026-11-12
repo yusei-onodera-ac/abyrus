@@ -9,6 +9,8 @@ import { BackButton } from '../ui/BackButton';
 import { Button } from '../ui/Button';
 import { HeroSlot, HERO_SLOT_SIZE } from '../ui/HeroSlot';
 import { buildHeroListControls } from '../ui/HeroListControls';
+import { buildUnreadDot } from '../ui/CardParts';
+import { CollectionSystem } from '../systems/CollectionSystem';
 import { applyHeroListView, readHeroListView, writeHeroListView } from '../systems/HeroListView';
 import type { ScrollView } from '../ui/ScrollView';
 import { buildTitlePlate, buildFramedScrollView, CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
@@ -482,6 +484,10 @@ export class RosterScene extends Phaser.Scene {
     container.add(createPanel(this, w / 2, y + headerH / 2, innerW, headerH, { fillColor: HEADER_FILL, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
     container.add(body(this, PAD + 16, y + headerH / 2, '所持キャラ', { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const total = this.save.heroes.length;
+    // 図鑑 (every character of the game, and the rewards for collecting them) is one tap away from the list of what is held.
+    const book = new Button(this, PAD + 196, y + headerH / 2, 112, 38, '図鑑', () => this.scene.start('Collection'), { variant: 'wood', fontSize: '20px', guard });
+    container.add(book);
+    if (CollectionSystem.claimable(this.save) > 0) container.add(buildUnreadDot(this, PAD + 196 + 50, y + headerH / 2 - 14, 7));
     container.add(body(this, PAD + innerW - 16, y + headerH / 2, heroes.length === total ? `${total}体` : `${heroes.length} / ${total}体`, { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
     y += headerH + 12;
     const controls = buildHeroListControls(this, innerW, view, (next) => {

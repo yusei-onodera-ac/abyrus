@@ -24,6 +24,8 @@ export interface HeroSlotOptions {
   twinInDeck?: boolean;
   /** Leave the LV label off (a list of heroes that are not owned has no level to show). */
   hideLevel?: boolean;
+  /** Draw the picture as a black silhouette (a character not obtained yet, in the 図鑑). */
+  silhouette?: boolean;
   /** Pulsing ring, for the slot/hero the next tap will act on. */
   selected?: boolean;
   onTap?: () => void;
@@ -53,7 +55,8 @@ export class HeroSlot extends Phaser.GameObjects.Container {
 
     if (hero) {
       const portrait = addPortrait(scene, hero, opts.generator, size);
-      if (opts.inDeck) portrait.setAlpha(0.4);
+      if (opts.silhouette) portrait.setTintFill(0x0a0a12).setAlpha(0.92);
+      else if (opts.inDeck) portrait.setAlpha(0.4);
       else if (opts.twinInDeck) portrait.setAlpha(0.55);
       this.add(portrait);
     } else {
