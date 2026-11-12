@@ -49,13 +49,24 @@ export function applyMockFromUrl(save: SaveData): boolean {
   return true;
 }
 
-/** Development only: `?battle=65` goes straight into that main stage's fight (0-149); add
+/** Development only: `?scene=<key>` opens that screen; `?battle=65` goes straight into that main stage's fight (0-149); add
  *  `&mode=extra` (0-29) or `&mode=final` for those, or use `?battle=infinite` for the endless
  *  mode. For looking at a region's enemies and backdrop without playing up to it.
  *  Production builds ignore it. */
 export function battleFromUrl(): { scene: string; data: Record<string, unknown> } | null {
   if (!import.meta.env.DEV) return null;
   const params = new URLSearchParams(location.search);
+  // `?scene=Collection` opens any screen by its key (and `&data={"tab":"add"}` gives it data): for walking every screen in a test.
+  const sceneKey = params.get('scene');
+  if (sceneKey && /^[A-Za-z]+$/.test(sceneKey)) {
+    let data: Record<string, unknown> = {};
+    try {
+      data = JSON.parse(params.get('data') ?? '{}') as Record<string, unknown>;
+    } catch {
+      data = {};
+    }
+    return { scene: sceneKey, data };
+  }
   const raw = params.get('battle');
   if (raw === 'infinite') return { scene: 'InfiniteRun', data: {} };
   const stageIndex = raw === null ? NaN : Number(raw);
