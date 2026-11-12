@@ -35,3 +35,4 @@ tools/art/out/
 tools/art/refs/
 tools/audio/raw/
 tools/audio/out/
+tools/tests/.out/
