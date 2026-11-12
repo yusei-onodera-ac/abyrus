@@ -22,6 +22,8 @@ export class HeroCard extends Phaser.GameObjects.Container {
     this.hero = hero;
     const { textureKey } = generator.generate(hero.seed, hero.heroClass, hero.rarity, hero.heroId);
     const rarityColor = RARITY_COLORS[hero.rarity];
+    // A big card (a single pull in the gacha) gets bigger words and bars too, up to twice the size.
+    const k = Math.min(2, Math.max(1, width / 110));
 
     const frame = createPanel(scene, 0, 0, width, width, {
       fillColor: COLORS.panelFill,
@@ -30,14 +32,22 @@ export class HeroCard extends Phaser.GameObjects.Container {
       radius: Math.max(10, width * 0.14),
       rarity: hero.rarity,
     });
-    this.portrait = scene.add.sprite(0, -4, textureKey).setDisplaySize(width * 0.8, width * 0.8);
-    const stars = scene.add.text(0, width / 2 - 14, '★'.repeat(hero.rarity), { fontSize: '12px', color: hex(rarityColor) }).setOrigin(0.5);
-    const nameText = scene.add.text(0, -width / 2 + 10, `${hero.name} Lv${hero.level}`, { fontSize: '11px', color: '#ffffff' }).setOrigin(0.5);
+    // The picture a small card shows is the 96px square the generator bakes; a big card (a single pull) shows the
+    // character's own full-size picture instead, fitted into the same square, so it stays sharp.
+    const art = width >= 150 && scene.textures.exists(hero.heroId) ? scene.textures.getFrame(hero.heroId) : undefined;
+    if (art) {
+      this.portrait = scene.add.sprite(0, -4, hero.heroId);
+      this.portrait.setScale(Math.min((width * 0.8) / art.width, (width * 0.8) / art.height));
+    } else {
+      this.portrait = scene.add.sprite(0, -4, textureKey).setDisplaySize(width * 0.8, width * 0.8);
+    }
+    const stars = scene.add.text(0, width / 2 - 14 * k, '★'.repeat(hero.rarity), { fontSize: `${Math.round(12 * k)}px`, color: hex(rarityColor) }).setOrigin(0.5);
+    const nameText = scene.add.text(0, -width / 2 + 10 * k, `${hero.name} Lv${hero.level}`, { fontSize: `${Math.round(11 * k)}px`, color: '#ffffff' }).setOrigin(0.5);
 
-    const hpBg = scene.add.rectangle(0, width / 2 - 26, width * 0.8, 6, 0x000000, 0.6).setRounded(3);
-    this.hpFill = scene.add.rectangle(-width * 0.4, width / 2 - 26, width * 0.8, 6, 0x4caf50).setOrigin(0, 0.5).setRounded(3);
+    const hpBg = scene.add.rectangle(0, width / 2 - 26 * k, width * 0.8, 6 * k, 0x000000, 0.6).setRounded(3 * k);
+    this.hpFill = scene.add.rectangle(-width * 0.4, width / 2 - 26 * k, width * 0.8, 6 * k, 0x4caf50).setOrigin(0, 0.5).setRounded(3 * k);
     this.ultFill = scene.add
-      .rectangle(-width * 0.4, width / 2 - 18, width * 0.8, 4, 0xffd23f)
+      .rectangle(-width * 0.4, width / 2 - 18 * k, width * 0.8, 4 * k, 0xffd23f)
       .setOrigin(0, 0.5)
       .setScale(0, 1)
       .setRounded(2);

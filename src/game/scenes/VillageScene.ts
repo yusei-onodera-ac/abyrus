@@ -1493,6 +1493,7 @@ export class VillageScene extends Phaser.Scene {
     if (castle) return `城Lv${castle[1]}で`;
     if (reason.includes('これ以上') || reason.includes('上限')) return '最大';
     if (reason.includes('作業中')) return '作業中';
+    if (reason.includes('壊れて')) return '修理が先';
     return reason.length > 6 ? `${reason.slice(0, 5)}…` : reason;
   }
 

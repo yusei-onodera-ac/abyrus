@@ -65,13 +65,14 @@ export function playAllianceLevelUp(scene: Phaser.Scene, level: number, onClose?
   const now = perksForLevel(level);
   const before = perksForLevel(level - 1);
   const pct = (v: number): string => `+${Math.round(v * 100)}%`;
+  // Only what this level actually changes (a line that reads "+0% → +0%" says nothing).
   const lines = [
-    `放置ゴールド ${pct(before.idleGoldBonus)} → ${pct(now.idleGoldBonus)}`,
-    `経験値素材 ${pct(before.expDropBonus)} → ${pct(now.expDropBonus)}`,
-    `スタミナ上限 +${before.staminaMaxBonus} → +${now.staminaMaxBonus}`,
-    `ボス挑戦 ${before.raidAttemptsPerDay}回 → ${now.raidAttemptsPerDay}回/日`,
-    `メンバー上限 ${before.memberMax}人 → ${now.memberMax}人`,
-  ];
+    before.idleGoldBonus !== now.idleGoldBonus ? `放置ゴールド ${pct(before.idleGoldBonus)} → ${pct(now.idleGoldBonus)}` : '',
+    before.expDropBonus !== now.expDropBonus ? `経験値素材 ${pct(before.expDropBonus)} → ${pct(now.expDropBonus)}` : '',
+    before.staminaMaxBonus !== now.staminaMaxBonus ? `スタミナ上限 +${before.staminaMaxBonus} → +${now.staminaMaxBonus}` : '',
+    before.raidAttemptsPerDay !== now.raidAttemptsPerDay ? `ボス挑戦 ${before.raidAttemptsPerDay}回 → ${now.raidAttemptsPerDay}回/日` : '',
+    before.memberMax !== now.memberMax ? `メンバー上限 ${before.memberMax}人 → ${now.memberMax}人` : '',
+  ].filter((text) => text !== '');
   lines.forEach((text, i) => {
     const t = body(scene, 360, 560 + i * 54, text, { fontSize: '30px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0).setScale(0.7);
     layer.add(t);

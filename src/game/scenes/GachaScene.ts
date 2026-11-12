@@ -173,23 +173,27 @@ export class GachaScene extends Phaser.Scene {
 
     const cols = Math.min(5, outcomes.length);
     const rows = Math.ceil(outcomes.length / cols);
-    const startY = 640 - (rows - 1) * 90;
+    // A few characters are shown big (a single pull is the whole screen's one moment); ten fit in two rows of five.
+    const cardW = outcomes.length === 1 ? 280 : outcomes.length <= 3 ? 190 : 110;
+    const stepX = cardW + 30;
+    const stepY = cardW + 70;
+    const startY = 640 - ((rows - 1) * stepY) / 2;
 
     outcomes.forEach((outcome, i) => {
       const { hero } = outcome;
       const col = i % cols;
       const row = Math.floor(i / cols);
-      const x = 360 - ((cols - 1) * 140) / 2 + col * 140;
-      const y = startY + row * 180;
+      const x = 360 - ((cols - 1) * stepX) / 2 + col * stepX;
+      const y = startY + row * stepY;
 
       if (hero.rarity >= 6) this.spawnGrandBurst(x, y, 120 * i);
       else if (hero.rarity >= 5) this.spawnBurst(x, y, RARITY_COLORS[hero.rarity], 120 * i);
 
-      const card = new HeroCard(this, x, y, hero, this.generator, 110);
+      const card = new HeroCard(this, x, y, hero, this.generator, cardW);
       card.setScale(0);
       container.add(card);
       // Tapping a character opens its detail screen.
-      const zone = this.add.zone(x, y, 116, 150).setInteractive({ useHandCursor: true });
+      const zone = this.add.zone(x, y, cardW + 6, cardW + 40).setInteractive({ useHandCursor: true });
       zone.on('pointerup', () => this.openHeroDetail(outcome));
       container.add(zone);
       this.tweens.add({

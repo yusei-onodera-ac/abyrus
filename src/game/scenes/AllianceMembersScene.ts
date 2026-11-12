@@ -105,7 +105,8 @@ export class AllianceMembersScene extends AllianceScene {
       }
       if ((myRole === 'leader' && m.role !== 'leader') || (myRole === 'officer' && m.role === 'member')) actions.push({ label: '除名する', variant: 'danger', onTap: () => this.askKick(m) });
     }
-    const h = 330 + actions.length * 76;
+    // The name and four lines take 372px; each action 76px; then the 閉じる button under them all.
+    const h = 480 + actions.length * 76;
     const cy = 640;
     const top = cy - h / 2;
     panel.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false }));

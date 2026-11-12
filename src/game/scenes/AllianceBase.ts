@@ -126,6 +126,8 @@ export abstract class AllianceScene extends InboxScene {
       return;
     }
     await onOk?.(result.value);
+    // Whatever was paid or received (魔晶石, ゴールド, スタミナ) shows in the bar along the top at once.
+    this.refreshResources();
     if (reloadAfter) await this.reload();
   }
 

@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { VILLAGE_COLS, VILLAGE_ROWS, getBuilding, type BuildingKind } from '../data/village';
+import { VILLAGE_WATER_TILES } from '../data/villageWalk';
+import { villagePlotTierOf } from './VillageArt';
 import type { SaveData } from '../systems/SaveSystem';
 import { castleLevel, footprints } from '../systems/VillageIncome';
 import { showToast } from './Toast';
@@ -197,6 +199,16 @@ export class VillageWalkers {
     const save = this.host.save();
     this.free = new Array<boolean>(VILLAGE_COLS * VILLAGE_ROWS).fill(true);
     this.rects = [];
+    // The plot's picture has a hedge (or a fence) round its edge and water here and there: nobody walks on them.
+    for (let i = 0; i < VILLAGE_COLS; i++) {
+      this.free[this.cell(i, 0)] = false;
+      this.free[this.cell(i, VILLAGE_ROWS - 1)] = false;
+    }
+    for (let i = 0; i < VILLAGE_ROWS; i++) {
+      this.free[this.cell(0, i)] = false;
+      this.free[this.cell(VILLAGE_COLS - 1, i)] = false;
+    }
+    for (const at of VILLAGE_WATER_TILES[villagePlotTierOf(castleLevel(save, now))] ?? []) this.free[at] = false;
     for (const b of save.village.buildings) {
       const def = getBuilding(b.kind);
       if (def.road) continue; // paving is walked on

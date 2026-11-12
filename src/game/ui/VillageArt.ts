@@ -56,7 +56,7 @@ export function villageArtKey(kind: BuildingKind, level: number): string {
 
 /** Loads the supplied village pictures, if any. A missing file is ignored (BootScene ignores load errors). */
 export function preloadVillageArt(scene: Phaser.Scene): void {
-  for (const def of BUILDINGS) for (let level = 1; level <= def.levels.length; level++) scene.load.image(villageArtKey(def.kind, level), `assets/village/${def.kind}_${level}.png`);
+  for (const def of BUILDINGS) if (!def.road) for (let level = 1; level <= def.levels.length; level++) scene.load.image(villageArtKey(def.kind, level), `assets/village/${def.kind}_${level}.png`);
   scene.load.image(SITE_KEY, 'assets/village/construction.png');
   scene.load.image(VILLAGE_GROUND_KEY, 'assets/village/ground.png');
   for (let tier = 1; tier <= VILLAGE_PLOT_TIERS; tier++) scene.load.image(villagePlotKey(tier), `assets/village/ground_${tier}.png`);
