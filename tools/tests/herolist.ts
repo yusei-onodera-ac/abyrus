@@ -48,4 +48,14 @@ ok(readHeroListView(registry).sort === 'power' && readHeroListView(registry).rar
 store.set('heroListView', { sort: 'nonsense', rarity: 99, heroClass: 'dragon' });
 ok(JSON.stringify(readHeroListView(registry)) === JSON.stringify(DEFAULT_HERO_LIST_VIEW), 'junk in the registry falls back to the default');
 
+// every character has words of their own for the Home screen, and none is left over for a character that does not exist
+import { PERSONAL_LINES } from '../../src/game/data/heroLines';
+import { homeLinesFor } from '../../src/game/data/homeLines';
+const ids = new Set(HERO_ROSTER.map((d) => d.id));
+ok(HERO_ROSTER.every((d) => (PERSONAL_LINES[d.id]?.length ?? 0) >= 2), 'every character has at least two lines of their own');
+ok(Object.keys(PERSONAL_LINES).every((id) => ids.has(id)), 'no lines for a character that is not in the roster');
+ok(Object.values(PERSONAL_LINES).every((l) => l.every((t) => t.length > 4 && t.length <= 60)), 'every line is a sentence of a sensible length');
+ok(homeLinesFor('gauss', 'tank')[0].voice === 'home_gauss_1', "a character's own lines use their own voice ids");
+ok(homeLinesFor('nobody', 'mage')[0].voice === 'home_mage_1', 'an unknown character falls back to the class lines');
+
 if (failures) process.exit(1);

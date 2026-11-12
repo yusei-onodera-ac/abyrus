@@ -48,3 +48,27 @@ export const VOICES = {
   tank: { voice: 'Charon', style: 'Say this in Japanese in a deep, steady, reassuring man voice.' },
   healer: { voice: 'Aoede', style: 'Say this in Japanese in a gentle, kind, soft woman voice.' },
 };
+
+// ---- 100 characters' home lines: who speaks them. Each character that is clearly a man or a woman (from the picture) gets
+// one of these Gemini TTS voices, spread so neighbours do not sound alike; the rest keep the voice of their class.
+const MALE_VOICES = ['Fenrir', 'Charon', 'Puck', 'Orus', 'Algenib', 'Iapetus', 'Achird', 'Zubenelgenubi', 'Sadaltager', 'Umbriel', 'Enceladus', 'Alnilam'];
+const FEMALE_VOICES = ['Kore', 'Aoede', 'Leda', 'Zephyr', 'Callirrhoe', 'Autonoe', 'Despina', 'Erinome', 'Laomedeia', 'Achernar', 'Pulcherrima', 'Vindemiatrix', 'Sulafat'];
+const MEN = 'gauss baron dias ignis ald touma pino zayd finn raiga sora taiga felix robin marin gustav bruno shade gen raijin rei enju ember sieg thorne noel'.split(' ');
+const WOMEN = 'aria suzuna mina noa yuno sylva nova kohaku astra viara seira mizuki garnet momo lumi celes nyx morrigan brisa rin volt karna mei tia kai fros lilith ivy quartz ouka rosa lune tsubame ines kaede doris lena mimi miru aion fione fern'.split(' ');
+const TONE = {
+  warrior: 'confident, energetic and brave',
+  mage: 'calm, clever and a little playful',
+  archer: 'light, upbeat and friendly',
+  tank: 'deep, steady and reassuring',
+  healer: 'gentle, kind and soft',
+};
+/** The voice for a character's home lines, or null to use the class voice. */
+export function castVoice(heroId, heroClass, rarity) {
+  const man = MEN.indexOf(heroId);
+  const woman = WOMEN.indexOf(heroId);
+  if (man < 0 && woman < 0) return null;
+  const who = man >= 0 ? (rarity <= 2 ? 'young man' : 'man') : rarity <= 2 ? 'young woman' : 'woman';
+  const voice = man >= 0 ? MALE_VOICES[man % MALE_VOICES.length] : FEMALE_VOICES[woman % FEMALE_VOICES.length];
+  const extra = rarity >= 5 ? ' with a noble, commanding presence' : rarity <= 2 ? ', still a little inexperienced' : '';
+  return { voice, style: `Say this in Japanese in a ${TONE[heroClass] ?? 'friendly'} ${who} voice${extra}. Speak naturally, like a game character.` };
+}

@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { JINGLES, MUSIC, SFX, VOICES } from './manifest.mjs';
+import { JINGLES, MUSIC, SFX, VOICES, castVoice } from './manifest.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const RAW = path.join(HERE, 'raw');
@@ -42,7 +42,8 @@ if (GROUPS.includes('voice')) {
     process.exit(1);
   }
   for (const line of JSON.parse(fs.readFileSync(file, 'utf8'))) {
-    const voice = VOICES[line.voice] ?? VOICES.guide;
+    // a character's own lines: their own cast voice, else the voice of their class
+    const voice = (line.hero && castVoice(line.hero, line.heroClass, line.rarity)) || VOICES[line.heroClass] || VOICES[line.voice] || VOICES.guide;
     jobs.push({ id: line.id, kind: 'voice', out: `voice/${line.id}.mp3`, text: line.text, voice });
   }
 }

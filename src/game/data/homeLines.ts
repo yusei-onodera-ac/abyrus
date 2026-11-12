@@ -1,4 +1,5 @@
 import type { HeroClass } from '../types';
+import { PERSONAL_LINES } from './heroLines';
 
 /**
  * ホーム画面のキャラをタップしたときのセリフ。吹き出しに文字が出て、音声ファイルがあれば
@@ -13,11 +14,7 @@ import type { HeroClass } from '../types';
  * 例: gauss の 2 つ目のセリフの声は home_gauss_2.mp3。声のファイルがなければ、
  * 文字だけが出る。
  */
-export const HERO_LINES: Record<string, string[]> = {
-  // 専用のセリフを足すときは、ここに書く。例:
-  // gauss: ['算盤の音が聞こえるか？ 全て計算どおりだ。', '数字は嘘をつかん。信じるがいい。', '守りは任せろ。'],
-  aion: ['無限の果てまで、ついていらっしゃい。', 'すべての桁を超えて、わたくしが導きましょう。', 'ふふ、ひざまずくには、まだ早いですわ。'],
-};
+export const HERO_LINES: Record<string, string[]> = PERSONAL_LINES;
 
 export const CLASS_LINES: Record<HeroClass, string[]> = {
   warrior: ['剣の腕なら誰にも負けないぞ！', '前は任せて。ひとりも通さない！', '鍛錬は欠かしてないからね。'],

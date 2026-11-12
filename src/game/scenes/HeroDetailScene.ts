@@ -19,7 +19,10 @@ import { showToast } from '../ui/Toast';
 import { createPanel, createDivider } from '../ui/Panel';
 import { buildStoneStage } from '../ui/StoneStage';
 import { body, caption, heading, CHROME } from '../ui/theme';
-import { enter } from '../ui/Transitions';
+import { enter, popIn } from '../ui/Transitions';
+import { homeLinesFor } from '../data/homeLines';
+import { VoiceSystem } from '../systems/VoiceSystem';
+import { wrapToWidth } from '../ui/CardParts';
 import { CLASS_LABELS, EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, MAX_LEVEL, MAX_PHASE, hex, type EquipSlot, type HeroData } from '../types';
 
 interface HeroDetailData {
@@ -137,9 +140,41 @@ export class HeroDetailScene extends Phaser.Scene {
       figure = this.add.sprite(360, 380, textureKey).setDisplaySize(330, 330);
     }
     figure.setDepth(-30);
+    // Tapping the figure: a hop, one of the character's lines in a bubble, and their voice (if there is a file for it).
+    figure.setInteractive({ useHandCursor: true });
+    figure.on('pointerup', () => this.talk(hero, figure));
     const restY = figure.y;
     enter(this, figure, { dy: 22, duration: 460, ease: 'Cubic.easeOut' });
     this.tweens.add({ targets: figure, y: restY - 9, duration: 2400, delay: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+  }
+
+  private lastLine = -1;
+  private bubble?: Phaser.GameObjects.Container;
+  private bubbleTimer?: Phaser.Time.TimerEvent;
+
+  /** A line from this character (never the same twice in a row) in a bubble that fades after a few seconds. */
+  private talk(hero: HeroData, figure: Phaser.GameObjects.Image | Phaser.GameObjects.Sprite): void {
+    const lines = homeLinesFor(hero.heroId, hero.heroClass);
+    let index = Math.floor(Math.random() * lines.length);
+    if (lines.length > 1 && index === this.lastLine) index = (index + 1) % lines.length;
+    this.lastLine = index;
+    const line = lines[index];
+    this.tweens.add({ targets: figure, scaleX: figure.scaleX * 1.02, scaleY: figure.scaleY * 1.02, duration: 90, yoyo: true, ease: 'Sine.easeOut' });
+    VoiceSystem.play(this.save, line.voice);
+
+    this.bubble?.destroy();
+    this.bubbleTimer?.remove();
+    const w = 420;
+    const text = body(this, 0, 0, wrapToWidth(line.text, w - 40, 24, 4, 'bold'), { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4, lineSpacing: 7 }).setOrigin(0.5);
+    const h = text.height + 36;
+    const box = this.add.container(360, STAGE_H - 122 - h / 2).setDepth(20);
+    box.add(createPanel(this, 0, 0, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, gradient: false }));
+    box.add(text);
+    this.bubble = box;
+    popIn(this, box, { duration: 220 });
+    this.bubbleTimer = this.time.delayedCall(4200, () => {
+      this.tweens.add({ targets: box, alpha: 0, duration: 260, onComplete: () => box.destroy() });
+    });
   }
 
   /** Dark title bar across the top: the screen's name. */
