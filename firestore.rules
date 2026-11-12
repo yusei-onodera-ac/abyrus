@@ -216,7 +216,7 @@ service cloud.firestore {
     function isDonationUpdate(a) {
       let n = request.resource.data;
       let o = resource.data;
-      let need = [1000, 1600, 2560, 4096, 6554, 10486, 16777, 26844, 42950];
+      let need = [3000, 4800, 7680, 12288, 19661, 31457, 50332, 80531, 128849];
       let d = dailyPath(a, uid());
       let before = exists(d) ? get(d).data.get('total', 0) : 0;
       return isMember(a)

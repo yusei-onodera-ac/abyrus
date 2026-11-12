@@ -71,10 +71,10 @@ export function weekIndex(ms: number): number {
 
 export const MAX_ALLIANCE_LEVEL = 10;
 
-/** 次のLvまでに必要なEXP (最大Lvなら null)。`1000 * 1.6^(Lv-1)` を、四捨五入。 */
+/** 次のLvまでに必要なEXP (最大Lvなら null)。`3000 * 1.6^(Lv-1)` を、四捨五入。 */
 export function expToNext(level: number): number | null {
   if (level >= MAX_ALLIANCE_LEVEL) return null;
-  return Math.round(1000 * Math.pow(1.6, Math.max(1, level) - 1));
+  return Math.round(3000 * Math.pow(1.6, Math.max(1, level) - 1));
 }
 
 /** 同盟Lvごとの恩恵 (docs/ALLIANCE_DESIGN.md の表)。 */
@@ -129,8 +129,8 @@ export const RAID = {
   ticketTtlMs: 10 * 60_000,
   /** 戦闘が終わるのを待つ最短 (これより早い提出は、断る)。 */
   minElapsedMs: 40_000,
-  /** 1回で入るダメージの上限 = 総合力 × これ。 */
-  powerCoef: 80,
+  /** 1回で入るダメージの上限 = 総合力 × これ (実際に出るのは、総合力の4〜6.5倍)。 */
+  powerCoef: 15,
   /** 1回で入るダメージの上限 = ボスの最大HP × これ (どんな申告でも、ここで頭打ち)。 */
   maxShareOfHp: 0.05,
 };
@@ -142,10 +142,11 @@ export function raidMaxDamage(power: number, bossMaxHp: number): number {
   return Math.max(0, Math.min(byPower, byShare));
 }
 
-/** 週のボスのHP: 同盟の総合力に比例させ、同盟Lvが高いほど強くする。 */
+/** 週のボスのHP: 同盟の総合力と1日の挑戦回数に比例させ、同盟Lvが高いほど強くする。
+ *  メンバー全員が、挑戦回数の4割を使えば倒せる重さ (1回で出るダメージは、総合力の約5倍: 14 = 0.4 × 5 × 7日)。 */
 export function raidBossHp(totalPower: number, allianceLevel: number, attemptsPerDay: number): number {
-  const base = Math.max(1_000_000, totalPower) * 30 * attemptsPerDay * 4;
-  return Math.round(base * (1 + 0.15 * (Math.max(1, allianceLevel) - 1)));
+  const base = Math.max(1_000_000, totalPower) * 14 * attemptsPerDay;
+  return Math.round(base * (1 + 0.04 * (Math.max(1, allianceLevel) - 1)));
 }
 
 /** ダメージ → 同盟ポイント (対数に近いスケール。1e4 で 1点、1e8 で約13点、1e20 で約 40点)。 */

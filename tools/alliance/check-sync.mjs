@@ -98,8 +98,8 @@ check(
   new Set(Array.from({ length: 5 }, (_, i) => game.raidBossFor(JST(2026, 1, 5) + i * 7 * 86_400_000).id)).size === 5 && game.raidBossFor(JST(2026, 1, 5)).id === game.raidBossFor(JST(2026, 2, 9)).id,
   'the five bosses take turns and then repeat',
 );
-check(game.expToNext(1) === 1000 && game.expToNext(2) === 1600 && game.expToNext(9) === 42950 && game.expToNext(10) === null, 'expToNext: 1000, 1600, ... 42950, none at the top');
-let grown = game.addAllianceExp(1, 900, 300);
+check(game.expToNext(1) === 3000 && game.expToNext(2) === 4800 && game.expToNext(9) === 128849 && game.expToNext(10) === null, 'expToNext: 3000, 4800, ... 128849, none at the top');
+let grown = game.addAllianceExp(1, 2900, 300);
 check(grown.level === 2 && grown.exp === 200 && grown.levelUp === 2, 'addAllianceExp carries the rest over a level up');
 grown = game.addAllianceExp(10, 0, 300);
 check(grown.level === 10 && grown.exp === 0 && grown.levelUp === null, 'addAllianceExp stays at the top level with no EXP');
@@ -109,7 +109,7 @@ check(
   game.perksForLevel(1).raidAttemptsPerDay === 3 && game.perksForLevel(5).raidAttemptsPerDay === 4 && game.perksForLevel(8).raidAttemptsPerDay === 5 && game.perksForLevel(10).memberMax === 30 && game.perksForLevel(10).idleGoldBonus === 0.2,
   'perksForLevel matches the design table',
 );
-check(game.raidMaxDamage(1e10, 1e12) === 5e10 && game.raidMaxDamage(1e8, 1e12) === 8e9 && game.raidMaxDamage(0, 1e12) === 0, 'raidMaxDamage is the smaller of power x 80 and 5% of the boss HP');
+check(game.raidMaxDamage(1e10, 1e12) === 5e10 && game.raidMaxDamage(1e8, 1e12) === 1.5e9 && game.raidMaxDamage(0, 1e12) === 0, 'raidMaxDamage is the smaller of power x 15 and 5% of the boss HP');
 check(game.raidPoints(0) === 0 && game.raidPoints(10_000) === 3 && game.raidPoints(1e8) > game.raidPoints(1e6) && game.raidPoints(1e30) < 400, 'raidPoints grows slowly with the damage');
 check(
   game.nextLeague('bronze', 1, 20).league === 'silver' && game.nextLeague('silver', 20, 20).league === 'bronze' && game.nextLeague('bronze', 20, 20).league === 'bronze' && game.nextLeague('diamond', 1, 20).league === 'diamond' && game.nextLeague('gold', 1, 4).league === 'gold',

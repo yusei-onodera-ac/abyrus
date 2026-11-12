@@ -32,7 +32,7 @@ export const CHAT_TEXT_MAX = 100;
 /** 同盟EXP: Lv から次の Lv まで (最大Lvは null)。 */
 export function allianceExpToNext(level: number): number | null {
   if (level >= ALLIANCE_MAX_LEVEL) return null;
-  return Math.round(1000 * Math.pow(1.6, Math.max(1, level) - 1));
+  return Math.round(3000 * Math.pow(1.6, Math.max(1, level) - 1));
 }
 
 /** 同盟Lv (index 0 = Lv1) ごとの恩恵。 */
@@ -125,14 +125,21 @@ export const RAID_BOSSES: RaidBossDef[] = REGIONS.slice(0, RAID_BOSS_COUNT).map(
   description: BOSS_TEXT[i] ?? '',
 }));
 
-/** その週のボスの最大HP: メンバーの総合力の合計に比例し、ボスが進むほど・同盟Lvが高いほど重い。 */
+/** 1回の挑戦で出るダメージは、auto で、総合力のおよそ4〜6.5倍 (戦闘を画面なしで動かして測った: 総合力が1,000から260万まで、
+ *  ほぼ一定。auto を切って手で押さないと、2.8倍ほど)。ボスのHPは、これを元に決める。 */
+export const RAID_TYPICAL_DAMAGE_RATIO = 5;
+/** メンバー全員が、挑戦回数の4割を使えば倒せる重さ (4割 = 14 / (RAID_TYPICAL_DAMAGE_RATIO × 7日))。 */
+const RAID_HP_PER_POWER_AND_ATTEMPT = 14;
+
+/** その週のボスの最大HP: メンバーの総合力の合計と、1日の挑戦回数に比例し、ボスが進むほど・同盟Lvが高いほど重い。 */
 export function raidMaxHp(totalPower: number, bossIndex: number, allianceLevel: number): number {
   const power = Math.max(100, totalPower);
-  return power * 400 * (1 + 0.15 * bossIndex) * (1 + 0.05 * (Math.max(1, allianceLevel) - 1));
+  const attempts = perksForLevel(allianceLevel).raidAttemptsPerDay;
+  return power * RAID_HP_PER_POWER_AND_ATTEMPT * attempts * (1 + 0.1 * bossIndex) * (1 + 0.04 * (Math.max(1, allianceLevel) - 1));
 }
 
-/** 1回の挑戦で入るダメージの上限: パーティの総合力 × 係数 (60秒で、実際に出る数の2〜4倍の余裕を持たせた切り捨て用)。 */
-export const RAID_DAMAGE_FACTOR = 100;
+/** 1回の挑戦で入るダメージの上限: パーティの総合力 × 係数 (実際に出る数 (4〜6.5倍) の2倍あまりの余裕を持たせた切り捨て用)。 */
+export const RAID_DAMAGE_FACTOR = 15;
 export function raidDamageCap(power: number): number {
   return Math.max(100, power) * RAID_DAMAGE_FACTOR;
 }
@@ -217,7 +224,7 @@ export function warRewardFor(rank: number, league: League): AllianceReward {
 
 /** 1シーズンに、同盟のメンバー1人あたり、およそ何ポイント入るか (疑似の同盟の強さの目安)。refPower は、メンバーの総合力。 */
 export function expectedWarPointsPerMember(refPower: number): number {
-  return 14 * raidWarPoints(Math.max(100, refPower) * 35) + 120;
+  return 14 * raidWarPoints(Math.max(100, refPower) * RAID_TYPICAL_DAMAGE_RATIO) + 120;
 }
 
 // ---------------------------------------------------------------------------------------------- 支援・助っ人

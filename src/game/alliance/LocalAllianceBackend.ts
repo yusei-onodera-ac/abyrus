@@ -306,10 +306,11 @@ export class LocalAllianceBackend implements AllianceBackend {
     for (const m of players) {
       if (!m.simulated) continue;
       const r = rngOf(world.seed, 'act', hourIndex, m.uid);
-      // ボスに挑む
-      if (!own.raid.defeatedAt && t <= own.raid.endsAt && m.used < perks.raidAttemptsPerDay && r() < m.act * 0.3 * w) {
-        // (a week of them alone leaves the boss at about a fifth of its HP: the player's own hits are what finish it)
-        const dmg = Math.min(m.power * (18 + r() * 20), raidDamageCap(m.power));
+      // ボスに挑む (挑戦回数の半分ほど。回数が増えるほど、挑む数も増える)
+      if (!own.raid.defeatedAt && t <= own.raid.endsAt && m.used < perks.raidAttemptsPerDay && r() < m.act * 0.16 * (perks.raidAttemptsPerDay / 3) * w) {
+        // (a hit is about the same as a real one - 3.5 to 6.5 times the member's power; on their own they take the boss
+        // down in about six days when it is light, and leave a good part of it when it is heavy: your hits finish it)
+        const dmg = Math.min(m.power * (3.5 + r() * 3), raidDamageCap(m.power));
         m.used += 1;
         this.applyDamage(own, m, dmg, t);
       }
