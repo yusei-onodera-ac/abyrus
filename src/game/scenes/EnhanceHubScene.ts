@@ -9,6 +9,8 @@ import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, RARITY_COLORS, hex, type HeroData }
 import { Button } from '../ui/Button';
 import { buildCardPanel } from '../ui/CardParts';
 import { HeroSlot } from '../ui/HeroSlot';
+import { buildHeroListControls } from '../ui/HeroListControls';
+import { applyHeroListView, readHeroListView, writeHeroListView } from '../systems/HeroListView';
 import { itemIcon, skillEssenceIcon, swordBadgeIcon } from '../ui/ItemIcons';
 import { phaseMaterialIcon } from '../ui/Icons';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
@@ -41,9 +43,34 @@ export class EnhanceHubScene extends InboxScene {
   protected buildCards(): InboxCard[] {
     const cards: InboxCard[] = [this.materialsCard(), this.equipmentCard()];
     const guard = () => this.scroll.isTap();
-    const heroes = [...this.save.heroes].sort((a, b) => b.rarity - a.rarity || b.level - a.level || a.heroId.localeCompare(b.heroId));
+    const view = readHeroListView(this.game.registry);
+    cards.push(this.controlsCard(view, guard));
+    const heroes = applyHeroListView(this.save.heroes, view);
+    if (heroes.length === 0) cards.push(this.emptyCard());
     for (const hero of heroes) cards.push(this.heroRow(hero, guard));
     return cards;
+  }
+
+  /** 並び替え and 絞り込み above the list of heroes (the choice is shared with the 編成 screen for the session). */
+  private controlsCard(view: ReturnType<typeof readHeroListView>, guard: () => boolean): InboxCard {
+    const controls = buildHeroListControls(this, CARD_WIDTH - PAD * 2, view, (next) => {
+      writeHeroListView(this.game.registry, next);
+      this.queueRender();
+    }, guard);
+    const height = controls.height + PAD * 2;
+    const container = this.add.container(0, 0);
+    container.add(buildCardPanel(this, CARD_WIDTH, height));
+    controls.container.setPosition(PAD, PAD);
+    container.add(controls.container);
+    return { container, height };
+  }
+
+  private emptyCard(): InboxCard {
+    const height = 96;
+    const container = this.add.container(0, 0);
+    container.add(buildCardPanel(this, CARD_WIDTH, height));
+    container.add(body(this, CARD_WIDTH / 2, height / 2, 'この条件のキャラはいません', { fontSize: '22px', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    return { container, height };
   }
 
   /** What is held: the four 経験値素材, 装備強化素材, 技素 and フェーズ素材, as icon + count. */
@@ -100,8 +127,9 @@ export class EnhanceHubScene extends InboxScene {
     const name = body(this, x, 24, hero.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
     if (name.width > 250) name.setScale(250 / name.width);
     container.add(name);
-    container.add(this.add.text(x, 52, '★'.repeat(hero.rarity), { fontSize: '17px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(caption(this, x + 92, 52, `${CLASS_LABELS[hero.heroClass]}　フェーズ ${hero.phase}/${MAX_PHASE}`, { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const stars = this.add.text(x, 52, '★'.repeat(hero.rarity), { fontSize: '17px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+    container.add(stars);
+    container.add(caption(this, x + Math.max(92, stars.width + 14), 52, `${CLASS_LABELS[hero.heroClass]}　フェーズ ${hero.phase}/${MAX_PHASE}`, { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     container.add(body(this, x, 84, `Lv.${hero.level}`, { fontSize: '24px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const barX = x + 96;

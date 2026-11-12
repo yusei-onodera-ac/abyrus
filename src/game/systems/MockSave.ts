@@ -1,8 +1,9 @@
 import { REGION_COUNT } from '../data/regions';
 import { EXTRA_STAGE_COUNT, FINAL_STAGE_INDEX } from './ProgressionSystem';
+import { HERO_ROSTER, createHeroInstance } from '../data/heroes';
 import { SaveSystem, type SaveData } from './SaveSystem';
 
-/** Development only: `?mock=allclear` on the address puts the save in the state
+/** Development only: `?mock=allheroes` gives one copy of every character; `?mock=allclear` on the address puts the save in the state
  *  of a player who has finished everything - all 150 main stages, the final
  *  battle, the ending and all 30 Extra stages, every story read - so the late
  *  game can be looked at without playing to it. It is saved like any other
@@ -17,6 +18,17 @@ export function applyMockFromUrl(save: SaveData): boolean {
     // A brand-new player: opening story and tutorial start over (progress is left alone).
     save.tutorial = { opening: false, step: 0, done: false };
     save.stageProgress = 0;
+    SaveSystem.save(save);
+    params.delete('mock');
+    const left = params.toString();
+    history.replaceState(null, '', location.pathname + (left ? `?${left}` : ''));
+    return true;
+  }
+  if (which === 'allheroes') {
+    // Every character in the roster, one copy each, at a spread of levels (for looking at the list screens).
+    HERO_ROSTER.forEach((def, i) => {
+      if (!save.heroes.some((h) => h.heroId === def.id)) save.heroes.push(createHeroInstance(def.id, `mock-${def.id}`, 1 + ((i * 7) % 100)));
+    });
     SaveSystem.save(save);
     params.delete('mock');
     const left = params.toString();

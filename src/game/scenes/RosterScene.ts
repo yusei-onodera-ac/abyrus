@@ -8,6 +8,8 @@ import { BottomNavBar } from '../ui/BottomNavBar';
 import { BackButton } from '../ui/BackButton';
 import { Button } from '../ui/Button';
 import { HeroSlot, HERO_SLOT_SIZE } from '../ui/HeroSlot';
+import { buildHeroListControls } from '../ui/HeroListControls';
+import { applyHeroListView, readHeroListView, writeHeroListView } from '../systems/HeroListView';
 import type { ScrollView } from '../ui/ScrollView';
 import { buildTitlePlate, buildFramedScrollView, CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { createPanel, createDivider } from '../ui/Panel';
@@ -466,12 +468,9 @@ export class RosterScene extends Phaser.Scene {
     const w = CARD_WIDTH;
     const innerW = w - PAD * 2;
     const guard = () => this.scroll.isTap();
-    // Copies of one character sit together, the character with the highest level first.
-    const bestLevel = new Map<string, number>();
-    for (const h of this.save.heroes) bestLevel.set(h.heroId, Math.max(bestLevel.get(h.heroId) ?? 0, h.level));
-    const heroes = [...this.save.heroes].sort(
-      (a, b) => b.rarity - a.rarity || bestLevel.get(b.heroId)! - bestLevel.get(a.heroId)! || a.heroId.localeCompare(b.heroId) || b.level - a.level,
-    );
+    // Ordered and narrowed the way the player chose (copies of one character sit together under ★順).
+    const view = readHeroListView(this.game.registry);
+    const heroes = applyHeroListView(this.save.heroes, view);
     // Only while editing: which heroes already stand in the deck being edited,
     // and which characters they are (a deck holds one copy of each).
     const inDeckHeroes = this.editingDeck === null ? [] : this.deckHeroes(this.editingDeck);
@@ -482,8 +481,20 @@ export class RosterScene extends Phaser.Scene {
     const headerH = 48;
     container.add(createPanel(this, w / 2, y + headerH / 2, innerW, headerH, { fillColor: HEADER_FILL, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
     container.add(body(this, PAD + 16, y + headerH / 2, '所持キャラ', { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(body(this, PAD + innerW - 16, y + headerH / 2, `${heroes.length}体`, { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+    const total = this.save.heroes.length;
+    container.add(body(this, PAD + innerW - 16, y + headerH / 2, heroes.length === total ? `${total}体` : `${heroes.length} / ${total}体`, { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
     y += headerH + 12;
+    const controls = buildHeroListControls(this, innerW, view, (next) => {
+      writeHeroListView(this.game.registry, next);
+      this.queueRender();
+    }, guard);
+    controls.container.setPosition(PAD, y);
+    container.add(controls.container);
+    y += controls.height + 14;
+    if (heroes.length === 0) {
+      container.add(body(this, w / 2, y + 40, 'この条件のキャラはいません', { fontSize: '22px', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      y += 100;
+    }
 
     const size = HERO_SLOT_SIZE;
     const gapX = (innerW - GRID_COLS * size) / (GRID_COLS - 1);
