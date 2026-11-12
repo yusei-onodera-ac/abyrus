@@ -19,6 +19,8 @@ export interface GeneratedCharacter {
 }
 
 const SIZE = 96;
+/** How many times SIZE a hero's illustration is baked at (the procedural fallback is drawn at SIZE). */
+const ILLUSTRATION_SCALE = 2;
 const CENTER = SIZE / 2;
 
 const SILHOUETTES: Record<HeroClass, 'round' | 'broad' | 'slim'> = {
@@ -62,11 +64,14 @@ export class CharacterGenerator {
     const key = `char_illust_${heroId}`;
     if (this.scene.textures.exists(key)) return key;
 
+    // Baked at twice the size it is laid out at (SIZE), so it stays sharp on a phone's screen, which shows the 720px
+    // game at 1.5x or more.
+    const baked = SIZE * ILLUSTRATION_SCALE;
     const frame = this.scene.textures.getFrame(heroId);
-    const scale = Math.min(SIZE / frame.width, SIZE / frame.height);
-    const temp = this.scene.add.image(CENTER, CENTER, heroId).setScale(scale).setVisible(false);
-    const rt = this.scene.add.renderTexture(0, 0, SIZE, SIZE);
-    rt.draw(temp, CENTER, CENTER);
+    const scale = Math.min(baked / frame.width, baked / frame.height);
+    const temp = this.scene.add.image(baked / 2, baked / 2, heroId).setScale(scale).setVisible(false);
+    const rt = this.scene.add.renderTexture(0, 0, baked, baked);
+    rt.draw(temp, baked / 2, baked / 2);
     rt.saveTexture(key);
     rt.destroy();
     temp.destroy();
