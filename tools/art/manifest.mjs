@@ -10,6 +10,8 @@
 //   prompt  the whole instruction; refs = existing pictures to copy the painting style from; refPrev = the id of the picture
 //           that this one is the "next level" of (its raw picture is passed as a reference when it exists)
 
+import { NEW_CHARACTERS } from './newCharacters.mjs';
+
 const NO_TEXT = 'No text of any kind: no letters, no characters, no captions, no signs with writing, no logos, no watermark, no user interface.';
 
 // ---------------------------------------------------------------------------------------------- items (3 materials)
@@ -504,6 +506,27 @@ const characters = [
   prompt: `${CHAR}${CHAR_QUALITY[rarity]} The character: ${what}.`,
 }));
 
+// ---------------------------------------------------------------------------------------------- 80 more characters (doubling the roster)
+// The list (id, rarity, class, name, gender, what the picture shows) is in newCharacters.mjs; the same ids are in src/game/data/heroes.ts.
+const CHAR_QUALITY_MORE = {
+  ...CHAR_QUALITY,
+  1: 'A very ordinary beginner: plain, simple clothes and a basic, cheap or home-made weapon, a humble look, hardly any ornament and no glow.',
+  2: 'A modest, ordinary adventurer: simple but neat clothes, a few small practical items, an unassuming look, hardly any ornament and no magical glow.',
+  5: 'A legendary top-tier hero, second only to a one-of-a-kind mythic character: an extremely elaborate, luxurious and eye-catching costume with large, crisp, hard-edged gold ornaments, a big signature weapon and dramatic accents. Effects are crisp painted shapes with outlines, not soft glow or haze, so the figure stays cleanly separated from the white background.',
+};
+const CHAR_REFS_MORE = { ...CHAR_REFS, 1: ['ref:mizuki.jpg', 'ref:ald.jpg'], 2: ['ref:momo.jpg', 'ref:lumi.jpg'], 5: ['ref:gauss.jpg', 'ref:aria.jpg'] };
+const characters2 = NEW_CHARACTERS.map(([id, rarity, , , , what]) => ({
+  id: `hero_${id}`,
+  group: 'chars2',
+  out: `characters/${id}.png`,
+  mode: 'portrait',
+  size: [1008, 1344],
+  aspect: '3:4',
+  refs: CHAR_REFS_MORE[rarity],
+  refNote: CHAR_NOTE,
+  prompt: `${CHAR}${CHAR_QUALITY_MORE[rarity]} The character: ${what}.`,
+}));
+
 // ---------------------------------------------------------------------------------------------- 特設ガチャ banner, 通常ガチャ banner, loading screen
 const GACHA_CHARS = 'The characters shown must be the SAME characters as in the reference pictures (same faces, hair, outfits and weapons), only posed differently - do not invent other characters.';
 const castBanners = [
@@ -739,7 +762,7 @@ const equipFest = [
   },
 ];
 
-export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...limited, ...pickups, ...equipFest, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
+export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...limited, ...pickups, ...equipFest, ...characters, ...characters2, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

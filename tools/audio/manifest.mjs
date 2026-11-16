@@ -7,6 +7,8 @@
 //                                                  single sound and the first `seconds` are kept)
 //   voice  -> public/assets/voice/<line id>.mp3  (the lines come from the game's own data: tutorial steps and home lines)
 
+import { NEW_CHARACTERS } from '../art/newCharacters.mjs';
+
 const LOOP = 'It must loop smoothly. Instrumental only, no vocals, no lyrics.';
 
 export const MUSIC = [
@@ -53,8 +55,15 @@ export const VOICES = {
 // one of these Gemini TTS voices, spread so neighbours do not sound alike; the rest keep the voice of their class.
 const MALE_VOICES = ['Fenrir', 'Charon', 'Puck', 'Orus', 'Algenib', 'Iapetus', 'Achird', 'Zubenelgenubi', 'Sadaltager', 'Umbriel', 'Enceladus', 'Alnilam'];
 const FEMALE_VOICES = ['Kore', 'Aoede', 'Leda', 'Zephyr', 'Callirrhoe', 'Autonoe', 'Despina', 'Erinome', 'Laomedeia', 'Achernar', 'Pulcherrima', 'Vindemiatrix', 'Sulafat'];
-const MEN = 'gauss baron dias ignis ald touma pino zayd finn raiga sora taiga felix robin marin gustav bruno shade gen raijin rei enju ember sieg thorne noel'.split(' ');
-const WOMEN = 'aria suzuna mina noa yuno sylva nova kohaku astra viara seira mizuki garnet momo lumi celes nyx morrigan brisa rin volt karna mei tia kai fros lilith ivy quartz ouka rosa lune tsubame ines kaede doris lena mimi miru aion fione fern'.split(' ');
+// (the 80 characters added to double the roster are listed with their gender in ../art/newCharacters.mjs)
+const MEN = [
+  ...'gauss baron dias ignis ald touma pino zayd finn raiga sora taiga felix robin marin gustav bruno shade gen raijin rei enju ember sieg thorne noel'.split(' '),
+  ...NEW_CHARACTERS.filter((c) => c[4] === 'm').map((c) => c[0]),
+];
+const WOMEN = [
+  ...'aria suzuna mina noa yuno sylva nova kohaku astra viara seira mizuki garnet momo lumi celes nyx morrigan brisa rin volt karna mei tia kai fros lilith ivy quartz ouka rosa lune tsubame ines kaede doris lena mimi miru aion fione fern'.split(' '),
+  ...NEW_CHARACTERS.filter((c) => c[4] === 'f').map((c) => c[0]),
+];
 const TONE = {
   warrior: 'confident, energetic and brave',
   mage: 'calm, clever and a little playful',

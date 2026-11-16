@@ -6,7 +6,7 @@ import { describeCampaign } from '../../src/game/data/campaigns';
 import { getHomeBanners } from '../../src/game/data/banners';
 import { getNotices, scheduleNotices } from '../../src/game/data/notices';
 import { KIND_NAME, formatSpan, groupByMonth, itemStatus, scheduleItems } from '../../src/game/systems/ScheduleView';
-import { createHeroInstance, getHeroDefinition } from '../../src/game/data/heroes';
+import { createHeroInstance, getHeroDefinition, getHeroesByRarity } from '../../src/game/data/heroes';
 import { GachaSystem, heroPoolOf, heroRatesOf, pickupHeroesOf, pityLeft, ratesOf } from '../../src/game/systems/GachaSystem';
 import { CampaignSystem } from '../../src/game/systems/CampaignSystem';
 import { EventSystem } from '../../src/game/systems/EventSystem';
@@ -173,7 +173,8 @@ for (const b of equipGachas) {
   const per = heroRatesOf(b);
   const aria = per.find((r) => r.def.id === 'aria')!;
   const otherFive = per.filter((r) => r.def.rarity === 5 && !r.pickup);
-  ok(Math.abs(aria.rate - 0.01) < 1e-12 && otherFive.length === 5 && otherFive.every((r) => Math.abs(r.rate - 0.002) < 1e-12), 'g03: aria is half of the ★5 2% (1%), the other five share the rest (0.2% each)');
+  const otherShare = 0.01 / otherFive.length; // the roster grows: the other ★5 heroes split the half that is left, whatever their number
+  ok(otherFive.length === getHeroesByRarity(5).length - 1 && Math.abs(aria.rate - 0.01) < 1e-12 && otherFive.every((r) => Math.abs(r.rate - otherShare) < 1e-12), 'g03: aria is half of the ★5 2% (1%), the other ★5 heroes share the rest equally');
   const four = per.filter((r) => r.def.rarity === 4 && r.pickup);
   ok(four.length === 2 && four.every((r) => Math.abs(r.rate - 0.02) < 1e-12), 'g03: the two ★4 ピックアップ share half of 8% (2% each)');
 

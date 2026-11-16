@@ -22,7 +22,9 @@ HEROES = ['viara', 'astra', 'dias', 'celes', 'noct', 'gauss', 'aria', 'zeno', 's
           # the heroes of the year's pickup gachas and events (data/schedule.ts)
           'sieg', 'kurenai', 'thorne', 'ouka', 'quartz', 'brann', 'raijin', 'ivy', 'lilith', 'gale', 'suzuna', 'kohaku', 'baron',
           'noel', 'gen', 'jin', 'kaede', 'lune', 'miru', 'rosa', 'lena', 'taiga', 'toxar', 'nyx', 'haruka', 'sora', 'ines', 'felix',
-          'tsubame', 'morrigan', 'orga', 'elrin', 'gustav', 'doris', 'bruno', 'mina', 'kai', 'fros', 'robin']
+          'tsubame', 'morrigan', 'orga', 'elrin', 'gustav', 'doris', 'bruno', 'mina', 'kai', 'fros', 'robin',
+          # style references for the ★1 and ★2 characters added to double the roster (newCharacters.mjs)
+          'mizuki', 'ald', 'momo', 'lumi', 'fern', 'enju']
 for n in HEROES:
     save(root / 'characters' / f'{n}.png', f'{n}.jpg', (640, 860))
 for n in ['wolf', 'lion', 'necrodraco', 'garumudo', 'arachnea', 'kongo', 'snake', 'bear']:

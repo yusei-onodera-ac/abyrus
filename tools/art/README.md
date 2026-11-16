@@ -44,3 +44,13 @@ Vertex AI の Gemini 画像生成で、ゲームに足りない画像（129枚�
   「同じキャラのまま、ポーズだけ変える」と指示している。
 - `also: ['banners/special.jpg']` を付けると、同じ完成品を別の場所にも書き出す（ホームのバナーなど）。
 - 2回目のバッチは `bash tools/art/priority2.sh`（特設バナー・ロード画面 → 新キャラ → 作り直したバナー）。
+
+## キャラを増やす（2026-11: 81体 → 161体）
+
+- 増やした80体の一覧（id・レア度・職業・名前・性別・立ち絵のプロンプト）は `newCharacters.mjs`。manifest（`group: chars2`）と
+  `tools/audio/manifest.mjs`（男女どちらの声か）が、ここから読む。`src/game/data/heroes.ts` / `skills.ts` / `heroLines.ts` にも同じ id がある
+  （`npm test` の roster が、一覧とゲームのデータが食い違っていないか、絵と声のファイルがそろっているかを調べる）。
+- 手順: `python tools/art/make_refs.py`（参考画像）→ `node tools/art/generate.mjs --group chars2 --yes --concurrency 3`（80枚、約US$11）
+  → `python tools/art/process.py --install --group chars2` → 声は `node tools/audio/extract.mjs` →
+  `node tools/audio/generate.mjs --group voice --yes` → `python tools/audio/process.py --install`。
+- 気に入らない1枚は `--only hero_<id> --force` で作り直す。キャラをさらに足すときは、`newCharacters.mjs` に1行 + heroes / skills / heroLines に同じ id。
