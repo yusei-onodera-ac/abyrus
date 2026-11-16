@@ -145,6 +145,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
+    // An event fight whose event is not known (or no longer in the schedule) must not run as a main stage.
+    if (this.mode === 'event' && !this.eventDef) {
+      this.scene.start('Event');
+      return;
+    }
     this.save = this.game.registry.get('save');
     this.generator = new CharacterGenerator(this);
     this.anim = new AnimationController(this);

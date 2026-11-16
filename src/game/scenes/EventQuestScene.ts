@@ -60,7 +60,8 @@ export class EventQuestScene extends InboxScene {
     // After the end the dungeon is closed: it opens on what can be taken (missions, then the 累計報酬), else the 交換所.
     const save = this.game.registry.get('save') as SaveData;
     const after: Tab = def && EventSystem.missions(save, def).some((m) => m.done && !m.claimed) ? 'mission' : def && EventSystem.milestones(save, def).some((m) => m.reached && !m.claimed) ? 'reward' : 'shop';
-    this.tab = data?.tab ?? (def && !EventSystem.isRunning(def) ? after : def?.kind === 'dungeon' ? 'play' : 'mission');
+    const wanted = data?.tab && !(data.tab === 'play' && def?.kind !== 'dungeon') ? data.tab : undefined;
+    this.tab = wanted ?? (def && !EventSystem.isRunning(def) ? after : def?.kind === 'dungeon' ? 'play' : 'mission');
   }
 
   create(): void {

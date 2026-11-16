@@ -1,7 +1,7 @@
 import { describeCampaign } from '../data/campaigns';
 import { GACHA_BANNERS } from '../data/gachaBanners';
 import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULE_NEXT, SCHEDULED_GACHAS } from '../data/schedule';
-import { pickupNote } from './GachaSystem';
+import { pickupHeroesOf } from './GachaSystem';
 
 /**
  * The year's calendar (data/schedule.ts) as one list of lines for the 年間予定 screen and for docs/EVENT_SCHEDULE.md: every 期間限定イベント, ピックアップガチャ
@@ -25,6 +25,16 @@ export type ScheduleStatus = 'live' | 'upcoming' | 'ended';
 export const KIND_NAME: Record<ScheduleKind, string> = { event: 'イベント', gacha: 'ガチャ', campaign: 'キャンペーン' };
 const KIND_ORDER: Record<ScheduleKind, number> = { event: 0, gacha: 1, campaign: 2 };
 
+/** One short line about a gacha: its top-★ ピックアップ by name, and how many more ("★5 虚数姫アリア　ほか4体"). */
+function pickupSummary(banner: Parameters<typeof pickupHeroesOf>[0]): string | null {
+  const picks = pickupHeroesOf(banner);
+  if (picks.length === 0) return null;
+  const top = Math.max(...picks.map((h) => h.rarity));
+  const best = picks.filter((h) => h.rarity === top);
+  const rest = picks.length - best.length;
+  return `★${top} ${best.map((h) => h.name).join('・')}${rest > 0 ? `　ほか${rest}体` : ''}`;
+}
+
 export function scheduleItems(): ScheduleItem[] {
   const items: ScheduleItem[] = [];
   for (const e of SCHEDULED_EVENTS) {
@@ -32,7 +42,7 @@ export function scheduleItems(): ScheduleItem[] {
   }
   for (const g of SCHEDULED_GACHAS) {
     const banner = GACHA_BANNERS.find((b) => b.id === g.id) ?? g;
-    items.push({ kind: 'gacha', id: g.id, title: g.title, startsAt: g.startsAt!, endsAt: g.endsAt!, detail: pickupNote(banner) ?? g.description, accent: g.accent ?? 0x6a3aa8 });
+    items.push({ kind: 'gacha', id: g.id, title: g.title, startsAt: g.startsAt!, endsAt: g.endsAt!, detail: pickupSummary(banner) ?? g.description, accent: g.accent ?? 0x6a3aa8 });
   }
   for (const c of SCHEDULED_CAMPAIGNS) {
     items.push({ kind: 'campaign', id: c.id, title: c.title, startsAt: c.startsAt, endsAt: c.endsAt, detail: describeCampaign(c), accent: 0x2f7a3a });

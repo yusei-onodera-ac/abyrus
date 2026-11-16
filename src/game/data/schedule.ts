@@ -23,6 +23,18 @@ export const SCHEDULE_NEXT = { at: '2027-11-16T00:00:00', title: '1周年記念'
 const at = (md: string): string => `${md >= '11-16' ? 2026 : 2027}-${md}`;
 const span = (from: string, to: string): { startsAt: string; endsAt: string } => ({ startsAt: `${at(from)}T00:00:00`, endsAt: `${at(to)}T23:59:00` });
 
+/** The banner pictures are loaded at start-up only for what is near in time (a year of them would take about 90 MB of texture memory): from
+ *  ART_DAYS_AHEAD days before it starts to ART_DAYS_AFTER days after it ends (the お知らせ of an event stays 30 days). An entry with no dates
+ *  is permanent: always. */
+export const ART_DAYS_AHEAD = 21;
+export const ART_DAYS_AFTER = 30;
+export function isArtNeeded(entry: { startsAt?: string; endsAt?: string }, now = Date.now()): boolean {
+  const DAY = 24 * 60 * 60 * 1000;
+  if (entry.startsAt && new Date(entry.startsAt).getTime() - ART_DAYS_AHEAD * DAY > now) return false;
+  if (entry.endsAt && new Date(entry.endsAt).getTime() + ART_DAYS_AFTER * DAY < now) return false;
+  return true;
+}
+
 // ------------------------------------------------------------------------------------------ 期間限定イベント (14)
 
 export const SCHEDULED_EVENTS: LimitedEventDef[] = [

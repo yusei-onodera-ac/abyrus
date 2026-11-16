@@ -23,6 +23,7 @@ import { GACHA_BANNERS } from '../data/gachaBanners';
 import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
+import { isArtNeeded } from '../data/schedule';
 import { heading, caption, CHROME } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -59,11 +60,12 @@ export class BootScene extends Phaser.Scene {
     preloadPlacePictures(this);
     preloadVillagePeople(this);
     preloadBanners(this, BANNERS);
-    preloadGachaArt(this, GACHA_BANNERS);
+    // (the year's limited banners only while they are near: data/schedule.ts isArtNeeded)
+    preloadGachaArt(this, GACHA_BANNERS.filter((b) => isArtNeeded(b)));
     preloadNoticeArt(this);
     // ルリ's expressions (public/assets/pet/<mood>.png), if supplied (otherwise she is drawn from code).
     preloadPetArt(this);
-    preloadEventArt(this, EVENTS);
+    preloadEventArt(this, EVENTS.filter((e) => isArtNeeded(e)));
     // The banner at the top of the プレミアムパス screen (optional, like the other pictures).
     this.load.image('premium_header', '/assets/events/premium_header.jpg');
   }

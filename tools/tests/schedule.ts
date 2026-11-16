@@ -1,9 +1,12 @@
 // The year's calendar (data/schedule.ts) and what runs on it: 期間限定イベント, ピックアップガチャ and ブーストキャンペーン - checked without a browser.
-import { SCHEDULE_START, SCHEDULE_END, SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULED_GACHAS } from '../../src/game/data/schedule';
+import { SCHEDULE_START, SCHEDULE_END, SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULED_GACHAS, isArtNeeded } from '../../src/game/data/schedule';
 import { GACHA_BANNERS, getActiveGachaBanners, isGachaActive, type GachaBannerEntry } from '../../src/game/data/gachaBanners';
 import { EVENTS, eventPhase, getVisibleEvents, UPCOMING_DAYS } from '../../src/game/data/events';
 import { describeCampaign } from '../../src/game/data/campaigns';
-import { getHeroDefinition } from '../../src/game/data/heroes';
+import { getHomeBanners } from '../../src/game/data/banners';
+import { getNotices, scheduleNotices } from '../../src/game/data/notices';
+import { KIND_NAME, formatSpan, groupByMonth, itemStatus, scheduleItems } from '../../src/game/systems/ScheduleView';
+import { createHeroInstance, getHeroDefinition } from '../../src/game/data/heroes';
 import { GachaSystem, heroPoolOf, heroRatesOf, pickupHeroesOf, pityLeft, ratesOf } from '../../src/game/systems/GachaSystem';
 import { CampaignSystem } from '../../src/game/systems/CampaignSystem';
 import { EventSystem } from '../../src/game/systems/EventSystem';
@@ -233,6 +236,47 @@ for (const b of equipGachas) {
 }
 ok(SaveSystem.createDefault().gachaPity && Object.keys(SaveSystem.createDefault().gachaPity).length === 0, 'a new save has no 天井 counts');
 
+// ============================================================================ notices, Home banners and the 年間予定 list
+{
+  const at = (iso: string): number => T(iso);
+  const dec18 = scheduleNotices(at('2026-12-18T12:00:00'));
+  ok(dec18.some((x) => x.id === 'event-xmas') && dec18.some((x) => x.id === 'gacha-g03-xmas'), 'the notices of what started on 12/17 are on the board on 12/18');
+  ok(!dec18.some((x) => x.id === 'event-newyear') && !dec18.some((x) => x.id === 'gacha-g04-newyear'), 'and not those that have not started');
+  ok(dec18.every((x, i, a) => i === 0 || a[i - 1].date >= x.date), 'newest first');
+  ok(dec18.every((x) => x.title.includes('開催のお知らせ') && x.body.includes('開催期間') && x.textureKey), 'each says the period and uses the picture already loaded');
+  ok(!scheduleNotices(at('2027-01-25T12:00:00')).some((x) => x.id === 'event-launch'), 'a notice leaves the board 30 days after the start');
+  ok(scheduleNotices(at('2026-11-20T12:00:00')).length === 2 && getNotices(at('2026-11-20T12:00:00')).length === 2 + getNotices(at('2026-11-20T12:00:00')).filter((x) => !x.id.startsWith('event-') && !x.id.startsWith('gacha-')).length, 'the board is the calendar notices plus the written ones');
+
+  const home = getHomeBanners(at('2026-12-18T12:00:00'));
+  ok(home[0].id === 'event-xmas' && home[0].target === 'EventQuest' && (home[0].targetData as { eventId: string }).eventId === 'xmas', 'Home: the event that is on comes first and opens its screen');
+  ok(home.some((b) => b.id === 'gacha-g03-xmas' && b.target === 'Gacha') && home.some((b) => b.id === 'special'), 'then the limited gacha, then the fixed banners');
+  ok(getHomeBanners(at('2026-12-10T12:00:00')).every((b) => !b.id.startsWith('event-')), 'no event banner while none is on');
+  ok(home.length <= 5, `a few banners only (${home.length})`);
+}
+
+{
+  const items = scheduleItems();
+  ok(items.length === SCHEDULED_EVENTS.length + SCHEDULED_GACHAS.length + SCHEDULED_CAMPAIGNS.length, 'the 年間予定 lists everything once');
+  ok(items.every((x, i, a) => i === 0 || T(a[i - 1].startsAt) <= T(x.startsAt)), 'in the order it starts');
+  const months = groupByMonth(items);
+  ok(months.length === 13 && months[0].key === '2026-11' && months[12].key === '2027-11', `from the second half of 2026-11 to the first half of 2027-11: 13 month cards (${months.map((m) => m.key).join(' ')})`);
+  ok(items.every((x) => x.detail.length > 0 && x.title.length > 0) && Object.keys(KIND_NAME).length === 3, 'every line has a name and a detail');
+  ok(itemStatus(items[0], T('2026-11-20T12:00:00')) === 'live' && itemStatus(items[0], T('2026-12-20T12:00:00')) === 'ended' && itemStatus(items[items.length - 1], T('2026-11-20T12:00:00')) === 'upcoming', 'live / ended / upcoming');
+  ok(formatSpan({ startsAt: '2026-12-31T00:00:00', endsAt: '2027-01-13T23:59:00' }) === '12/31 〜 1/13', 'a span shows month/day only');
+}
+
+// the pictures loaded at start-up: only what is near in time
+{
+  const at = (iso: string): number => T(iso);
+  const need = (iso: string): number => [...SCHEDULED_EVENTS, ...SCHEDULED_GACHAS].filter((x) => isArtNeeded(x, at(iso))).length;
+  ok(isArtNeeded({}, at('2027-01-01T00:00:00')), 'an entry with no dates is always loaded');
+  ok(isArtNeeded(SCHEDULED_EVENTS[0], at('2026-11-16T00:00:00')) && isArtNeeded(SCHEDULED_EVENTS[1], at('2026-11-30T00:00:00')) && !isArtNeeded(SCHEDULED_EVENTS[1], at('2026-11-20T00:00:00')), 'an event is loaded from 21 days before its start');
+  ok(isArtNeeded(SCHEDULED_EVENTS[0], at('2027-01-05T00:00:00')) && !isArtNeeded(SCHEDULED_EVENTS[0], at('2027-01-10T00:00:00')), 'and until 30 days after its end');
+  const counts = [0, 60, 120, 180, 240, 300, 360].map((d) => need(new Date(start + d * DAY + 12 * 3600 * 1000).toISOString().slice(0, 19)));
+  console.log('      pictures needed at a time (events + gachas), every 60 days:', counts.join(' '));
+  ok(counts.every((c) => c <= 14), 'never more than 14 of the 39 year pictures at once');
+}
+
 // ============================================================================ the campaigns
 {
   CampaignSystem.setTesting(false);
@@ -354,6 +398,35 @@ ok(SaveSystem.createDefault().gachaPity && Object.keys(SaveSystem.createDefault(
   const bagBefore = save.equipment.length;
   const gear = EventSystem.buy(save, def, 'equip5', now)!;
   ok(gear.length === 1 && gear[0].equipment?.length === 1 && save.equipment.length === bagBefore + 1 && gear[0].equipment[0].defId.split('-')[1] === '5', 'the ★5 equipment item puts a ★5 piece in the bag');
+}
+
+// ============================================================================ sweeping an event tier
+{
+  const def = EventSystem.get('launch')!;
+  const now = T('2026-11-20T12:00:00');
+  const save = SaveSystem.createDefault();
+  for (const id of ['gauss', 'aria', 'ren']) if (!save.heroes.some((h) => h.heroId === id)) save.heroes.push(createHeroInstance(id, `sw-${id}`, 20));
+  let slot = 0;
+  for (const h of save.heroes.slice(0, 3)) SaveSystem.setDeckSlot(save, save.activeDeck, 'front', slot++, h.id);
+  save.stageProgress = 31;
+  save.stamina = [60, 60];
+  save.staminaAt = now;
+  const target = { kind: 'event' as const, eventId: 'launch', tier: 0 };
+  ok(!SweepSystem.canSweep(save, target, now) && SweepSystem.maxCount(save, target, now) === 0, 'an event tier cannot be swept before it is cleared');
+  EventSystem.clear(save, def, 0, 1, now);
+  ok(SweepSystem.canSweep(save, target, now), 'once it is cleared it can');
+  ok(!SweepSystem.canSweep(save, target, T('2026-12-08T12:00:00')), 'but not once the event has ended');
+  ok(!SweepSystem.canSweep(save, { kind: 'event', eventId: 'launch', tier: 1 }, now), 'and a tier not cleared cannot');
+  ok(SweepSystem.costPer(target) === 10 && SweepSystem.baseCostPer(target) === 10 && SweepSystem.maxCount(save, target, now) === 6, 'a sweep costs the tier stamina (10): six with 60');
+  const before = save.events.launch.tokens;
+  const gemsBefore = save.gems;
+  const result = SweepSystem.run(save, target, 3, () => 0.5, now)!;
+  ok(result && result.count === 3 && result.stamina === 30 && result.playerExp === 30, 'three sweeps cost 30 stamina and pay 30 プレイヤーEXP');
+  ok(result.eventTokens?.amount === 60 && result.eventTokens.token.name === def.token.name && save.events.launch.tokens === before + 60, 'they pay 3 x 20 of the event currency');
+  ok(save.gems - gemsBefore === (result.levelUp?.gems ?? 0), 'a sweep pays no first-clear 魔晶石 (only the player level-up gems, if there are any)');
+  ok(save.events.launch.counts.event_clear === 4, 'every sweep counts as a clear for the missions (1 + 3)');
+  ok(SweepSystem.run(save, target, 99, () => 0.5, now) === null, 'more than the stamina allows is refused');
+  ok(!result.gold.isZero() && result.exp > 0, 'gold and EXP are paid like a fight');
 }
 
 // ============================================================================ saving and loading
