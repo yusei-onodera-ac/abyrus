@@ -6,6 +6,7 @@ import { SaveSystem, type ExpeditionRun } from '../systems/SaveSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
 import { CLASS_LABELS, hex, RARITY_COLORS, type HeroData } from '../types';
 import { Button } from '../ui/Button';
+import { addPlacePicture, expeditionPictureKey } from '../ui/PlacePicture';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { showRewardModal } from '../ui/RewardModal';
 import { buildRewardGrid, tileForReward, tilesForGranted } from '../ui/RewardTiles';
@@ -151,6 +152,7 @@ export class ExpeditionScene extends InboxScene {
     const height = 206;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height, done));
+    addPlacePicture(this, container, expeditionPictureKey(def.id), 6, 6, CARD_WIDTH - 12, 118, 0.5);
 
     container.add(heading(this, PAD + 4, 32, def.name, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const chip = buildChip(this, 0, 32, `${def.hours}時間`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
@@ -221,6 +223,7 @@ export class ExpeditionScene extends InboxScene {
     const height = gridTop + grid.height + 18 + 70 + 18;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
+    addPlacePicture(this, container, expeditionPictureKey(def.id), 6, 6, CARD_WIDTH - 12, 124, open ? 0.5 : 0.72);
 
     container.add(heading(this, PAD + 4, 32, def.name, { fontSize: '28px', color: open ? '#ffe9b8' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const hours = buildChip(this, 0, 32, `${def.hours}時間`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });

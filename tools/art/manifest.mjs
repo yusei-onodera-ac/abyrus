@@ -176,6 +176,51 @@ const finalBoss = [
   },
 ];
 
+
+// ---------------------------------------------------------------------------------------------- 曜日ダンジョン (7) and 遠征 (9)
+// Wide pictures for the cards of those two screens (no characters: the places only).
+const PLACE =
+  'A wide cinematic landscape-format painting of a place in a Japanese mobile fantasy RPG, hand-painted game art, clean detail, rich saturated colours and atmospheric lighting, ' +
+  'the main subject in the horizontal middle band (the top and the bottom of the picture may be cropped away). No characters, no people, no creatures. ' + NO_TEXT;
+const weekdayPlaces = [
+  ['sun', '安息の祭壇: a serene ancient stone altar in a sunlit sacred glade, offerings of softly glowing crystals in every colour (blue, red, gold, violet, green) set around it, warm golden light, drifting petals'],
+  ['mon', '経験の洞窟: a vast glowing cave full of large blue and red experience crystals growing from the walls and floor, a sparkling pool, deep blue and crimson light'],
+  ['tue', '鍛冶の坑道: a mine tunnel with a roaring forge, anvils and hammers, glowing molten metal, ore carts full of ore, stacked steel and gold ingots, orange fire glow and sparks'],
+  ['wed', '技の書庫: an enormous mystical library of towering bookshelves, spell books floating and glowing in pink and magenta light, ladders, candles, magic runes in the air'],
+  ['thu', '位階の聖域: a white-and-blue sanctuary hall with a great glowing wing-shaped crystal orb above an altar, beams of holy light from high windows, floating feathers, violet accents'],
+  ['fri', '黄金の宝物庫: a huge treasure vault overflowing with mountains of gold coins, golden chests, jewelled goblets and gleaming gold bars, dazzling golden light'],
+  ['sat', '修練の闘技場: a stone training arena under open sky with practice dummies, weapon racks, banners and a sandy floor, bright afternoon light, an energetic atmosphere'],
+].map(([id, what]) => ({
+  id: `place_weekday_${id}`,
+  group: 'places',
+  out: `weekday/${id}.jpg`,
+  mode: 'jpg',
+  size: [960, 411],
+  aspect: '21:9',
+  refs: [],
+  prompt: `${PLACE} The place: ${what}.`,
+}));
+const expeditionPlaces = [
+  ['forest-patrol', '森の見回り: a winding forest trail through tall green trees in morning mist, sunbeams, ferns and mossy stones'],
+  ['forest-herbs', '薬草の採取行: deep in an enchanted forest, clusters of glowing medicinal herbs and mushrooms among giant roots, soft green and teal light'],
+  ['waste-caravan', '隊商の護衛: a caravan road through an ash-grey wasteland, covered wagons and pack animals in a line under a huge hazy sun, dry gullies, dust'],
+  ['waste-hunt', '猛獣狩り: a rocky wasteland with enormous claw marks and bones before the dark mouth of a beast lair, red sunset, drifting ash'],
+  ['frost-lab', '廃研究所の調査: a ruined research lab sealed in blue ice, frozen machines, shattered glass tubes, frost-covered instruments, cold blue light'],
+  ['frost-climb', '山嶺の踏破: a narrow trail along a snowy mountain ridge above clouds, glaciers and jagged blue peaks, bright cold sunlight'],
+  ['ruins-dig', '遺跡の発掘: an excavation site in overgrown ancient ruins, scaffolding, lanterns, picks and crates, half-buried carvings, warm lantern glow'],
+  ['ruins-seal', '封印の巡礼: an ancient sealing circle glowing violet on broken stone steps among ruined pillars, creeping red-purple miasma, mysterious light'],
+  ['twilight-guard', '都の治安維持: a ruined twilight city street with barricades and burning torches, broken buildings, a purple-orange dusk sky'],
+].map(([id, what]) => ({
+  id: `place_expedition_${id}`,
+  group: 'places',
+  out: `expedition/${id}.jpg`,
+  mode: 'jpg',
+  size: [960, 411],
+  aspect: '21:9',
+  refs: [],
+  prompt: `${PLACE} The place: ${what}.`,
+}));
+
 // ---------------------------------------------------------------------------------------------- region maps (5)
 const REGION =
   'A very tall narrow portrait landscape painted from a high three-quarter bird\'s-eye view as the backdrop of a mobile RPG stage map: a winding route will be drawn over it later, so keep the whole picture as continuous open ground and scenery from the top to the bottom, with no road, no path, no buildings in the middle. ' +
@@ -612,7 +657,7 @@ const road = [
   prompt: `${ROAD}The paving: ${what}.`,
 }));
 
-export const MANIFEST = [...finalBoss, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
+export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

@@ -12,6 +12,7 @@ import { addHelperRow, canBorrowHelpers, HELPER_ROW_HEIGHT, launchWithHelper, ty
 import { buildRewardGrid, tileForReward } from '../ui/RewardTiles';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading } from '../ui/theme';
+import { addPlacePicture, weekdayPictureKey } from '../ui/PlacePicture';
 import { InboxScene, type InboxCard } from './InboxScene';
 
 const INK = '#1c130a';
@@ -47,6 +48,7 @@ export class WeekdayDungeonScene extends InboxScene {
     const height = 146;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height, true));
+    addPlacePicture(this, container, weekdayPictureKey(this.day), 6, 6, CARD_WIDTH - 12, height - 12, 0.42);
     container.add(caption(this, PAD + 4, 24, `今日は${WEEKDAY_NAMES[this.day]}曜日`, { fontSize: '20px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     container.add(heading(this, PAD + 4, 64, dungeon.name, { fontSize: '34px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     container.add(caption(this, PAD + 4, 108, dungeon.theme, { fontSize: '21px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
