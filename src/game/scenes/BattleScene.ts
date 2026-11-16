@@ -103,6 +103,7 @@ export class BattleScene extends Phaser.Scene {
   private currentStageDef?: StageDef;
   private finalStage?: FinalStageDef;
   private waveIndex = 0;
+  private firstWave = 0;
   private rewardGold = BigNumber.ZERO;
   private rewardExp = 0;
   private rewardSkillEssence = 0;
@@ -111,8 +112,10 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number; helper?: HelperHero }): void {
+  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number; helper?: HelperHero; wave?: number }): void {
     this.helper = data.helper;
+    // Development only (`?battle=150&mode=final&wave=5`): start the final battle at that wave, to look at its last boss.
+    this.firstWave = import.meta.env.DEV && Number.isInteger(data.wave) ? Math.max(0, data.wave as number) : 0;
     this.stageIndex = data.stageIndex ?? 0;
     this.mode = data.mode;
     this.weekdayDay = data.day ?? 0;
@@ -211,8 +214,8 @@ export class BattleScene extends Phaser.Scene {
     this.riseParty();
 
     if (this.mode === 'final' && this.finalStage) {
-      this.waveIndex = 0;
-      const wave = this.finalStage.waves[0];
+      this.waveIndex = Math.min(this.firstWave, this.finalStage.waves.length - 1);
+      const wave = this.finalStage.waves[this.waveIndex];
       const enemyUnits = this.buildEnemyUnits(wave.enemies, wave.difficulty);
       this.engine = new BattleEngine(playerUnits, enemyUnits);
       this.layoutUnits(enemyUnits, false);
@@ -835,6 +838,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private applyProgressionOnVictory(): void {
+    if (this.mode === 'weekday') WeekdayDungeonSystem.markCleared(this.save, this.stageIndex);
     if (this.mode === 'weekday' || this.mode === 'raid') return;
     if (this.mode === 'extra') {
       SaveSystem.clearExtraStage(this.save, this.stageIndex);

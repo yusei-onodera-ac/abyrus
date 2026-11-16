@@ -14,6 +14,9 @@ export const ENEMY_SPACING = 170;
 const BOX_W = 168;
 const BOX_H = 118;
 const BOSS_SCALE = 1.45;
+/** The last boss stands alone on the field, so it is drawn bigger still. */
+const LAST_BOSS_SCALE = 2.4;
+const LAST_BOSS_ART = 'uroboros';
 
 export function enemyArtKey(id: string): string {
   return `enemy_${id}`;
@@ -34,7 +37,7 @@ export function fitEnemyArt(scene: Phaser.Scene, art: string | undefined, isBoss
   const key = art ? enemyArtKey(art) : '';
   if (!key || !scene.textures.exists(key)) return null;
   const frame = scene.textures.getFrame(key);
-  const k = isBoss ? BOSS_SCALE : 1;
+  const k = art === LAST_BOSS_ART ? LAST_BOSS_SCALE : isBoss ? BOSS_SCALE : 1;
   const scale = Math.min((BOX_W * k) / frame.width, (BOX_H * k) / frame.height);
   return { key, width: frame.width * scale, height: frame.height * scale };
 }

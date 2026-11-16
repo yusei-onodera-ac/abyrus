@@ -19,6 +19,15 @@ export const WeekdayDungeonSystem = {
     return save.stageProgress >= getWeekdayTier(tier).needStage;
   },
 
+  /** Whether this tier has been cleared at least once (then it can be swept). */
+  isCleared(save: SaveData, tier: number): boolean {
+    return save.weekdayCleared.includes(tier);
+  },
+
+  markCleared(save: SaveData, tier: number): void {
+    if (!save.weekdayCleared.includes(tier)) save.weekdayCleared.push(tier);
+  },
+
   /** What a clear pays, as the result panel and StageRewardSystem.grant expect it: fixed amounts, no luck. */
   bonus(day: number, tier: number): StageBonus {
     const dungeon = getWeekdayDungeon(day);

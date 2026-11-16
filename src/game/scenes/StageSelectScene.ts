@@ -11,6 +11,8 @@ import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { BackButton } from '../ui/BackButton';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
+import { addSweepRow, showSweepResult, SWEEP_ROW_HEIGHT } from '../ui/SweepRow';
+import { SweepSystem, type SweepTarget } from '../systems/SweepSystem';
 import type { ModalHandle } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
 import { ResourceBar } from '../ui/ResourceBar';
@@ -377,7 +379,10 @@ export class StageSelectScene extends Phaser.Scene {
     const choice: HelperChoice = { helper: null };
     const helpers = canBorrowHelpers(save);
     const chain = stage.kind !== 'final';
-    const extraHeight = (chain ? CHAIN_ROW_HEIGHT : 0) + (helpers ? HELPER_ROW_HEIGHT : 0);
+    // 掃討: a stage cleared before can be swept (no fight, the rewards at once).
+    const target: SweepTarget = { kind: 'quest', stage };
+    const sweep = SweepSystem.canSweep(save, target);
+    const extraHeight = (chain ? CHAIN_ROW_HEIGHT : 0) + (helpers ? HELPER_ROW_HEIGHT : 0) + (sweep ? SWEEP_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
       message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
@@ -395,7 +400,11 @@ export class StageSelectScene extends Phaser.Scene {
                   addChainRow(this, container, top + CHAIN_ROW_HEIGHT / 2, save);
                   top += CHAIN_ROW_HEIGHT;
                 }
-                if (helpers) addHelperRow(this, container, top + HELPER_ROW_HEIGHT / 2, save, choice);
+                if (helpers) {
+                  addHelperRow(this, container, top + HELPER_ROW_HEIGHT / 2, save, choice);
+                  top += HELPER_ROW_HEIGHT;
+                }
+                if (sweep) addSweepRow(this, container, top + SWEEP_ROW_HEIGHT / 2, save, target, (count) => this.sweep(target, count));
               },
             },
       onConfirm: () => {
@@ -405,6 +414,16 @@ export class StageSelectScene extends Phaser.Scene {
         void launchWithHelper(this, save, route, choice.helper);
       },
     });
+  }
+
+  /** 掃討 pressed in the 出撃 popup: the popup closes, the sweep is done and its rewards are shown. */
+  private sweep(target: SweepTarget, count: number): void {
+    const save = this.getSave();
+    this.modal?.close();
+    const result = SweepSystem.run(save, target, count);
+    if (!result) return;
+    SaveSystem.save(save);
+    showSweepResult(this, this.view, result, () => this.scene.restart({ initialTab: this.activeTab }));
   }
 
   private openDialog(opts: ConfirmOptions): void {

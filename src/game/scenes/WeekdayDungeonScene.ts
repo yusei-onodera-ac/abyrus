@@ -6,6 +6,8 @@ import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { Button } from '../ui/Button';
 import { openConfirm, type ConfirmOptions } from '../ui/Dialogs';
+import { addSweepRow, showSweepResult, SWEEP_ROW_HEIGHT } from '../ui/SweepRow';
+import { SweepSystem, type SweepTarget } from '../systems/SweepSystem';
 import { addHelperRow, canBorrowHelpers, HELPER_ROW_HEIGHT, launchWithHelper, type HelperChoice } from '../ui/HelperRow';
 import { buildRewardGrid, tileForReward } from '../ui/RewardTiles';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
@@ -146,18 +148,45 @@ export class WeekdayDungeonScene extends InboxScene {
     // 助っ人: a member's hero can be borrowed for this fight (offered only in a 同盟 that has some).
     const choice: HelperChoice = { helper: null };
     const helpers = canBorrowHelpers(this.save);
+    // 掃討: a tier cleared before can be swept (no fight, the rewards at once).
+    const target: SweepTarget = { kind: 'weekday', day: this.day, tier };
+    const sweep = SweepSystem.canSweep(this.save, target);
+    const extraHeight = (helpers ? HELPER_ROW_HEIGHT : 0) + (sweep ? SWEEP_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
       message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
       confirmLabel: '出撃',
       confirmVariant: 'gold',
-      extra: helpers ? { height: HELPER_ROW_HEIGHT, build: (container, y) => addHelperRow(this, container, y, this.save, choice) } : undefined,
+      extra:
+        extraHeight === 0
+          ? undefined
+          : {
+              height: extraHeight,
+              build: (container, y) => {
+                let top = y - extraHeight / 2;
+                if (helpers) {
+                  addHelperRow(this, container, top + HELPER_ROW_HEIGHT / 2, this.save, choice);
+                  top += HELPER_ROW_HEIGHT;
+                }
+                if (sweep) addSweepRow(this, container, top + SWEEP_ROW_HEIGHT / 2, this.save, target, (count) => this.sweep(target, count));
+              },
+            },
       onConfirm: () => {
         if (!StaminaSystem.spend(this.save, cost)) return;
         SaveSystem.save(this.save);
         void launchWithHelper(this, this.save, { scene: 'Battle', data: { stageIndex: tier, mode: 'weekday', day: this.day } }, choice.helper);
       },
     });
+  }
+
+  /** 掃討 pressed in the 出撃 popup: the popup closes, the sweep is done and its rewards are shown. */
+  private sweep(target: SweepTarget, count: number): void {
+    this.modal?.close();
+    const result = SweepSystem.run(this.save, target, count);
+    if (!result) return;
+    SaveSystem.save(this.save);
+    this.refreshResources();
+    showSweepResult(this, this.scroll, result, () => this.queueRender());
   }
 
   private openDialog(opts: ConfirmOptions): void {

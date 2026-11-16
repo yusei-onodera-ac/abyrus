@@ -178,6 +178,9 @@ export function pickFeral(region: RegionDef, rng: () => number): { name: string;
 }
 
 /** Every picture a region's animals or boss ask for: what BootScene loads. */
+/** The picture of 大狂獣ウロボロス, the last boss of the final battle (public/assets/enemies/uroboros.png). */
+export const FINAL_BOSS_ART = 'uroboros';
+
 export const ENEMY_ART_IDS: string[] = [
-  ...new Set(REGIONS.flatMap((r) => [...r.feralAnimals.map((a) => a.art), r.bossArt]).filter((id): id is string => !!id)),
+  ...new Set([...REGIONS.flatMap((r) => [...r.feralAnimals.map((a) => a.art), r.bossArt]), FINAL_BOSS_ART].filter((id): id is string => !!id)),
 ];

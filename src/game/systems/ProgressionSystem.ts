@@ -1,7 +1,7 @@
 import { BigNumber } from './BigNumber';
 import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
-import { REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
+import { FINAL_BOSS_ART, REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
 import { WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
 import { expToNextLevel } from './LevelCurve';
@@ -235,6 +235,7 @@ export const ProgressionSystem = {
           heroClass: 'mage',
           rarity: 5,
           name: '教授の最終実験体・大狂獣ウロボロス',
+          art: FINAL_BOSS_ART,
           isBoss: true,
         });
       } else {

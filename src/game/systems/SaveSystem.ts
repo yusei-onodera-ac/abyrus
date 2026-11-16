@@ -315,6 +315,8 @@ export interface SaveData {
   supply: { day: string; claimed: string[]; bonus: boolean };
   /** 図鑑 (data/collection.ts): the milestone counts whose reward has been taken. */
   collection: { claimed: number[] };
+  /** 曜日ダンジョン: the tiers (0-3) that have been cleared at least once - only those can be 掃討'd. */
+  weekdayCleared: number[];
   /** 放置報酬: epoch ms it has been piling up from, and today's count of ads watched to speed it. */
   idle: { lastClaimAt: number; adDay: string; adCount: number };
   /** 遠征: one entry per slot (EXPEDITION_SLOTS), null where nothing is out. */
@@ -420,6 +422,7 @@ function restoreInventory(merged: SaveData, parsed: Partial<SaveData>): void {
     claimed: Array.isArray(supply?.claimed) ? [...new Set(supply.claimed.filter((id): id is string => typeof id === 'string' && !!getSupplySlot(id)))] : [],
     bonus: supply?.bonus === true,
   };
+  merged.weekdayCleared = Array.isArray(parsed.weekdayCleared) ? [...new Set(parsed.weekdayCleared.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) < 8))] : [];
   const collection = parsed.collection;
   merged.collection = {
     claimed: Array.isArray(collection?.claimed) ? [...new Set(collection.claimed.filter((n): n is number => Number.isInteger(n) && n > 0))] : [],
@@ -675,6 +678,7 @@ export const SaveSystem = {
       loginBonus: { month: '', claimed: [] },
       supply: { day: '', claimed: [], bonus: false },
       collection: { claimed: [] },
+      weekdayCleared: [],
       idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
       expeditions: { slots: Array.from({ length: EXPEDITION_SLOTS }, () => null) },
       village: defaultVillage(),

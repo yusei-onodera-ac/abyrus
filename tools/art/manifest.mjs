@@ -153,6 +153,29 @@ const battles = [
   prompt: `${BATTLE} The place: ${what}.`,
 }));
 
+
+// ---------------------------------------------------------------------------------------------- the last boss
+// 大狂獣ウロボロス: the strongest captive of the Professor, the climax of the final battle (the region bosses were supplied by hand).
+const finalBoss = [
+  {
+    id: 'enemy_uroboros',
+    group: 'enemies',
+    out: 'enemies/uroboros.png',
+    mode: 'cutout',
+    fit: 'trim',
+    size: [900, 640],
+    aspect: '16:9',
+    refs: ['ref:e_necrodraco.jpg', 'ref:e_kongo.jpg', 'ref:e_garumudo.jpg'],
+    refNote: 'These are the existing boss monsters of the game: match their painting style, line weight, level of detail and the way each is a single huge creature on a plain white page. Do not copy their shapes.',
+    prompt:
+      'A single colossal final-boss monster for a Japanese mobile fantasy RPG, painted by hand in the same style as the reference monsters, on a plain pure white page: ' +
+      'Uroboros, the great feral beast, the ultimate failed experiment of the mad Professor: a monstrous chimera made of many beasts fused together - a lion-maned head, a rhino horn, the shoulders of a bear, the jaws of a wolf, giant eagle-like wings of torn dark feathers - ' +
+      'and its long scaled serpent tail curls around the whole body and bites its own tip, forming a ring (the ouroboros). Cracked purple-red crystalline growths and glowing violet-white veins of crazed energy run across its hide, broken iron shackles and tubes from the laboratory hang from its limbs, ' +
+      'several glowing eyes, steam and violet mist at its feet. A fearsome, majestic, intimidating pose facing the viewer, the biggest and most dangerous creature of the whole game, a dark crimson, violet and black palette with bright glowing accents. ' +
+      'Show the whole creature, fully inside the picture, with empty white space around it. ' + NO_TEXT,
+  },
+];
+
 // ---------------------------------------------------------------------------------------------- region maps (5)
 const REGION =
   'A very tall narrow portrait landscape painted from a high three-quarter bird\'s-eye view as the backdrop of a mobile RPG stage map: a winding route will be drawn over it later, so keep the whole picture as continuous open ground and scenery from the top to the bottom, with no road, no path, no buildings in the middle. ' +
@@ -589,7 +612,7 @@ const road = [
   prompt: `${ROAD}The paving: ${what}.`,
 }));
 
-export const MANIFEST = [...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
+export const MANIFEST = [...finalBoss, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

@@ -72,5 +72,6 @@ export function battleFromUrl(): { scene: string; data: Record<string, unknown> 
   const stageIndex = raw === null ? NaN : Number(raw);
   if (!Number.isInteger(stageIndex) || stageIndex < 0) return null;
   const mode = params.get('mode');
-  return { scene: 'Battle', data: { stageIndex, mode: mode === 'extra' || mode === 'final' ? mode : undefined } };
+  const wave = params.get('wave');
+  return { scene: 'Battle', data: { stageIndex, mode: mode === 'extra' || mode === 'final' ? mode : undefined, wave: wave === null ? undefined : Number(wave) } };
 }
