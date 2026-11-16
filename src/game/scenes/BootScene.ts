@@ -23,6 +23,7 @@ import { GACHA_BANNERS } from '../data/gachaBanners';
 import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
+import { RemoteShopConfig } from '../systems/RemoteShopConfig';
 import { heading, caption, CHROME } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -38,6 +39,10 @@ export class BootScene extends Phaser.Scene {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {});
 
     this.buildLoadingUi();
+
+    // The shop's products and the premium pass's price from the operator's admin (Firestore), read once while the pictures load.
+    // Without Firebase settings, offline or on any failure it does nothing and the static data stays (systems/RemoteShopConfig.ts).
+    void RemoteShopConfig.refresh();
 
     for (const hero of HERO_ROSTER) {
       this.load.image(hero.id, `/assets/characters/${hero.id}.png`);
