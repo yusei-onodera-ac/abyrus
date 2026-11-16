@@ -1,6 +1,10 @@
 import { BigNumber } from './BigNumber';
+import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
+import { FINAL_BOSS_ART, REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
+import { WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
+import { expToNextLevel } from './LevelCurve';
 
 interface ClassBase {
   hp: number;
@@ -17,50 +21,334 @@ const CLASS_BASE: Record<HeroClass, ClassBase> = {
   healer: { hp: 1.0, atk: 0.8, spd: 90, def: 10 },
 };
 
-const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2 };
+const RARITY_STAT_MUL: Record<Rarity, number> = { 1: 1, 2: 1.3, 3: 1.7, 4: 2.3, 5: 3.2, 6: 4.8 };
 
-const ENEMY_CLASSES: HeroClass[] = ['warrior', 'mage', 'archer', 'tank', 'healer'];
-const NAME_P1 = ['零', '虚', '影', '灰', '銀', '黒', '蝕', '綺', '幻', '棄'];
-const NAME_P2 = ['算兵', '演算体', '断片', '残響', '執行者', '番人', '傀儡', '古算'];
+// Exported so InfiniteModeSystem can generate its own continuously-scaling
+// enemy defs from the same class pool instead of duplicating it. It is the
+// generic class pool for every enemy (a region's flavor changes the *name* and
+// picture, not the class spread).
+export const ENEMY_CLASSES: HeroClass[] = ['warrior', 'mage', 'archer', 'tank', 'healer'];
 
 export interface EnemyUnitDef {
   seed: number;
   heroClass: HeroClass;
   rarity: Rarity;
   name: string;
+  /** Picture id (public/assets/enemies/<art>.png); a silhouette is drawn without one. */
+  art?: string;
+  /** Single powerful unit (region Extra dungeon's 6th-stage guardian, the
+   *  final battle's wave climax) rather than rank-and-file - gets a flat
+   *  stat multiplier in computeEnemyStats instead of just a rarity bump. */
+  isBoss?: boolean;
 }
 
 export interface StageDef {
   index: number;
+  regionIndex: number;
+  stageInRegion: number;
   name: string;
   enemies: EnemyUnitDef[];
+  /** Continuous growth-curve input fed into computeEnemyStats/reward
+   *  scaling - see mainDifficulty()'s doc comment for why this is not
+   *  simply `index`. */
+  difficulty: number;
   rewardGold: BigNumber;
   rewardExp: number;
+  /** 技素, spent on raising skill levels (see data/skills.ts). */
+  rewardSkillEssence: number;
+  /** Set on Extra-mode stages only, true on the 6th (region boss) stage. */
+  isBossStage?: boolean;
+}
+
+export interface WaveDef {
+  name: string;
+  difficulty: number;
+  enemies: EnemyUnitDef[];
+}
+
+export interface FinalStageDef {
+  index: number;
+  name: string;
+  waves: WaveDef[];
+  rewardGold: BigNumber;
+  rewardExp: number;
+  rewardSkillEssence: number;
+}
+
+/** Sum of every hero in a deck, for the formation screen's 詳細 popup. */
+export interface DeckTotals {
+  power: BigNumber;
+  maxHp: BigNumber;
+  atk: BigNumber;
+  def: number;
+  spd: number;
+}
+
+export const STAGES_PER_REGION = 30;
+export const MAIN_STAGE_COUNT = REGION_COUNT * STAGES_PER_REGION; // 150
+/** The single finite-wave final battle, one past the last main stage. */
+export const FINAL_STAGE_INDEX = MAIN_STAGE_COUNT; // 150
+export const EXTRA_STAGES_PER_REGION = 6;
+export const EXTRA_STAGE_COUNT = REGION_COUNT * EXTRA_STAGES_PER_REGION; // 30
+
+// --- Difficulty curve -------------------------------------------------------
+// computeEnemyStats()/reward scaling both read as `BigNumber.pow(rate,
+// difficulty)` - exactly the old flat-40-stage campaign's own convention,
+// still shared verbatim with Infinite Mode's own continuous
+// difficultyIndex (see InfiniteModeSystem.ts), so neither that formula nor
+// its exponents change here. What *does* change is what number the quest
+// campaign now feeds into it: the old campaign reached its hardest
+// rank-and-file enemies at stageIndex 39. Feeding the new campaign's raw
+// 0-149 main-stage index into the same curve would blow far past that
+// (150 stages of 13%-per-stage compounding is a different game), so stage
+// index is first mapped onto a "difficulty" value that reaches a ceiling
+// just above the old one by the last main stage - giving 5 regions worth
+// of finer-grained pacing without re-tuning (or discontinuing) the shared
+// formula itself. This mapping is a single continuous function of the
+// global stage index, so there is never a jump or dip at a region
+// boundary - only the enemy name pool and rarity tier (tied to region
+// index, see getStage()) change there, by design, same as the original
+// curve's own per-tier rarity steps.
+//
+// Raised a little (2026-10-29): the first stage now starts at difficulty 0.3
+// instead of 0, and the last main stage ends at 47.5 instead of 46 - about +4%
+// enemy HP/attack at the start, growing to about +20% at the end. (Enemy HP and
+// attack both compound, so even this much is felt: a party that beat a stage
+// nine times in ten before now wins roughly three in four to nine in ten.)
+const MAIN_DIFFICULTY_START = 0.3;
+const MAIN_DIFFICULTY_END = 47.5;
+
+function mainDifficulty(index: number): number {
+  return MAIN_DIFFICULTY_START + (index / (MAIN_STAGE_COUNT - 1)) * (MAIN_DIFFICULTY_END - MAIN_DIFFICULTY_START);
+}
+
+/** Final battle's waves continue just past the main campaign's ceiling,
+ *  stepping up slightly wave-to-wave so the fight itself has a visible
+ *  escalation leading into its climax. */
+function finalDifficulty(waveOffset: number): number {
+  return MAIN_DIFFICULTY_END + 2 + waveOffset;
+}
+
+/** Extra is explicitly post-game: it starts beyond the final battle and
+ *  keeps climbing across its own 30 stages, so "strongest feral of each
+ *  region" is a genuine capstone challenge rather than a victory lap. */
+function extraDifficulty(extraIndex: number): number {
+  return MAIN_DIFFICULTY_END + 4 + extraIndex * 1.4;
+}
+
+// --- Rewards tied to the level the stage asks for ---------------------------------
+// Measured with the battle engine (a mid-strength party of ★3-4 heroes with
+// auto skills, 80% wins): stages 1-30 need nothing, then the level a stage asks
+// for rises by about 0.58 a stage, to about 84 at stage 150. The EXP a clear
+// pays is set from that, so that growth keeps up with the difficulty instead of
+// being a separate guess.
+const LEVEL_PER_STAGE = 0.58;
+const LEVEL_AT_ZERO = -6;
+/** Share of one level's EXP, times the levels asked per stage, that a clear pays each hero in the party; the rest comes from replays, drops and idle rewards. */
+const EXP_REWARD_SHARE = 0.5;
+
+/** The hero level that main stage `index` (0-based) asks for, as measured. */
+export function levelAskedByStage(index: number): number {
+  return Math.max(1, Math.min(99, LEVEL_PER_STAGE * (index + 1) + LEVEL_AT_ZERO));
+}
+
+/** EXP each party hero gets for clearing a stage that asks for `level`. */
+export function expRewardForLevel(level: number): number {
+  const clamped = Math.max(1, Math.min(99, Math.round(level)));
+  return Math.max(1, Math.round(EXP_REWARD_SHARE * LEVEL_PER_STAGE * expToNextLevel(clamped)));
+}
+
+/** Enemy squad size: grows with the global stage index (never reset per
+ *  region) so it is monotonic with no boundary discontinuity, same
+ *  reasoning as the difficulty curve above. Caps at 5 - the front-3/back-2
+ *  layout BattleScene already lays every stage's enemies out on. */
+function enemyCountForIndex(index: number): number {
+  return Math.min(5, 1 + Math.floor(index / 10));
+}
+
+/** A rank-and-file enemy of `region` (its name and picture come from the region's animals). */
+export function rollEnemy(region: RegionDef, rarity: Rarity, rng: () => number): EnemyUnitDef {
+  return {
+    seed: Math.floor(rng() * 2 ** 31),
+    heroClass: ENEMY_CLASSES[Math.floor(rng() * ENEMY_CLASSES.length)],
+    rarity,
+    ...pickFeral(region, rng),
+  };
 }
 
 export const ProgressionSystem = {
-  STAGE_COUNT: 40,
+  /** Kept for any external reference to "how many main stages exist" -
+   *  equal to MAIN_STAGE_COUNT (the final battle and Extra are addressed
+   *  through getFinalStage()/getExtraStage() instead, not this count). */
+  STAGE_COUNT: MAIN_STAGE_COUNT,
 
-  /** Stages are derived purely from their index, so they are stable across reloads. */
+  /** Main-campaign stage 0..MAIN_STAGE_COUNT-1. Derived purely from its
+   *  index, so stages are stable across reloads. Each region's 30 stages
+   *  share that region's rarity tier (tier = regionIndex + 1) and feral
+   *  name pool; only enemy count and the continuous difficulty curve vary
+   *  within a region. */
   getStage(index: number): StageDef {
+    const region = getRegion(Math.floor(index / STAGES_PER_REGION));
+    const stageInRegion = index % STAGES_PER_REGION;
     const rng = mulberry32(90210 + index * 131);
-    const enemyCount = Math.min(5, 1 + Math.floor(index / 4));
-    const tierRarity = Math.min(5, 1 + Math.floor(index / 8)) as Rarity;
+    const enemyCount = enemyCountForIndex(index);
+    const tierRarity = (region.index + 1) as Rarity;
+    const difficulty = mainDifficulty(index);
+
     const enemies: EnemyUnitDef[] = [];
     for (let i = 0; i < enemyCount; i++) {
-      enemies.push({
-        seed: Math.floor(rng() * 2 ** 31),
-        heroClass: ENEMY_CLASSES[Math.floor(rng() * ENEMY_CLASSES.length)],
-        rarity: tierRarity,
-        name: NAME_P1[Math.floor(rng() * NAME_P1.length)] + NAME_P2[Math.floor(rng() * NAME_P2.length)],
-      });
+      enemies.push(rollEnemy(region, tierRarity, rng));
     }
+
     return {
       index,
-      name: `第${index + 1}層`,
+      regionIndex: region.index,
+      stageInRegion,
+      name: `${region.name} 第${stageInRegion + 1}層`,
       enemies,
-      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, index)),
-      rewardExp: Math.round(25 * Math.pow(1.11, index)),
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
+      rewardExp: expRewardForLevel(levelAskedByStage(index)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
+    };
+  },
+
+  /** The single finite-wave final battle at the top of the 狂化の塔: a
+   *  fixed, ordered list of waves (never endless, unlike InfiniteRunEngine)
+   *  rotating through every region's feral flavor before climaxing in one
+   *  boss-tier specimen - the Professor releasing his strongest captive
+   *  rather than fighting himself, per the story brief. */
+  getFinalStage(): FinalStageDef {
+    const rng = mulberry32(424242);
+    const waveCount = 6;
+    const waves: WaveDef[] = [];
+
+    for (let w = 0; w < waveCount; w++) {
+      const isClimax = w === waveCount - 1;
+      const region = getRegion(w % REGION_COUNT);
+      const difficulty = finalDifficulty(w * 0.6);
+      const enemies: EnemyUnitDef[] = [];
+
+      if (isClimax) {
+        enemies.push({
+          seed: Math.floor(rng() * 2 ** 31),
+          heroClass: 'mage',
+          rarity: 5,
+          name: '教授の最終実験体・大狂獣ウロボロス',
+          art: FINAL_BOSS_ART,
+          isBoss: true,
+        });
+      } else {
+        const enemyCount = Math.min(5, 3 + w);
+        for (let i = 0; i < enemyCount; i++) {
+          enemies.push(rollEnemy(region, 5, rng));
+        }
+      }
+
+      waves.push({
+        name: isClimax ? '最終波 ― 大狂獣ウロボロス' : `第${w + 1}波 ― ${region.name}の狂獣`,
+        difficulty,
+        enemies,
+      });
+    }
+
+    const rewardDifficulty = finalDifficulty(waveCount);
+    return {
+      index: FINAL_STAGE_INDEX,
+      name: '狂化の塔 最奥決戦',
+      waves,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, rewardDifficulty)),
+      // The final battle pays three times the last main stage.
+      rewardExp: expRewardForLevel(levelAskedByStage(MAIN_STAGE_COUNT - 1)) * 3,
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, rewardDifficulty)),
+    };
+  },
+
+  /** Extra (野に放たれた狂獣), unlocked only after the ending is seen: 5
+   *  regions x 6 stages (index 0..EXTRA_STAGE_COUNT-1), the 6th of each
+   *  group a solo fight against that region's named boss. A separate
+   *  index space from the main campaign (see SaveSystem.extraProgress),
+   *  harder than anything in the main campaign or final battle. */
+  getExtraStage(index: number): StageDef {
+    const region = getRegion(Math.floor(index / EXTRA_STAGES_PER_REGION));
+    const stageInRegion = index % EXTRA_STAGES_PER_REGION;
+    const isBossStage = stageInRegion === EXTRA_STAGES_PER_REGION - 1;
+    const rng = mulberry32(777000 + index * 97);
+    const difficulty = extraDifficulty(index);
+
+    const enemies: EnemyUnitDef[] = isBossStage
+      ? [
+          {
+            seed: Math.floor(rng() * 2 ** 31),
+            heroClass: region.bossClass,
+            rarity: 5,
+            name: region.bossName,
+            art: region.bossArt,
+            isBoss: true,
+          },
+        ]
+      : Array.from({ length: 5 }, () => rollEnemy(region, 5, rng));
+
+    return {
+      index,
+      regionIndex: region.index,
+      stageInRegion,
+      name: isBossStage ? `${region.name}(特別) ${region.bossName}` : `${region.name}(特別) 第${stageInRegion + 1}層`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
+      // Extra goes on past the main campaign: each stage counts as four stages further on.
+      rewardExp: expRewardForLevel(levelAskedByStage(MAIN_STAGE_COUNT + index * 4)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
+      isBossStage,
+    };
+  },
+
+  /** 曜日ダンジョン (data/weekdayDungeons.ts): the day's dungeon at `tier` (0 = 初級 ... 3 = 超級). Its enemies, region and
+   *  gold / EXP are set like the main stage the tier names (`likeStage`); the day then changes the gold and 技素. It
+   *  is no stage of the campaign: `index` is only the tier. */
+  getWeekdayStage(day: number, tier: number): StageDef {
+    const dungeon = getWeekdayDungeon(day);
+    const t = getWeekdayTier(tier);
+    const tierIndex = WEEKDAY_TIERS.indexOf(t);
+    const region = getRegion(Math.floor(t.likeStage / STAGES_PER_REGION));
+    // A tier with its own fixed difficulty (超級, tuned against a fixed squad) has the same enemies every day of the week.
+    const rng = mulberry32(31000 + (t.difficulty === undefined ? dungeon.day * 53 : 0) + tierIndex * 7);
+    const difficulty = t.difficulty ?? mainDifficulty(t.likeStage);
+    const count = Math.max(3, enemyCountForIndex(t.likeStage));
+    const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
+    return {
+      index: tierIndex,
+      regionIndex: region.index,
+      stageInRegion: t.likeStage % STAGES_PER_REGION,
+      name: `${WEEKDAY_NAMES[dungeon.day]}曜 ${dungeon.name} ${t.name}`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(dungeon.goldMul),
+      rewardExp: expRewardForLevel(t.expLevel ?? levelAskedByStage(t.likeStage)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)) + (dungeon.skillEssence[tierIndex] ?? 0),
+    };
+  },
+
+  /** 襲撃 (the village): a pack of beasts of the region `likeStage` lies in, as strong as that main stage. `seed` varies the
+   *  pack from one 襲撃 to the next. It is no stage of the campaign: `index` is only the main stage it is set like. */
+  getRaidStage(likeStage: number, seed = 0): StageDef {
+    const index = Math.max(0, Math.min(MAIN_STAGE_COUNT - 1, Math.floor(likeStage)));
+    const region = getRegion(Math.floor(index / STAGES_PER_REGION));
+    const rng = mulberry32(47000 + index * 13 + (Math.abs(Math.floor(seed)) % 997));
+    const difficulty = mainDifficulty(index);
+    const count = Math.max(3, enemyCountForIndex(index));
+    const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
+    return {
+      index,
+      regionIndex: region.index,
+      stageInRegion: index % STAGES_PER_REGION,
+      name: `襲撃！ ${region.name}の獣の群れ`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
+      rewardExp: expRewardForLevel(levelAskedByStage(index)),
+      rewardSkillEssence: 0,
     };
   },
 
@@ -68,26 +356,56 @@ export const ProgressionSystem = {
     const base = CLASS_BASE[hero.heroClass];
     const rarityMul = RARITY_STAT_MUL[hero.rarity];
     const growth = BigNumber.pow(1.07, hero.level - 1);
-    return {
-      maxHp: BigNumber.from(60 * base.hp * rarityMul).mul(growth),
-      atk: BigNumber.from(12 * base.atk * rarityMul).mul(growth),
-      spd: base.spd,
-      def: base.def + hero.rarity * 2,
-      critRate: 0.1 + hero.rarity * 0.02,
-      critMul: 1.8,
-    };
+    return applyGear(
+      {
+        maxHp: BigNumber.from(60 * base.hp * rarityMul).mul(growth),
+        atk: BigNumber.from(12 * base.atk * rarityMul).mul(growth),
+        spd: base.spd,
+        def: base.def + hero.rarity * 2,
+        critRate: 0.1 + hero.rarity * 0.02,
+        critMul: 1.8,
+      },
+      hero.gear,
+    );
   },
 
+  /** 総合力: one number for comparing heroes and decks at a glance. Display
+   *  only - nothing in combat reads it. */
+  computeHeroPower(hero: HeroData): BigNumber {
+    const stats = ProgressionSystem.computeHeroStats(hero);
+    return stats.maxHp.add(stats.atk.mul(5));
+  },
+
+  computeDeckTotals(heroes: HeroData[]): DeckTotals {
+    const totals: DeckTotals = { power: BigNumber.ZERO, maxHp: BigNumber.ZERO, atk: BigNumber.ZERO, def: 0, spd: 0 };
+    for (const hero of heroes) {
+      const stats = ProgressionSystem.computeHeroStats(hero);
+      totals.power = totals.power.add(ProgressionSystem.computeHeroPower(hero));
+      totals.maxHp = totals.maxHp.add(stats.maxHp);
+      totals.atk = totals.atk.add(stats.atk);
+      totals.def += stats.def;
+      totals.spd += stats.spd;
+    }
+    return totals;
+  },
+
+  /** `stageIndex` here is really "difficulty": a continuous growth-curve
+   *  input, not necessarily a literal stage index - Infinite Mode feeds it
+   *  its own difficultyIndex, quest stages feed it StageDef.difficulty /
+   *  WaveDef.difficulty. isBoss applies a flat multiplier on top of the
+   *  normal rarity tier, for the handful of solo boss-tier fights (region
+   *  Extra guardians, the final battle's climax). */
   computeEnemyStats(def: EnemyUnitDef, stageIndex: number): CombatStats {
     const base = CLASS_BASE[def.heroClass];
     const rarityMul = RARITY_STAT_MUL[def.rarity];
+    const bossMul = def.isBoss ? 2.2 : 1;
     const growth = BigNumber.pow(1.13, stageIndex);
     return {
-      maxHp: BigNumber.from(50 * base.hp * rarityMul).mul(growth),
-      atk: BigNumber.from(9 * base.atk * rarityMul).mul(growth),
+      maxHp: BigNumber.from(50 * base.hp * rarityMul * bossMul).mul(growth),
+      atk: BigNumber.from(9 * base.atk * rarityMul * bossMul).mul(growth),
       spd: base.spd * 0.9,
-      def: base.def + stageIndex,
-      critRate: 0.08,
+      def: base.def + stageIndex + (def.isBoss ? 6 : 0),
+      critRate: 0.08 + (def.isBoss ? 0.04 : 0),
       critMul: 1.6,
     };
   },

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Local Firebase config for the Infinite Mode leaderboard - never commit.
+# See .env.example for what's needed and BACKEND_SETUP.md for how to get it.
+.env
+.env.local
+.env.*.local
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -22,3 +28,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Art generation (tools/art): raw model output and the review copies are not kept in git
+tools/art/raw/
+tools/art/out/
+tools/art/refs/
+tools/audio/raw/
+tools/audio/out/
+tools/tests/.out/

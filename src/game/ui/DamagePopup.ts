@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { BigNumber } from '../systems/BigNumber';
+import { COLORS } from './theme';
 
 interface PoolEntry {
   text: Phaser.GameObjects.Text;
@@ -33,36 +34,69 @@ export class DamagePopupPool {
     }
   }
 
-  pop(x: number, y: number, amount: BigNumber, opts: { crit?: boolean; heal?: boolean } = {}): void {
+  /** "CRITICAL!" over a critical number: pops in big, shakes, and is gone with it. */
+  private critLabel(x: number, y: number): void {
+    const label = this.scene.add
+      .text(x, y - 46, 'CRITICAL!', { fontFamily: 'Arial Black, sans-serif', fontSize: '24px', color: '#ffffff', stroke: '#b3220f', strokeThickness: 7 })
+      .setOrigin(0.5)
+      .setDepth(1001)
+      .setScale(0.3)
+      .setRotation(Phaser.Math.DegToRad(-8));
+    this.scene.tweens.add({ targets: label, scale: 1.25, rotation: 0, duration: 130, ease: 'Back.easeOut' });
+    this.scene.tweens.add({ targets: label, y: label.y - 36, alpha: 0, delay: 380, duration: 340, onComplete: () => label.destroy() });
+  }
+
+  /** `label` shows that text instead of the number (e.g. 無敵 on a blocked hit). */
+  pop(x: number, y: number, amount: BigNumber, opts: { crit?: boolean; heal?: boolean; label?: string } = {}): void {
     const entry = this.pool.find((e) => !e.inUse) ?? this.pool[0];
     entry.inUse = true;
     const { text } = entry;
     const crit = !!opts.crit;
+    const heal = !!opts.heal;
+    if (crit && !opts.label) this.critLabel(x, y);
 
-    text.setText((opts.heal ? '+' : '') + amount.toString());
-    text.setColor(opts.heal ? '#7cfc9a' : crit ? '#ffd23f' : '#ffffff');
-    text.setFontSize(crit ? 38 : 24);
+    text.setText(opts.label ?? (heal ? '+' : '') + amount.toString());
+    text.setColor(opts.label ? '#9fe0ff' : heal ? Phaser.Display.Color.ValueToColor(COLORS.heal).rgba : crit ? Phaser.Display.Color.ValueToColor(COLORS.gold).rgba : '#ffffff');
+    text.setStroke(crit ? '#b3220f' : heal ? '#0f5a2a' : '#1c130a', crit ? 9 : 6);
+    text.setFontSize(crit ? 58 : 32);
     text.setPosition(x + Phaser.Math.Between(-10, 10), y);
-    text.setScale(crit ? 0.4 : 0.6);
+    text.setRotation(Phaser.Math.DegToRad(Phaser.Math.Between(-6, 6)));
+    this.scene.tweens.killTweensOf(text);
+
+    // Squash-and-stretch pop: land wide and flat, then snap up to full size
+    // with an elastic overshoot before drifting up and fading - reads as a
+    // much punchier hit than a flat scale tween.
+    text.setScale(crit ? 0.4 : 0.7, crit ? 0.2 : 0.4);
     text.setAlpha(1);
     text.setVisible(true);
 
     this.scene.tweens.add({
       targets: text,
-      y: y - (crit ? 70 : 50),
-      scale: crit ? 1.3 : 1,
-      duration: 160,
-      ease: 'Back.easeOut',
+      scaleX: crit ? 1.7 : 1.2,
+      scaleY: crit ? 1.7 : 1.2,
+      duration: 100,
+      ease: 'Quad.easeOut',
       onComplete: () => {
         this.scene.tweens.add({
           targets: text,
-          alpha: 0,
-          y: text.y - 20,
-          delay: 260,
-          duration: 300,
+          scaleX: crit ? 1.2 : 1,
+          scaleY: crit ? 1.2 : 1,
+          y: y - (crit ? 96 : 64),
+          rotation: 0,
+          duration: 180,
+          ease: 'Back.easeOut',
           onComplete: () => {
-            entry.inUse = false;
-            text.setVisible(false);
+            this.scene.tweens.add({
+              targets: text,
+              alpha: 0,
+              y: text.y - 22,
+              delay: 250,
+              duration: 320,
+              onComplete: () => {
+                entry.inUse = false;
+                text.setVisible(false);
+              },
+            });
           },
         });
       },

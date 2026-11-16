@@ -3,6 +3,12 @@ import { RARITY_COLORS, type Rarity } from '../types';
 
 const AURA_TEXTURE_KEY = 'fx_spark';
 
+/** The scale a sprite rests at (set when its view is made): tweens that swell or squash it
+ *  go to and from this, so two of them overlapping cannot leave it stuck at the wrong size. */
+function baseScaleOf(sprite: Phaser.GameObjects.Sprite): number {
+  return (sprite.getData('baseScale') as number | undefined) ?? sprite.scaleX;
+}
+
 /**
  * Owns all per-sprite visual flair: idle bob, aura particles, attack lunge,
  * hit flash, crit camera shake, and death fade. Particle emitters are
@@ -44,7 +50,8 @@ export class AnimationController {
       alpha: { start: 0.7, end: 0 },
       lifespan: 800,
       frequency: Math.max(60, 260 - rarity * 45),
-      tint: color,
+      // ★6: gold, magenta, cyan and violet sparks instead of one colour.
+      tint: rarity >= 6 ? [0xffd23f, 0xff4fd8, 0x6be3ff, 0xa97bff] : color,
       blendMode: 'ADD',
       follow: sprite,
       followOffset: { x: 0, y: 20 },
@@ -63,26 +70,82 @@ export class AnimationController {
     });
   }
 
-  hitFlash(sprite: Phaser.GameObjects.Sprite, crit: boolean): void {
-    sprite.setTintFill(crit ? 0xffffff : 0xff6666);
-    this.scene.time.delayedCall(crit ? 140 : 90, () => sprite.clearTint());
-    const baseScale = sprite.scaleX;
+  /** The attacker darts a good way towards its target, swelling as it goes, and snaps back. */
+  lunge(sprite: Phaser.GameObjects.Sprite, target: { x: number; y: number }, power = 0.28): void {
+    const dx = (target.x - sprite.x) * power;
+    const dy = (target.y - sprite.y) * power;
+    const base = baseScaleOf(sprite);
     this.scene.tweens.add({
       targets: sprite,
-      scaleX: baseScale * (crit ? 0.82 : 0.92),
-      scaleY: baseScale * (crit ? 0.82 : 0.92),
+      x: sprite.x + dx,
+      y: sprite.y + dy,
+      scaleX: base * 1.14,
+      scaleY: base * 1.14,
+      duration: 95,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
+  }
+
+  /** The struck one is knocked back away from the attacker and shudders. */
+  knockback(sprite: Phaser.GameObjects.Sprite, from: { x: number; y: number }, power: number): void {
+    const dx = sprite.x - from.x;
+    const dy = sprite.y - from.y;
+    const len = Math.max(1, Math.hypot(dx, dy));
+    this.scene.tweens.add({
+      targets: sprite,
+      x: sprite.x + (dx / len) * power,
+      y: sprite.y + (dy / len) * power,
       duration: 70,
+      yoyo: true,
+      ease: 'Quad.easeOut',
+    });
+  }
+
+  hitFlash(sprite: Phaser.GameObjects.Sprite, crit: boolean): void {
+    sprite.setTintFill(crit ? 0xffffff : 0xff6666);
+    this.scene.time.delayedCall(crit ? 170 : 100, () => sprite.clearTint());
+    const baseScale = baseScaleOf(sprite);
+    this.scene.tweens.add({
+      targets: sprite,
+      scaleX: baseScale * (crit ? 0.74 : 0.88),
+      scaleY: baseScale * (crit ? 0.74 : 0.88),
+      duration: 80,
       yoyo: true,
     });
   }
 
+  /** Generic non-damage status pulse (heal/buff/debuff/stun) - same
+   *  tint-and-clear beat as hitFlash but without the hit-impact squash,
+   *  since nothing was struck. */
+  statusFlash(sprite: Phaser.GameObjects.Sprite, color: number): void {
+    sprite.setTintFill(color);
+    this.scene.time.delayedCall(180, () => sprite.clearTint());
+  }
+
   death(sprite: Phaser.GameObjects.Sprite, onComplete: () => void): void {
+    // A white flash, a last swell, then it spins away and fades.
+    sprite.setTintFill(0xffffff);
+    const base = baseScaleOf(sprite);
     this.scene.tweens.add({
       targets: sprite,
-      alpha: 0,
-      y: sprite.y + 20,
-      duration: 400,
-      onComplete,
+      scaleX: base * 1.25,
+      scaleY: base * 1.25,
+      duration: 110,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.scene.tweens.add({
+          targets: sprite,
+          alpha: 0,
+          scaleX: base * 0.4,
+          scaleY: base * 0.4,
+          angle: sprite.angle + Phaser.Math.Between(-35, 35),
+          y: sprite.y - 14,
+          duration: 380,
+          ease: 'Cubic.easeIn',
+          onComplete,
+        });
+      },
     });
   }
 
