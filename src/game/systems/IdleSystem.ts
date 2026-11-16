@@ -25,6 +25,7 @@ import { MAIN_STAGE_COUNT, STAGES_PER_REGION, ProgressionSystem, levelAskedBySta
 import { expToNextLevel } from './LevelCurve';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import { recordMission } from './MissionProgress';
+import { CampaignSystem } from './CampaignSystem';
 import { periodKey } from './ShopSystem';
 import { incomeMultiplier, materialRates } from './VillageIncome';
 import { VillageQuests } from './VillageQuests';
@@ -105,13 +106,18 @@ export const IdleSystem = {
     const level = Math.max(IDLE_EXP_MIN_LEVEL, Math.round(levelAskedByStage(stageIndex)));
     const expPerHour = IDLE_EXP_LEVELS_PER_HOUR * expToNextLevel(level);
     for (const { item, share } of IDLE_EXP_SPLIT[region] ?? []) items[item] += (expPerHour * share) / (ITEMS[item].exp ?? 1);
+    // 放置報酬2倍ウィーク (data/schedule.ts): everything that piles up, twice.
+    const boost = CampaignSystem.mul('idle', now);
+    for (const id of Object.keys(items) as ItemId[]) items[id] *= boost;
+    const materials = this.materialsPerHour(save, now);
+    for (const { id } of VILLAGE_MATERIALS) materials[id] *= boost;
     return {
       // (the 同盟's bonus on top of the village's 売上倍率; the village's prices are counted in the base rate, so they do not move)
-      gold: this.baseGoldPerHour(save).mul(incomeMultiplier(save, now) * (1 + allianceIdleGoldBonus(save))),
-      skillEssence: stage.rewardSkillEssence * IDLE_ESSENCE_CLEARS_PER_HOUR,
-      phaseMaterials: IDLE_PHASE_PER_HOUR,
+      gold: this.baseGoldPerHour(save).mul(incomeMultiplier(save, now) * (1 + allianceIdleGoldBonus(save)) * boost),
+      skillEssence: stage.rewardSkillEssence * IDLE_ESSENCE_CLEARS_PER_HOUR * boost,
+      phaseMaterials: IDLE_PHASE_PER_HOUR * boost,
       items,
-      materials: this.materialsPerHour(save, now),
+      materials,
     };
   },
 

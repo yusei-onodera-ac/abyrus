@@ -7,13 +7,19 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node tools/tests/run.mjs"
+    "test": "node tools/tests/run.mjs",
+    "schedule:doc": "node tools/schedule/export.mjs",
+    "ios:sync": "npm run build && cap sync ios",
+    "ios:open": "cap open ios"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.6.2",
     "typescript": "~6.0.3",
     "vite": "^8.3.4"
   },
   "dependencies": {
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
     "firebase": "^13.1.0",
     "phaser": "^3.90.0"
   }

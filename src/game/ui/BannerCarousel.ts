@@ -11,8 +11,8 @@ const TAP_SLOP = 10;
 const SWIPE_FRACTION = 0.2;
 const FLICK_SPEED = 0.6; // px per ms
 
-function bannerKey(id: string): string {
-  return `banner_${id}`;
+function bannerKey(entry: BannerEntry): string {
+  return entry.textureKey ?? `banner_${entry.id}`;
 }
 
 /** Queues every banner's image for loading. Call once from
@@ -21,7 +21,7 @@ function bannerKey(id: string): string {
  *  rule every other illustrated piece of chrome in this game follows. */
 export function preloadBanners(scene: Phaser.Scene, banners: BannerEntry[]): void {
   for (const b of banners) {
-    scene.load.image(bannerKey(b.id), `/assets/banners/${b.image}`);
+    if (b.image) scene.load.image(bannerKey(b), `/assets/banners/${b.image}`);
   }
 }
 
@@ -30,7 +30,7 @@ export function preloadBanners(scene: Phaser.Scene, banners: BannerEntry[]): voi
  *  trims any overflow. */
 function buildPage(scene: Phaser.Scene, entry: BannerEntry, w: number, h: number): Phaser.GameObjects.Container {
   const page = scene.add.container(0, 0);
-  const key = bannerKey(entry.id);
+  const key = bannerKey(entry);
   if (scene.textures.exists(key)) {
     const frame = scene.textures.get(key).getSourceImage();
     const scale = Math.max(w / frame.width, h / frame.height);
@@ -50,8 +50,10 @@ function buildPage(scene: Phaser.Scene, entry: BannerEntry, w: number, h: number
  *
  *  Three cells (previous / current / next) are laid side by side and the
  *  whole strip moves, so wrapping works even with just two banners. */
-export function buildBannerCarousel(scene: Phaser.Scene, x: number, y: number, banners: BannerEntry[], w: number, h: number): Phaser.GameObjects.Container {
+export function buildBannerCarousel(scene: Phaser.Scene, x: number, y: number, allBanners: BannerEntry[], w: number, h: number): Phaser.GameObjects.Container {
   const root = scene.add.container(x, y);
+  // A banner that names a picture loaded elsewhere is left out when that picture is not there (no "準備中" cards for a calendar entry).
+  const banners = allBanners.filter((b) => !b.textureKey || b.image || scene.textures.exists(b.textureKey));
   if (banners.length === 0) return root;
   const n = banners.length;
 
@@ -189,7 +191,7 @@ export function buildBannerCarousel(scene: Phaser.Scene, x: number, y: number, b
     if (!moved) {
       const inside = pointer.x >= x && pointer.x <= x + w && pointer.y >= y && pointer.y <= y + h;
       const target = banners[index].target;
-      if (inside && target) scene.scene.start(target);
+      if (inside && target) scene.scene.start(target, banners[index].targetData);
       return;
     }
     if (n < 2) return;

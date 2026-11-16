@@ -19,13 +19,22 @@ const STEPS: { count: number; rewards: Reward[] }[] = [
   { count: 50, rewards: [{ type: 'gems', amount: 250 }, { type: 'phaseMaterials', amount: 4 }] },
   { count: 60, rewards: [{ type: 'gems', amount: 300 }, { type: 'item', item: 'exp_xl', amount: 2 }] },
   { count: 70, rewards: [{ type: 'gems', amount: 400 }, { type: 'phaseMaterials', amount: 6 }, { type: 'skillEssence', amount: 600 }] },
+  // the roster doubled (81 -> 161): more steps on the way
+  { count: 80, rewards: [{ type: 'gems', amount: 300 }, { type: 'item', item: 'exp_xl', amount: 3 }] },
+  { count: 90, rewards: [{ type: 'gems', amount: 350 }, { type: 'phaseMaterials', amount: 8 }] },
+  { count: 100, rewards: [{ type: 'gems', amount: 500 }, { type: 'skillEssence', amount: 1000 }, { type: 'item', item: 'exp_xl', amount: 3 }] },
+  { count: 110, rewards: [{ type: 'gems', amount: 400 }, { type: 'phaseMaterials', amount: 8 }] },
+  { count: 120, rewards: [{ type: 'gems', amount: 450 }, { type: 'item', item: 'exp_xl', amount: 3 }] },
+  { count: 130, rewards: [{ type: 'gems', amount: 500 }, { type: 'skillEssence', amount: 1200 }] },
+  { count: 140, rewards: [{ type: 'gems', amount: 550 }, { type: 'phaseMaterials', amount: 10 }] },
+  { count: 150, rewards: [{ type: 'gems', amount: 600 }, { type: 'item', item: 'exp_xl', amount: 5 }] },
 ];
 
 /** The reward for holding every character in the roster. */
 const COMPLETE: Reward[] = [
-  { type: 'gems', amount: 1000 },
-  { type: 'phaseMaterials', amount: 15 },
-  { type: 'item', item: 'exp_xl', amount: 5 },
+  { type: 'gems', amount: 2000 },
+  { type: 'phaseMaterials', amount: 30 },
+  { type: 'item', item: 'exp_xl', amount: 10 },
 ];
 
 /** The milestones in order; the counts above the roster's size are left out and the complete-the-book one comes last. */

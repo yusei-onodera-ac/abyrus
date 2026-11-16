@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { CharacterGenerator } from '../characters/CharacterGenerator';
+import { bustKey } from '../characters/HeroArt';
 import { hex, RARITY_COLORS, type HeroData } from '../types';
 import { addRainbowFrame } from './Rainbow';
 import { CHROME } from './theme';
@@ -136,6 +137,10 @@ export class HeroSlot extends Phaser.GameObjects.Container {
  *  portrait when that hero has no art yet. Centered on the slot's origin. */
 function addPortrait(scene: Phaser.Scene, hero: HeroData, generator: CharacterGenerator, size: number): Phaser.GameObjects.Image {
   const inner = size - 8;
+  // The head-and-chest square, made offline from the illustration (tools/art/make_thumbs.py): every character has one in memory.
+  if (hero.heroId && scene.textures.exists(bustKey(hero.heroId))) {
+    return scene.add.image(0, 0, bustKey(hero.heroId)).setDisplaySize(inner, inner);
+  }
   if (hero.heroId && scene.textures.exists(hero.heroId)) {
     const frame = scene.textures.get(hero.heroId).getSourceImage();
     const side = frame.width * BUST_SIDE;

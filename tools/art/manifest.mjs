@@ -10,6 +10,8 @@
 //   prompt  the whole instruction; refs = existing pictures to copy the painting style from; refPrev = the id of the picture
 //           that this one is the "next level" of (its raw picture is passed as a reference when it exists)
 
+import { NEW_CHARACTERS } from './newCharacters.mjs';
+
 const NO_TEXT = 'No text of any kind: no letters, no characters, no captions, no signs with writing, no logos, no watermark, no user interface.';
 
 // ---------------------------------------------------------------------------------------------- items (3 materials)
@@ -90,7 +92,7 @@ const gear = [
 // ---------------------------------------------------------------------------------------------- gacha banners (4)
 const BANNER =
   'A wide promotional banner picture for a Japanese mobile fantasy RPG gacha screen, painted by hand in a rich, glossy anime-game style with strong lighting, glowing particles and a sense of excitement. ' +
-  'Leave the lower-left quarter calmer so that a title can be placed there later. ' + NO_TEXT;
+  'Leave the lower-left quarter calmer (just quieter scenery: no panel, no bar, no stripe, no rectangle, no frame, no overlay) so that a title can be placed there later. ' + NO_TEXT;
 const banners = [
   ['first', 'a first-time summoning: a grand glowing golden magic circle in the centre with a rising pillar of light, a treasure chest overflowing with gems and gold coins, confetti and sparkles, a warm celebratory gold-and-pink palette'],
   ['equip_standard', 'an armory summoning: legendary swords, shields and armor floating around a glowing blue-and-gold magic circle above an anvil, sparks flying, a cool steel-blue and gold palette'],
@@ -504,6 +506,27 @@ const characters = [
   prompt: `${CHAR}${CHAR_QUALITY[rarity]} The character: ${what}.`,
 }));
 
+// ---------------------------------------------------------------------------------------------- 80 more characters (doubling the roster)
+// The list (id, rarity, class, name, gender, what the picture shows) is in newCharacters.mjs; the same ids are in src/game/data/heroes.ts.
+const CHAR_QUALITY_MORE = {
+  ...CHAR_QUALITY,
+  1: 'A very ordinary beginner: plain, simple clothes and a basic, cheap or home-made weapon, a humble look, hardly any ornament and no glow.',
+  2: 'A modest, ordinary adventurer: simple but neat clothes, a few small practical items, an unassuming look, hardly any ornament and no magical glow.',
+  5: 'A legendary top-tier hero, second only to a one-of-a-kind mythic character: an extremely elaborate, luxurious and eye-catching costume with large, crisp, hard-edged gold ornaments, a big signature weapon and dramatic accents. Effects are crisp painted shapes with outlines, not soft glow or haze, so the figure stays cleanly separated from the white background.',
+};
+const CHAR_REFS_MORE = { ...CHAR_REFS, 1: ['ref:mizuki.jpg', 'ref:ald.jpg'], 2: ['ref:momo.jpg', 'ref:lumi.jpg'], 5: ['ref:gauss.jpg', 'ref:aria.jpg'] };
+const characters2 = NEW_CHARACTERS.map(([id, rarity, , , , what]) => ({
+  id: `hero_${id}`,
+  group: 'chars2',
+  out: `characters/${id}.png`,
+  mode: 'portrait',
+  size: [1008, 1344],
+  aspect: '3:4',
+  refs: CHAR_REFS_MORE[rarity],
+  refNote: CHAR_NOTE,
+  prompt: `${CHAR}${CHAR_QUALITY_MORE[rarity]} The character: ${what}.`,
+}));
+
 // ---------------------------------------------------------------------------------------------- 特設ガチャ banner, 通常ガチャ banner, loading screen
 const GACHA_CHARS = 'The characters shown must be the SAME characters as in the reference pictures (same faces, hair, outfits and weapons), only posed differently - do not invent other characters.';
 const castBanners = [
@@ -657,7 +680,89 @@ const road = [
   prompt: `${ROAD}The paving: ${what}.`,
 }));
 
-export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...characters, ...loading, ...logo, ...land, ...peopleSheets, ...road];
+
+// ---------------------------------------------------------------------------------------------- the year's limited events (14) and pickup gachas (26)
+// (data/schedule.ts: events/<id>.jpg are the event cards, gacha/<id>.jpg the gacha cards; the characters are the ones that event / gacha features)
+const limited = [
+  ['launch', ['astra', 'nova', 'sieg', 'celes'], 'the opening celebration of a new fantasy adventure: the heroes from the references cheering on a flower-decked wooden stage in a lush forest clearing at dusk, hundreds of glowing paper lanterns, colourful pennants, confetti and fireworks overhead, a warm green-and-gold palette, joyful'],
+  ['xmas', ['aria', 'ouka', 'quartz', 'noel'], 'a snowy mountain village on Christmas night: the heroes from the references in warm winter clothes carrying big gift boxes with ribbons around a giant sparkling decorated fir tree, falling snow, glowing windows, a red-green-and-gold palette, cosy and magical'],
+  ['newyear', ['gauss', 'kurenai', 'thorne', 'gen'], 'a New Year festival in a lantern-lit fantasy city street at dawn: the heroes from the references in festive robes holding red and gold lucky bags and paper charms, a rising sun between rooftops, red gates and lanterns, a gold-and-red palette, auspicious'],
+  ['setsubun', ['shade', 'ignis', 'raijin', 'taiga'], 'a bean-throwing festival at ancient stone ruins at dusk: the heroes from the references throwing handfuls of beans at funny friendly red and blue oni demon masks and cartoon horned beasts, beans scattering in the air, purple mist, a lively comical-but-exciting mood, a red-and-orange palette'],
+  ['valentine', ['viara', 'ivy', 'lilith', 'rosa'], 'a magical chocolate festival: the heroes from the references around a huge swirling fountain of glossy chocolate, heart-shaped candies, ribbons and rose petals floating in the air, a sweet pink-and-brown palette, enchanting'],
+  ['sakura', ['aria', 'ouka', 'sylva', 'haruka'], 'a cherry blossom spring festival in a forest: the heroes from the references under giant blooming sakura trees with petals swirling, picnic mats, floating paper lanterns, a soft pink and fresh green palette, serene and cheerful'],
+  ['golden', ['gauss', 'thorne', 'dias', 'bruno'], 'a golden treasure hunt in a sunlit desert wasteland: the heroes from the references around an open chest overflowing with gold coins and jewels with golden light beams, an old treasure map and ruins behind, a gold-and-sand palette, adventurous'],
+  ['rain', ['viara', 'ivy', 'quartz', 'toxar'], 'a quiet rainy day among blooming hydrangeas: the heroes from the references sheltering under big leaf umbrellas at a village gate, blue and violet hydrangeas, sparkling raindrops and a faint rainbow, a soft blue-and-violet palette, gentle'],
+  ['tanabata', ['astra', 'quartz', 'lilith', 'miru'], 'a Tanabata star festival at night in a city: the heroes from the references holding paper strips beside a tall bamboo decorated with colourful ornaments, a glittering river of stars across the sky and shooting stars, a deep blue-and-gold palette, romantic'],
+  ['summer', ['gauss', 'gale', 'seira', 'sora'], 'a summer pirate festival on a sunny beach: the heroes from the references on the deck and sand beside a wrecked pirate ship with spilled treasure, seashells, palm trees, turquoise water, bright sun and white clouds, a turquoise-and-gold palette, lively'],
+  ['moon', ['shade', 'lilith', 'lune', 'miru'], 'a moon-viewing party under a huge full moon: the heroes from the references sitting on a veranda with stacks of white dumplings, pampas grass and autumn flowers, a gigantic golden full moon in an indigo sky, an indigo-and-gold palette, tranquil'],
+  ['harvest', ['aria', 'kurenai', 'ouka', 'kaede'], 'an autumn leaf-viewing day in a forest: the heroes from the references walking in a forest of red and orange maple leaves swirling in the air, baskets of nuts and fruits, golden sunlight, a red-orange-and-gold palette, warm'],
+  ['halloween', ['shade', 'viara', 'lilith', 'nyx'], 'a Halloween night parade in spooky stone ruins: the heroes from the references in witch hats and costumes holding glowing carved pumpkin lanterns, friendly ghosts and bats, a giant moon, a purple-and-orange palette, spooky yet fun'],
+  ['countdown', ['aria', 'zeno', 'astra', 'sieg'], 'an anniversary countdown celebration: the heroes from the references on a grand stage under a gigantic glowing golden crown-and-ribbon emblem, fireworks, confetti and streamers, a gold-and-pink palette, grand and joyful'],
+].map(([id, who, what]) => ({
+  id: `event_${id}`,
+  group: 'limited',
+  out: `events/${id}.jpg`,
+  mode: 'jpg',
+  size: [1050, 450],
+  aspect: '21:9',
+  refs: who.map((n) => `ref:${n}.jpg`),
+  refNote: SHOW_CHARS,
+  prompt: `${EVENT} The scene: ${what}.`,
+}));
+
+const STAR = ' The FIRST reference picture is the star character: show them biggest, in the centre, striking a powerful pose; the other reference characters stand smaller on either side.';
+const LINEUP = ' All the reference characters stand together in a confident line-up of about the same size.';
+const pickups = [
+  ['g01-launch', ['astra', 'sieg', 'hild', 'celes'], true, 'a grand opening summoning in a festive forest clearing: a golden magic circle, hanging lanterns, confetti and sparkles, a warm green-and-gold palette'],
+  ['g02-winter4', ['seira', 'gran', 'ignis', 'skadi'], false, 'a winter preparation summoning: a snowy pine forest at dawn, a frost-covered magic circle glowing ice-blue, falling snow and ice crystals, a cool blue-and-white palette'],
+  ['g03-xmas', ['serafina', 'ouka', 'anju', 'noel'], true, 'a Christmas-night summoning: a giant sparkling decorated fir tree, falling snow, gift boxes, a glowing red-and-gold magic circle, a red-green-and-gold palette'],
+  ['g04-newyear', ['gauss', 'kurenai', 'shaolan', 'gen'], true, 'a New Year summoning: sunrise over lantern-lit rooftops, red and gold lucky bags and paper charms, a golden magic circle, a red-and-gold palette'],
+  ['g05-sword4', ['dias', 'ren', 'musashi', 'dante'], false, 'a swordmasters line-up in a frosty dojo courtyard: crossed swords, a steel-blue magic circle and flying sparks, a cool steel-and-silver palette'],
+  ['g06-setsubun', ['prime', 'magna', 'raijin', 'toro'], true, 'a bean-throwing summoning at old stone ruins at dusk: flying beans, red and blue oni masks, a fiery orange-red magic circle, purple mist, a red-and-orange palette'],
+  ['g07-valentine', ['viara', 'ivy', 'fleur', 'rosa'], true, 'a sweet chocolate summoning: a swirling chocolate fountain, hearts, roses and ribbons, a pink magic circle, a pink-and-brown palette'],
+  ['g08-archer4', ['suzuna', 'hawk', 'fiora', 'annie'], false, 'a line-up of master archers in a bright green meadow: arrows of light flying, a green magic circle, a fresh green-and-gold palette'],
+  ['g09-piday', ['tau', 'chrono', 'quartz', 'noct'], true, 'a mathematical summoning: a magic circle made of glowing concentric rings, arcs and spirals, floating glowing geometric shapes (no digits and no letters), an indigo-and-gold palette'],
+  ['g10-sakura', ['phi', 'ouka', 'shiro', 'haruka'], true, 'a cherry blossom summoning: huge sakura trees, swirling petals, a pink magic circle, a pink-and-white palette'],
+  ['g11-tank4', ['baron', 'torta', 'magna', 'amara'], false, 'a guardian line-up before a massive castle gate: shields and armor, a steel-grey magic circle, a steel-and-gold palette'],
+  ['g12-golden', ['sigma', 'thorne', 'hild', 'leona'], true, 'a golden-week summoning: piles of treasure, a golden magic circle, golden light beams, a gold-and-sand palette'],
+  ['g13-mage4', ['iris', 'terra', 'lilith', 'mike'], false, 'an arcane line-up in a wizard tower: floating spellbooks, a violet magic circle, a violet-and-blue palette'],
+  ['g14-gale', ['delta', 'gale', 'hawk', 'hibari'], true, 'a gale summoning: strong wind swirling leaves and clouds, a cyan magic circle, a cyan-and-white palette'],
+  ['g15-rain', ['aria', 'rain', 'ivy', 'sachi'], true, 'a hydrangea summoning in the rain: blue and violet hydrangeas, raindrops, a blue-violet magic circle, a blue-and-violet palette'],
+  ['g16-tanabata', ['astra', 'quartz', 'chrono', 'cyril'], true, 'a star-festival summoning: bamboo with paper strips, a river of stars, a gold-and-indigo magic circle, a deep blue-and-gold palette'],
+  ['g17-heat4', ['kurenai', 'magna', 'ignis', 'bao'], false, 'a blazing heat line-up: lava and flames, a red-orange magic circle, an orange-and-red palette'],
+  ['g18-summer', ['gauss', 'nerei', 'seira', 'isana'], true, 'a summer pirate summoning on a sunny beach: a pirate ship, treasure, turquoise sea, a turquoise-and-gold magic circle'],
+  ['g19-summer2', ['zeno', 'fiora', 'nova', 'lotta'], true, 'a summer sea summoning at sunset: waves, seashells, a glowing aqua magic circle, an aqua-and-orange palette'],
+  ['g20-late4', ['ren', 'shaolan', 'sieg', 'ulf'], false, 'an end-of-summer line-up: a sunflower field at dusk, fireflies, a yellow-green magic circle, a golden-green palette'],
+  ['g21-autumn', ['tau', 'hild', 'thorne', 'tengri'], true, 'an early autumn summoning: red dragonflies, pampas grass, a golden magic circle, an amber-and-gold palette'],
+  ['g22-moon', ['shade', 'lilith', 'somu', 'kon'], true, 'a moonlit summoning: a huge full moon, pampas grass, white dumplings, a silver-violet magic circle, an indigo-and-silver palette'],
+  ['g23-momiji', ['phi', 'kurenai', 'shiro', 'kaede'], true, 'an autumn leaves summoning: red maple leaves swirling, a red-gold magic circle, a red-and-gold palette'],
+  ['g24-halloween', ['shade', 'viara', 'weiss', 'lilith'], true, 'a Halloween summoning: giant carved pumpkin lanterns, bats, a purple magic circle, a purple-and-orange palette'],
+  ['g25-countdown', ['aria', 'zeno', 'astra', 'sieg'], true, 'an anniversary summoning: fireworks, a gigantic golden crown-and-ribbon emblem, a rainbow-gold magic circle, a pink-and-gold palette'],
+].map(([id, who, star, what]) => ({
+  id: `banner_${id}`,
+  group: 'pickups',
+  out: `gacha/${id}.jpg`,
+  mode: 'jpg',
+  size: [1024, 576],
+  aspect: '16:9',
+  refs: who.map((n) => `ref:${n}.jpg`),
+  refNote: GACHA_CHARS + (star ? STAR : LINEUP),
+  prompt: `${BANNER} The scene: ${what}.`,
+}));
+const equipFest = [
+  {
+    id: 'banner_equip_fest',
+    group: 'pickups',
+    out: 'gacha/equip_fest.jpg',
+    mode: 'jpg',
+    size: [1024, 576],
+    aspect: '16:9',
+    refs: ['gacha/equip_standard.jpg'],
+    prompt: `${BANNER} The scene: an armory festival: legendary swords, shields and armor floating around a golden anvil, streamers and confetti, a glowing blue-and-gold magic circle, a bright celebratory blue-and-gold palette.`,
+  },
+];
+
+export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...limited, ...pickups, ...equipFest, ...characters, ...characters2, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;

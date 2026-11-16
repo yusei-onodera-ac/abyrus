@@ -13,6 +13,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_APP_ID: string;
   /** Cloud Functions region for the 同盟 (optional; default asia-northeast1). */
   readonly VITE_FIREBASE_FUNCTIONS_REGION?: string;
+  /** '1' on the dev environment (deploy/dev/deploy.sh): the 開発版 notice, and the `?date=` clock. */
+  readonly VITE_DEV_ENV?: string;
 }
 
 interface ImportMeta {

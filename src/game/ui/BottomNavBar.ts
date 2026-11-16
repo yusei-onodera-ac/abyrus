@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { EventSystem } from '../systems/EventSystem';
+import type { SaveData } from '../systems/SaveSystem';
+import { buildUnreadDot } from './CardParts';
 import { createPanel, createDivider } from './Panel';
 import { enhanceTabIcon, eventTabIcon, friendTabIcon, homeTabIcon, shopTabIcon } from './Icons';
 import { CHROME } from './theme';
@@ -102,6 +105,10 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
       this.add(createDivider(scene, slotWidth * i, barCy, BAR_HEIGHT * 0.56, BRASS_DARK).setAngle(90));
     }
 
+    // A red dot on イベント while something of an event can be taken (a finished mission, a reached 累計報酬).
+    const save = scene.game.registry.get('save') as SaveData | undefined;
+    const eventDot = !!save && EventSystem.anyClaimable(save);
+
     TABS.forEach((tab, i) => {
       const cx = slotWidth * (i + 0.5);
       const isActive = tab === active;
@@ -132,6 +139,8 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
       }
       if (!isActive) icon.setAlpha(0.55);
       this.add(icon);
+
+      if (tab === 'event' && eventDot) this.add(buildUnreadDot(scene, cx + iconSize * 0.3, iconCy - iconSize * 0.28, 9));
 
       const label = scene.add
         .text(cx, barY + BAR_HEIGHT * 0.87, TAB_LABELS[tab], {

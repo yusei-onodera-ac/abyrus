@@ -50,7 +50,10 @@ def duration_and_peak(path):
 def filters(job):
     kind = job['kind']
     if kind == 'voice':
-        return ['-ac', '1', '-ar', '24000', '-b:a', '64k', '-af', 'silenceremove=start_periods=1:start_threshold=-50dB:stop_periods=1:stop_threshold=-50dB:stop_duration=0.4,loudnorm=I=-16:TP=-1.5:LRA=11']
+        # Cut only the silence before the first sound and after the last one (the second silenceremove works on the reversed audio).
+        # Not `stop_periods=1`: that cuts the line off at its first pause longer than 0.4 s (a comma, an ellipsis) - it did to 24 lines.
+        trim = 'silenceremove=start_periods=1:start_threshold=-50dB'
+        return ['-ac', '1', '-ar', '24000', '-b:a', '64k', '-af', f'{trim},areverse,{trim},areverse,loudnorm=I=-16:TP=-1.5:LRA=11']
     if kind == 'jingle':
         s = job['seconds']
         return ['-t', str(s), '-ac', '2', '-ar', '44100', '-b:a', '128k', '-af', f'afade=t=out:st={s - 1.2}:d=1.2,loudnorm=I=-16:TP=-1.5:LRA=11']

@@ -5,7 +5,7 @@ import { openingRoute } from '../systems/QuestRoute';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { MusicDirector } from '../systems/MusicSystem';
 import { parseFriendInput } from '../systems/SocialSystem';
-import { HERO_ROSTER } from '../data/heroes';
+import { pinnedHeroIds, preloadHeroThumbs, queueHeroArt, textureReport } from '../characters/HeroArt';
 import { ENEMY_ART_IDS } from '../data/regions';
 import { preloadEnemyArt } from '../characters/EnemyArt';
 import { preloadEquipArt, preloadItemArt } from '../ui/ItemIcons';
@@ -24,6 +24,7 @@ import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
+import { isArtNeeded } from '../data/schedule';
 import { heading, caption, CHROME } from '../ui/theme';
 
 export class BootScene extends Phaser.Scene {
@@ -44,9 +45,10 @@ export class BootScene extends Phaser.Scene {
     // Without Firebase settings, offline or on any failure it does nothing and the static data stays (systems/RemoteShopConfig.ts).
     void RemoteShopConfig.refresh();
 
-    for (const hero of HERO_ROSTER) {
-      this.load.image(hero.id, `/assets/characters/${hero.id}.png`);
-    }
+    // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
+    // rest are loaded when shown big - see characters/HeroArt.ts: all 161 together are ~1.4 GB, more than a phone holds).
+    preloadHeroThumbs(this);
+    queueHeroArt(this, pinnedHeroIds(SaveSystem.load()));
     preloadBackgrounds(this);
     preloadButtonAssets(this);
     preloadIconAssets(this);
@@ -64,11 +66,12 @@ export class BootScene extends Phaser.Scene {
     preloadPlacePictures(this);
     preloadVillagePeople(this);
     preloadBanners(this, BANNERS);
-    preloadGachaArt(this, GACHA_BANNERS);
+    // (the year's limited banners only while they are near: data/schedule.ts isArtNeeded)
+    preloadGachaArt(this, GACHA_BANNERS.filter((b) => isArtNeeded(b)));
     preloadNoticeArt(this);
     // ルリ's expressions (public/assets/pet/<mood>.png), if supplied (otherwise she is drawn from code).
     preloadPetArt(this);
-    preloadEventArt(this, EVENTS);
+    preloadEventArt(this, EVENTS.filter((e) => isArtNeeded(e)));
     // The banner at the top of the プレミアムパス screen (optional, like the other pictures).
     this.load.image('premium_header', '/assets/events/premium_header.jpg');
   }
@@ -77,6 +80,8 @@ export class BootScene extends Phaser.Scene {
     const save = SaveSystem.load();
     applyMockFromUrl(save);
     this.game.registry.set('save', save);
+    // Development: `?mem` on the address prints how much texture memory is in use (what a phone has to hold).
+    if ((import.meta.env.DEV || import.meta.env.VITE_DEV_ENV === '1') && new URLSearchParams(location.search).has('mem')) console.log('[mem]', JSON.stringify(textureReport(this)));
     // Opened from someone's share link (...?friend=ID): go straight to the
     // 追加 tab with their ID filled in, and tidy the address bar so a reload
     // doesn't offer it again.

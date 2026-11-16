@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { InboxSystem } from '../systems/InboxSystem';
 import { SaveSystem } from '../systems/SaveSystem';
-import { NOTICES, type NoticeEntry } from '../data/notices';
+import { NOTICES, getNotices, type NoticeEntry } from '../data/notices';
 import { buildLoginBonusCalendarCard } from '../ui/LoginBonusCalendar';
 import { Button } from '../ui/Button';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
@@ -17,13 +17,13 @@ const THUMB_W = 210;
 const FALLBACK_ASPECT = 1024 / 572;
 const NEW_RED = 0xc23232;
 
-const noticeKey = (id: string) => `notice_${id}`;
+const noticeKey = (notice: NoticeEntry) => notice.textureKey ?? `notice_${notice.id}`;
 
 /** Queues every notice's image for loading (BootScene.preload). A missing
  *  file is fine - the card shows a "画像準備中" box instead. */
 export function preloadNoticeArt(scene: Phaser.Scene): void {
   for (const notice of NOTICES) {
-    if (notice.image) scene.load.image(noticeKey(notice.id), `/assets/notices/${notice.image}`);
+    if (notice.image) scene.load.image(noticeKey(notice), `/assets/notices/${notice.image}`);
   }
 }
 
@@ -39,7 +39,7 @@ export class NoticeScene extends InboxScene {
   }
 
   protected buildCards(): InboxCard[] {
-    return [buildLoginBonusCalendarCard(this, this.save), ...NOTICES.map((notice) => this.buildNoticeCard(notice))];
+    return [buildLoginBonusCalendarCard(this, this.save), ...getNotices().map((notice) => this.buildNoticeCard(notice))];
   }
 
   private buildNoticeCard(notice: NoticeEntry): InboxCard {
@@ -50,7 +50,7 @@ export class NoticeScene extends InboxScene {
     // Thumbnail (optional).
     let thumbH = 0;
     if (notice.image) {
-      const key = noticeKey(notice.id);
+      const key = noticeKey(notice);
       if (this.textures.exists(key)) {
         const frame = this.textures.get(key).getSourceImage();
         thumbH = Math.round((THUMB_W * frame.height) / frame.width);
@@ -131,7 +131,7 @@ export class NoticeScene extends InboxScene {
     view.setDepth(201);
 
     let y = 0;
-    const key = noticeKey(notice.id);
+    const key = noticeKey(notice);
     if (notice.image && this.textures.exists(key)) {
       const frame = this.textures.get(key).getSourceImage();
       const imgH = Math.round((inner * frame.height) / frame.width);

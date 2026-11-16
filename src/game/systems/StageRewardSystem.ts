@@ -5,6 +5,7 @@ import { VILLAGE_STAGE_DROPS, type MaterialBundle } from '../data/village';
 import type { QuestStage } from './QuestRoute';
 import { EXTRA_STAGES_PER_REGION, FINAL_STAGE_INDEX, STAGES_PER_REGION } from './ProgressionSystem';
 import { SaveSystem, type SaveData } from './SaveSystem';
+import { CampaignSystem } from './CampaignSystem';
 
 /** What a clear paid on top of gold / EXP / 技素. */
 export interface StageBonus {
@@ -55,13 +56,14 @@ export const StageRewardSystem = {
       if (rng() >= drop.chance) continue;
       materials[drop.material] = (drop.amounts[Math.min(drop.amounts.length - 1, region)] ?? 0) * (boss ? BOSS_DROP_MULTIPLIER : 1);
     }
-    return {
+    // (a ドロップ2倍 campaign makes the 素材 of the clear bigger; the first-clear 魔晶石 is left alone)
+    return CampaignSystem.boostDrops({
       firstClear,
       gems: firstClear ? rule.firstClearGems : 0,
       phaseMaterials: rng() < rule.phaseMaterialChance ? rule.phaseMaterialAmount : 0,
       items,
       materials,
-    };
+    });
   },
 
   grant(save: SaveData, bonus: StageBonus): void {

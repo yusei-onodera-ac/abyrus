@@ -3,6 +3,7 @@ import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
 import { FINAL_BOSS_ART, REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
 import { WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
+import type { LimitedEventDef } from '../data/limitedEvents';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
 import { expToNextLevel } from './LevelCurve';
 
@@ -327,6 +328,32 @@ export const ProgressionSystem = {
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(dungeon.goldMul),
       rewardExp: expRewardForLevel(t.expLevel ?? levelAskedByStage(t.likeStage)),
       rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)) + (dungeon.skillEssence[tierIndex] ?? 0),
+    };
+  },
+
+  /** 期間限定イベント's dungeon (data/limitedEvents.ts) at `tier` (0 = 初級 ... 3 = 超級): as strong as the 曜日ダンジョン's tier of that name, but with the
+   *  beasts and backdrop of the event's own region, and twice the gold. The same fight every time (it is set by the event and the tier). It is no
+   *  stage of the campaign: `index` is only the tier. */
+  getEventStage(event: LimitedEventDef, tier: number): StageDef {
+    const t = getWeekdayTier(tier);
+    const tierIndex = WEEKDAY_TIERS.indexOf(t);
+    const region = getRegion(event.region);
+    let hash = 0;
+    for (let i = 0; i < event.id.length; i++) hash = (Math.imul(hash, 31) + event.id.charCodeAt(i)) | 0;
+    const rng = mulberry32(((hash >>> 0) % 100000) + tierIndex * 7 + 91000);
+    const difficulty = t.difficulty ?? mainDifficulty(t.likeStage);
+    const count = Math.max(3, enemyCountForIndex(t.likeStage));
+    const enemies: EnemyUnitDef[] = Array.from({ length: count }, () => rollEnemy(region, (region.index + 1) as Rarity, rng));
+    return {
+      index: tierIndex,
+      regionIndex: region.index,
+      stageInRegion: t.likeStage % STAGES_PER_REGION,
+      name: `${event.title} ${t.name}`,
+      enemies,
+      difficulty,
+      rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(2),
+      rewardExp: expRewardForLevel(t.expLevel ?? levelAskedByStage(t.likeStage)),
+      rewardSkillEssence: Math.round(10 * Math.pow(1.09, difficulty)),
     };
   },
 

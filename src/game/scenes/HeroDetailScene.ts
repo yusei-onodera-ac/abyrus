@@ -7,6 +7,7 @@ import { getHeroDefinition } from '../data/heroes';
 import { MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillUpgradeCost, type SkillDefinition } from '../data/skills';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { pinnedHeroIds, queueHeroArt, trimHeroArt } from '../characters/HeroArt';
 import { Button } from '../ui/Button';
 import { BackButton } from '../ui/BackButton';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -61,6 +62,15 @@ export class HeroDetailScene extends Phaser.Scene {
     this.detailData = data;
     this.modal = undefined;
     this.chips = undefined;
+  }
+
+  /** This hero's big illustration (and the Home hero's and the party's); any other that was loaded is let go of - see characters/HeroArt.ts. */
+  preload(): void {
+    const save: SaveData = this.game.registry.get('save');
+    const shown = this.detailData.preview ? this.detailData.heroId : SaveSystem.getHero(save, this.detailData.heroId)?.heroId;
+    const keep = [...pinnedHeroIds(save), ...(shown ? [shown] : [])];
+    trimHeroArt(this, keep);
+    queueHeroArt(this, keep);
   }
 
   create(): void {

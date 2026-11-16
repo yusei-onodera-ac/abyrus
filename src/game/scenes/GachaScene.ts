@@ -10,6 +10,7 @@ import { gachaMovieId } from '../data/gachaMovies';
 import { playMovieOverlay } from '../ui/MovieOverlay';
 import { playGemDrop } from '../ui/GemDrop';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { ensureHeroArt, pinnedHeroIds, trimHeroArt } from '../characters/HeroArt';
 import { ResourceBar } from '../ui/ResourceBar';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { BackButton } from '../ui/BackButton';
@@ -168,6 +169,20 @@ export class GachaScene extends Phaser.Scene {
   }
 
   private showResults(outcomes: HeroPullOutcome[]): void {
+    // One to three pulls are shown as big cards with the character's own illustration: load those first (and let go of the
+    // ones no longer wanted); ten pulls use the small pictures that are always in memory. See characters/HeroArt.ts.
+    const big = outcomes.length <= 3 ? outcomes.map((o) => o.hero.heroId) : [];
+    if (big.length === 0 || big.every((id) => this.textures.exists(id))) {
+      this.buildResults(outcomes);
+      return;
+    }
+    trimHeroArt(this, [...pinnedHeroIds(this.game.registry.get('save')), ...big]);
+    void ensureHeroArt(this, big).then(() => {
+      if (this.sys.isActive()) this.buildResults(outcomes);
+    });
+  }
+
+  private buildResults(outcomes: HeroPullOutcome[]): void {
     SoundSystem.play(this, outcomes.some((o) => o.hero.rarity >= 5) ? 'reveal5' : outcomes.some((o) => o.hero.rarity >= 4) ? 'reveal' : 'confirm');
     const container = this.openModal(0.78);
 

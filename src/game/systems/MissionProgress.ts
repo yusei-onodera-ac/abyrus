@@ -1,4 +1,5 @@
 import type { MissionKey } from '../data/missions';
+import { recordEvent } from './EventProgress';
 import type { SaveData } from './SaveSystem';
 
 /** One span of time's worth of mission progress (a day, or a week). */
@@ -92,4 +93,6 @@ export function recordMission(save: SaveData, key: MissionKey, amount = 1, now =
   m.daily.counts[key] = (m.daily.counts[key] ?? 0) + amount;
   m.weekly.counts[key] = (m.weekly.counts[key] ?? 0) + amount;
   m.totals[key] = (m.totals[key] ?? 0) + amount;
+  // The 期間限定イベント that are on count it too (their missions: data/limitedEvents.ts).
+  recordEvent(save, key, amount, now);
 }

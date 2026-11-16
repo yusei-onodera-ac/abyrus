@@ -1,8 +1,10 @@
 import { formatDateTime } from '../ui/format';
+import type { LimitedEventDef } from './limitedEvents';
+import { SCHEDULED_EVENTS } from './schedule';
 
-/** What tapping a running event opens. Only the 無限モード screen exists so far;
- *  add a kind here (and a case in EventScene.open) when another mode is built. */
-export type EventKind = 'infinite' | 'premium';
+/** What tapping a running event opens: the 無限モード screen, the プレミアムパス, or the 期間限定イベント's own screen
+ *  (data/limitedEvents.ts; the year's are in data/schedule.ts). Add a kind here (and a case in EventScene.open) when another mode is built. */
+export type EventKind = 'infinite' | 'premium' | 'limited';
 
 export interface EventEntry {
   id: string;
@@ -27,6 +29,26 @@ export interface EventEntry {
   /** Local end time, e.g. "2026-12-14T23:59:00". Once it passes, the event
    *  drops off the list. Omit for a permanent event. */
   endsAt?: string;
+  /** Epoch ms until which the card stays (as 交換期間) after `endsAt`: a 期間限定イベント's 交換所 is open a few days more. */
+  exchangeUntil?: number;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The card of a 期間限定イベント on the Event tab. */
+export function limitedEventEntry(def: LimitedEventDef): EventEntry {
+  return {
+    id: def.id,
+    kind: 'limited',
+    title: def.title,
+    description: def.description,
+    image: def.image,
+    accent: def.accent,
+    emblem: def.emblem,
+    startsAt: def.startsAt,
+    endsAt: def.endsAt,
+    exchangeUntil: new Date(def.endsAt).getTime() + def.exchangeDays * DAY_MS,
+  };
 }
 
 /**
@@ -56,35 +78,35 @@ export const EVENTS: EventEntry[] = [
     accent: 0xc79a2a,
     emblem: '♛',
   },
-  // Sample of an announced event (delete or replace it): it shows as 開催予定
-  // until startsAt, then as 準備中 until it is given a `kind`.
-  {
-    id: 'sample-upcoming',
-    title: '期間限定イベント（サンプル）',
-    image: 'sample.jpg',
-    description: '開催予定のイベントは、期間つきでこのように表示されます。',
-    accent: 0x3f7a3a,
-    emblem: '祭',
-    startsAt: '2026-12-01T00:00:00',
-    endsAt: '2026-12-14T23:59:00',
-  },
+  // The 期間限定イベント of the year are added below (data/schedule.ts).
+  ...SCHEDULED_EVENTS.map(limitedEventEntry),
 ];
 
-export type EventPhase = 'live' | 'upcoming' | 'ended';
+/** 'exchange' = the event is over but its 交換所 is still open (a 期間限定イベント only). */
+export type EventPhase = 'live' | 'exchange' | 'upcoming' | 'ended';
 
 export function eventPhase(entry: EventEntry, now = Date.now()): EventPhase {
-  if (entry.endsAt && new Date(entry.endsAt).getTime() <= now) return 'ended';
+  if (entry.endsAt && new Date(entry.endsAt).getTime() <= now) return entry.exchangeUntil !== undefined && entry.exchangeUntil > now ? 'exchange' : 'ended';
   if (entry.startsAt && new Date(entry.startsAt).getTime() > now) return 'upcoming';
   return 'live';
 }
 
-/** Events to list: the running ones in listed order, then the upcoming ones
- *  (soonest first). Ended events are left out. */
+/** How many days ahead an announced event shows on the Event tab (the later ones are in the 年間予定). */
+export const UPCOMING_DAYS = 14;
+
+/** Events to list: the 期間限定イベント that is running, then those in their 交換期間 (their currency is about to be lost), then the permanent events
+ *  that are running (each in listed order), then the upcoming ones that start within UPCOMING_DAYS (soonest first). Ended events are left out. */
 export function getVisibleEvents(now = Date.now()): { entry: EventEntry; phase: EventPhase }[] {
   const all = EVENTS.map((entry) => ({ entry, phase: eventPhase(entry, now) })).filter((e) => e.phase !== 'ended');
   const live = all.filter((e) => e.phase === 'live');
-  const upcoming = all.filter((e) => e.phase === 'upcoming').sort((a, b) => new Date(a.entry.startsAt!).getTime() - new Date(b.entry.startsAt!).getTime());
-  return [...live, ...upcoming];
+  const limitedFirst = [...live.filter((e) => e.entry.kind === 'limited'), ...live.filter((e) => e.entry.kind !== 'limited')];
+  const exchange = all.filter((e) => e.phase === 'exchange');
+  const upcoming = all
+    .filter((e) => e.phase === 'upcoming' && new Date(e.entry.startsAt!).getTime() - now <= UPCOMING_DAYS * DAY_MS)
+    .sort((a, b) => new Date(a.entry.startsAt!).getTime() - new Date(b.entry.startsAt!).getTime());
+  const limitedLive = limitedFirst.filter((e) => e.entry.kind === 'limited');
+  const permanent = limitedFirst.filter((e) => e.entry.kind !== 'limited');
+  return [...limitedLive, ...exchange, ...permanent, ...upcoming];
 }
 
 const formatMoment = (iso: string): string => formatDateTime(new Date(iso).getTime());
