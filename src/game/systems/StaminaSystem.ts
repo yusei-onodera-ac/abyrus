@@ -1,5 +1,6 @@
 import type { SaveData } from './SaveSystem';
 import { recordMission } from './MissionProgress';
+import { CampaignSystem } from './CampaignSystem';
 
 /** How long one point of stamina takes to come back. Placeholder balance. */
 export const STAMINA_REGEN_SECONDS = 180;
@@ -12,10 +13,16 @@ export type StageKind = 'main' | 'final' | 'extra';
 
 /** Stamina it costs to start a stage. Placeholder balance: main stages climb
  *  from 5 to 14 over the campaign, the final battle and Extra cost more. */
-export function stageStaminaCost(kind: StageKind, index: number): number {
+export function baseStageStaminaCost(kind: StageKind, index: number): number {
   if (kind === 'final') return 20;
   if (kind === 'extra') return 12 + Math.floor(index / 6);
   return 5 + Math.floor(index / 15);
+}
+
+/** What starting the stage costs now: the base cost, halved while a スタミナ半額 campaign is on. (The プレイヤーEXP a clear gives is the
+ *  base cost either way.) */
+export function stageStaminaCost(kind: StageKind, index: number, now = Date.now()): number {
+  return CampaignSystem.staminaCost(baseStageStaminaCost(kind, index), now);
 }
 
 /** Stamina is stored as the amount at the moment `staminaAt` says its timer

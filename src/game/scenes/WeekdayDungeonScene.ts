@@ -2,6 +2,7 @@ import { WEEKDAY_DUNGEONS, WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, type
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { SaveSystem } from '../systems/SaveSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
+import { CampaignSystem } from '../systems/CampaignSystem';
 import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { Button } from '../ui/Button';
@@ -69,7 +70,8 @@ export class WeekdayDungeonScene extends InboxScene {
     container.add(buildCardPanel(this, CARD_WIDTH, height));
 
     container.add(heading(this, PAD + 4, 34, tier.name, { fontSize: '30px', color: open ? '#ffe9b8' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    const cost = buildChip(this, 0, 34, `スタミナ ${tier.stamina}`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
+    const staminaNow = CampaignSystem.staminaCost(tier.stamina);
+    const cost = buildChip(this, 0, 34, `スタミナ ${staminaNow}${staminaNow < tier.stamina ? '（割引）' : ''}`, { fill: staminaNow < tier.stamina ? 0x2f7a3a : 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     cost.container.setX(CARD_WIDTH - PAD - cost.width);
     container.add(cost.container);
     container.add(caption(this, PAD + 4, 76, `${ProgressionSystem.getWeekdayStage(this.day, index).enemies.length}体の敵　${tier.note ?? `クエスト${tier.likeStage + 1}層ほどの強さ`}`, { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
@@ -127,7 +129,7 @@ export class WeekdayDungeonScene extends InboxScene {
    *  on to the fight. Without a formation or enough stamina it says so and points at where to fix that. */
   private askToEnter(tier: number): void {
     if (this.modal?.container.active) return;
-    const cost = WEEKDAY_TIERS[tier].stamina;
+    const cost = CampaignSystem.staminaCost(WEEKDAY_TIERS[tier].stamina);
     const name = ProgressionSystem.getWeekdayStage(this.day, tier).name;
 
     const party = SaveSystem.getPartyHeroes(this.save);

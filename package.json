@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "node tools/tests/run.mjs"
+    "test": "node tools/tests/run.mjs",
+    "schedule:doc": "node tools/schedule/export.mjs"
   },
   "devDependencies": {
     "typescript": "~6.0.3",

@@ -18,7 +18,12 @@ def save(src, dst, box):
     im.save(out / dst, quality=86)
 
 
-for n in ['viara', 'astra', 'dias', 'celes', 'noct', 'gauss', 'aria', 'zeno', 'shade', 'nova', 'sylva', 'ignis', 'seira', 'ren']:
+HEROES = ['viara', 'astra', 'dias', 'celes', 'noct', 'gauss', 'aria', 'zeno', 'shade', 'nova', 'sylva', 'ignis', 'seira', 'ren',
+          # the heroes of the year's pickup gachas and events (data/schedule.ts)
+          'sieg', 'kurenai', 'thorne', 'ouka', 'quartz', 'brann', 'raijin', 'ivy', 'lilith', 'gale', 'suzuna', 'kohaku', 'baron',
+          'noel', 'gen', 'jin', 'kaede', 'lune', 'miru', 'rosa', 'lena', 'taiga', 'toxar', 'nyx', 'haruka', 'sora', 'ines', 'felix',
+          'tsubame', 'morrigan', 'orga', 'elrin', 'gustav', 'doris', 'bruno', 'mina', 'kai', 'fros', 'robin']
+for n in HEROES:
     save(root / 'characters' / f'{n}.png', f'{n}.jpg', (640, 860))
 for n in ['wolf', 'lion', 'necrodraco', 'garumudo', 'arachnea', 'kongo', 'snake', 'bear']:
     save(root / 'enemies' / f'{n}.png', f'e_{n}.jpg', (640, 640))

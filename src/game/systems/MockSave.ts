@@ -73,5 +73,7 @@ export function battleFromUrl(): { scene: string; data: Record<string, unknown> 
   if (!Number.isInteger(stageIndex) || stageIndex < 0) return null;
   const mode = params.get('mode');
   const wave = params.get('wave');
+  // `&mode=event&event=launch` fights that 期間限定イベント's dungeon (the event must be on: add `&date=...` for another day), `?battle=<tier 0-3>`.
+  if (mode === 'event') return { scene: 'Battle', data: { stageIndex: Math.min(3, stageIndex), mode: 'event', eventId: params.get('event') ?? '' } };
   return { scene: 'Battle', data: { stageIndex, mode: mode === 'extra' || mode === 'final' ? mode : undefined, wave: wave === null ? undefined : Number(wave) } };
 }

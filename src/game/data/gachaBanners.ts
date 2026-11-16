@@ -1,4 +1,5 @@
 import type { Rarity } from '../types';
+import { SCHEDULED_GACHAS } from './schedule';
 
 export interface GachaBannerEntry {
   id: string;
@@ -9,6 +10,9 @@ export interface GachaBannerEntry {
   image: string;
   /** One line beside the 詳細 button. */
   description: string;
+  /** Local start time, e.g. "2026-12-17T00:00:00". Before it the gacha is not in the list. Omit for one that is already on
+   *  (the year's limited ones are all given a start: data/schedule.ts). */
+  startsAt?: string;
   /** Local end time, e.g. "2026-11-11T23:59:00". Shown after the title as
    *  "11/11 23:59まで", and the gacha drops off the list once it passes.
    *  Omit for a permanent gacha. */
@@ -23,9 +27,13 @@ export interface GachaBannerEntry {
   /** Which characters (hero ids, data/heroes.ts) can come out. Leave out for everyone. The
    *  ガチャ詳細 screen lists exactly these, each with its own rate. */
   pool?: string[];
+  /** ピックアップ: these characters (hero ids; ★3 or better) come out more often. Of each rarity that has some, `share` (0..1) of
+   *  its rate goes to them, shared evenly; the rest goes to the others of that rarity. Leave out for no ピックアップ. */
+  pickup?: { heroes: string[]; share: number };
   /** 天井: the `at`-th pull counted since the last ★minRarity-or-better is certain to be one,
-   *  and the count starts over whenever one comes out. Leave out for no 天井. */
-  pity?: { at: number; minRarity: Rarity };
+   *  and the count starts over whenever one comes out. With `pickup`, that certain one is one of the ピックアップ
+   *  (those of ★minRarity or better) instead of anyone. Leave out for no 天井. */
+  pity?: { at: number; minRarity: Rarity; pickup?: boolean };
   /** 10連の保証: a ten-pull always contains at least one hero of this ★ or better (if none came, the last pull of
    *  the batch is raised to one). A single pull is not affected. Leave out for no such promise. */
   tenMin?: Rarity;
@@ -95,14 +103,25 @@ export const GACHA_BANNERS: GachaBannerEntry[] = [
     image: 'standard.jpg',
     description: '★5以下の全キャラクターが排出対象',
   },
+  // The year's limited gachas (ピックアップ and 装備の感謝祭): data/schedule.ts. getActiveGachaBanners puts the ones that are on first.
+  ...SCHEDULED_GACHAS,
 ];
 
 /** Promo strip beside the フレンドガチャ button, under public/assets/gacha/.
  *  About 4.6:1 (e.g. 1290x280). */
 export const FRIEND_GACHA_IMAGE = 'friend_gacha.jpg';
 
+/** Whether the gacha is on at `now`: started (if it has a start) and not yet ended (if it has an end). */
+export function isGachaActive(b: Pick<GachaBannerEntry, 'startsAt' | 'endsAt'>, now = Date.now()): boolean {
+  if (b.startsAt && new Date(b.startsAt).getTime() > now) return false;
+  return !b.endsAt || new Date(b.endsAt).getTime() > now;
+}
+
+/** The gachas that are on: the limited ones (the newest started first), then the permanent ones in their listed order. */
 export function getActiveGachaBanners(now = Date.now()): GachaBannerEntry[] {
-  return GACHA_BANNERS.filter((b) => !b.endsAt || new Date(b.endsAt).getTime() > now);
+  const on = GACHA_BANNERS.filter((b) => isGachaActive(b, now));
+  const limited = on.filter((b) => b.startsAt).sort((a, b) => new Date(b.startsAt!).getTime() - new Date(a.startsAt!).getTime());
+  return [...limited, ...on.filter((b) => !b.startsAt)];
 }
 
 /** "11/7 11:59まで" - month/day unpadded, minutes padded. */

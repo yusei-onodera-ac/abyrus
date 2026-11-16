@@ -1,10 +1,11 @@
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { EQUIP_DEFS, describeEquip } from '../data/equipment';
 import { getActiveGachaBanners, formatGachaEnd, type GachaBannerEntry } from '../data/gachaBanners';
+import { formatDateTime } from '../ui/format';
 import { createHeroInstance } from '../data/heroes';
-import { costOf, heroPoolOf, pityLeft, ratesOf, tenPullNote, type RateRow } from '../systems/GachaSystem';
+import { costOf, heroRatesOf, pickupNote, pityLeft, ratesOf, tenPullNote, type RateRow } from '../systems/GachaSystem';
 import { RARITY_COLORS, hex, type Rarity } from '../types';
-import { buildCardPanel, wrappedText } from '../ui/CardParts';
+import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { HeroSlot } from '../ui/HeroSlot';
 import { equipIcon } from '../ui/ItemIcons';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
@@ -73,11 +74,16 @@ export class GachaDetailScene extends InboxScene {
     const lines: { text: string; color: string; size: number; bold?: boolean }[] = [];
     lines.push({ text: banner.description, color: '#f5e6c8', size: 21 });
     lines.push({ text: `1回 ${costOf(banner, 1)} 魔晶石　／　10連 ${costOf(banner, 10)} 魔晶石`, color: '#ffe9b8', size: 22, bold: true });
-    if (banner.endsAt) lines.push({ text: `開催期間：${formatGachaEnd(banner.endsAt)}`, color: '#cdbb94', size: 19 });
+    if (banner.endsAt) {
+      const period = banner.startsAt ? `${formatDateTime(new Date(banner.startsAt).getTime())} 〜 ${formatDateTime(new Date(banner.endsAt).getTime())}` : formatGachaEnd(banner.endsAt);
+      lines.push({ text: `開催期間：${period}`, color: '#cdbb94', size: 19 });
+    }
+    const pickup = pickupNote(banner);
+    if (pickup) lines.push({ text: `【ピックアップ】${pickup}`, color: '#ff9ab8', size: 21, bold: true });
     if (banner.pity) {
       const { at, minRarity } = banner.pity;
       const left = pityLeft(this.save, banner) ?? at;
-      lines.push({ text: `【天井】${at}回目のガチャで、★${minRarity}以上が必ず1体出ます。`, color: '#ffd23f', size: 21, bold: true });
+      lines.push({ text: banner.pity.pickup ? `【天井】${at}回目のガチャで、ピックアップの★${minRarity}以上が必ず1体出ます。` : `【天井】${at}回目のガチャで、★${minRarity}以上が必ず1体出ます。`, color: '#ffd23f', size: 21, bold: true });
       lines.push({ text: `★${minRarity}以上が出ると、回数は0に戻ります。（現在 あと${left}回で確定）`, color: '#d8c49a', size: 19 });
     } else {
       lines.push({ text: 'このガチャに天井はありません。', color: '#cdbb94', size: 19 });
@@ -121,21 +127,27 @@ export class GachaDetailScene extends InboxScene {
 
   /** One rarity's characters, each with its own rate (the rarity's rate shared evenly). */
   private heroCard(banner: GachaBannerEntry, row: RateRow): InboxCard {
-    const heroes = heroPoolOf(banner).filter((h) => h.rarity === row.rarity);
-    const each = row.rate / Math.max(1, heroes.length);
+    // Each character with its own rate (the ピックアップ first, and higher: see heroRatesOf).
+    const heroes = heroRatesOf(banner)
+      .filter((r) => r.def.rarity === row.rarity)
+      .sort((a, b) => Number(b.pickup) - Number(a.pickup));
     const rows = Math.ceil(heroes.length / COLS);
     const gapX = (CARD_WIDTH - PAD * 2 - COLS * SLOT) / (COLS - 1);
     const height = 70 + rows * ROW_H + PAD;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
     this.addRarityHeader(container, row.rarity, heroes.length, '体');
-    heroes.forEach((def, i) => {
+    heroes.forEach(({ def, rate, pickup }, i) => {
       const x = PAD + SLOT / 2 + (i % COLS) * (SLOT + gapX);
       const top = 70 + Math.floor(i / COLS) * ROW_H;
       const hero = createHeroInstance(def.id, `detail-${def.id}`);
       const open = (): void => this.openPreview(def.id);
       container.add(new HeroSlot(this, x, top + SLOT / 2, { hero, generator: this.generator, hideLevel: true, onTap: open, guard: () => this.scroll.isTap() }, SLOT));
-      this.addTileText(container, x, top + SLOT, def.name, percent(each));
+      if (pickup) {
+        const chip = buildChip(this, x - SLOT / 2 + 4, top + 12, 'PICK UP', { fill: 0xc23232, color: '#fff0d0', fontSize: 13 });
+        container.add(chip.container);
+      }
+      this.addTileText(container, x, top + SLOT, def.name, percent(rate), pickup);
     });
     return { container, height };
   }
@@ -173,10 +185,10 @@ export class GachaDetailScene extends InboxScene {
   }
 
   /** The name and the rate under a tile, each shrunk to fit its width. */
-  private addTileText(container: Phaser.GameObjects.Container, x: number, tileBottom: number, name: string, rate: string): void {
+  private addTileText(container: Phaser.GameObjects.Container, x: number, tileBottom: number, name: string, rate: string, pickup = false): void {
     const nameText = caption(this, x, tileBottom + NAME_H / 2 + 2, name, { fontSize: '16px', color: '#f5e6c8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
     if (nameText.width > SLOT) nameText.setScale(SLOT / nameText.width);
-    const rateText = body(this, x, tileBottom + NAME_H + RATE_H / 2 + 2, rate, { fontSize: '19px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+    const rateText = body(this, x, tileBottom + NAME_H + RATE_H / 2 + 2, rate, { fontSize: '19px', fontStyle: 'bold', color: pickup ? '#ff9ab8' : '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
     container.add([nameText, rateText]);
   }
 }

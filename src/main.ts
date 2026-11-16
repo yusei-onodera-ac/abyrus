@@ -1,4 +1,5 @@
 import './style.css';
+import { installDevClock } from './devClock';
 import Phaser from 'phaser';
 import { BootScene } from './game/scenes/BootScene';
 import { HomeScene } from './game/scenes/HomeScene';
@@ -16,6 +17,8 @@ import { EnhanceScene } from './game/scenes/EnhanceScene';
 import { StageSelectScene } from './game/scenes/StageSelectScene';
 import { StoryScene } from './game/scenes/StoryScene';
 import { EventScene } from './game/scenes/EventScene';
+import { EventQuestScene } from './game/scenes/EventQuestScene';
+import { ScheduleScene } from './game/scenes/ScheduleScene';
 import { InfiniteLobbyScene } from './game/scenes/InfiniteLobbyScene';
 import { InfiniteModeScene } from './game/scenes/InfiniteModeScene';
 import { CollectionScene } from './game/scenes/CollectionScene';
@@ -43,6 +46,9 @@ import { AllianceHelperScene } from './game/scenes/AllianceHelperScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
 import { showDevNotice } from './devNotice';
+
+// (development only: `?date=2027-01-05` moves the game's clock)
+installDevClock();
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -74,6 +80,8 @@ const config: Phaser.Types.Core.GameConfig = {
     StageSelectScene,
     StoryScene,
     EventScene,
+    EventQuestScene,
+    ScheduleScene,
     InfiniteLobbyScene,
     InfiniteModeScene,
     EnhanceHubScene,

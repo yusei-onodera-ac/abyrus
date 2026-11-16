@@ -3,6 +3,7 @@ import type { MaterialBundle } from '../data/village';
 import { WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
 import type { SaveData } from './SaveSystem';
 import type { StageBonus } from './StageRewardSystem';
+import { CampaignSystem } from './CampaignSystem';
 
 /**
  * 曜日ダンジョン (data/weekdayDungeons.ts): which day it is, which tiers are open, and what a clear
@@ -35,7 +36,7 @@ export const WeekdayDungeonSystem = {
     const items = dungeon.items.flatMap(({ item, amounts }) => ((amounts[index] ?? 0) > 0 ? [{ item, amount: amounts[index] }] : []));
     const materials: MaterialBundle = {};
     for (const { material, amounts } of dungeon.materials) if ((amounts[index] ?? 0) > 0) materials[material] = (materials[material] ?? 0) + amounts[index];
-    return { firstClear: false, gems: 0, phaseMaterials: dungeon.phaseMaterials[index] ?? 0, items, materials };
+    return CampaignSystem.boostDrops({ firstClear: false, gems: 0, phaseMaterials: dungeon.phaseMaterials[index] ?? 0, items, materials });
   },
 
   /** The 素材 a clear pays beyond the ordinary, for showing before the fight (the gold multiple is in `goldMul`). */

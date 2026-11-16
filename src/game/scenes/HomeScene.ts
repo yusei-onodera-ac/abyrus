@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { IdleSystem } from '../systems/IdleSystem';
 import { LoginBonusSystem } from '../systems/LoginBonusSystem';
+import { touchEventLogin } from '../systems/EventProgress';
 import { TutorialSystem } from '../systems/TutorialSystem';
 import { showRewardModal } from '../ui/RewardModal';
 import { tilesForGranted, tilesForIdleClaim } from '../ui/RewardTiles';
@@ -35,7 +36,7 @@ import { body, caption, CHROME } from '../ui/theme';
 import { enter, enterStagger, popIn } from '../ui/Transitions';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { buildBannerCarousel } from '../ui/BannerCarousel';
-import { BANNERS } from '../data/banners';
+import { getHomeBanners } from '../data/banners';
 import { RARITY_COLORS, type HeroData } from '../types';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
@@ -72,6 +73,8 @@ export class HomeScene extends Phaser.Scene {
     stopAutoAdvance(this.game);
     // Hand over any gifts/mails the operator has added since the last visit.
     if (InboxSystem.deliver(save)) SaveSystem.save(save);
+    // Coming in counts as a day of the login mission of the 期間限定イベント that is on.
+    touchEventLogin(save);
     this.cameras.main.setBackgroundColor('#10121c');
     applyBackground(this, 'home');
 
@@ -239,7 +242,7 @@ export class HomeScene extends Phaser.Scene {
    *  swipe or wait 3 seconds for the next. Pure content: see data/banners.ts to
    *  add/swap one without touching this scene. */
   private buildBanners(): void {
-    const carousel = buildBannerCarousel(this, BANNER.x, BANNER.y, BANNERS, BANNER.w, BANNER.h);
+    const carousel = buildBannerCarousel(this, BANNER.x, BANNER.y, getHomeBanners(), BANNER.w, BANNER.h);
     // Fade only: the carousel clips to a fixed on-screen frame, so it can't slide in.
     enter(this, carousel, { dx: 0, dy: 0, duration: 400, delay: 220 });
   }

@@ -107,7 +107,7 @@ export function buildGachaBannerCard(
   container.add(outline);
   if (entry.pity && handlers.pityLeft !== undefined) {
     const left = handlers.pityLeft;
-    const chip = buildChip(scene, PAD + 12, y + bannerH - 26, left <= 1 ? `次の1回で★${entry.pity.minRarity}以上が確定！` : `あと${left}回で★${entry.pity.minRarity}以上が確定`, { fill: left <= 1 ? 0xb8472a : 0x1c130a, color: '#ffe9b8', fontSize: 20 });
+    const chip = buildChip(scene, PAD + 12, y + bannerH - 26, entry.pity.pickup ? (left <= 1 ? '次の1回でピックアップが確定！' : `あと${left}回でピックアップ確定`) : left <= 1 ? `次の1回で★${entry.pity.minRarity}以上が確定！` : `あと${left}回で★${entry.pity.minRarity}以上が確定`, { fill: left <= 1 ? 0xb8472a : 0x1c130a, color: '#ffe9b8', fontSize: 20 });
     container.add(chip.container);
   }
   y += bannerH + 10;

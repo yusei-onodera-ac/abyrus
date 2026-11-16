@@ -272,7 +272,9 @@ const must = <T>(r: { ok: boolean; value?: T; message?: string }, label: string)
     for (let i = 0; i < 3; i++) if (must(await r.b.donate(r.me, 'gems'), 'donate gems').levelUp) ups++;
   }
   const d = must(await r.b.load(r.me), 'load')!;
-  ok(ups >= 1 && d.summary.level >= 2, 'three days of 1400 EXP: the first level-up comes (3000 needed)');
+  // (the level may be reached by the simulated members' own donations just before ours: `ups` can be 0 - what counts is the level)
+  void ups;
+  ok(d.summary.level >= 2, 'three days of 1400 EXP: the first level-up comes (3000 needed)');
   ok(r.save.alliance.level === d.summary.level && d.perks.idleGoldBonus >= 0.02, 'the save follows the level and the perk');
 }
 

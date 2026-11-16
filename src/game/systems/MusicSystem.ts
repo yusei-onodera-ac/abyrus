@@ -38,6 +38,8 @@ const TRACK_BY_SCENE: Record<string, Track> = {
   WeekdayDungeon: 'map',
   Expedition: 'map',
   Event: 'map',
+  EventQuest: 'map',
+  Schedule: 'map',
   Village: 'village',
   Story: 'story',
   InfiniteMode: 'infinite',

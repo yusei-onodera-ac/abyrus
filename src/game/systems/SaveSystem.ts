@@ -17,6 +17,7 @@ import { SocialSystem, generatePlayerId } from './SocialSystem';
 import { SettingsSystem, type Report, type SettingsState } from './SettingsSystem';
 import { StaminaSystem } from './StaminaSystem';
 import { emptyMissions, loadMissions, recordMission, type MissionState } from './MissionProgress';
+import { loadEvents, type EventProgress } from './EventProgress';
 import { expToNextLevel } from './LevelCurve';
 import { MAX_PLAYER_LEVEL, staminaMaxFor } from '../data/playerLevel';
 import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
@@ -318,6 +319,8 @@ export interface SaveData {
   collection: { claimed: number[] };
   /** 曜日ダンジョン: the tiers (0-3) that have been cleared at least once - only those can be 掃討'd. */
   weekdayCleared: number[];
+  /** 期間限定イベント (data/schedule.ts): what has been done in each, by event id (systems/EventProgress.ts). */
+  events: Record<string, EventProgress>;
   /** 放置報酬: epoch ms it has been piling up from, and today's count of ads watched to speed it. */
   idle: { lastClaimAt: number; adDay: string; adCount: number };
   /** 遠征: one entry per slot (EXPEDITION_SLOTS), null where nothing is out. */
@@ -424,6 +427,7 @@ function restoreInventory(merged: SaveData, parsed: Partial<SaveData>): void {
     bonus: supply?.bonus === true,
   };
   merged.weekdayCleared = Array.isArray(parsed.weekdayCleared) ? [...new Set(parsed.weekdayCleared.filter((n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0 && (n as number) < 8))] : [];
+  merged.events = loadEvents(parsed.events);
   const collection = parsed.collection;
   merged.collection = {
     claimed: Array.isArray(collection?.claimed) ? [...new Set(collection.claimed.filter((n): n is number => Number.isInteger(n) && n > 0))] : [],
@@ -680,6 +684,7 @@ export const SaveSystem = {
       supply: { day: '', claimed: [], bonus: false },
       collection: { claimed: [] },
       weekdayCleared: [],
+      events: {},
       idle: { lastClaimAt: Date.now(), adDay: '', adCount: 0 },
       expeditions: { slots: Array.from({ length: EXPEDITION_SLOTS }, () => null) },
       village: defaultVillage(),

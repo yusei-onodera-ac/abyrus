@@ -2,7 +2,7 @@ import { BigNumber } from './BigNumber';
 import { SaveSystem, type Gift, type GiftReward, type SaveData } from './SaveSystem';
 import { GIFT_CAMPAIGNS } from '../data/gifts';
 import { MAIL_CAMPAIGNS } from '../data/mails';
-import { NOTICES } from '../data/notices';
+import { getNotices } from '../data/notices';
 
 const DAY = 86_400_000;
 const DEFAULT_GIFT_DAYS = 30;
@@ -168,7 +168,7 @@ export const InboxSystem = {
 
   getUnread(save: SaveData, now = Date.now()): { notification: boolean; giftBox: boolean; mail: boolean } {
     return {
-      notification: NOTICES.some((n) => !save.readNotices.includes(n.id)),
+      notification: getNotices(now).some((n) => !save.readNotices.includes(n.id)),
       giftBox: save.gifts.some((g) => this.canClaim(g, now)),
       mail: save.mails.some((m) => !m.read),
     };
