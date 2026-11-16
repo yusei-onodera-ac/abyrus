@@ -53,4 +53,7 @@ Vertex AI の Gemini 画像生成で、ゲームに足りない画像（129枚�
 - 手順: `python tools/art/make_refs.py`（参考画像）→ `node tools/art/generate.mjs --group chars2 --yes --concurrency 3`（80枚、約US$11）
   → `python tools/art/process.py --install --group chars2` → 声は `node tools/audio/extract.mjs` →
   `node tools/audio/generate.mjs --group voice --yes` → `python tools/audio/process.py --install`。
+- 立ち絵を入れたら、必ず `python tools/art/make_thumbs.py`（小さい2枚: `characters/bust/` と `characters/fit/`）。ゲームは、全員のこの2枚だけを
+  起動時に読み、大きい立ち絵は詳細・ホーム・ガチャ演出で出すときに読む（全員分を読むと約1.4GBで、スマホが持てない。`src/game/characters/HeroArt.ts`）。
+  `npm test` の roster が、全員分そろっているか調べる。
 - 気に入らない1枚は `--only hero_<id> --force` で作り直す。キャラをさらに足すときは、`newCharacters.mjs` に1行 + heroes / skills / heroLines に同じ id。

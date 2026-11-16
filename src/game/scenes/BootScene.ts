@@ -5,7 +5,7 @@ import { openingRoute } from '../systems/QuestRoute';
 import { TutorialDirector } from '../systems/TutorialDirector';
 import { MusicDirector } from '../systems/MusicSystem';
 import { parseFriendInput } from '../systems/SocialSystem';
-import { HERO_ROSTER } from '../data/heroes';
+import { pinnedHeroIds, preloadHeroThumbs, queueHeroArt, textureReport } from '../characters/HeroArt';
 import { ENEMY_ART_IDS } from '../data/regions';
 import { preloadEnemyArt } from '../characters/EnemyArt';
 import { preloadEquipArt, preloadItemArt } from '../ui/ItemIcons';
@@ -40,9 +40,10 @@ export class BootScene extends Phaser.Scene {
 
     this.buildLoadingUi();
 
-    for (const hero of HERO_ROSTER) {
-      this.load.image(hero.id, `/assets/characters/${hero.id}.png`);
-    }
+    // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
+    // rest are loaded when shown big - see characters/HeroArt.ts: all 161 together are ~1.4 GB, more than a phone holds).
+    preloadHeroThumbs(this);
+    queueHeroArt(this, pinnedHeroIds(SaveSystem.load()));
     preloadBackgrounds(this);
     preloadButtonAssets(this);
     preloadIconAssets(this);
@@ -74,6 +75,8 @@ export class BootScene extends Phaser.Scene {
     const save = SaveSystem.load();
     applyMockFromUrl(save);
     this.game.registry.set('save', save);
+    // Development: `?mem` on the address prints how much texture memory is in use (what a phone has to hold).
+    if ((import.meta.env.DEV || import.meta.env.VITE_DEV_ENV === '1') && new URLSearchParams(location.search).has('mem')) console.log('[mem]', JSON.stringify(textureReport(this)));
     // Opened from someone's share link (...?friend=ID): go straight to the
     // 追加 tab with their ID filled in, and tidy the address bar so a reload
     // doesn't offer it again.

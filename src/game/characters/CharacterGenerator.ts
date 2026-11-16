@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { RARITY_COLORS, type HeroClass, type Rarity } from '../types';
+import { fitKey } from './HeroArt';
 
 /** Deterministic PRNG so the same seed always draws the same character. */
 export function mulberry32(seed: number): () => number {
@@ -47,7 +48,9 @@ export class CharacterGenerator {
   }
 
   generate(seed: number, heroClass: HeroClass, rarity: Rarity, heroId?: string): GeneratedCharacter {
-    if (heroId && this.scene.textures.exists(heroId)) {
+    // The whole-figure square: made offline (tools/art/make_thumbs.py, loaded under this key at start), or baked here from the
+    // big illustration when that is loaded and the small picture is not.
+    if (heroId && (this.scene.textures.exists(fitKey(heroId)) || this.scene.textures.exists(heroId))) {
       return { textureKey: this.illustrationTexture(heroId), size: SIZE };
     }
     const key = `char_${heroClass}_${rarity}_${seed}`;

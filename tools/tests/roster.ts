@@ -35,6 +35,10 @@ ok(noVoice.length === 0, `every home line has its voice file${names(noVoice)}`);
 const noPicture = HERO_ROSTER.filter((h) => !fs.existsSync(here('public/assets/characters', `${h.id}.png`))).map((h) => h.id);
 ok(noPicture.length === 0, `every hero has a picture${names(noPicture)}`);
 
+// the two small pictures the game keeps in memory for everybody (tools/art/make_thumbs.py); the big illustration is loaded on demand
+const noThumb = HERO_ROSTER.filter((h) => !fs.existsSync(here('public/assets/characters/bust', `${h.id}.png`)) || !fs.existsSync(here('public/assets/characters/fit', `${h.id}.png`))).map((h) => h.id);
+ok(noThumb.length === 0, `every hero has its bust and fit pictures (python tools/art/make_thumbs.py)${names(noThumb)}`);
+
 // skills: as many as the rarity grants, each with a name and a line
 const badKit = HERO_ROSTER.filter((h) => (HERO_SKILLS[h.id]?.length ?? 0) !== RARITY_SKILL_SLOTS[h.rarity]).map((h) => h.id);
 ok(badKit.length === 0, `every hero has exactly the skills its rarity grants${names(badKit)}`);
