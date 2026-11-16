@@ -128,7 +128,7 @@ function itemsSection(icon: Icons): string {
     ['gold', 'ゴールド', '/assets/ui/coin.png', 'キャラ・装備の強化や、ショップの買い物に使うコイン。'],
     ['gems', '魔晶石', '/assets/ui/gem.png', 'ガチャを引く、スタミナを買うなどに使う。課金で手に入る。'],
     ['stamina', 'スタミナ', '/assets/ui/stamina.png', 'クエストに出撃するたびに使う。時間で回復する。'],
-    ['phaseMaterials', 'フェーズ素材', `icon:phase`, '使うとキャラのフェーズが1上がる。'],
+    ['phaseMaterials', 'フェーズ素材', `icon:phase`, '使うとキャラのフェーズが1上がる（上のフェーズほど、多く要る）。'],
     ['skillEssence', '技素', `icon:essence`, 'スキルのレベルを上げるのに使う。'],
   ];
   const goodRows = goods

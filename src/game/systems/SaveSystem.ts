@@ -2,6 +2,7 @@ import { BigNumber } from './BigNumber';
 import { createHeroInstance } from '../data/heroes';
 import { BACK_SLOTS, FRONT_SLOTS, MAX_DECKS, cleanDeckName, defaultDeckName, emptyDeck } from './DeckSystem';
 import { REGION_COUNT } from '../data/regions';
+import { phaseFusionCopies, phaseMaterialCost } from '../data/phaseCost';
 import { EQUIP_SLOTS, MAX_LEVEL, MAX_PHASE, emptyGear, type EquipmentItem, type HeroData, type HeroGear, type Row } from '../types';
 import { getEquipDef } from '../data/equipment';
 import { EXPEDITION_SLOTS, getExpedition } from '../data/expeditions';
@@ -891,25 +892,38 @@ export const SaveSystem = {
       .sort((a, b) => spare(a) - spare(b) || a.level - b.level || a.exp - b.exp);
   },
 
-  /** 合成: consumes the copy `materialId` to raise `baseId` by 1 phase. Both
-   *  must be copies of the same character, and the base not yet at MAX_PHASE.
-   *  A deck that had the material standing in it gets the base there instead
-   *  (it can't hold both). False (no change) when any of that doesn't hold. */
-  fuseHero(data: SaveData, baseId: string, materialId: string): boolean {
+  /** 合成: consumes `phaseFusionCopies(base.phase)` copies (the more the nearer MAX_PHASE: data/phaseCost.ts) to raise
+   *  `baseId` by 1 phase. `materialIds` must name at least that many other copies of the same character, and the base
+   *  must not be at MAX_PHASE; the first ones are used. A deck that had a used copy standing in it gets the base there
+   *  instead (it can't hold both). False (no change) when any of that doesn't hold. */
+  fuseHero(data: SaveData, baseId: string, materialIds: string[]): boolean {
     const base = this.getHero(data, baseId);
-    const material = this.getHero(data, materialId);
-    if (!base || !material || base.id === material.id || base.heroId !== material.heroId || base.phase >= MAX_PHASE) return false;
-    // What the copy was wearing goes back to the bag rather than vanishing with it.
-    for (const slot of EQUIP_SLOTS) {
-      const worn = material.gear[slot];
-      if (worn) data.equipment.push(worn);
+    if (!base || base.phase >= MAX_PHASE) return false;
+    const need = phaseFusionCopies(base.phase);
+    const ids = [...new Set(materialIds)].filter((id) => id !== base.id);
+    const materials = ids.map((id) => this.getHero(data, id)).filter((h): h is HeroData => !!h && h.heroId === base.heroId);
+    if (materials.length < need) return false;
+    const used = materials.slice(0, need);
+    const usedIds = new Set(used.map((m) => m.id));
+    for (const material of used) {
+      // What the copy was wearing goes back to the bag rather than vanishing with it.
+      for (const slot of EQUIP_SLOTS) {
+        const worn = material.gear[slot];
+        if (worn) data.equipment.push(worn);
+      }
+      // The fused copy stood on Home? Its character carries on there, as the copy it was fused into.
+      if (data.homeHeroId === material.id) data.homeHeroId = base.id;
     }
-    // The fused copy stood on Home? Its character carries on there, as the copy it was fused into.
-    if (data.homeHeroId === material.id) data.homeHeroId = base.id;
-    data.heroes = data.heroes.filter((h) => h.id !== material.id);
+    data.heroes = data.heroes.filter((h) => !usedIds.has(h.id));
     for (const deck of data.decks) {
       const hasBase = deck.front.includes(base.id) || deck.back.includes(base.id);
-      const swap = (id: string | null) => (id === material.id ? (hasBase ? null : base.id) : id);
+      let placed = hasBase;
+      const swap = (id: string | null) => {
+        if (id === null || !usedIds.has(id)) return id;
+        if (placed) return null;
+        placed = true;
+        return base.id;
+      };
       deck.front = deck.front.map(swap);
       deck.back = deck.back.map(swap);
     }
@@ -918,12 +932,14 @@ export const SaveSystem = {
     return true;
   },
 
-  /** Spends one phase material to raise a hero's phase by 1 (capped at
-   *  MAX_PHASE). False (no change) if out of materials or already maxed. */
+  /** Spends `phaseMaterialCost(phase)` phase materials (the more the nearer MAX_PHASE: data/phaseCost.ts) to raise a
+   *  hero's phase by 1. False (no change) if there are too few or the hero is already at MAX_PHASE. */
   usePhaseMaterial(data: SaveData, heroId: string): boolean {
     const hero = this.getHero(data, heroId);
-    if (!hero || hero.phase >= MAX_PHASE || data.phaseMaterials <= 0) return false;
-    data.phaseMaterials -= 1;
+    if (!hero || hero.phase >= MAX_PHASE) return false;
+    const cost = phaseMaterialCost(hero.phase);
+    if (data.phaseMaterials < cost) return false;
+    data.phaseMaterials -= cost;
     hero.phase += 1;
     recordMission(data, 'hero_enhance');
     return true;

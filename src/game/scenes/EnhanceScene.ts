@@ -14,6 +14,7 @@ import { showToast } from '../ui/Toast';
 import { playEnhanceFx } from '../ui/EnhanceFx';
 import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, RARITY_COLORS, hex, type HeroData } from '../types';
 import { EXP_ITEMS, ITEMS, type ItemId } from '../data/items';
+import { phaseFusionCopies, phaseMaterialCost } from '../data/phaseCost';
 import { itemIcon } from '../ui/ItemIcons';
 import { InboxScene, type InboxCard } from './InboxScene';
 
@@ -28,8 +29,8 @@ const INK = '#1c130a';
 
 /** 強化: the screen the hero detail's 強化する button opens. Two ways to make a
  *  hero stronger - 経験値素材 for levels (the other way to gain levels is clearing
- *  quests; gold cannot buy them), フェーズ素材でフェーズ強化 (+1 phase per material) and
- *  合成 (+1 phase per same-character copy used up).
+ *  quests; gold cannot buy them), フェーズ素材でフェーズ強化 (+1 phase for a number of materials that rises
+ *  towards MAX_PHASE) and 合成 (+1 phase for a number of same-character copies that rises the same way).
  *  戻る goes back to that hero's detail. */
 export class EnhanceScene extends InboxScene {
   protected readonly screenTitle = '強化';
@@ -156,14 +157,18 @@ export class EnhanceScene extends InboxScene {
       panel.container.add(g);
     }
     panel.container.add(body(this, CARD_WIDTH - PAD - 4, top + 28, `${hero.phase} / ${MAX_PHASE}`, { fontSize: '30px', fontStyle: 'bold', color: '#d9c2ff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
-    panel.container.add(caption(this, PAD + 4, top + 74, '素材を1つ使うと、フェーズが1上がります。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    panel.container.add(caption(this, PAD + 4, top + 104, '同じキャラを合成しても上がります。（下の「合成」）', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const cost = maxed ? 0 : phaseMaterialCost(hero.phase);
+    const enough = have >= cost;
+    panel.container.add(
+      caption(this, PAD + 4, top + 74, maxed ? 'フェーズは最大です。' : `フェーズ ${hero.phase} → ${hero.phase + 1} に、素材が ${cost}個 要ります。`, { fontSize: '20px', fontStyle: 'bold', color: maxed ? '#ffd23f' : enough ? '#9fe39f' : '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
+    );
+    panel.container.add(caption(this, PAD + 4, top + 104, maxed ? '' : '上のフェーズほど、多く要ります。同じキャラの合成でも上がります。', { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const guard = () => this.scroll.isTap();
     const button = new Button(this, CARD_WIDTH / 2, top + bodyH - 44, CARD_WIDTH - PAD * 2, 70, maxed ? 'フェーズ最大' : 'フェーズ素材で強化', () => this.raisePhase(hero), {
       variant: 'gold',
       fontSize: '28px',
-      subLabel: maxed ? undefined : `素材 ×${have.toLocaleString('ja-JP')}`,
+      subLabel: maxed ? undefined : `素材 ${have.toLocaleString('ja-JP')} / 必要 ${cost}`,
       guard,
     });
     button.setEnabled(!maxed);
@@ -171,19 +176,25 @@ export class EnhanceScene extends InboxScene {
     return { container: panel.container, height: panel.height };
   }
 
-  /** 合成: fuse another copy of this character (a repeat pull) into this one for
-   *  +1 phase each. Tap a copy to use just it, or まとめて合成 for every copy
-   *  that isn't standing in a deck. The copies used up are gone. */
+  /** 合成: fuse other copies of this character (repeat pulls) into this one: the nearer MAX_PHASE, the more copies one
+   *  phase takes (data/phaseCost.ts). Tap a copy to use it (and the next ones, if more are needed), or まとめて合成 for
+   *  as many phases as the copies that aren't standing in a deck allow. The copies used up are gone. */
   private fuseCard(hero: HeroData): InboxCard {
     const maxed = hero.phase >= MAX_PHASE;
     const materials = maxed ? [] : SaveSystem.fusionMaterials(this.save, hero);
-    const bulk = materials.filter((m) => !SaveSystem.isInAnyDeck(this.save, m.id)).slice(0, MAX_PHASE - hero.phase);
+    const spare = materials.filter((m) => !SaveSystem.isInAnyDeck(this.save, m.id));
+    const bulk = this.bulkFusion(hero, spare);
+    const need = maxed ? 0 : phaseFusionCopies(hero.phase);
     const guard = () => this.scroll.isTap();
     const lines = maxed
       ? ['フェーズが最大のため、合成できません。']
       : materials.length === 0
-        ? ['同じキャラのかぶりを持っていません。', 'ガチャで同じキャラが出ると、ここで合成できます。']
-        : ['素材にする個体をタップ → フェーズが1上がります。', '素材にした個体は消えます。', '編成中の個体を使うと、この個体が代わりに入ります。'];
+        ? [`フェーズ ${hero.phase} → ${hero.phase + 1} の合成には、同じキャラが ${need}体 要ります。`, '同じキャラのかぶりを持っていません。']
+        : [
+            `フェーズ ${hero.phase} → ${hero.phase + 1} の合成には、同じキャラが ${need}体 要ります。${materials.length < need ? `（あと ${need - materials.length}体）` : ''}`,
+            need > 1 ? '素材にする個体をタップ → 足りない分は、ほかの個体も使います。' : '素材にする個体をタップ → フェーズが1上がります。',
+            '使った個体は消えます。編成中の個体は、この個体に入れ替わります。',
+          ];
 
     let bodyH = 24 + lines.length * 30;
     const size = HERO_SLOT_SIZE;
@@ -205,14 +216,15 @@ export class EnhanceScene extends InboxScene {
       const x = PAD + size / 2 + (i % cols) * (size + gapX);
       const y = gridTop + size / 2 + Math.floor(i / cols) * (size + gridGap);
       panel.container.add(
-        new HeroSlot(this, x, y, { hero: material, generator: this.generator, inDeck: SaveSystem.isInAnyDeck(this.save, material.id), onTap: () => this.askFuse(hero, [material]), guard }),
+        new HeroSlot(this, x, y, { hero: material, generator: this.generator, inDeck: SaveSystem.isInAnyDeck(this.save, material.id), onTap: () => this.askFuseWith(hero, material, materials), guard }),
       );
     });
     const buttonY = gridTop + rows * size + (rows - 1) * gridGap + 16 + 35;
+    const bulkCopies = bulk.reduce((n, g) => n + g.length, 0);
     const all = new Button(this, CARD_WIDTH / 2, buttonY, CARD_WIDTH - PAD * 2, 70, 'まとめて合成', () => this.askFuse(hero, bulk), {
       variant: 'gold',
       fontSize: '28px',
-      subLabel: bulk.length > 0 ? `${bulk.length}体を使用（編成中は除く）` : '編成中以外のかぶりがありません',
+      subLabel: bulk.length > 0 ? `フェーズ+${bulk.length}（${bulkCopies}体を使用・編成中は除く）` : '編成中以外のかぶりでは足りません',
       guard,
     });
     all.setEnabled(bulk.length > 0);
@@ -222,14 +234,37 @@ export class EnhanceScene extends InboxScene {
 
   // --- actions ----------------------------------------------------------
 
-  /** Confirms before using up copies: they can't be got back. */
-  private askFuse(hero: HeroData, materials: HeroData[]): void {
-    if (materials.length === 0) return;
-    const after = Math.min(MAX_PHASE, hero.phase + materials.length);
-    const what =
-      materials.length === 1
-        ? `Lv.${materials[0].level} の${materials[0].name}を素材にして、`
-        : `${materials.length}体を素材にして、`;
+  /** The copies, in groups - one group for each phase they pay for (the first group is what the next phase takes, the
+   *  next group what the phase after takes ...) - for as many phases as `spare` copies reach. */
+  private bulkFusion(hero: HeroData, spare: HeroData[]): HeroData[][] {
+    const groups: HeroData[][] = [];
+    let at = 0;
+    for (let phase = hero.phase; phase < MAX_PHASE; phase++) {
+      const need = phaseFusionCopies(phase);
+      if (at + need > spare.length) break;
+      groups.push(spare.slice(at, at + need));
+      at += need;
+    }
+    return groups;
+  }
+
+  /** A copy was tapped: it, and the cheapest other copies if the phase takes more than one. */
+  private askFuseWith(hero: HeroData, tapped: HeroData, all: HeroData[]): void {
+    const need = phaseFusionCopies(hero.phase);
+    if (all.length < need) {
+      showToast(this, `あと ${need - all.length}体 要ります（フェーズ ${hero.phase} → ${hero.phase + 1}）`, '#ffb0a0');
+      return;
+    }
+    const group = [tapped, ...all.filter((m) => m.id !== tapped.id)].slice(0, need);
+    this.askFuse(hero, [group]);
+  }
+
+  /** Confirms before using up copies: they can't be got back. Each group of copies pays for one phase. */
+  private askFuse(hero: HeroData, groups: HeroData[][]): void {
+    if (groups.length === 0) return;
+    const materials = groups.flat();
+    const after = Math.min(MAX_PHASE, hero.phase + groups.length);
+    const what = materials.length === 1 ? `Lv.${materials[0].level} の${materials[0].name}を素材にして、` : `${materials.length}体を素材にして、`;
     const inDeck = materials.some((m) => SaveSystem.isInAnyDeck(this.save, m.id));
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
@@ -237,18 +272,23 @@ export class EnhanceScene extends InboxScene {
       message: `${what}\nフェーズ ${hero.phase} → ${after} に上げます。\n素材にした個体は消えます。${inDeck ? '\n（編成中の枠は、この個体に入れ替わります）' : ''}`,
       confirmLabel: '合成する',
       confirmVariant: 'gold',
-      onConfirm: () => this.fuse(hero, materials),
+      onConfirm: () => this.fuse(hero, groups),
     });
   }
 
-  private fuse(hero: HeroData, materials: HeroData[]): void {
-    let used = 0;
+  private fuse(hero: HeroData, groups: HeroData[][]): void {
+    let done = 0;
     const from = hero.phase;
-    for (const material of materials) if (SaveSystem.fuseHero(this.save, hero.id, material.id)) used++;
-    if (used === 0) return;
+    const used: HeroData[] = [];
+    for (const group of groups) {
+      if (!SaveSystem.fuseHero(this.save, hero.id, group.map((m) => m.id))) break;
+      done++;
+      used.push(...group);
+    }
+    if (done === 0) return;
     SaveSystem.save(this.save);
     this.queueRender();
-    playEnhanceFx(this, { kind: 'fuse', hero, generator: this.generator, from, to: hero.phase, materials });
+    playEnhanceFx(this, { kind: 'fuse', hero, generator: this.generator, from, to: hero.phase, materials: used });
   }
 
   private useExp(hero: HeroData, id: ItemId, count: number): void {
@@ -275,21 +315,31 @@ export class EnhanceScene extends InboxScene {
 
   private raisePhase(hero: HeroData): void {
     if (hero.phase >= MAX_PHASE) return;
-    if (this.save.phaseMaterials <= 0) {
-      this.modal?.close();
+    const cost = phaseMaterialCost(hero.phase);
+    const have = this.save.phaseMaterials;
+    this.modal?.close();
+    if (have < cost) {
       this.modal = openConfirm(this, this.scroll, {
         title: 'フェーズ素材が足りません',
-        message: 'フェーズ素材を持っていません。\nショップで購入しますか？',
+        message: `フェーズ ${hero.phase} → ${hero.phase + 1} には、素材が ${cost}個 要ります。\n（いま ${have}個）\nショップで購入しますか？`,
         confirmLabel: 'ショップへ',
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'materials' }),
       });
       return;
     }
-    const from = hero.phase;
-    if (!SaveSystem.usePhaseMaterial(this.save, hero.id)) return;
-    SaveSystem.save(this.save);
-    this.queueRender();
-    playEnhanceFx(this, { kind: 'phase', hero, generator: this.generator, from, to: hero.phase });
+    this.modal = openConfirm(this, this.scroll, {
+      title: 'フェーズを上げますか？',
+      message: `フェーズ素材を ${cost}個 使って、\nフェーズ ${hero.phase} → ${hero.phase + 1} に上げます。\n（いま ${have}個 → ${have - cost}個）`,
+      confirmLabel: '上げる',
+      confirmVariant: 'gold',
+      onConfirm: () => {
+        const from = hero.phase;
+        if (!SaveSystem.usePhaseMaterial(this.save, hero.id)) return;
+        SaveSystem.save(this.save);
+        this.queueRender();
+        playEnhanceFx(this, { kind: 'phase', hero, generator: this.generator, from, to: hero.phase });
+      },
+    });
   }
 }
