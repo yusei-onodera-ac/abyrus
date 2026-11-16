@@ -92,7 +92,7 @@ const gear = [
 // ---------------------------------------------------------------------------------------------- gacha banners (4)
 const BANNER =
   'A wide promotional banner picture for a Japanese mobile fantasy RPG gacha screen, painted by hand in a rich, glossy anime-game style with strong lighting, glowing particles and a sense of excitement. ' +
-  'Leave the lower-left quarter calmer so that a title can be placed there later. ' + NO_TEXT;
+  'Leave the lower-left quarter calmer (just quieter scenery: no panel, no bar, no stripe, no rectangle, no frame, no overlay) so that a title can be placed there later. ' + NO_TEXT;
 const banners = [
   ['first', 'a first-time summoning: a grand glowing golden magic circle in the centre with a rising pillar of light, a treasure chest overflowing with gems and gold coins, confetti and sparkles, a warm celebratory gold-and-pink palette'],
   ['equip_standard', 'an armory summoning: legendary swords, shields and armor floating around a glowing blue-and-gold magic circle above an anvil, sparks flying, a cool steel-blue and gold palette'],
@@ -713,30 +713,30 @@ const limited = [
 const STAR = ' The FIRST reference picture is the star character: show them biggest, in the centre, striking a powerful pose; the other reference characters stand smaller on either side.';
 const LINEUP = ' All the reference characters stand together in a confident line-up of about the same size.';
 const pickups = [
-  ['g01-launch', ['astra', 'nova', 'sieg', 'celes'], true, 'a grand opening summoning in a festive forest clearing: a golden magic circle, hanging lanterns, confetti and sparkles, a warm green-and-gold palette'],
-  ['g02-winter4', ['seira', 'ignis', 'brann', 'fros'], false, 'a winter preparation summoning: a snowy pine forest at dawn, a frost-covered magic circle glowing ice-blue, falling snow and ice crystals, a cool blue-and-white palette'],
-  ['g03-xmas', ['aria', 'ouka', 'quartz', 'noel'], true, 'a Christmas-night summoning: a giant sparkling decorated fir tree, falling snow, gift boxes, a glowing red-and-gold magic circle, a red-green-and-gold palette'],
-  ['g04-newyear', ['gauss', 'kurenai', 'thorne', 'gen'], true, 'a New Year summoning: sunrise over lantern-lit rooftops, red and gold lucky bags and paper charms, a golden magic circle, a red-and-gold palette'],
-  ['g05-sword4', ['dias', 'ren', 'kohaku', 'taiga'], false, 'a swordmasters line-up in a frosty dojo courtyard: crossed swords, a steel-blue magic circle and flying sparks, a cool steel-and-silver palette'],
-  ['g06-setsubun', ['shade', 'ignis', 'raijin', 'taiga'], true, 'a bean-throwing summoning at old stone ruins at dusk: flying beans, red and blue oni masks, a fiery orange-red magic circle, purple mist, a red-and-orange palette'],
-  ['g07-valentine', ['viara', 'ivy', 'lilith', 'rosa'], true, 'a sweet chocolate summoning: a swirling chocolate fountain, hearts, roses and ribbons, a pink magic circle, a pink-and-brown palette'],
-  ['g08-archer4', ['suzuna', 'nova', 'gale', 'morrigan'], false, 'a line-up of master archers in a bright green meadow: arrows of light flying, a green magic circle, a fresh green-and-gold palette'],
-  ['g09-piday', ['zeno', 'quartz', 'brann', 'noct'], true, 'a mathematical summoning: a magic circle made of glowing concentric rings, arcs and spirals, floating glowing geometric shapes (no digits and no letters), an indigo-and-gold palette'],
-  ['g10-sakura', ['aria', 'ouka', 'sylva', 'haruka'], true, 'a cherry blossom summoning: huge sakura trees, swirling petals, a pink magic circle, a pink-and-white palette'],
-  ['g11-tank4', ['baron', 'brann', 'raijin', 'elrin'], false, 'a guardian line-up before a massive castle gate: shields and armor, a steel-grey magic circle, a steel-and-gold palette'],
-  ['g12-golden', ['gauss', 'thorne', 'dias', 'bruno'], true, 'a golden-week summoning: piles of treasure, a golden magic circle, golden light beams, a gold-and-sand palette'],
-  ['g13-mage4', ['lilith', 'quartz', 'ouka', 'miru'], false, 'an arcane line-up in a wizard tower: floating spellbooks, a violet magic circle, a violet-and-blue palette'],
-  ['g14-gale', ['zeno', 'gale', 'nova', 'mina'], true, 'a gale summoning: strong wind swirling leaves and clouds, a cyan magic circle, a cyan-and-white palette'],
-  ['g15-rain', ['viara', 'ivy', 'quartz', 'toxar'], true, 'a hydrangea summoning in the rain: blue and violet hydrangeas, raindrops, a blue-violet magic circle, a blue-and-violet palette'],
-  ['g16-tanabata', ['astra', 'quartz', 'lilith', 'miru'], true, 'a star-festival summoning: bamboo with paper strips, a river of stars, a gold-and-indigo magic circle, a deep blue-and-gold palette'],
-  ['g17-heat4', ['kurenai', 'ignis', 'raijin', 'kai'], false, 'a blazing heat line-up: lava and flames, a red-orange magic circle, an orange-and-red palette'],
-  ['g18-summer', ['gauss', 'gale', 'seira', 'sora'], true, 'a summer pirate summoning on a sunny beach: a pirate ship, treasure, turquoise sea, a turquoise-and-gold magic circle'],
-  ['g19-summer2', ['zeno', 'quartz', 'nova', 'felix'], true, 'a summer sea summoning at sunset: waves, seashells, a glowing aqua magic circle, an aqua-and-orange palette'],
-  ['g20-late4', ['ren', 'dias', 'sieg', 'haruka'], false, 'an end-of-summer line-up: a sunflower field at dusk, fireflies, a yellow-green magic circle, a golden-green palette'],
-  ['g21-autumn', ['astra', 'sieg', 'gale', 'mina'], true, 'an early autumn summoning: red dragonflies, pampas grass, a golden magic circle, an amber-and-gold palette'],
-  ['g22-moon', ['shade', 'lilith', 'quartz', 'lune'], true, 'a moonlit summoning: a huge full moon, pampas grass, white dumplings, a silver-violet magic circle, an indigo-and-silver palette'],
-  ['g23-momiji', ['aria', 'kurenai', 'ouka', 'kaede'], true, 'an autumn leaves summoning: red maple leaves swirling, a red-gold magic circle, a red-and-gold palette'],
-  ['g24-halloween', ['shade', 'viara', 'lilith', 'ivy'], true, 'a Halloween summoning: giant carved pumpkin lanterns, bats, a purple magic circle, a purple-and-orange palette'],
+  ['g01-launch', ['astra', 'sieg', 'hild', 'celes'], true, 'a grand opening summoning in a festive forest clearing: a golden magic circle, hanging lanterns, confetti and sparkles, a warm green-and-gold palette'],
+  ['g02-winter4', ['seira', 'gran', 'ignis', 'skadi'], false, 'a winter preparation summoning: a snowy pine forest at dawn, a frost-covered magic circle glowing ice-blue, falling snow and ice crystals, a cool blue-and-white palette'],
+  ['g03-xmas', ['serafina', 'ouka', 'anju', 'noel'], true, 'a Christmas-night summoning: a giant sparkling decorated fir tree, falling snow, gift boxes, a glowing red-and-gold magic circle, a red-green-and-gold palette'],
+  ['g04-newyear', ['gauss', 'kurenai', 'shaolan', 'gen'], true, 'a New Year summoning: sunrise over lantern-lit rooftops, red and gold lucky bags and paper charms, a golden magic circle, a red-and-gold palette'],
+  ['g05-sword4', ['dias', 'ren', 'musashi', 'dante'], false, 'a swordmasters line-up in a frosty dojo courtyard: crossed swords, a steel-blue magic circle and flying sparks, a cool steel-and-silver palette'],
+  ['g06-setsubun', ['prime', 'magna', 'raijin', 'toro'], true, 'a bean-throwing summoning at old stone ruins at dusk: flying beans, red and blue oni masks, a fiery orange-red magic circle, purple mist, a red-and-orange palette'],
+  ['g07-valentine', ['viara', 'ivy', 'fleur', 'rosa'], true, 'a sweet chocolate summoning: a swirling chocolate fountain, hearts, roses and ribbons, a pink magic circle, a pink-and-brown palette'],
+  ['g08-archer4', ['suzuna', 'hawk', 'fiora', 'annie'], false, 'a line-up of master archers in a bright green meadow: arrows of light flying, a green magic circle, a fresh green-and-gold palette'],
+  ['g09-piday', ['tau', 'chrono', 'quartz', 'noct'], true, 'a mathematical summoning: a magic circle made of glowing concentric rings, arcs and spirals, floating glowing geometric shapes (no digits and no letters), an indigo-and-gold palette'],
+  ['g10-sakura', ['phi', 'ouka', 'shiro', 'haruka'], true, 'a cherry blossom summoning: huge sakura trees, swirling petals, a pink magic circle, a pink-and-white palette'],
+  ['g11-tank4', ['baron', 'torta', 'magna', 'amara'], false, 'a guardian line-up before a massive castle gate: shields and armor, a steel-grey magic circle, a steel-and-gold palette'],
+  ['g12-golden', ['sigma', 'thorne', 'hild', 'leona'], true, 'a golden-week summoning: piles of treasure, a golden magic circle, golden light beams, a gold-and-sand palette'],
+  ['g13-mage4', ['iris', 'terra', 'lilith', 'mike'], false, 'an arcane line-up in a wizard tower: floating spellbooks, a violet magic circle, a violet-and-blue palette'],
+  ['g14-gale', ['delta', 'gale', 'hawk', 'hibari'], true, 'a gale summoning: strong wind swirling leaves and clouds, a cyan magic circle, a cyan-and-white palette'],
+  ['g15-rain', ['aria', 'rain', 'ivy', 'sachi'], true, 'a hydrangea summoning in the rain: blue and violet hydrangeas, raindrops, a blue-violet magic circle, a blue-and-violet palette'],
+  ['g16-tanabata', ['astra', 'quartz', 'chrono', 'cyril'], true, 'a star-festival summoning: bamboo with paper strips, a river of stars, a gold-and-indigo magic circle, a deep blue-and-gold palette'],
+  ['g17-heat4', ['kurenai', 'magna', 'ignis', 'bao'], false, 'a blazing heat line-up: lava and flames, a red-orange magic circle, an orange-and-red palette'],
+  ['g18-summer', ['gauss', 'nerei', 'seira', 'isana'], true, 'a summer pirate summoning on a sunny beach: a pirate ship, treasure, turquoise sea, a turquoise-and-gold magic circle'],
+  ['g19-summer2', ['zeno', 'fiora', 'nova', 'lotta'], true, 'a summer sea summoning at sunset: waves, seashells, a glowing aqua magic circle, an aqua-and-orange palette'],
+  ['g20-late4', ['ren', 'shaolan', 'sieg', 'ulf'], false, 'an end-of-summer line-up: a sunflower field at dusk, fireflies, a yellow-green magic circle, a golden-green palette'],
+  ['g21-autumn', ['tau', 'hild', 'thorne', 'tengri'], true, 'an early autumn summoning: red dragonflies, pampas grass, a golden magic circle, an amber-and-gold palette'],
+  ['g22-moon', ['shade', 'lilith', 'somu', 'kon'], true, 'a moonlit summoning: a huge full moon, pampas grass, white dumplings, a silver-violet magic circle, an indigo-and-silver palette'],
+  ['g23-momiji', ['phi', 'kurenai', 'shiro', 'kaede'], true, 'an autumn leaves summoning: red maple leaves swirling, a red-gold magic circle, a red-and-gold palette'],
+  ['g24-halloween', ['shade', 'viara', 'weiss', 'lilith'], true, 'a Halloween summoning: giant carved pumpkin lanterns, bats, a purple magic circle, a purple-and-orange palette'],
   ['g25-countdown', ['aria', 'zeno', 'astra', 'sieg'], true, 'an anniversary summoning: fireworks, a gigantic golden crown-and-ribbon emblem, a rainbow-gold magic circle, a pink-and-gold palette'],
 ].map(([id, who, star, what]) => ({
   id: `banner_${id}`,

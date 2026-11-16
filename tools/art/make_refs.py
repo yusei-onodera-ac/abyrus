@@ -25,6 +25,10 @@ HEROES = ['viara', 'astra', 'dias', 'celes', 'noct', 'gauss', 'aria', 'zeno', 's
           'tsubame', 'morrigan', 'orga', 'elrin', 'gustav', 'doris', 'bruno', 'mina', 'kai', 'fros', 'robin',
           # style references for the ★1 and ★2 characters added to double the roster (newCharacters.mjs)
           'mizuki', 'ald', 'momo', 'lumi', 'fern', 'enju']
+# the 80 characters added to double the roster (tools/art/newCharacters.mjs) headline the year's pickup banners too
+import re
+
+HEROES += re.findall(r"^\s*\['(\w+)', \d,", (Path(__file__).resolve().parent / 'newCharacters.mjs').read_text(encoding='utf-8'), re.M)
 for n in HEROES:
     save(root / 'characters' / f'{n}.png', f'{n}.jpg', (640, 860))
 for n in ['wolf', 'lion', 'necrodraco', 'garumudo', 'arachnea', 'kongo', 'snake', 'bear']:
