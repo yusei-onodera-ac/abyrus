@@ -485,4 +485,294 @@ export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
   brisa: [defineSkill(1, 'buff_atk', '原野の喊声', '原野に響く喊声が味方全体を奮い立たせる。')],
   finn: [defineSkill(1, 'debuff_atk', '腐食調合液', '調合した薬液が敵単体の攻撃力を鈍らせる。')],
   rin: [defineSkill(1, 'drain_single', '拳闘奪気', '拳打で敵単体から気力を奪い取る。')],
+
+  // =====================================================================================================
+  // 2026-11: 80 more characters (the roster doubled). ★5 four skills, ★4 three, ★3 two, ★2-1 one.
+  // =====================================================================================================
+
+  // --- ★5 ---------------------------------------------------------------------------------------------
+  phi: [
+    defineSkill(5, 'nuke_single', '黄金螺旋斬', '黄金比の螺旋を描く斬撃で、敵単体を貫く。'),
+    defineSkill(5, 'buff_atk', '比率の閃き', '最適な間合いを見抜き、味方全体の攻撃力を高める。'),
+    defineSkill(5, 'debuff_def', '均衡崩し', '敵単体の守りの均衡を崩し、防御力を落とす。'),
+    defineSkill(5, 'nuke_aoe', '螺旋剣舞', '螺旋の剣舞で戦場を駆け、敵全体を斬り払う。'),
+  ],
+  tau: [
+    defineSkill(5, 'nuke_aoe', '円環断', '巨大な輪の刃を投げ放ち、敵全体を薙ぐ。'),
+    defineSkill(5, 'buff_def', '円陣の覇気', '円環の陣で、味方全体の防御力を高める。'),
+    defineSkill(5, 'stun', '覇者の一喝', '王の一喝で敵単体を竦ませ、行動を封じる。'),
+    defineSkill(5, 'nuke_single', '環王の裁断', '輪刃を叩きつけ、敵単体を両断する。'),
+  ],
+  prime: [
+    defineSkill(5, 'nuke_single', '素数の一矢', '割り切れぬ一矢が、敵単体を射抜く。'),
+    defineSkill(5, 'debuff_atk', '孤影の照準', '照準に捉えた敵単体の攻撃力を奪う。'),
+    defineSkill(5, 'stun', '静止の矢', '時の止まったような一矢で、敵単体の動きを縫い止める。'),
+    defineSkill(5, 'nuke_aoe', '素因分解の雨', '光の矢を無数に分け、敵全体へ降らせる。'),
+  ],
+  sigma: [
+    defineSkill(5, 'invincible', '総和の城塞', '積み重ねた金板が全てを弾き、しばらく無敵になる。'),
+    defineSkill(5, 'buff_def', '加算の守護', '味方全体の防御を積み上げ、堅牢にする。'),
+    defineSkill(5, 'stun', '女帝の威圧', '威厳の一睨みで、敵単体を行動不能にする。'),
+    defineSkill(5, 'nuke_single', '王笏の一突き', '槍の王笏で、敵単体を貫く。'),
+  ],
+  delta: [
+    defineSkill(5, 'nuke_single', '三叉の矢', '三つに裂ける矢で、敵単体を撃ち抜く。'),
+    defineSkill(5, 'nuke_aoe', '次元裂き', '次元を裂く矢で、敵全体を切り刻む。'),
+    defineSkill(5, 'debuff_def', '結晶の楔', '結晶の楔を打ち込み、敵単体の防御力を砕く。'),
+    defineSkill(5, 'buff_atk', '光の追い風', '裂け目から吹く光が、味方全体の攻撃力を高める。'),
+  ],
+  serafina: [
+    defineSkill(5, 'heal_single', '癒光の抱擁', '光の翼で味方単体を包み、傷を癒す。'),
+    defineSkill(5, 'heal_aoe', '六翼の祝福', '六枚の翼が、味方全体の傷を一斉に癒す。'),
+    defineSkill(5, 'revive', '大司教の奇跡', '祈りの奇跡で、倒れた味方を呼び戻す。'),
+    defineSkill(5, 'buff_def', '聖域の加護', '聖域の光が、味方全体の防御力を高める。'),
+  ],
+
+  // --- ★4 ---------------------------------------------------------------------------------------------
+  musashi: [
+    defineSkill(4, 'nuke_single', '二天一流・断', '二刀を交差させ、敵単体を断ち斬る。'),
+    defineSkill(4, 'nuke_aoe', '二刀乱れ斬り', '二刀を振るい、敵全体を斬り伏せる。'),
+    defineSkill(4, 'debuff_def', '破鎧の太刀', '鎧を断つ太刀筋で、敵単体の防御力を削る。'),
+  ],
+  hild: [
+    defineSkill(4, 'nuke_single', '戦乙女の槍', '翼で加速した槍で、敵単体を貫く。'),
+    defineSkill(4, 'buff_atk', '勝利への号令', '戦乙女の号令が、味方全体の攻撃力を高める。'),
+    defineSkill(4, 'nuke_aoe', '天駆ける斬撃', '空から舞い降り、敵全体を薙ぎ払う。'),
+  ],
+  shaolan: [
+    defineSkill(4, 'nuke_single', '蒼龍拳', '龍気を纏う拳で、敵単体を打ち抜く。'),
+    defineSkill(4, 'stun', '点穴', '急所を突き、敵単体の動きを止める。'),
+    defineSkill(4, 'nuke_aoe', '昇龍連脚', '昇る龍の連脚で、敵全体を蹴り上げる。'),
+  ],
+  iris: [
+    defineSkill(4, 'nuke_aoe', '七色の光条', '虹の光条で、敵全体を撃つ。'),
+    defineSkill(4, 'debuff_atk', '屈折の幻惑', '光を曲げて敵単体を惑わせ、攻撃力を奪う。'),
+    defineSkill(4, 'buff_atk', '虹の祝福', '虹の光が、味方全体の攻撃力を高める。'),
+  ],
+  chrono: [
+    defineSkill(4, 'stun', '刻の停止', '時を止め、敵単体の動きを封じる。'),
+    defineSkill(4, 'nuke_single', '遅延爆撃', '時間差の魔弾を、敵単体に叩き込む。'),
+    defineSkill(4, 'buff_atk', '加速の刻印', '時の流れを早め、味方全体の攻撃力を高める。'),
+  ],
+  terra: [
+    defineSkill(4, 'nuke_aoe', '岩峰召喚', '大地から岩の槍を突き上げ、敵全体を貫く。'),
+    defineSkill(4, 'buff_def', '大地の護り', '大地の力が、味方全体の防御力を高める。'),
+    defineSkill(4, 'nuke_single', '落岩', '巨岩を落とし、敵単体を押し潰す。'),
+  ],
+  somu: [
+    defineSkill(4, 'stun', '子守りの霧', '眠気を誘う霧で、敵単体の動きを止める。'),
+    defineSkill(4, 'debuff_atk', '悪夢の囁き', '悪夢を見せ、敵単体の攻撃力を奪う。'),
+    defineSkill(4, 'nuke_aoe', '夢喰いの渦', '夢を喰らう渦で、敵全体を呑み込む。'),
+  ],
+  nerei: [
+    defineSkill(4, 'nuke_aoe', '渦潮の怒り', '渦潮を呼び、敵全体を呑み込む。'),
+    defineSkill(4, 'heal_aoe', '潮の恵み', '満ちる潮が、味方全体の傷を癒す。'),
+    defineSkill(4, 'debuff_def', '水圧の枷', '水圧で敵単体を押さえ、防御力を落とす。'),
+  ],
+  hawk: [
+    defineSkill(4, 'nuke_single', '鷹の目の一射', '鷹の眼で狙い澄まし、敵単体を射抜く。'),
+    defineSkill(4, 'debuff_atk', '鷹の急襲', '鷹を放って敵単体を襲わせ、攻撃力を奪う。'),
+    defineSkill(4, 'nuke_aoe', '羽ばたきの矢', '羽ばたく矢の群れで、敵全体を射る。'),
+  ],
+  kreis: [
+    defineSkill(4, 'nuke_single', '重弩の一撃', '極太の矢で、敵単体を撃ち抜く。'),
+    defineSkill(4, 'nuke_aoe', '連装掃射', '連装の弩で、敵全体を掃射する。'),
+    defineSkill(4, 'stun', '楔打ち', '楔の矢で敵単体を縫い止め、動きを封じる。'),
+  ],
+  fiora: [
+    defineSkill(4, 'nuke_single', '花弁の矢', '花弁をまとう矢で、敵単体を射る。'),
+    defineSkill(4, 'buff_atk', '妖精の粉', '妖精の粉が、味方全体の攻撃力を高める。'),
+    defineSkill(4, 'debuff_atk', '眠り花粉', '花粉で敵単体を惑わせ、攻撃力を奪う。'),
+  ],
+  gran: [
+    defineSkill(4, 'buff_def', '岩腕の構え', '岩の腕で守りを固め、味方全体の防御力を高める。'),
+    defineSkill(4, 'stun', '巨人の拳', '巨人の拳で敵単体を叩き、動きを止める。'),
+    defineSkill(4, 'nuke_single', '落石の一撃', '岩の棍棒を振り下ろし、敵単体を打つ。'),
+  ],
+  torta: [
+    defineSkill(4, 'invincible', '甲羅ごもり', '甲羅に籠もり、しばらくあらゆる攻撃を弾く。'),
+    defineSkill(4, 'buff_def', '甲羅の守り', '甲羅の守りが、味方全体の防御力を高める。'),
+    defineSkill(4, 'nuke_single', '甲羅突撃', '甲羅ごと体当たりし、敵単体を弾き飛ばす。'),
+  ],
+  magna: [
+    defineSkill(4, 'stun', '鬼の咆哮', '鬼の咆哮で、敵単体を竦ませる。'),
+    defineSkill(4, 'buff_def', '鉄鬼の護り', '鉄の鎧が仲間を守り、味方全体の防御力を高める。'),
+    defineSkill(4, 'nuke_aoe', '金棒薙ぎ', '金棒を薙ぎ払い、敵全体を打ち据える。'),
+  ],
+  fleur: [
+    defineSkill(4, 'heal_single', '花びらの手当て', '花びらが舞い、味方単体の傷を癒す。'),
+    defineSkill(4, 'heal_aoe', '満開の祝福', '満開の花が、味方全体の傷を癒す。'),
+    defineSkill(4, 'buff_def', '蔓の護り', '蔓が味方を包み、防御力を高める。'),
+  ],
+  shiro: [
+    defineSkill(4, 'heal_single', '狐火の灯り', '温かな狐火が、味方単体の傷を癒す。'),
+    defineSkill(4, 'buff_atk', '稲荷の加護', '稲荷の加護が、味方全体の攻撃力を高める。'),
+    defineSkill(4, 'heal_aoe', '白狐の舞', '白狐の舞が、味方全体を癒す。'),
+  ],
+  rain: [
+    defineSkill(4, 'heal_aoe', '慈雨', '恵みの雨が、味方全体の傷を癒す。'),
+    defineSkill(4, 'heal_single', '雨だれの治癒', '雨粒が傷口を洗い、味方単体を癒す。'),
+    defineSkill(4, 'debuff_atk', '霧雨の帳', '霧雨で敵単体の視界を奪い、攻撃力を落とす。'),
+  ],
+  weiss: [
+    defineSkill(4, 'heal_single', '調合治療', '調合した薬で、味方単体を治療する。'),
+    defineSkill(4, 'debuff_atk', '毒除けの煙', '特殊な煙で敵単体を弱らせ、攻撃力を落とす。'),
+    defineSkill(4, 'heal_aoe', '霧中の施療', '薬の霧が、味方全体の傷を癒す。'),
+  ],
+  anju: [
+    defineSkill(4, 'heal_single', '天使の口づけ', '天使の祈りが、味方単体の傷を癒す。'),
+    defineSkill(4, 'revive', '見習い天使の奇跡', 'ひたむきな祈りが、倒れた味方を呼び戻す。'),
+    defineSkill(4, 'buff_def', '白い羽根の護り', '白い羽根が舞い、味方全体の防御力を高める。'),
+  ],
+
+  // --- ★3 ---------------------------------------------------------------------------------------------
+  dante: [
+    defineSkill(3, 'nuke_single', '賞金首狩り', '狙った獲物を逃さず、敵単体を斬る。'),
+    defineSkill(3, 'debuff_def', '咎人の一太刀', '急所を狙い、敵単体の防御力を削る。'),
+  ],
+  hinata: [
+    defineSkill(3, 'nuke_single', '木刀一本', '稽古で鍛えた木刀で、敵単体を打つ。'),
+    defineSkill(3, 'buff_atk', '道場の気合', '道場仕込みの気合が、味方全体を奮い立たせる。'),
+  ],
+  ulf: [
+    defineSkill(3, 'nuke_aoe', '北海の大斧', '大斧を振り回し、敵全体をなぎ倒す。'),
+    defineSkill(3, 'buff_atk', '戦士の雄叫び', '雄叫びが、味方全体の攻撃力を高める。'),
+  ],
+  cecil: [
+    defineSkill(3, 'nuke_single', '落ち騎士の剣', '欠けた剣で、それでも敵単体を斬る。'),
+    defineSkill(3, 'debuff_atk', '騎士の矜持', '気迫で敵単体を気圧し、攻撃力を落とす。'),
+  ],
+  leona: [
+    defineSkill(3, 'nuke_single', '闘技場の一閃', '観衆の歓声を力に、敵単体を斬る。'),
+    defineSkill(3, 'stun', '盾叩き', '小盾で敵単体を殴りつけ、動きを止める。'),
+  ],
+  toro: [
+    defineSkill(3, 'stun', '紅布の誘い', '赤い布で敵単体を誘い、動きを止める。'),
+    defineSkill(3, 'nuke_single', '闘牛の一突き', '鋭い突きで、敵単体を貫く。'),
+  ],
+  skadi: [
+    defineSkill(3, 'nuke_single', '氷槍の一撃', '氷の槍で、敵単体を貫く。'),
+    defineSkill(3, 'debuff_atk', '凍える風', '凍てつく風が、敵単体の力を奪う。'),
+  ],
+  bao: [
+    defineSkill(3, 'nuke_aoe', '酔拳乱舞', '千鳥足の乱舞で、敵全体を打つ。'),
+    defineSkill(3, 'drain_single', '酒気の一撃', '酒の勢いで敵単体を殴り、生気を奪う。'),
+  ],
+  mike: [
+    defineSkill(3, 'nuke_single', '見習いの火花', '覚えたての魔法で、敵単体を撃つ。'),
+    defineSkill(3, 'buff_atk', '黒猫の幸運', '黒猫の幸運が、味方全体の攻撃力を高める。'),
+  ],
+  faust: [
+    defineSkill(3, 'nuke_aoe', '頁の嵐', '無数の頁を飛ばし、敵全体を斬る。'),
+    defineSkill(3, 'debuff_def', '禁書の注釈', '禁書の一節で、敵単体の防御力を落とす。'),
+  ],
+  kon: [
+    defineSkill(3, 'nuke_aoe', '狐火乱舞', '狐火を乱れ飛ばし、敵全体を焼く。'),
+    defineSkill(3, 'stun', '化かし', '化かして敵単体を惑わせ、動きを止める。'),
+  ],
+  rook: [
+    defineSkill(3, 'nuke_single', '猟犬の追撃', '猟犬と共に獲物を追い、敵単体を射抜く。'),
+    defineSkill(3, 'debuff_atk', '足止めの矢', '足を狙って、敵単体の力を削ぐ。'),
+  ],
+  annie: [
+    defineSkill(3, 'nuke_single', '早撃ち', '目にも止まらぬ早撃ちで、敵単体を撃つ。'),
+    defineSkill(3, 'nuke_aoe', '乱れ撃ち', '連射で、敵全体を撃ち抜く。'),
+  ],
+  hibari: [
+    defineSkill(3, 'nuke_single', '雲雀の一矢', '高く舞い上がる矢で、敵単体を射る。'),
+    defineSkill(3, 'buff_atk', 'さえずりの鼓舞', '澄んださえずりが、味方全体を鼓舞する。'),
+  ],
+  tengri: [
+    defineSkill(3, 'nuke_aoe', '草原の矢雨', '草原を渡る風に乗せ、矢の雨を降らせる。'),
+    defineSkill(3, 'debuff_def', '騎射の一矢', '馬上仕込みの一矢で、敵単体の守りを崩す。'),
+  ],
+  isana: [
+    defineSkill(3, 'nuke_single', '銛打ち', '大銛を放ち、敵単体を貫く。'),
+    defineSkill(3, 'stun', '綱絡め', '綱で敵単体を絡め取り、動きを止める。'),
+  ],
+  cyril: [
+    defineSkill(3, 'nuke_single', '速達の矢', '手紙を結んだ矢が、敵単体に確かに届く。'),
+    defineSkill(3, 'buff_atk', '朗報の便り', '良い知らせが、味方全体の攻撃力を高める。'),
+  ],
+  moss: [
+    defineSkill(3, 'buff_def', '苔の鎧', '苔むす体が、味方全体の防御力を高める。'),
+    defineSkill(3, 'stun', '石塊の落下', '石の塊を落とし、敵単体を止める。'),
+  ],
+  grete: [
+    defineSkill(3, 'buff_def', '鍋蓋の守り', '大きな鍋蓋で、味方全体を守る。'),
+    defineSkill(3, 'nuke_single', 'フライパン一閃', '熱々のフライパンで、敵単体を殴る。'),
+  ],
+  ivan: [
+    defineSkill(3, 'buff_def', '雪国の防壁', '雪を固めた壁が、味方全体の防御力を高める。'),
+    defineSkill(3, 'stun', '斧の柄打ち', '斧の柄で敵単体を叩き、動きを止める。'),
+  ],
+  teo: [
+    defineSkill(3, 'buff_def', '従騎士の誓い', '誓いを胸に、味方全体の防御力を高める。'),
+    defineSkill(3, 'nuke_single', '見習いの突き', '精一杯の突きを、敵単体に放つ。'),
+  ],
+  amara: [
+    defineSkill(3, 'buff_def', '太陽の盾', '陽光を宿す盾で、味方全体を守る。'),
+    defineSkill(3, 'stun', '砂塵の盾打ち', '砂塵と共に盾を叩きつけ、敵単体を止める。'),
+  ],
+  rhino: [
+    defineSkill(3, 'stun', '突角突進', '角で突進し、敵単体の動きを止める。'),
+    defineSkill(3, 'buff_def', '犀の鎧', '分厚い鎧が、味方全体の防御力を高める。'),
+  ],
+  ravi: [
+    defineSkill(3, 'buff_def', '梵鐘の守り', '鐘の音が、味方全体の防御力を高める。'),
+    defineSkill(3, 'stun', '鐘の一撃', '鐘を打ち鳴らし、敵単体を怯ませる。'),
+  ],
+  pia: [
+    defineSkill(3, 'heal_single', '野戦の応急手当', '素早い応急手当で、味方単体を治療する。'),
+    defineSkill(3, 'heal_aoe', '灯火の看護', '灯火の下、味方全体の傷を手当てする。'),
+  ],
+  hugo: [
+    defineSkill(3, 'heal_single', '薬酒の一杯', '薬酒の一杯が、味方単体の傷を癒す。'),
+    defineSkill(3, 'buff_atk', '宴の活力', '陽気な活力が、味方全体の攻撃力を高める。'),
+  ],
+  lotta: [
+    defineSkill(3, 'heal_aoe', '旅の子守唄', '穏やかな歌が、味方全体の傷を癒す。'),
+    defineSkill(3, 'buff_atk', '陽気な行進曲', '陽気な旋律が、味方全体の攻撃力を高める。'),
+  ],
+  sachi: [
+    defineSkill(3, 'heal_aoe', '湯けむりの癒し', '温かな湯けむりが、味方全体の傷を癒す。'),
+    defineSkill(3, 'heal_single', '湯桶の一杯', '温かな湯で、味方単体の傷を癒す。'),
+  ],
+  owen: [
+    defineSkill(3, 'heal_single', '森の薬草', '森の薬草で、味方単体を治療する。'),
+    defineSkill(3, 'heal_aoe', '梟の見守り', '梟の見守りが、味方全体の傷を癒す。'),
+  ],
+  tsumugi: [
+    defineSkill(3, 'heal_single', '縫合の糸', '光る糸で傷を縫い合わせ、味方単体を癒す。'),
+    defineSkill(3, 'buff_def', '継ぎ当ての加護', '丈夫な継ぎ当てが、味方全体の防御力を高める。'),
+  ],
+
+  // --- ★2 : 1-skill kits ------------------------------------------------------------------------------
+  cain: [defineSkill(2, 'nuke_single', '見習いの剣闘', '闘技場で覚えた一撃を、敵単体へ。')],
+  nene: [defineSkill(2, 'nuke_aoe', '棒術の薙ぎ', '長い棒を振るい、敵全体を打つ。')],
+  tobi: [defineSkill(2, 'nuke_single', '授業で習った魔弾', '習いたての魔弾を、敵単体へ放つ。')],
+  nel: [defineSkill(2, 'debuff_atk', '雪の冷たさ', '雪の冷気で、敵単体の攻撃力を落とす。')],
+  sparky: [defineSkill(2, 'stun', '静電気ショック', '火花で敵単体を痺れさせ、動きを止める。')],
+  mugi: [defineSkill(2, 'nuke_single', '麦畑の一矢', '素朴な一矢で、敵単体を射る。')],
+  kei: [defineSkill(2, 'nuke_single', '狩りの一矢', '身を潜めて放つ一矢で、敵単体を射る。')],
+  lily: [defineSkill(2, 'debuff_atk', '羊追いの石', '投げた石で敵単体を怯ませ、攻撃力を落とす。')],
+  dote: [defineSkill(2, 'buff_def', '門番の構え', '門を固く守り、味方全体の防御力を高める。')],
+  kuma: [defineSkill(2, 'stun', '熊の一撃', '熊の勢いで敵単体を叩き、動きを止める。')],
+  hank: [defineSkill(2, 'nuke_single', '木こりの一振り', '斧を振り下ろし、敵単体を叩き割る。')],
+  bell: [defineSkill(2, 'buff_def', '鐘の音の守り', '鐘の音が、味方全体の防御力を高める。')],
+  hana: [defineSkill(2, 'heal_single', '花の手当て', '花の香りが、味方単体の傷を癒す。')],
+  miel: [defineSkill(2, 'heal_aoe', '蜂蜜の甘さ', '甘い蜂蜜が、味方全体の傷を癒す。')],
+  tomo: [defineSkill(2, 'heal_single', '見習いの祈り', 'ひたむきな祈りが、味方単体の傷を癒す。')],
+
+  // --- ★1 : 1-skill kits ------------------------------------------------------------------------------
+  nuts: [defineSkill(1, 'nuke_single', '石つぶて', '小石を放ち、敵単体にぶつける。')],
+  rie: [defineSkill(1, 'nuke_single', '森の少女の矢', '精一杯引いた矢を、敵単体へ。')],
+  taka: [defineSkill(1, 'debuff_atk', '罠の下準備', '仕掛けた罠で、敵単体の攻撃力を落とす。')],
+  don: [defineSkill(1, 'buff_def', '木盾の構え', '木の盾を構え、味方全体の防御力を高める。')],
+  rock: [defineSkill(1, 'stun', '石頭の頭突き', '固い頭で、敵単体に頭突きをかます。')],
+  pam: [defineSkill(1, 'buff_def', '門前の見張り', '門前で見張り、味方全体の防御力を高める。')],
+  yomo: [defineSkill(1, 'heal_single', '薬草の煎じ汁', '煎じた薬草で、味方単体の傷を癒す。')],
+  mio: [defineSkill(1, 'heal_aoe', '新米僧の祈祷', '真心の祈りが、味方全体を癒す。')],
+  tiko: [defineSkill(1, 'nuke_single', '背伸びの魔法', '大きな魔法を、背伸びして敵単体へ。')],
+  ryo: [defineSkill(1, 'nuke_single', '木刀の一振り', '木刀を精一杯振り下ろし、敵単体を打つ。')],
 };

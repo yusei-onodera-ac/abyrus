@@ -3,10 +3,11 @@ import { SCHEDULE_START, SCHEDULE_END, SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SC
 import { GACHA_BANNERS, getActiveGachaBanners, isGachaActive, type GachaBannerEntry } from '../../src/game/data/gachaBanners';
 import { EVENTS, eventPhase, getVisibleEvents, UPCOMING_DAYS } from '../../src/game/data/events';
 import { describeCampaign } from '../../src/game/data/campaigns';
+import { MANIFEST } from '../art/manifest.mjs';
 import { getHomeBanners } from '../../src/game/data/banners';
 import { getNotices, scheduleNotices } from '../../src/game/data/notices';
 import { KIND_NAME, formatSpan, groupByMonth, itemStatus, scheduleItems } from '../../src/game/systems/ScheduleView';
-import { createHeroInstance, getHeroDefinition } from '../../src/game/data/heroes';
+import { createHeroInstance, getHeroDefinition, getHeroesByRarity } from '../../src/game/data/heroes';
 import { GachaSystem, heroPoolOf, heroRatesOf, pickupHeroesOf, pityLeft, ratesOf } from '../../src/game/systems/GachaSystem';
 import { CampaignSystem } from '../../src/game/systems/CampaignSystem';
 import { EventSystem } from '../../src/game/systems/EventSystem';
@@ -164,16 +165,31 @@ for (const b of equipGachas) {
   const five = new Map<string, number>();
   for (const b of heroGachas) for (const h of pickupHeroesOf(b)) if (h.rarity === 5) five.set(h.id, (five.get(h.id) ?? 0) + 1);
   console.log('      ★5 headlines:', [...five].map(([id, n]) => `${id}×${n}`).join(' '));
-  ok(five.size === 6, 'all six ★5 headline at least once in the year');
+  ok(five.size === getHeroesByRarity(5).length, `all ${getHeroesByRarity(5).length} ★5 headline at least once in the year`);
+}
+
+// the banner pictures are made with the heroes the banner features as references: the manifest must not drift from the schedule
+{
+  const art = new Map(MANIFEST.filter((m: { group: string }) => m.group === 'pickups').map((m: { id: string; refs?: string[] }) => [m.id, m.refs ?? []]));
+  const wrong: string[] = [];
+  for (const b of heroGachas) {
+    const refs = (art.get(`banner_${b.id}`) ?? []).map((r: string) => r.replace(/^ref:/, '').replace(/\.jpg$/, ''));
+    const picks = pickupHeroesOf(b);
+    const top = picks.filter((h) => h.rarity === Math.max(...picks.map((x) => x.rarity)));
+    const ok1 = refs.length >= 3 && refs.every((id: string) => picks.some((h) => h.id === id)) && top.some((h) => h.id === refs[0]);
+    if (!ok1) wrong.push(`${b.id} [${refs.join(',')}]`);
+  }
+  ok(wrong.length === 0, `every banner picture shows its own ピックアップ, the top ★ first${wrong.length ? ` -> ${wrong.join(' ')}` : ''}`);
 }
 
 // pickup weights and the 天井
 {
-  const b = heroGachas.find((g) => g.id === 'g03-xmas')!; // ★5 aria; ★4 ouka, quartz; ★3 noel, celes
+  const b = heroGachas.find((g) => g.id === 'g03-xmas')!; // ★5 serafina; ★4 ouka, anju; ★3 noel, celes, pia
   const per = heroRatesOf(b);
-  const aria = per.find((r) => r.def.id === 'aria')!;
+  const head = per.find((r) => r.def.id === 'serafina')!;
   const otherFive = per.filter((r) => r.def.rarity === 5 && !r.pickup);
-  ok(Math.abs(aria.rate - 0.01) < 1e-12 && otherFive.length === 5 && otherFive.every((r) => Math.abs(r.rate - 0.002) < 1e-12), 'g03: aria is half of the ★5 2% (1%), the other five share the rest (0.2% each)');
+  const otherShare = 0.01 / otherFive.length; // the roster grows: the other ★5 heroes split the half that is left, whatever their number
+  ok(otherFive.length === getHeroesByRarity(5).length - 1 && Math.abs(head.rate - 0.01) < 1e-12 && otherFive.every((r) => Math.abs(r.rate - otherShare) < 1e-12), 'g03: serafina is half of the ★5 2% (1%), the other ★5 heroes share the rest equally');
   const four = per.filter((r) => r.def.rarity === 4 && r.pickup);
   ok(four.length === 2 && four.every((r) => Math.abs(r.rate - 0.02) < 1e-12), 'g03: the two ★4 ピックアップ share half of 8% (2% each)');
 
@@ -181,25 +197,25 @@ for (const b of equipGachas) {
   const save = SaveSystem.createDefault();
   const r = rng(7);
   let pulls = 0;
-  let ariaCount = 0;
+  let headCount = 0;
   let fiveCount = 0;
   for (let i = 0; i < 4000; i++) {
     save.gachaPity = {}; // (the 天井 is tested below)
     for (const h of GachaSystem.pullHeroes(save, b, 10, r)) {
       pulls++;
       if (h.rarity === 5) fiveCount++;
-      if (h.heroId === 'aria') ariaCount++;
+      if (h.heroId === 'serafina') headCount++;
     }
   }
   ok(Math.abs(fiveCount / pulls - 0.02) < 0.004, `★5 comes out at about 2% (${((fiveCount / pulls) * 100).toFixed(2)}%)`);
-  ok(Math.abs(ariaCount / pulls - 0.01) < 0.003, `aria at about 1% (${((ariaCount / pulls) * 100).toFixed(2)}%)`);
+  ok(Math.abs(headCount / pulls - 0.01) < 0.003, `serafina at about 1% (${((headCount / pulls) * 100).toFixed(2)}%)`);
 
   // the 天井: the 50th pull without a ★5 is a ★5 ピックアップ
   const save2 = SaveSystem.createDefault();
   save2.gachaPity[b.id] = 49;
   const lowest = (): number => 0.999999; // the natural roll is the lowest rarity
   const [certain] = GachaSystem.pullHeroes(save2, b, 1, lowest);
-  ok(certain.rarity === 5 && certain.heroId === 'aria', `the 50th pull is the ★5 ピックアップ even when luck says otherwise (${certain.heroId})`);
+  ok(certain.rarity === 5 && certain.heroId === 'serafina', `the 50th pull is the ★5 ピックアップ even when luck says otherwise (${certain.heroId})`);
   ok(save2.gachaPity[b.id] === 0 && pityLeft(save2, b) === 50, 'and the count starts again');
   const save3 = SaveSystem.createDefault();
   save3.gachaPity[b.id] = 10;
@@ -222,7 +238,7 @@ for (const b of equipGachas) {
   const save5 = SaveSystem.createDefault();
   save5.gachaPity[g2.id] = 29;
   const [four4] = GachaSystem.pullHeroes(save5, g2, 1, lowest);
-  ok(['seira', 'ignis', 'brann'].includes(four4.heroId), `a ★4 banner's 天井 is one of its ★4 ピックアップ (${four4.heroId})`);
+  ok(['seira', 'gran', 'ignis'].includes(four4.heroId), `a ★4 banner's 天井 is one of its ★4 ピックアップ (${four4.heroId})`);
 
   // ten-pull promise
   let tenBad = 0;

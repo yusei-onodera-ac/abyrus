@@ -25,6 +25,7 @@ import { InboxSystem } from '../systems/InboxSystem';
 import { ResourceBar } from '../ui/ResourceBar';
 import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { pinnedHeroIds, queueHeroArt, trimHeroArt } from '../characters/HeroArt';
 import { applyBackground } from '../ui/Background';
 import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, settingsIcon } from '../ui/Icons';
 import { buildAvatar } from '../ui/CardParts';
@@ -66,6 +67,13 @@ export class HomeScene extends Phaser.Scene {
 
   constructor() {
     super('Home');
+  }
+
+  /** The Home hero's big illustration (and the party's); any other that was loaded is let go of - see characters/HeroArt.ts. */
+  preload(): void {
+    const keep = pinnedHeroIds(this.getSave());
+    trimHeroArt(this, keep);
+    queueHeroArt(this, keep);
   }
 
   create(): void {
