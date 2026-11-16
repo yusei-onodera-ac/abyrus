@@ -11,12 +11,15 @@ import {
   type FinalStageDef,
 } from '../systems/ProgressionSystem';
 import { getRegionOutroScript, getEndingScript } from '../data/storyScript';
-import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
+import { StaminaSystem, baseStageStaminaCost, stageStaminaCost } from '../systems/StaminaSystem';
 import { nextQuestStage, questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
 import { StageRewardSystem, type StageBonus } from '../systems/StageRewardSystem';
 import { VillageSystem } from '../systems/VillageSystem';
 import { RAID_PLAYER_EXP } from '../data/village';
 import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
+import { CampaignSystem } from '../systems/CampaignSystem';
+import { EventSystem } from '../systems/EventSystem';
+import type { LimitedEventDef } from '../data/limitedEvents';
 import { getWeekdayTier } from '../data/weekdayDungeons';
 import { PlayerLevelSystem, type LevelUp } from '../systems/PlayerLevelSystem';
 import { TutorialDirector } from '../systems/TutorialDirector';
@@ -70,15 +73,19 @@ interface UnitView {
  *  index space from the main campaign; undefined = an ordinary main-quest
  *  stage (getStage); 'weekday' = a 曜日ダンジョン fight (getWeekdayStage): `stageIndex`
  *  is its tier and `day` the day it belongs to, and it moves no campaign progress;
+ *  'event' = a 期間限定イベント's dungeon (getEventStage): `stageIndex` is its tier and `eventId` the event; it moves no campaign
+ *  progress and pays the event's currency (EventSystem.clear);
  *  'raid' = a 襲撃 on the village (getRaidStage): `stageIndex` is the main stage it is set like and `seed`
  *  varies the pack. It moves no campaign progress, costs no stamina and pays the village (VillageSystem.winRaid). */
-type BattleMode = 'final' | 'extra' | 'weekday' | 'raid' | undefined;
+type BattleMode = 'final' | 'extra' | 'weekday' | 'event' | 'raid' | undefined;
 
 export class BattleScene extends Phaser.Scene {
   private stageIndex = 0;
   private mode: BattleMode;
   /** 曜日ダンジョン only: 0 = 日曜 ... 6 = 土曜. */
   private weekdayDay = 0;
+  /** 期間限定イベント only: which event's dungeon. */
+  private eventDef?: LimitedEventDef;
   /** 襲撃 only: varies the pack of beasts. */
   private raidSeed = 0;
   private save!: SaveData;
@@ -112,13 +119,14 @@ export class BattleScene extends Phaser.Scene {
     super('Battle');
   }
 
-  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; seed?: number; helper?: HelperHero; wave?: number }): void {
+  init(data: { stageIndex?: number; mode?: BattleMode; day?: number; eventId?: string; seed?: number; helper?: HelperHero; wave?: number }): void {
     this.helper = data.helper;
     // Development only (`?battle=150&mode=final&wave=5`): start the final battle at that wave, to look at its last boss.
     this.firstWave = import.meta.env.DEV && Number.isInteger(data.wave) ? Math.max(0, data.wave as number) : 0;
     this.stageIndex = data.stageIndex ?? 0;
     this.mode = data.mode;
     this.weekdayDay = data.day ?? 0;
+    this.eventDef = data.mode === 'event' && data.eventId ? EventSystem.get(data.eventId) : undefined;
     this.raidSeed = data.seed ?? 0;
     this.views.clear();
     this.resultOverlay = undefined;
@@ -160,6 +168,12 @@ export class BattleScene extends Phaser.Scene {
       this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
     } else if (this.mode === 'weekday') {
       this.currentStageDef = ProgressionSystem.getWeekdayStage(this.weekdayDay, this.stageIndex);
+      title = this.currentStageDef.name;
+      this.rewardGold = this.currentStageDef.rewardGold;
+      this.rewardExp = this.currentStageDef.rewardExp;
+      this.rewardSkillEssence = this.currentStageDef.rewardSkillEssence;
+    } else if (this.mode === 'event' && this.eventDef) {
+      this.currentStageDef = ProgressionSystem.getEventStage(this.eventDef, this.stageIndex);
       title = this.currentStageDef.name;
       this.rewardGold = this.currentStageDef.rewardGold;
       this.rewardExp = this.currentStageDef.rewardExp;
@@ -236,6 +250,11 @@ export class BattleScene extends Phaser.Scene {
     if (this.mode === 'weekday') {
       const dungeonRegion = getRegion(ProgressionSystem.getWeekdayStage(this.weekdayDay, this.stageIndex).regionIndex);
       applyBattleBackground(this, dungeonRegion.id, dungeonRegion.look.battleTint);
+      return;
+    }
+    if (this.mode === 'event' && this.eventDef) {
+      const eventRegion = getRegion(this.eventDef.region);
+      applyBattleBackground(this, eventRegion.id, eventRegion.look.battleTint);
       return;
     }
     const perRegion = this.mode === 'extra' ? EXTRA_STAGES_PER_REGION : STAGES_PER_REGION;
@@ -573,6 +592,8 @@ export class BattleScene extends Phaser.Scene {
     if (victory) {
       // 曜日ダンジョン pays its day's 素材 in fixed amounts, and is no stage of the campaign.
       const weekday = this.mode === 'weekday';
+      // 期間限定イベント's dungeon: the drops of a stage as strong as its tier, and the event's currency.
+      const eventDef = this.mode === 'event' ? this.eventDef : undefined;
       // A 襲撃 is no stage of the campaign either: the village pays it.
       const raid = this.mode === 'raid';
       const stage: QuestStage = { kind: this.mode === 'extra' || this.mode === 'final' ? this.mode : 'main', index: this.stageIndex };
@@ -582,34 +603,42 @@ export class BattleScene extends Phaser.Scene {
         ? noBonus
         : weekday
           ? WeekdayDungeonSystem.bonus(this.weekdayDay, this.stageIndex)
-          : StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage), this.rewardExp);
+          : eventDef
+            ? StageRewardSystem.roll({ kind: 'main', index: getWeekdayTier(this.stageIndex).likeStage }, false, this.rewardExp)
+            : StageRewardSystem.roll(stage, StageRewardSystem.isFirstClear(this.save, stage), this.rewardExp);
       const raidWin = raid ? VillageSystem.winRaid(this.save) : null;
-      SaveSystem.addGold(this.save, this.rewardGold);
+      // ゴールド2倍 / 経験値2倍 campaigns (data/schedule.ts): what the clear pays, made bigger. (The 素材 drops were made bigger when they were rolled.)
+      const goldGain = raid ? this.rewardGold : this.rewardGold.mul(CampaignSystem.mul('gold'));
+      const expGain = raid ? this.rewardExp : CampaignSystem.scale('exp', this.rewardExp);
+      SaveSystem.addGold(this.save, goldGain);
       SaveSystem.addSkillEssence(this.save, this.rewardSkillEssence);
       StageRewardSystem.grant(this.save, bonus);
+      const eventClear = eventDef ? EventSystem.clear(this.save, eventDef, this.stageIndex) : null;
       // Who was on the field, and where they stood before the EXP: the result shows the change.
       party = this.engine.playerUnits.flatMap((unit) => {
         const hero = SaveSystem.getHero(this.save, unit.id);
-        return hero ? [{ hero, levelBefore: hero.level, expBefore: hero.exp, gained: hero.level >= MAX_LEVEL ? 0 : this.rewardExp }] : [];
+        return hero ? [{ hero, levelBefore: hero.level, expBefore: hero.exp, gained: hero.level >= MAX_LEVEL ? 0 : expGain }] : [];
       });
       for (const unit of this.engine.playerUnits) {
-        SaveSystem.grantExp(this.save, unit.id, this.rewardExp);
+        SaveSystem.grantExp(this.save, unit.id, expGain);
       }
       this.applyProgressionOnVictory();
       if (!raid) recordMission(this.save, 'quest_clear');
       // プレイヤーEXP = the stamina this stage cost.
-      const playerExp = raid ? RAID_PLAYER_EXP : weekday ? getWeekdayTier(this.stageIndex).stamina : stageStaminaCost(stage.kind, stage.index);
+      const playerExp = raid ? RAID_PLAYER_EXP : weekday || eventDef ? getWeekdayTier(this.stageIndex).stamina : baseStageStaminaCost(stage.kind, stage.index);
       levelUp = PlayerLevelSystem.gain(this.save, playerExp);
       SaveSystem.save(this.save);
       if (chain) AutoAdvance.addWin(this.game);
 
       tiles = [
-        { kind: 'gold', amount: `+${(raidWin ? raidWin.gold : this.rewardGold).toString()}` },
-        { kind: 'exp', amount: `+${this.rewardExp}` },
+        { kind: 'gold', amount: `+${(raidWin ? raidWin.gold : goldGain).toString()}` },
+        { kind: 'exp', amount: `+${expGain}` },
       ];
       if (!raid) tiles.push({ kind: 'essence', amount: `+${this.rewardSkillEssence}` });
       tiles.push({ kind: 'rank', amount: `+${playerExp}`, tag: levelUp ? `Lv${levelUp.to}` : undefined });
       if (levelUp) tiles.push({ kind: 'gems', amount: `+${levelUp.gems}`, tag: 'LvUP' });
+      if (eventDef && eventClear) tiles.push({ kind: 'token', token: eventDef.token, amount: `+${eventClear.tokens}`, tag: 'イベント' });
+      if (eventClear && eventClear.gems > 0) tiles.push({ kind: 'gems', amount: `+${eventClear.gems}`, tag: '初回' });
       if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
       if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: 'ドロップ' });
       for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: 'ドロップ' });
@@ -789,7 +818,7 @@ export class BattleScene extends Phaser.Scene {
    *  clear leads somewhere else first: a story still to read (a region's last
    *  stage, the final battle's ending) or the end of the Extra stages. */
   private nextStageOffer(): QuestStage | null {
-    if (this.mode === 'final' || this.mode === 'weekday' || this.mode === 'raid') return null;
+    if (this.mode === 'final' || this.mode === 'weekday' || this.mode === 'event' || this.mode === 'raid') return null;
     if (this.mode !== 'extra' && this.storyAfterClear()) return null;
     return nextQuestStage({ kind: this.mode === 'extra' ? 'extra' : 'main', index: this.stageIndex });
   }
@@ -804,6 +833,7 @@ export class BattleScene extends Phaser.Scene {
     if (this.mode === 'final') return 'エンディングへ';
     if (this.mode === 'extra') return 'クエスト一覧へ';
     if (this.mode === 'weekday') return 'ダンジョン一覧へ';
+    if (this.mode === 'event') return 'イベントへ戻る';
     if (this.mode === 'raid') return '村へ戻る';
     return 'ストーリーへ';
   }
@@ -839,7 +869,7 @@ export class BattleScene extends Phaser.Scene {
 
   private applyProgressionOnVictory(): void {
     if (this.mode === 'weekday') WeekdayDungeonSystem.markCleared(this.save, this.stageIndex);
-    if (this.mode === 'weekday' || this.mode === 'raid') return;
+    if (this.mode === 'weekday' || this.mode === 'event' || this.mode === 'raid') return;
     if (this.mode === 'extra') {
       SaveSystem.clearExtraStage(this.save, this.stageIndex);
     } else if (this.mode === 'final') {
@@ -870,6 +900,10 @@ export class BattleScene extends Phaser.Scene {
     }
     if (this.mode === 'weekday') {
       this.scene.start('WeekdayDungeon');
+      return;
+    }
+    if (this.mode === 'event') {
+      this.scene.start('EventQuest', { eventId: this.eventDef?.id });
       return;
     }
 

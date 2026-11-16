@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { formatEventPeriod, type EventEntry, type EventPhase } from '../data/events';
 import { Button } from './Button';
-import { buildCardPanel, buildChip, wrappedText } from './CardParts';
+import { buildCardPanel, buildChip, buildUnreadDot, wrappedText } from './CardParts';
 import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
 import { mixColor } from './StageMap';
@@ -17,6 +17,9 @@ function bannerKey(id: string): string {
   return `event_banner_${id}`;
 }
 
+/** The texture key of an event's banner picture (loaded by preloadEventArt). */
+export const eventBannerKey = bannerKey;
+
 /** Queues every event banner image for loading. Call once from
  *  BootScene.preload(). Missing files are fine - an event without art (or
  *  whose file isn't there yet) gets a banner drawn in its own color. */
@@ -28,12 +31,15 @@ export function preloadEventArt(scene: Phaser.Scene, events: EventEntry[]): void
 
 export interface EventCardHandlers {
   onOpen: () => void;
+  /** A red dot on the card: something in the event can be taken (a finished mission, a reached step). */
+  claimable?: boolean;
   /** Click guard for the card's button, see ScrollView.isTap(). */
   guard: () => boolean;
 }
 
 const PHASE_CHIP: Record<EventPhase, { text: string; fill: number; color: string }> = {
   live: { text: '開催中', fill: 0x2f7a3a, color: '#e6ffe0' },
+  exchange: { text: '交換期間', fill: 0x8a5a1c, color: '#fff0d0' },
   upcoming: { text: '開催予定', fill: 0x3a4f7a, color: '#e0ecff' },
   ended: { text: '終了', fill: 0x4a3a3a, color: '#d8c8c8' },
 };
@@ -92,7 +98,7 @@ export function buildEventCard(
   } else {
     container.add(drawBanner(scene, entry, PAD, y, innerW, bannerH));
   }
-  if (phase !== 'live') {
+  if (phase === 'upcoming' || phase === 'ended') {
     const veil = scene.add.graphics();
     veil.fillStyle(0x000000, 0.42);
     veil.fillRect(PAD, y, innerW, bannerH);
@@ -110,11 +116,12 @@ export function buildEventCard(
   container.add(body(scene, PAD + 6, y, `開催期間　${formatEventPeriod(entry)}`, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0));
   y += 34;
 
-  const canOpen = phase === 'live' && entry.kind !== undefined;
-  const label = canOpen ? (entry.actionLabel ?? 'イベントへ') : phase === 'upcoming' ? '開催予定' : '準備中';
+  const canOpen = (phase === 'live' || phase === 'exchange') && entry.kind !== undefined;
+  const label = canOpen ? (phase === 'exchange' ? '交換所へ' : (entry.actionLabel ?? 'イベントへ')) : phase === 'upcoming' ? '開催予定' : '準備中';
   const button = new Button(scene, w / 2, y + 36, innerW, 72, label, handlers.onOpen, { variant: canOpen ? 'gold' : 'wood', fontSize: '28px', guard: handlers.guard });
   if (!canOpen) button.setEnabled(false);
   container.add(button);
+  if (handlers.claimable && canOpen) container.add(buildUnreadDot(scene, w - PAD - 16, y + 8, 10));
   y += 72 + PAD + 4;
 
   // The card body goes in last, once the height is known, then sinks to the back.

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { DEFAULT_GLYPH, getEquipDef, type EquipGlyph } from '../data/equipment';
 import { isItemId, ITEMS, type ItemId } from '../data/items';
 import type { GoodType } from '../data/shop';
+import type { EventToken } from '../data/limitedEvents';
 import type { Reward } from '../data/rewards';
 import { VILLAGE_MATERIALS, materialName, type VillageMaterial } from '../data/village';
 import type { GrantedReward } from '../systems/RewardSystem';
@@ -18,7 +19,7 @@ export const TILE_H = 132;
 const GAP = 10;
 const PER_ROW = 5;
 
-export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'coin' | 'item' | 'equipment' | 'material';
+export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'coin' | 'item' | 'equipment' | 'material' | 'token';
 
 export interface RewardTile {
   kind: RewardTileKind;
@@ -30,6 +31,8 @@ export interface RewardTile {
   item?: ItemId;
   /** For kind 'material': 木材 / 鉄 / 石 (only the village lists these). */
   material?: VillageMaterial;
+  /** For kind 'token': the 期間限定イベント's currency (a disc in its colour with its kanji). */
+  token?: EventToken;
   /** For kind 'equipment': the piece's slot, rarity and name - and its id, unless only the rarity is known (then its shape is drawn). */
   equip?: { glyph: EquipGlyph; rarity: Rarity; name: string; id?: string };
 }
@@ -68,8 +71,9 @@ export function tilesForGranted(granted: GrantedReward[]): RewardTile[] {
 
 /** The tile's illustration - a supplied/drawn icon, or a disc with a kanji - centered at (x, y), `size` px across. Returns its label. */
 export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.Container, tile: RewardTile, x: number, y: number, size: number): string {
-  if (tile.kind === 'exp' || tile.kind === 'essence' || tile.kind === 'rank' || tile.kind === 'coin') {
-    const badge = BADGE[tile.kind];
+  const tokenBadge = tile.kind === 'token' && tile.token ? { color: tile.token.color, glyph: tile.token.glyph, label: tile.token.name } : null;
+  if (tokenBadge || tile.kind === 'exp' || tile.kind === 'essence' || tile.kind === 'rank' || tile.kind === 'coin') {
+    const badge = tokenBadge ?? BADGE[tile.kind as 'exp' | 'essence' | 'rank' | 'coin'];
     const r = size / 2;
     const g = scene.add.graphics();
     g.fillStyle(0x000000, 0.35);

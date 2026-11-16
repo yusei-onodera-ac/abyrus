@@ -6,9 +6,12 @@ import { PlayerLevelSystem, type LevelUp } from './PlayerLevelSystem';
 import { FINAL_STAGE_INDEX, ProgressionSystem } from './ProgressionSystem';
 import type { QuestStage } from './QuestRoute';
 import { SaveSystem, type SaveData } from './SaveSystem';
-import { StaminaSystem, stageStaminaCost } from './StaminaSystem';
+import { StaminaSystem, baseStageStaminaCost, stageStaminaCost } from './StaminaSystem';
+import { CampaignSystem } from './CampaignSystem';
 import { StageRewardSystem, type StageBonus } from './StageRewardSystem';
 import { WeekdayDungeonSystem } from './WeekdayDungeonSystem';
+import { EventSystem } from './EventSystem';
+import type { EventToken } from '../data/limitedEvents';
 
 /**
  * 掃討: a stage that has been cleared before can be "swept" - no fight, the stamina is paid and the rewards come at once,
@@ -17,7 +20,7 @@ import { WeekdayDungeonSystem } from './WeekdayDungeonSystem';
  */
 export const SWEEP_MAX = 10;
 
-export type SweepTarget = { kind: 'quest'; stage: QuestStage } | { kind: 'weekday'; day: number; tier: number };
+export type SweepTarget = { kind: 'quest'; stage: QuestStage } | { kind: 'weekday'; day: number; tier: number } | { kind: 'event'; eventId: string; tier: number };
 
 export interface SweepHeroGain {
   heroId: string;
@@ -39,6 +42,8 @@ export interface SweepResult {
   phaseMaterials: number;
   items: { item: ItemId; amount: number }[];
   party: SweepHeroGain[];
+  /** 期間限定イベント only: the event currency the sweeps paid. */
+  eventTokens?: { token: EventToken; amount: number };
 }
 
 interface StageValues {
@@ -48,6 +53,10 @@ interface StageValues {
 }
 
 function valuesOf(target: SweepTarget): StageValues {
+  if (target.kind === 'event') {
+    const def = ProgressionSystem.getEventStage(EventSystem.get(target.eventId)!, target.tier);
+    return { gold: def.rewardGold, exp: def.rewardExp, essence: def.rewardSkillEssence };
+  }
   if (target.kind === 'weekday') {
     const def = ProgressionSystem.getWeekdayStage(target.day, target.tier);
     return { gold: def.rewardGold, exp: def.rewardExp, essence: def.rewardSkillEssence };
@@ -63,7 +72,11 @@ function valuesOf(target: SweepTarget): StageValues {
 
 export const SweepSystem = {
   /** True when the stage has been cleared at least once. */
-  canSweep(save: SaveData, target: SweepTarget): boolean {
+  canSweep(save: SaveData, target: SweepTarget, now = Date.now()): boolean {
+    if (target.kind === 'event') {
+      const def = EventSystem.get(target.eventId);
+      return !!def && EventSystem.isRunning(def, now) && EventSystem.isCleared(save, target.eventId, target.tier);
+    }
     if (target.kind === 'weekday') return WeekdayDungeonSystem.isCleared(save, target.tier);
     const { stage } = target;
     if (stage.kind === 'extra') return stage.index < save.extraProgress;
@@ -71,15 +84,21 @@ export const SweepSystem = {
     return stage.index < save.stageProgress;
   },
 
-  /** Stamina one sweep of the stage costs (what a fight would cost). */
+  /** Stamina one sweep of the stage costs (what a fight would cost - less in a スタミナ半額 campaign). */
   costPer(target: SweepTarget): number {
-    if (target.kind === 'weekday') return getWeekdayTier(target.tier).stamina;
+    if (target.kind === 'weekday' || target.kind === 'event') return CampaignSystem.staminaCost(getWeekdayTier(target.tier).stamina);
     return stageStaminaCost(target.stage.kind, target.stage.index);
+  },
+
+  /** The same without any campaign: what the プレイヤーEXP of a sweep is counted by. */
+  baseCostPer(target: SweepTarget): number {
+    if (target.kind === 'weekday' || target.kind === 'event') return getWeekdayTier(target.tier).stamina;
+    return baseStageStaminaCost(target.stage.kind, target.stage.index);
   },
 
   /** How many sweeps can be done now: the stamina allows, up to SWEEP_MAX; 0 when there is no party or the stage was not cleared. */
   maxCount(save: SaveData, target: SweepTarget, now = Date.now()): number {
-    if (!this.canSweep(save, target)) return 0;
+    if (!this.canSweep(save, target, now)) return 0;
     const party = SaveSystem.getPartyHeroes(save);
     if (party.front.length + party.back.length === 0) return 0;
     StaminaSystem.refresh(save, now);
@@ -96,10 +115,11 @@ export const SweepSystem = {
     const { front, back } = SaveSystem.getPartyHeroes(save);
     const heroes = [...front, ...back];
     const before = heroes.map((h) => h.level);
-    const exp = values.exp * count;
+    // ゴールド2倍 / 経験値2倍 campaigns: as in a fight.
+    const exp = CampaignSystem.scale('exp', values.exp) * count;
     for (const hero of heroes) SaveSystem.grantExp(save, hero.id, exp);
 
-    const gold = values.gold.mul(count);
+    const gold = values.gold.mul(CampaignSystem.mul('gold') * count);
     SaveSystem.addGold(save, gold);
     const essence = values.essence * count;
     SaveSystem.addSkillEssence(save, essence);
@@ -109,15 +129,27 @@ export const SweepSystem = {
     const items = new Map<ItemId, number>();
     for (let i = 0; i < count; i++) {
       const bonus: StageBonus =
-        target.kind === 'weekday' ? WeekdayDungeonSystem.bonus(target.day, target.tier) : StageRewardSystem.roll(target.stage, false, values.exp, rng);
+        target.kind === 'weekday'
+          ? WeekdayDungeonSystem.bonus(target.day, target.tier)
+          : target.kind === 'event'
+            ? StageRewardSystem.roll({ kind: 'main', index: getWeekdayTier(target.tier).likeStage }, false, values.exp, rng)
+            : StageRewardSystem.roll(target.stage, false, values.exp, rng);
       StageRewardSystem.grant(save, bonus);
       phaseMaterials += bonus.phaseMaterials;
       for (const { item, amount } of bonus.items) items.set(item, (items.get(item) ?? 0) + amount);
     }
 
     recordMission(save, 'quest_clear', count, now);
-    // プレイヤーEXP = the stamina paid, as for a fight.
-    const levelUp = PlayerLevelSystem.gain(save, cost);
+    // 期間限定イベント: the currency of every sweep (and the clears for its missions).
+    let eventTokens: SweepResult['eventTokens'];
+    if (target.kind === 'event') {
+      const def = EventSystem.get(target.eventId)!;
+      const paid = EventSystem.clear(save, def, target.tier, count, now);
+      if (paid) eventTokens = { token: def.token, amount: paid.tokens };
+    }
+    // プレイヤーEXP = the stamina a fight costs, as for a fight (the same in a スタミナ半額 campaign).
+    const playerExp = this.baseCostPer(target) * count;
+    const levelUp = PlayerLevelSystem.gain(save, playerExp);
 
     return {
       count,
@@ -125,11 +157,12 @@ export const SweepSystem = {
       gold,
       exp,
       essence,
-      playerExp: cost,
+      playerExp,
       levelUp,
       phaseMaterials,
       items: [...items].map(([item, amount]) => ({ item, amount })),
       party: heroes.map((h, i) => ({ heroId: h.id, name: h.name, levelBefore: before[i], levelAfter: h.level })),
+      eventTokens,
     };
   },
 };

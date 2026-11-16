@@ -36,3 +36,4 @@ tools/art/refs/
 tools/audio/raw/
 tools/audio/out/
 tools/tests/.out/
+tools/schedule/.out/

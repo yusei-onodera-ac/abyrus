@@ -64,6 +64,7 @@ export function showSweepResult(scene: Phaser.Scene, lock: ModalLock, result: Sw
     { kind: 'rank', amount: n(result.playerExp), tag: result.levelUp ? `Lv${result.levelUp.to}` : undefined },
   ];
   if (result.levelUp) tiles.push({ kind: 'gems', amount: n(result.levelUp.gems), tag: 'LvUP' });
+  if (result.eventTokens) tiles.push({ kind: 'token', token: result.eventTokens.token, amount: n(result.eventTokens.amount), tag: 'イベント' });
   if (result.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: n(result.phaseMaterials), tag: 'ドロップ' });
   for (const { item, amount } of result.items) tiles.push({ kind: 'item', item, amount: n(amount), tag: 'ドロップ' });
   const up = result.party.filter((p) => p.levelAfter > p.levelBefore);
