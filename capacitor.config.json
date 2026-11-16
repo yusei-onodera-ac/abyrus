@@ -1,0 +1,10 @@
+{
+  "appId": "app.abyrus.game",
+  "appName": "ABYRUS",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0a0b12",
+    "scrollEnabled": false
+  }
+}
