@@ -16,7 +16,7 @@ export function applyMockFromUrl(save: SaveData): boolean {
   const which = params.get('mock');
   if (which === 'tutorial') {
     // A brand-new player: opening story and tutorial start over (progress is left alone).
-    save.tutorial = { opening: false, step: 0, done: false };
+    save.tutorial = { opening: false, step: 0, done: false, village: { step: 0, done: false } };
     save.stageProgress = 0;
     SaveSystem.save(save);
     params.delete('mock');

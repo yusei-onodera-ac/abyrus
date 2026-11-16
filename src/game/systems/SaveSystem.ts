@@ -246,7 +246,7 @@ export interface SaveData {
   homeHeroId: string;
   /** The first-launch story and チュートリアル: `opening` once the opening story has been
    *  seen, `step` the next tutorial step (data/tutorial.ts), `done` when finished or skipped. */
-  tutorial: { opening: boolean; step: number; done: boolean };
+  tutorial: { opening: boolean; step: number; done: boolean; village: { step: number; done: boolean } };
   /** EXP towards the next プレイヤーレベル (see data/playerLevel.ts). */
   playerExp: number;
   /** [current, max]. Starting a stage spends it and it recovers over time -
@@ -649,7 +649,7 @@ export const SaveSystem = {
       playerName: 'プレイヤー',
       playerLevel: 1,
       playerExp: 0,
-      tutorial: { opening: false, step: 0, done: false },
+      tutorial: { opening: false, step: 0, done: false, village: { step: 0, done: false } },
       homeHeroId: '',
       gachaPity: {},
       missions: emptyMissions(),
@@ -708,10 +708,14 @@ export const SaveSystem = {
       merged.playerLevel = Number.isInteger(parsed.playerLevel) ? Math.max(1, Math.min(MAX_PLAYER_LEVEL, parsed.playerLevel!)) : 1;
       // A save from before the tutorial existed belongs to someone already playing: nothing to teach.
       const t = parsed.tutorial;
+      // The 村のチュートリアル (data/tutorial.ts) is its own track: a village that has been built up already needs none.
+      const villageTaught = (parsed.village?.buildings?.length ?? 0) > 2;
+      const v = t?.village;
+      const village = v && Number.isInteger(v.step) && typeof v.done === 'boolean' ? { step: Math.max(0, v.step), done: v.done } : { step: 0, done: villageTaught };
       merged.tutorial =
         t && typeof t.opening === 'boolean' && Number.isInteger(t.step) && typeof t.done === 'boolean'
-          ? { opening: t.opening, step: Math.max(0, t.step), done: t.done }
-          : { opening: true, step: 0, done: true };
+          ? { opening: t.opening, step: Math.max(0, t.step), done: t.done, village }
+          : { opening: true, step: 0, done: true, village };
       merged.missions = loadMissions(parsed.missions);
       merged.gachaPity = {};
       for (const [id, n] of Object.entries(parsed.gachaPity ?? {})) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) merged.gachaPity[id] = Math.floor(n);

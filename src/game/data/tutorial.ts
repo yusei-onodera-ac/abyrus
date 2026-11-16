@@ -142,6 +142,87 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
+/**
+ * 村のチュートリアル: a second, short track. It runs on the first visit to the 村 once the main tutorial is over
+ * (finished or skipped), and teaches only the village. Every step is a 'tap' one (the lit spots are pointed at, not
+ * pressed), so it never gets in the way of the village's own popups. Voices: `public/assets/voice/<step id>.mp3`.
+ */
+export const VILLAGE_TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    id: 'village_welcome',
+    mood: 'happy',
+    scene: 'Village',
+    lines: ['ここが、軍団長の村だよ！ 建物を建てて、育てていくの。', 'お店が稼いだ「売上」が、ゴールドになるんだよ。村が大きいほど、放置報酬も増えるよ。'],
+    advance: 'tap',
+  },
+  {
+    id: 'village_header',
+    scene: 'Village',
+    lines: ['左上が、村のレベルと建築員の数。建築員が空いていれば、同時に工事ができるよ。', 'その下の「売上」は、お店が1時間に稼ぐゴールドだよ。'],
+    target: { x: 12, y: 140, w: 274, h: 62 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_materials',
+    scene: 'Village',
+    lines: ['木材・鉄・石は、建築に使う素材。ここにだけ表示されるよ。', '放置報酬、曜日ダンジョン、クエストで集まるし、伐採所や採石場、鉱山を建てれば自分でも増やせるよ。'],
+    target: { x: 292, y: 140, w: 352, h: 62 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_build',
+    mood: 'determined',
+    scene: 'Village',
+    lines: ['「建築」を押すと、建てる物を選べるよ。', 'ゴールドと素材が足りれば、好きな場所に置ける。置いたら ✓ で決定！ 工事には時間がかかるけど、魔晶石で急ぐこともできるよ。'],
+    target: { x: 4, y: 1162, w: 202, h: 114 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_buildings',
+    scene: 'Village',
+    lines: ['建物をタップすると、強化・移動・撤去のボタンが出るよ。', 'お城を強くすると、建てられる数と、建物の最大レベルが増える！ まずはお城から育てよう。'],
+    advance: 'tap',
+  },
+  {
+    id: 'village_raid',
+    mood: 'worried',
+    scene: 'Village',
+    lines: ['ときどき、獣が村を襲いに来るよ。柵と門を強くしておけば、防げるの。', '襲撃が来たら「迎え撃つ」で戦えるよ。壊されても、素材で直せるから安心してね。'],
+    advance: 'tap',
+  },
+  {
+    id: 'village_quests',
+    scene: 'Village',
+    lines: ['「依頼」は、毎日の村のお仕事。こなすと、素材がもらえるよ。'],
+    target: { x: 284, y: 1182, w: 152, h: 92 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_goals',
+    scene: 'Village',
+    lines: ['「目標」を達成すると、魔晶石がもらえるよ。', '村を育てる道しるべにしてね。'],
+    target: { x: 648, y: 140, w: 62, h: 62 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_claim',
+    scene: 'Village',
+    lines: ['「受け取る」で、たまった売上のゴールドをもらえるよ。', 'ゲームを閉じている間もたまるから、ときどき来てね！'],
+    target: { x: 516, y: 1162, w: 196, h: 114 },
+    advance: 'tap',
+  },
+  {
+    id: 'village_end',
+    mood: 'happy',
+    scene: 'Village',
+    lines: ['あとは、軍団長の好きなように！ 道を敷いたり、木や花、噴水で飾ったりして、自分だけの村を作ってね。'],
+    advance: 'tap',
+  },
+];
+
+/** Handed over when the last village step is finished. */
+export const VILLAGE_TUTORIAL_REWARD: Reward[] = [{ type: 'gems', amount: 30 }];
+
 /** Handed over when the last step is finished (not when the tutorial is skipped). */
 export const TUTORIAL_REWARD: Reward[] = [
   { type: 'gems', amount: 100 },

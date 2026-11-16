@@ -37,6 +37,8 @@ export class TutorialOverlay {
   private skipArmed = false;
   private done = false;
   private readonly hole?: TutorialRect;
+  /** Where the speech bubble is (set when it is built): the スキップ button keeps clear of it and of the lit spot. */
+  private bubbleRect: TutorialRect = { x: 0, y: 0, w: 0, h: 0 };
   private pointerListener?: (pointer: Phaser.Input.Pointer) => void;
 
   private readonly scene: Phaser.Scene;
@@ -158,6 +160,7 @@ export class TutorialOverlay {
     const cy = this.bubbleAtTop() ? 150 + h / 2 : 1090 - h / 2;
     const left = 360 - PANEL_W / 2;
     const top = cy - h / 2;
+    this.bubbleRect = { x: left, y: top, w: PANEL_W, h };
 
     this.add(createPanel(this.scene, 360, cy, PANEL_W, h, { fillColor: CHROME.woodFill, fillAlpha: 0.98, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 4, gradient: false }));
     this.add(addPetFace(this.scene, left + 76, top + 96, 112, this.step.mood));
@@ -195,9 +198,13 @@ export class TutorialOverlay {
 
   private buildSkip(): void {
     // Opposite the bubble, so they never overlap; at the top it keeps to the left, clear of the fight's controls down the right edge.
+    // (If the lit spot is where it would go, it moves to the next place that is free.)
     const atTop = this.bubbleAtTop();
-    const x = atTop ? 640 : 100;
-    const y = atTop ? 1214 : 168;
+    const candidates: [number, number][] = atTop
+      ? [[640, 1214], [360, 1236], [100, 1214]]
+      : [[100, 168], [360, 1236], [640, 1214], [360, 168]];
+    const clash = (x: number, y: number, r: TutorialRect | undefined): boolean => !!r && x + 80 > r.x && x - 80 < r.x + r.w && y + 30 > r.y && y - 30 < r.y + r.h;
+    const [x, y] = candidates.find(([cx, cy]) => !clash(cx, cy, this.hole) && !clash(cx, cy, this.bubbleRect)) ?? candidates[0];
     const label = this.add(body(this.scene, x, y, 'スキップ', { fontSize: '22px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5)) as Phaser.GameObjects.Text;
     const hit = this.add(this.scene.add.zone(x, y, 150, 56));
     (hit as Phaser.GameObjects.Zone).setInteractive({ useHandCursor: true });

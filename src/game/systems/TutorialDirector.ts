@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { TUTORIAL_REWARD } from '../data/tutorial';
+import { TUTORIAL_REWARD, VILLAGE_TUTORIAL_REWARD } from '../data/tutorial';
 import { showRewardModal } from '../ui/RewardModal';
 import { tilesForGranted } from '../ui/RewardTiles';
 import { TutorialOverlay } from '../ui/TutorialOverlay';
@@ -49,7 +49,7 @@ export const TutorialDirector = {
   maybeShow(scene: Phaser.Scene, event: 'enter' | 'result', delay: number): void {
     const save = getSave(scene);
     if (!save) return;
-    const step = TutorialSystem.current(save);
+    const step = TutorialSystem.active(save);
     if (!step || step.scene !== scene.scene.key || (step.on ?? 'enter') !== event) return;
     waiting = true;
     scene.time.delayedCall(delay, () => this.show(scene));
@@ -57,7 +57,7 @@ export const TutorialDirector = {
 
   show(scene: Phaser.Scene): void {
     const save = getSave(scene);
-    const step = save ? TutorialSystem.current(save) : null;
+    const step = save ? TutorialSystem.active(save) : null;
     if (!save || !step || step.scene !== scene.scene.key || !scene.scene.isActive()) {
       waiting = false;
       return;
@@ -78,10 +78,16 @@ export const TutorialDirector = {
     SaveSystem.save(save);
     clear();
     if (finished) {
-      const granted = RewardSystem.grantAll(save, TUTORIAL_REWARD);
+      const village = finished === 'village';
+      const granted = RewardSystem.grantAll(save, village ? VILLAGE_TUTORIAL_REWARD : TUTORIAL_REWARD);
       SaveSystem.save(save);
       // Reopen the screen afterwards so the top bar shows what came with it.
-      showRewardModal(scene, { setEnabled: () => undefined }, { title: 'チュートリアル完了！', tiles: tilesForGranted(granted), note: 'ルリより：おつかれさま！ これからもよろしくね。', onClose: () => scene.scene.restart() });
+      showRewardModal(scene, { setEnabled: () => undefined }, {
+        title: village ? '村のチュートリアル完了！' : 'チュートリアル完了！',
+        tiles: tilesForGranted(granted),
+        note: village ? 'ルリより：村づくり、がんばってね！' : 'ルリより：おつかれさま！ これからもよろしくね。',
+        onClose: () => scene.scene.restart(),
+      });
       return;
     }
     // The next step may be on this same screen (e.g. the 出撃 popup that the last press opened).
