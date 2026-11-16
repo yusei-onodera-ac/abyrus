@@ -176,3 +176,25 @@ service cloud.firestore {
 - ビルド/デプロイ環境（本番サーバーや CI）では、同じ 6 つの
   `VITE_FIREBASE_*` 環境変数をそのビルド環境のシークレット/環境変数設定に
   も登録してください（`.env` はローカル専用で、リポジトリには含まれません）。
+
+## ショップ商品・プレミアムパスの値段（運営の管理画面から読む）
+
+ゲームは、起動時に1回だけ、運営の管理画面 (abyrus-admin) が Firestore に書いた次の2か所を読みます
+（`src/game/systems/RemoteShopConfig.ts`）。`VITE_FIREBASE_*` がそろっていないとき、取得に失敗したとき
+（オフライン・ルール・形式の違い・8秒で返らない）は、何も言わずに `src/game/data/shop.ts` と `premium.ts` の
+静的データのまま動きます。例外は投げません。
+
+- `shopProducts/{商品id}`: `{ name, description, group: 'pack'|'gems'|'gold'|'item', priceCurrency: 'yen'|'gems'|'gold',
+  priceAmount, goods: [{type, amount}], bonus?, limitPeriod?, limitCount?, badge?, startsAt?, endsAt?, category? }`
+- `config/premium`: `{ yen, durationDays, dailyGems, battleSpeed, idleCapHours, joinPack: [{type, amount, item?, rarity?}] }`
+
+決まり:
+- 1つ1つ検めて、形が正しくないもの（型・範囲・ゲームが知らない素材）は捨てます。正しいものだけを使います。
+- 商品は group ごとに静的データと入れ替えます。ある group に正しい商品が1つもなければ、その group は静的データのままです。
+  並びは、静的データにある id は静的データの順、新しい id はそのあとに id 順。
+- 商品の **ドキュメントid が購入回数の数え方の鍵**です（`SaveData.shop.purchases`）。今ある商品の id は変えないでください
+  （`pack-starter`、`gems-50` など）。
+- プレミアムは1項目ずつ検めて、正しい項目だけ上書きします。`joinPack` は、正しい報酬が1つ以上あるときだけ入れ替えます。
+- 読むだけです（サインイン不要）。ルールで `shopProducts/*` と `config/*` を「誰でも読み取り可、書き込みは管理者のみ」にしてください。
+  **このリポジトリの `firestore.rules` にはまだ入っていません**（管理画面側で変えた版が本番にあります）。このファイルをそのまま
+  公開すると、その2つのルールが消えます。公開する前に、管理画面側のルールと合わせてください。

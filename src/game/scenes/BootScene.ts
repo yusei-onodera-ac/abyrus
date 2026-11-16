@@ -23,6 +23,7 @@ import { GACHA_BANNERS } from '../data/gachaBanners';
 import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
+import { RemoteShopConfig } from '../systems/RemoteShopConfig';
 import { isArtNeeded } from '../data/schedule';
 import { heading, caption, CHROME } from '../ui/theme';
 
@@ -39,6 +40,10 @@ export class BootScene extends Phaser.Scene {
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {});
 
     this.buildLoadingUi();
+
+    // The shop's products and the premium pass's price from the operator's admin (Firestore), read once while the pictures load.
+    // Without Firebase settings, offline or on any failure it does nothing and the static data stays (systems/RemoteShopConfig.ts).
+    void RemoteShopConfig.refresh();
 
     // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
     // rest are loaded when shown big - see characters/HeroArt.ts: all 161 together are ~1.4 GB, more than a phone holds).
