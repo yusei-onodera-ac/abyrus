@@ -141,7 +141,7 @@ export interface PremiumConfig {
   joinPack: Reward[];
 }
 
-function rewardOf(v: unknown): Reward | null {
+export function rewardOf(v: unknown): Reward | null {
   if (!isObject(v) || !isInt(v.amount, 1, MAX_AMOUNT)) return null;
   if (typeof v.type === 'string' && PLAIN_GOODS.includes(v.type)) return { type: v.type as 'gems', amount: v.amount };
   if (v.type === 'item' && isItemId(v.item)) return { type: 'item', item: v.item, amount: v.amount };

@@ -35,5 +35,5 @@ await bundle.close();
 
 const args = process.argv.slice(2);
 const run = spawnSync(process.execPath, [file, ...args], { stdio: 'inherit', env: { ...process.env, CHECK_PROJECT_ID: projectId } });
-rmSync(out, { recursive: true, force: true });
+rmSync(file, { force: true });
 process.exit(run.status ?? 1);
