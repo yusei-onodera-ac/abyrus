@@ -298,6 +298,32 @@ export function friendTabIcon(scene: Phaser.Scene, size = 72): string {
   });
 }
 
+/** 同盟 tab: a shield with two crossed swords, for "the ones you stand with". (The bar draws the supplied
+ *  public/assets/ui/tab_alliance.png instead whenever it is there; this is what shows without it.) */
+export function allianceTabIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_tab_alliance_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, 0x4a3a1f, 0xffd23f);
+    const shield = [
+      { x: c - c * 0.5, y: c - c * 0.46 },
+      { x: c + c * 0.5, y: c - c * 0.46 },
+      { x: c + c * 0.5, y: c + c * 0.1 },
+      { x: c, y: c + c * 0.62 },
+      { x: c - c * 0.5, y: c + c * 0.1 },
+    ];
+    g.fillStyle(0x7a5a2b, 1);
+    g.fillPoints(shield, true);
+    g.lineStyle(Math.max(2, c * 0.06), 0xffd23f, 1);
+    g.strokePoints(shield, true, true);
+    g.lineStyle(Math.max(2, c * 0.1), 0xf4f1e6, 1);
+    g.beginPath();
+    g.moveTo(c - c * 0.34, c - c * 0.3);
+    g.lineTo(c + c * 0.34, c + c * 0.28);
+    g.moveTo(c + c * 0.34, c - c * 0.3);
+    g.lineTo(c - c * 0.34, c + c * 0.28);
+    g.strokePath();
+  });
+}
+
 /** Home tab: a small keep - a base wall with three crenellated towers. */
 export function homeTabIcon(scene: Phaser.Scene, size = 72): string {
   return ensureTexture(scene, `${ICON_TAB_HOME}_${size}`, size, (g, c) => {
@@ -452,6 +478,21 @@ export function mailIcon(scene: Phaser.Scene, size = 72): string {
     g.lineTo(c, top + h * 0.56);
     g.lineTo(left + w, top);
     g.strokePath();
+  });
+}
+
+/** Two people side by side for the home screen's corner button row: フレンド. */
+export function friendIcon(scene: Phaser.Scene, size = 72): string {
+  return ensureTexture(scene, `icon_friend_${size}`, size, (g, c) => {
+    drawNavBadge(g, c, CORNER_BADGE_FILL, CORNER_BADGE_RING);
+    // The one behind (right): smaller and a shade dimmer.
+    g.fillStyle(CORNER_BADGE_RING, 1);
+    g.fillCircle(c + c * 0.3, c - c * 0.2, c * 0.17);
+    g.fillEllipse(c + c * 0.3, c + c * 0.3, c * 0.5, c * 0.42);
+    // The one in front (left).
+    g.fillStyle(CORNER_GLYPH, 1);
+    g.fillCircle(c - c * 0.12, c - c * 0.12, c * 0.21);
+    g.fillEllipse(c - c * 0.12, c + c * 0.4, c * 0.72, c * 0.5);
   });
 }
 

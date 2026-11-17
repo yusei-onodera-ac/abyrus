@@ -3,7 +3,8 @@ import { EventSystem } from '../systems/EventSystem';
 import type { SaveData } from '../systems/SaveSystem';
 import { buildUnreadDot } from './CardParts';
 import { createPanel, createDivider } from './Panel';
-import { enhanceTabIcon, eventTabIcon, friendTabIcon, homeTabIcon, shopTabIcon } from './Icons';
+import { AllianceService } from '../alliance/AllianceService';
+import { allianceTabIcon, enhanceTabIcon, eventTabIcon, homeTabIcon, shopTabIcon } from './Icons';
 import { CHROME } from './theme';
 
 // Sampled from the topbar artwork (see CHROME in theme.ts), so this
@@ -14,11 +15,11 @@ const BRASS_DARK = CHROME.brassDark;
 const BRASS = CHROME.brass;
 const BRASS_BRIGHT = CHROME.brassBright;
 
-export type NavTab = 'event' | 'friend' | 'home' | 'enhance' | 'shop';
+export type NavTab = 'event' | 'alliance' | 'home' | 'enhance' | 'shop';
 
 const TAB_LABELS: Record<NavTab, string> = {
   event: 'イベント',
-  friend: 'フレンド',
+  alliance: '同盟',
   home: 'ホーム',
   enhance: '強化',
   shop: 'ショップ',
@@ -26,21 +27,27 @@ const TAB_LABELS: Record<NavTab, string> = {
 
 const TAB_SCENE: Record<NavTab, string> = {
   event: 'Event',
-  friend: 'Friend',
+  alliance: 'AllianceHome',
   home: 'Home',
   enhance: 'EnhanceHub',
   shop: 'Shop',
 };
 
+/** The screen a tab opens. 同盟 is a set of screens of its own: the 同盟ホーム, or 同盟を探す for a player who is in none. */
+function sceneOf(tab: NavTab, save: SaveData | undefined): string {
+  if (tab === 'alliance' && save && AllianceService.cached(save) === null) return 'AllianceFind';
+  return TAB_SCENE[tab];
+}
+
 const TAB_ICON: Record<NavTab, (scene: Phaser.Scene, size?: number) => string> = {
   event: eventTabIcon,
-  friend: friendTabIcon,
+  alliance: allianceTabIcon,
   home: homeTabIcon,
   enhance: enhanceTabIcon,
   shop: shopTabIcon,
 };
 
-const TABS: NavTab[] = ['event', 'friend', 'home', 'enhance', 'shop'];
+const TABS: NavTab[] = ['event', 'alliance', 'home', 'enhance', 'shop'];
 
 const BAR_HEIGHT = 124;
 
@@ -164,7 +171,7 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
       hitZone.on('pointerover', () => { if (!isActive) icon.setAlpha(0.8); });
       hitZone.on('pointerout', () => { if (!isActive) icon.setAlpha(0.55); });
       hitZone.on('pointerup', () => {
-        if (!isActive) scene.scene.start(TAB_SCENE[tab]);
+        if (!isActive) scene.scene.start(sceneOf(tab, save));
       });
       this.add(hitZone);
     });

@@ -41,7 +41,35 @@ export class WeekdayDungeonScene extends InboxScene {
   }
 
   protected buildCards(): InboxCard[] {
-    return [this.todayCard(), ...WEEKDAY_TIERS.map((tier, index) => this.tierCard(tier, index)), this.weekCard()];
+    return [this.todayCard(), this.howToCard(), ...WEEKDAY_TIERS.map((tier, index) => this.tierCard(tier, index)), this.weekCard()];
+  }
+
+  /** あそびかた: the five things a player needs to know, in the order they meet them. */
+  private howToCard(): InboxCard {
+    const steps = [
+      '曜日ごとに、もらえる素材が変わります。何曜日に何がもらえるかは、下の「1週間の予定」で見られます',
+      '初級〜超級から選んで「挑戦する」を押し、「出撃」でスタミナを使って戦います',
+      '勝つと、それぞれのカードに出ている素材が、そのままもらえます',
+      '一度勝った難しさは「掃討」で、戦わずにまとめて受け取れます',
+      '上の難しさは、メインステージを進めると開放されます',
+    ];
+    const textW = CARD_WIDTH - PAD * 2 - 44;
+    const container = this.add.container(0, 0);
+    let y = 64;
+    const rows = steps.map((step, i) => {
+      const number = body(this, PAD + 4, 0, String(i + 1), { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0);
+      const text = wrappedText(this, 0, 0, step, textW, { fontSize: '21px', color: '#f5e6c8' });
+      const rowY = y;
+      number.setY(rowY + 1);
+      text.setPosition(PAD + 44, rowY);
+      y += Math.max(text.height, 28) + 12;
+      return [number, text];
+    });
+    const height = y + 8;
+    container.add(buildCardPanel(this, CARD_WIDTH, height));
+    container.add(heading(this, PAD + 4, 32, 'あそびかた', { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    rows.forEach((row) => container.add(row));
+    return { container, height };
   }
 
   private todayCard(): InboxCard {
@@ -62,7 +90,9 @@ export class WeekdayDungeonScene extends InboxScene {
     const dungeon = getWeekdayDungeon(this.day);
     const tiles = WeekdayDungeonSystem.preview(this.day, index).map(tileForReward);
     const grid = tiles.length > 0 ? buildRewardGrid(this, tiles, CARD_WIDTH - PAD * 2) : undefined;
-    const gridTop = 112;
+    // "クリアでもらえるもの" over the rewards, so it is plain what they are.
+    const hasRewards = tiles.length > 0 || dungeon.goldMul > 1;
+    const gridTop = hasRewards ? 138 : 112;
     const extraNote = dungeon.goldMul > 1 ? 34 : 0;
     const bodyH = grid ? grid.height + 14 : extraNote > 0 ? 8 : 0;
     const height = gridTop + bodyH + extraNote + 18 + 70 + 18;
@@ -76,6 +106,7 @@ export class WeekdayDungeonScene extends InboxScene {
     container.add(cost.container);
     container.add(caption(this, PAD + 4, 76, `${ProgressionSystem.getWeekdayStage(this.day, index).enemies.length}体の敵　${tier.note ?? `クエスト${tier.likeStage + 1}層ほどの強さ`}`, { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
+    if (hasRewards) container.add(caption(this, PAD + 4, 116, 'クリアでもらえるもの', { fontSize: '19px', fontStyle: 'bold', color: open ? '#d8c49a' : '#8d7d5e', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     let y = gridTop;
     if (grid) {
       grid.container.setPosition(PAD, y);

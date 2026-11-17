@@ -70,7 +70,7 @@ export class BootScene extends Phaser.Scene {
     preloadButtonAssets(this);
     preloadIconAssets(this);
     this.load.image('topbar', '/assets/ui/topbar.png');
-    for (const tab of ['event', 'friend', 'home', 'enhance', 'shop']) {
+    for (const tab of ['event', 'alliance', 'home', 'enhance', 'shop']) {
       this.load.image(`tab_${tab}`, `/assets/ui/tab_${tab}.png`);
     }
     this.load.image('currency_coin', '/assets/ui/coin.png');
@@ -139,7 +139,6 @@ export class BootScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0a0b12');
     // Until the pictures below are in (they are the first things asked for), a plain centred title and bar.
     const title = heading(this, 360, 560, 'ABYRUS', { fontSize: '46px' }).setOrigin(0.5).setDepth(5);
-    const tagline = caption(this, 360, 610, '無限算盤の子', { fontSize: '14px' }).setOrigin(0.5).setDepth(5);
 
     const barW = 420;
     const barH = 16;
@@ -180,7 +179,6 @@ export class BootScene extends Phaser.Scene {
         const y = artReady ? 172 : 330;
         logo.setY(y);
         shimmer.setY(y);
-        tagline.setY(y + logo.displayHeight / 2 + 26);
       }
       drawBar();
     };
@@ -198,7 +196,6 @@ export class BootScene extends Phaser.Scene {
       shimmer = this.add.image(360, 172, logoKey).setScale(scale * 0.94).setAlpha(0).setDepth(6).setBlendMode(Phaser.BlendModes.ADD).setTint(0xffd98a);
       this.tweens.add({ targets: logo, alpha: 1, scale, duration: 600, ease: 'Cubic.easeOut' });
       this.tweens.add({ targets: shimmer, alpha: { from: 0, to: 0.32 }, scale: scale * 1.03, duration: 1500, delay: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      tagline.setFontSize(24).setColor('#f0dfb0').setStroke('#0a0b12', 6);
       layout();
     });
 

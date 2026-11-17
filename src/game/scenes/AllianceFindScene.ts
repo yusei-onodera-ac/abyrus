@@ -24,7 +24,7 @@ const CREATE_COST = ALLIANCE_CREATE_GEMS;
  *  (from friends) and making a new one. A player already in one is sent to its home. */
 export class AllianceFindScene extends AllianceScene {
   protected readonly screenTitle = '同盟を探す';
-  protected readonly navTab: NavTab = 'friend';
+  protected readonly navTab: NavTab = 'alliance';
   protected readonly toolbarHeight = 76;
   protected readonly needsAlliance = false;
   protected backTo = 'Friend';

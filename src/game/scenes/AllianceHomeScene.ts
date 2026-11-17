@@ -19,7 +19,7 @@ import { AllianceScene, INK, PAD } from './AllianceBase';
  *  doors to the rest (メンバー / 寄付 / ショップ / チャット / 設定). A red dot marks what is waiting. */
 export class AllianceHomeScene extends AllianceScene {
   protected readonly screenTitle = '同盟';
-  protected readonly navTab: NavTab = 'friend';
+  protected readonly navTab: NavTab = 'alliance';
   protected backTo = 'Friend';
 
   /** Description / rules being edited in the settings popup. */
