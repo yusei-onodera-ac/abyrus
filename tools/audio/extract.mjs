@@ -14,7 +14,7 @@ fs.writeFileSync(
   entry,
   `import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '${ROOT.replace(/\\/g, '/')}/src/game/data/tutorial';
 import { CLASS_LINES, HERO_LINES } from '${ROOT.replace(/\\/g, '/')}/src/game/data/homeLines';
-import { HERO_ROSTER } from '${ROOT.replace(/\\/g, '/')}/src/game/data/heroes';
+import { ALL_HEROES as HERO_ROSTER } from '${ROOT.replace(/\\/g, '/')}/src/game/data/heroes';
 const lines: { id: string; voice: string; text: string; hero?: string; heroClass?: string; rarity?: number }[] = [];
 for (const s of [...TUTORIAL_STEPS, ...VILLAGE_TUTORIAL_STEPS]) lines.push({ id: s.id, voice: 'guide', text: s.lines.join('') });
 for (const [cls, list] of Object.entries(CLASS_LINES)) list.forEach((text, i) => lines.push({ id: \`home_\${cls}_\${i + 1}\`, voice: cls, text }));

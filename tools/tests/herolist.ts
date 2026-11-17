@@ -1,5 +1,5 @@
 // The sort / filter of the hero lists (編成 roster, 強化 tab).
-import { HERO_ROSTER, createHeroInstance } from '../../src/game/data/heroes';
+import { ALL_HEROES, HERO_ROSTER, createHeroInstance } from '../../src/game/data/heroes';
 import { DEFAULT_HERO_LIST_VIEW, applyHeroListView, readHeroListView, writeHeroListView, type HeroListView } from '../../src/game/systems/HeroListView';
 
 let failures = 0;
@@ -51,9 +51,9 @@ ok(JSON.stringify(readHeroListView(registry)) === JSON.stringify(DEFAULT_HERO_LI
 // every character has words of their own for the Home screen, and none is left over for a character that does not exist
 import { PERSONAL_LINES } from '../../src/game/data/heroLines';
 import { homeLinesFor } from '../../src/game/data/homeLines';
-const ids = new Set(HERO_ROSTER.map((d) => d.id));
-ok(HERO_ROSTER.every((d) => (PERSONAL_LINES[d.id]?.length ?? 0) >= 2), 'every character has at least two lines of their own');
-ok(Object.keys(PERSONAL_LINES).every((id) => ids.has(id)), 'no lines for a character that is not in the roster');
+const ids = new Set(ALL_HEROES.map((d) => d.id)); // (the ones made ahead of their release have lines too)
+ok(ALL_HEROES.every((d) => (PERSONAL_LINES[d.id]?.length ?? 0) >= 2), 'every character has at least two lines of their own');
+ok(Object.keys(PERSONAL_LINES).every((id) => ids.has(id)), 'no lines for a character that does not exist');
 ok(Object.values(PERSONAL_LINES).every((l) => l.every((t) => t.length > 4 && t.length <= 60)), 'every line is a sentence of a sensible length');
 ok(homeLinesFor('gauss', 'tank')[0].voice === 'home_gauss_1', "a character's own lines use their own voice ids");
 ok(homeLinesFor('nobody', 'mage')[0].voice === 'home_mage_1', 'an unknown character falls back to the class lines');

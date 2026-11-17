@@ -8,6 +8,7 @@
 //   voice  -> public/assets/voice/<line id>.mp3  (the lines come from the game's own data: tutorial steps and home lines)
 
 import { NEW_CHARACTERS } from '../art/newCharacters.mjs';
+import { NEW_CHARACTERS_2 } from '../art/newCharacters2.mjs';
 
 const LOOP = 'It must loop smoothly. Instrumental only, no vocals, no lyrics.';
 
@@ -59,10 +60,12 @@ const FEMALE_VOICES = ['Kore', 'Aoede', 'Leda', 'Zephyr', 'Callirrhoe', 'Autonoe
 const MEN = [
   ...'gauss baron dias ignis ald touma pino zayd finn raiga sora taiga felix robin marin gustav bruno shade gen raijin rei enju ember sieg thorne noel'.split(' '),
   ...NEW_CHARACTERS.filter((c) => c[4] === 'm').map((c) => c[0]),
+  ...NEW_CHARACTERS_2.filter((c) => c[4] === 'm').map((c) => c[0]),
 ];
 const WOMEN = [
   ...'aria suzuna mina noa yuno sylva nova kohaku astra viara seira mizuki garnet momo lumi celes nyx morrigan brisa rin volt karna mei tia kai fros lilith ivy quartz ouka rosa lune tsubame ines kaede doris lena mimi miru aion fione fern'.split(' '),
   ...NEW_CHARACTERS.filter((c) => c[4] === 'f').map((c) => c[0]),
+  ...NEW_CHARACTERS_2.filter((c) => c[4] === 'f').map((c) => c[0]),
 ];
 const TONE = {
   warrior: 'confident, energetic and brave',

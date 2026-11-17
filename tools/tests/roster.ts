@@ -1,12 +1,13 @@
-// The roster as a whole: every character has what the game needs of it (a picture, home lines with their voices, a skill kit),
+// The roster as a whole (ALL_HEROES: the ones out now and the 30 made ahead of their release): every character has what the game needs of it (a picture, home lines with their voices, a skill kit),
 // and the list the pictures are made from (tools/art/newCharacters.mjs) says the same as data/heroes.ts.
 import fs from 'node:fs';
 import path from 'node:path';
-import { HERO_ROSTER } from '../../src/game/data/heroes';
+import { ALL_HEROES as HERO_ROSTER } from '../../src/game/data/heroes';
 import { HERO_SKILLS, RARITY_SKILL_SLOTS } from '../../src/game/data/skills';
 import { homeLinesFor } from '../../src/game/data/homeLines';
 import { PERSONAL_LINES } from '../../src/game/data/heroLines';
 import { NEW_CHARACTERS } from '../art/newCharacters.mjs';
+import { NEW_CHARACTERS_2 } from '../art/newCharacters2.mjs';
 
 let failures = 0;
 function ok(cond: unknown, label: string): void {
@@ -55,5 +56,17 @@ for (const [id, rarity, heroClass, name, gender] of NEW_CHARACTERS as [string, n
 }
 ok(mismatch.length === 0, `tools/art/newCharacters.mjs agrees with data/heroes.ts (id, name, class, rarity)${names(mismatch)}`);
 ok(NEW_CHARACTERS.length === 80, 'the roster doubled: 80 characters were added');
+
+// the 30 made ahead of time (tools/art/newCharacters2.mjs)
+const mismatch2: string[] = [];
+for (const [id, rarity, heroClass, name, gender] of NEW_CHARACTERS_2 as [string, number, string, string, string][]) {
+  const def = HERO_ROSTER.find((h) => h.id === id);
+  if (!def || def.rarity !== rarity || def.heroClass !== heroClass || def.name !== name || (gender !== 'm' && gender !== 'f')) mismatch2.push(id);
+}
+ok(mismatch2.length === 0, `tools/art/newCharacters2.mjs agrees with data/heroes.ts (id, name, class, rarity)${names(mismatch2)}`);
+ok(NEW_CHARACTERS_2.length === 30 && NEW_CHARACTERS_2.filter((c: unknown[]) => c[1] === 6).length === 10 && NEW_CHARACTERS_2.filter((c: unknown[]) => c[1] === 5).length === 20, 'ahead of time: 30 characters, ★6 x10 and ★5 x20');
+ok(HERO_ROSTER.length === 191, 'every character defined: 161 + 30 = 191');
+const names2 = new Set(HERO_ROSTER.map((h) => h.name));
+ok(names2.size === HERO_ROSTER.length, 'hero names are unique');
 
 if (failures) process.exit(1);
