@@ -26,6 +26,7 @@ import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
 import { RemoteNotices } from '../systems/RemoteNotices';
 import { RemoteInbox } from '../systems/RemoteInbox';
+import { RemoteLoginBonus } from '../systems/RemoteLoginBonus';
 import { RemoteMaintenance, type MaintenanceState } from '../systems/RemoteMaintenance';
 import { waitAtMost } from '../systems/firestoreRead';
 import { isArtNeeded } from '../data/schedule';
@@ -57,6 +58,8 @@ export class BootScene extends Phaser.Scene {
     void RemoteNotices.refresh();
     // The プレゼント and メール the operator sends to everyone (systems/RemoteInbox.ts): added to the campaign lists Home delivers from.
     void RemoteInbox.refresh();
+    // The ログインボーナス calendar's days the operator set (systems/RemoteLoginBonus.ts).
+    void RemoteLoginBonus.refresh();
     this.maintenance = RemoteMaintenance.check();
 
     // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
@@ -126,6 +129,7 @@ export class BootScene extends Phaser.Scene {
       this.maintenance && !skip ? waitAtMost(this.maintenance, BOOT_WAIT_MS, null) : null,
       waitAtMost(RemoteNotices.refresh(), BOOT_WAIT_MS, null),
       waitAtMost(RemoteInbox.refresh(), BOOT_WAIT_MS, null),
+      waitAtMost(RemoteLoginBonus.refresh(), BOOT_WAIT_MS, null),
     ]);
     if (state?.enabled) this.scene.start('Maintenance', { message: state.message, next });
     else this.scene.start(next.scene, next.data);
