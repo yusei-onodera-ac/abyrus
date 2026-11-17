@@ -8,6 +8,7 @@ import { GachaScene } from './game/scenes/GachaScene';
 import { GachaDetailScene } from './game/scenes/GachaDetailScene';
 import { RosterScene } from './game/scenes/RosterScene';
 import { NoticeScene } from './game/scenes/NoticeScene';
+import { MaintenanceScene } from './game/scenes/MaintenanceScene';
 import { GiftScene } from './game/scenes/GiftScene';
 import { MailScene } from './game/scenes/MailScene';
 import { FriendScene } from './game/scenes/FriendScene';
@@ -71,6 +72,7 @@ const config: Phaser.Types.Core.GameConfig = {
     GachaDetailScene,
     RosterScene,
     NoticeScene,
+    MaintenanceScene,
     GiftScene,
     MailScene,
     FriendScene,

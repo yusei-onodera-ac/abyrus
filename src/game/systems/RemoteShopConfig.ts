@@ -3,7 +3,8 @@ import { PREMIUM, PREMIUM_JOIN_PACK } from '../data/premium';
 import type { Reward } from '../data/rewards';
 import type { Rarity } from '../types';
 import { GEM_PRODUCTS, GOLD_PRODUCTS, ITEM_PRODUCTS, PACKS, type Good, type GoodType, type LimitPeriod, type ShopProduct } from '../data/shop';
-import { getFirebaseConfig, isLeaderboardConfigured } from './firebaseConfig';
+import { isLeaderboardConfigured } from './firebaseConfig';
+import { openFirestore, withTimeout } from './firestoreRead';
 
 /**
  * ショップの商品とプレミアムパスの値段を、運営の管理画面 (abyrus-admin) が Firestore に書いたものから読む。
@@ -222,32 +223,10 @@ export function applyRemoteShop(data: RemoteShopData): RemoteShopResult {
 
 const FETCH_TIMEOUT_MS = 8000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('timeout')), ms);
-    promise.then(
-      (v) => {
-        clearTimeout(timer);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(timer);
-        reject(e);
-      },
-    );
-  });
-}
-
 /** Reads the two places from Firestore (public read: no sign-in). The Firebase SDK is loaded on demand, like LeaderboardSystem does. */
 async function fetchFromFirestore(): Promise<RemoteShopData> {
-  const [appMod, firestoreMod] = await Promise.all([import('firebase/app'), import('firebase/firestore')]);
-  // (the leaderboard and the alliance start the same default app with the same settings: share it when it is already there)
-  const app = appMod.getApps().length > 0 ? appMod.getApp() : appMod.initializeApp(getFirebaseConfig());
-  const db = firestoreMod.getFirestore(app);
-  const [products, premium] = await Promise.all([
-    firestoreMod.getDocs(firestoreMod.collection(db, 'shopProducts')),
-    firestoreMod.getDoc(firestoreMod.doc(db, 'config', 'premium')),
-  ]);
+  const { fs, db } = await openFirestore();
+  const [products, premium] = await Promise.all([fs.getDocs(fs.collection(db, 'shopProducts')), fs.getDoc(fs.doc(db, 'config', 'premium'))]);
   return { products: products.docs.map((d) => ({ id: d.id, data: d.data() })), premium: premium.exists() ? premium.data() : null };
 }
 

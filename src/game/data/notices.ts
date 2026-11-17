@@ -1,5 +1,6 @@
 import { SCHEDULED_EVENTS, SCHEDULED_GACHAS } from './schedule';
 import { formatDate, formatDateTime } from '../ui/format';
+import { remoteNotices } from '../systems/RemoteNotices';
 
 export interface NoticeEntry {
   id: string;
@@ -110,7 +111,8 @@ ${period}
   return out.sort((a, b) => b.at - a.at).map(({ at: _at, ...notice }) => notice);
 }
 
-/** The whole board, newest first: the notices the calendar made, then the ones written above. */
+/** The whole board: the operator's notices from the admin (systems/RemoteNotices.ts, newest first, none without a connection), then the
+ *  ones the calendar made, then the ones written above. */
 export function getNotices(now = Date.now()): NoticeEntry[] {
-  return [...scheduleNotices(now), ...NOTICES];
+  return [...remoteNotices(now), ...scheduleNotices(now), ...NOTICES];
 }
