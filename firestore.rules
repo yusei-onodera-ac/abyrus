@@ -1,4 +1,6 @@
-// ABYRUS の Firestore ルール: 無限モードのランキング + 同盟（アライアンス）。
+// ABYRUS の Firestore ルール: 無限モードのランキング + 同盟（アライアンス） + 管理画面 (abyrus-admin) の管理者・ショップ・プレミアム。
+// Firebase プロジェクト abyrus-game は、ゲームと管理画面で共用。ルールは1プロジェクトに1つだけ公開できるので、両方の分を、このファイルに入れてある。
+// 公開する前に、必ず admins/{自分の認証uid} を、Firebase コンソールで作っておくこと (作る前に公開すると、管理画面に入れなくなる)。
 // 同盟の設計と、各ルールが何を守るかは、docs/ALLIANCE_SERVER.md に書いてある。
 // ※ 未検証。Firebase プロジェクトにつないで、エミュレーターか本番で、試してから公開すること。
 //
@@ -85,6 +87,183 @@ service cloud.firestore {
         && data.playerName is string
         && data.playerName.size() <= 24
         && data.updatedAt == request.time;
+    }
+
+    // ====================================================================== 管理画面 (abyrus-admin) と、ショップ・プレミアムの価格
+    // 管理画面 (別のリポジトリ abyrus-admin) と、同じ Firebase プロジェクトを使っているので、ルールは1つのファイルにまとめる。
+    // ここから下の「管理画面」の節は、abyrus-admin の firestore.rules (コミット 36bd365) から、そのまま写したもの。
+    // 管理者は、Firebase コンソールで admins/{認証uid} のドキュメントを手で作った人だけ (メールアドレスはどこにも書かない)。
+    // shopProducts と config/premium は、ゲームが読む (サインイン不要)。書けるのは管理者だけで、中身は RemoteShopConfig.ts と同じ検査を通す。
+
+    // --- Admin allow-list ---
+    // An admin is an Authentication user whose uid has a matching document
+    // here. The document's content is never read by any rule below (only
+    // its existence matters), and this collection itself is never readable
+    // or writable from a client - the project owner adds/removes an
+    // admins/{uid} document by hand from the Firebase console (see
+    // SETUP.md). No email address appears in these rules or in app code.
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    match /admins/{adminUid} {
+      allow read, write: if false;
+    }
+
+    // --- shopProducts / config/premium schema (mirrors
+    // src/game/systems/RemoteShopConfig.ts in the game repo field-for-field
+    // and limit-for-limit - keep the two in sync on any schema change).
+    // A write that does not match this shape is rejected here, so nothing
+    // the game would silently drop can ever be saved as if it worked. ----
+
+    function isGoodType(t) {
+      return t in ['gems', 'gold', 'stamina', 'phaseMaterials', 'skillEssence',
+                   'exp_s', 'exp_m', 'exp_l', 'exp_xl', 'equip_essence'];
+    }
+
+    function isValidGood(g) {
+      return g is map
+        && g.keys().hasOnly(['type', 'amount'])
+        && g.type is string && isGoodType(g.type)
+        && g.amount is int && g.amount >= 1 && g.amount <= 1000000000;
+    }
+
+    // Firestore rules have no array loop, so each index up to the 10-item
+    // cap is checked by hand; an index past the list's actual size is
+    // trivially fine (there's nothing there to check).
+    function isValidGoodAt(goods, i) {
+      return goods.size() <= i || isValidGood(goods[i]);
+    }
+
+    function isValidGoodsList(goods) {
+      return goods is list && goods.size() >= 1 && goods.size() <= 10
+        && isValidGoodAt(goods, 0) && isValidGoodAt(goods, 1) && isValidGoodAt(goods, 2)
+        && isValidGoodAt(goods, 3) && isValidGoodAt(goods, 4) && isValidGoodAt(goods, 5)
+        && isValidGoodAt(goods, 6) && isValidGoodAt(goods, 7) && isValidGoodAt(goods, 8)
+        && isValidGoodAt(goods, 9);
+    }
+
+    // The document's id is the purchase-count key on the game side
+    // (SaveData.shop.purchases) - this rule only checks the document's
+    // *content*, never its id; nothing here stops an id from being reused
+    // or renamed, that is an operational rule for whoever edits the data.
+    function isValidShopProduct(d) {
+      return d.keys().hasOnly(['name', 'description', 'group', 'priceCurrency', 'priceAmount',
+                                'goods', 'bonus', 'limitPeriod', 'limitCount', 'badge',
+                                'startsAt', 'endsAt', 'category', 'createdAt', 'updatedAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 60
+        && d.group in ['pack', 'gems', 'gold', 'item']
+        && d.priceCurrency in ['yen', 'gems', 'gold']
+        && d.priceAmount is int && d.priceAmount >= 1
+        && d.priceAmount <= (d.priceCurrency == 'yen' ? 1000000 : 1000000000)
+        && isValidGoodsList(d.goods)
+        && (!('description' in d) || d.description == null || d.description == ''
+            || (d.description is string && d.description.size() <= 300))
+        && (!('bonus' in d) || d.bonus == null
+            || (d.bonus is int && d.bonus >= 0 && d.bonus <= 1000000000))
+        // 'none' (the admin form's own "no limit" default) is rejected on
+        // purpose, same as the game's parser: it must be left out / null,
+        // never the literal string 'none'.
+        && (!('limitPeriod' in d) || d.limitPeriod == null || d.limitPeriod == ''
+            || (d.limitPeriod in ['once', 'day', 'week', 'month']
+                && (!('limitCount' in d) || d.limitCount == null
+                    || (d.limitCount is int && d.limitCount >= 1 && d.limitCount <= 9999))))
+        && (!('badge' in d) || d.badge == null || d.badge == ''
+            || (d.badge is string && d.badge.size() <= 16))
+        && (!('startsAt' in d) || d.startsAt == null || d.startsAt == ''
+            || d.startsAt is string || d.startsAt is timestamp)
+        && (!('endsAt' in d) || d.endsAt == null || d.endsAt == ''
+            || d.endsAt is string || d.endsAt is timestamp)
+        && (!('category' in d) || d.category == null || d.category == ''
+            || d.category in ['stamina', 'material']);
+    }
+
+    // One hasOnly() across the union of fields (instead of one per branch,
+    // times up to 12 reward slots) keeps this well clear of the rules
+    // engine's per-request expression-count ceiling.
+    function isValidPremiumReward(r) {
+      return r is map
+        && r.keys().hasOnly(['type', 'amount', 'item', 'rarity'])
+        && r.amount is int && r.amount >= 1 && r.amount <= 1000000000
+        && (
+          (r.type in ['gems', 'gold', 'stamina', 'phaseMaterials', 'skillEssence']
+            && !('item' in r) && !('rarity' in r))
+          || (r.type == 'item' && !('rarity' in r)
+            && r.item in ['exp_s', 'exp_m', 'exp_l', 'exp_xl', 'equip_essence'])
+          || (r.type == 'equipment' && !('item' in r)
+            && r.rarity is int && r.rarity >= 1 && r.rarity <= 5)
+        );
+    }
+
+    function isValidJoinPackAt(pack, i) {
+      return pack.size() <= i || isValidPremiumReward(pack[i]);
+    }
+
+    function isValidJoinPack(pack) {
+      return pack is list && pack.size() <= 12
+        && isValidJoinPackAt(pack, 0) && isValidJoinPackAt(pack, 1) && isValidJoinPackAt(pack, 2)
+        && isValidJoinPackAt(pack, 3) && isValidJoinPackAt(pack, 4) && isValidJoinPackAt(pack, 5)
+        && isValidJoinPackAt(pack, 6) && isValidJoinPackAt(pack, 7) && isValidJoinPackAt(pack, 8)
+        && isValidJoinPackAt(pack, 9) && isValidJoinPackAt(pack, 10) && isValidJoinPackAt(pack, 11);
+    }
+
+    function isValidPremiumConfig(d) {
+      return d.keys().hasOnly(['yen', 'durationDays', 'dailyGems', 'battleSpeed', 'idleCapHours',
+                                'joinPack', 'updatedAt'])
+        && d.yen is int && d.yen >= 1 && d.yen <= 1000000
+        && d.durationDays is int && d.durationDays >= 1 && d.durationDays <= 365
+        && d.dailyGems is int && d.dailyGems >= 0 && d.dailyGems <= 100000
+        && d.battleSpeed is number && d.battleSpeed >= 1 && d.battleSpeed <= 4
+        && d.idleCapHours is int && d.idleCapHours >= 1 && d.idleCapHours <= 168
+        && d.joinPack is list && isValidJoinPack(d.joinPack);
+    }
+
+    // --- This admin app's own collections: allow-listed admins only. ---
+    match /announcements/{docId} { allow read, write: if isAdmin(); }
+    match /gifts/{docId} { allow read, write: if isAdmin(); }
+    match /mail/{docId} { allow read, write: if isAdmin(); }
+    match /inquiries/{docId} { allow read, write: if isAdmin(); }
+    match /bugReports/{docId} { allow read, write: if isAdmin(); }
+    match /gachaBanners/{docId} { allow read, write: if isAdmin(); }
+
+    // Shop pricing: publicly readable (no sign-in) so the GAME client can
+    // fetch it, same as infiniteModeScores above; writes are admin-only and
+    // schema-checked (isValidShopProduct above).
+    match /shopProducts/{docId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidShopProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /events/{docId} { allow read, write: if isAdmin(); }
+    match /homeBanners/{docId} { allow read, write: if isAdmin(); }
+    match /loginBonusDays/{docId} { allow read, write: if isAdmin(); }
+    match /heroDefinitions/{docId} { allow read, write: if isAdmin(); }
+    match /equipmentDefinitions/{docId} { allow read, write: if isAdmin(); }
+    match /missionDefs/{docId} { allow read, write: if isAdmin(); }
+    match /limitedEvents/{docId} { allow read, write: if isAdmin(); }
+    match /campaigns/{docId} { allow read, write: if isAdmin(); }
+    match /questRegions/{docId} { allow read, write: if isAdmin(); }
+    match /weekdayDungeons/{docId} { allow read, write: if isAdmin(); }
+    match /expeditions/{docId} { allow read, write: if isAdmin(); }
+    match /collectionMilestones/{docId} { allow read, write: if isAdmin(); }
+    match /allianceShopItems/{docId} { allow read, write: if isAdmin(); }
+    match /notes/{docId} { allow read, write: if isAdmin(); }
+
+    // config/*: admin-only, except config/premium which (like shopProducts)
+    // is publicly readable and schema-checked on write. The docId != 'premium'
+    // guard keeps this wildcard block from ever being the one that decides
+    // config/premium's access (Firestore merges every matching block with
+    // OR, so without the guard this block's un-checked isAdmin() write
+    // would stand in for the stricter rule below on that one document).
+    match /config/{docId} {
+      allow read, write: if docId != 'premium' && isAdmin();
+    }
+    match /config/premium {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidPremiumConfig(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     // ====================================================================== プレイヤー
