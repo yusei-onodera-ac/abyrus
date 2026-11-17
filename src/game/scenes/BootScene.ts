@@ -25,6 +25,7 @@ import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
 import { RemoteNotices } from '../systems/RemoteNotices';
+import { RemoteInbox } from '../systems/RemoteInbox';
 import { RemoteMaintenance, type MaintenanceState } from '../systems/RemoteMaintenance';
 import { waitAtMost } from '../systems/firestoreRead';
 import { isArtNeeded } from '../data/schedule';
@@ -54,6 +55,8 @@ export class BootScene extends Phaser.Scene {
     void RemoteShopConfig.refresh();
     // The operator's お知らせ and the メンテナンス switch, the same way (systems/RemoteNotices.ts, RemoteMaintenance.ts); `create` waits a moment for them.
     void RemoteNotices.refresh();
+    // The プレゼント and メール the operator sends to everyone (systems/RemoteInbox.ts): added to the campaign lists Home delivers from.
+    void RemoteInbox.refresh();
     this.maintenance = RemoteMaintenance.check();
 
     // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
@@ -119,7 +122,11 @@ export class BootScene extends Phaser.Scene {
   private async enter(next: { scene: string; data?: object }): Promise<void> {
     const dev = import.meta.env.DEV || import.meta.env.VITE_DEV_ENV === '1';
     const skip = dev && new URLSearchParams(location.search).has('nomaint');
-    const [state] = await Promise.all([this.maintenance && !skip ? waitAtMost(this.maintenance, BOOT_WAIT_MS, null) : null, waitAtMost(RemoteNotices.refresh(), BOOT_WAIT_MS, null)]);
+    const [state] = await Promise.all([
+      this.maintenance && !skip ? waitAtMost(this.maintenance, BOOT_WAIT_MS, null) : null,
+      waitAtMost(RemoteNotices.refresh(), BOOT_WAIT_MS, null),
+      waitAtMost(RemoteInbox.refresh(), BOOT_WAIT_MS, null),
+    ]);
     if (state?.enabled) this.scene.start('Maintenance', { message: state.message, next });
     else this.scene.start(next.scene, next.data);
   }

@@ -226,8 +226,17 @@ service cloud.firestore {
       allow read: if isAdmin() || resource.data.active == true;
       allow write: if isAdmin();
     }
-    match /gifts/{docId} { allow read, write: if isAdmin(); }
-    match /mail/{docId} { allow read, write: if isAdmin(); }
+    // gifts / mail: the プレゼント and メール the operator sends to EVERYONE are read by the game (it asks for
+    // `status == 'sent' && recipientType == 'all'`, which is what lets a player read them; a query without those filters is refused).
+    // Drafts, and anything addressed to one named player, stay admin-only. Writes are admin-only.
+    match /gifts/{docId} {
+      allow read: if isAdmin() || (resource.data.status == 'sent' && resource.data.recipientType == 'all');
+      allow write: if isAdmin();
+    }
+    match /mail/{docId} {
+      allow read: if isAdmin() || (resource.data.status == 'sent' && resource.data.recipientType == 'all');
+      allow write: if isAdmin();
+    }
     match /inquiries/{docId} { allow read, write: if isAdmin(); }
     match /bugReports/{docId} { allow read, write: if isAdmin(); }
     match /gachaBanners/{docId} { allow read, write: if isAdmin(); }
