@@ -220,7 +220,12 @@ service cloud.firestore {
     }
 
     // --- This admin app's own collections: allow-listed admins only. ---
-    match /announcements/{docId} { allow read, write: if isAdmin(); }
+    // announcements: the game's お知らせ board reads the published ones (it asks for `active == true`, which is what lets a player
+    // read them; a query without that filter is refused). Everything else is admin-only, as before.
+    match /announcements/{docId} {
+      allow read: if isAdmin() || resource.data.active == true;
+      allow write: if isAdmin();
+    }
     match /gifts/{docId} { allow read, write: if isAdmin(); }
     match /mail/{docId} { allow read, write: if isAdmin(); }
     match /inquiries/{docId} { allow read, write: if isAdmin(); }
@@ -251,14 +256,27 @@ service cloud.firestore {
     match /allianceShopItems/{docId} { allow read, write: if isAdmin(); }
     match /notes/{docId} { allow read, write: if isAdmin(); }
 
-    // config/*: admin-only, except config/premium which (like shopProducts)
-    // is publicly readable and schema-checked on write. The docId != 'premium'
-    // guard keeps this wildcard block from ever being the one that decides
-    // config/premium's access (Firestore merges every matching block with
+    // config/maintenance { enabled, message }: the game reads it at launch (publicly, no sign-in) to show the メンテナンス screen.
+    // Writes are admin-only and checked (the admin form also sends `updatedAt`).
+    function isValidMaintenance(d) {
+      return d.keys().hasOnly(['enabled', 'message', 'updatedAt'])
+        && d.enabled is bool
+        && d.message is string && d.message.size() <= 300;
+    }
+
+    // config/*: admin-only, except config/premium and config/maintenance, which (like shopProducts)
+    // are publicly readable and schema-checked on write. The docId guards
+    // keep this wildcard block from ever being the one that decides
+    // those documents' access (Firestore merges every matching block with
     // OR, so without the guard this block's un-checked isAdmin() write
-    // would stand in for the stricter rule below on that one document).
+    // would stand in for the stricter rule below on those documents).
     match /config/{docId} {
-      allow read, write: if docId != 'premium' && isAdmin();
+      allow read, write: if docId != 'premium' && docId != 'maintenance' && isAdmin();
+    }
+    match /config/maintenance {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidMaintenance(request.resource.data);
+      allow delete: if isAdmin();
     }
     match /config/premium {
       allow read: if true;

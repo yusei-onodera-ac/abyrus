@@ -24,10 +24,18 @@ import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
+import { RemoteNotices } from '../systems/RemoteNotices';
+import { RemoteMaintenance, type MaintenanceState } from '../systems/RemoteMaintenance';
+import { waitAtMost } from '../systems/firestoreRead';
 import { isArtNeeded } from '../data/schedule';
 import { heading, caption, CHROME } from '../ui/theme';
 
+/** The longest `create` waits for the operator's settings before it goes on without them (ms). */
+const BOOT_WAIT_MS = 2500;
+
 export class BootScene extends Phaser.Scene {
+  private maintenance?: Promise<MaintenanceState>;
+
   constructor() {
     super('Boot');
   }
@@ -44,6 +52,9 @@ export class BootScene extends Phaser.Scene {
     // The shop's products and the premium pass's price from the operator's admin (Firestore), read once while the pictures load.
     // Without Firebase settings, offline or on any failure it does nothing and the static data stays (systems/RemoteShopConfig.ts).
     void RemoteShopConfig.refresh();
+    // The operator's お知らせ and the メンテナンス switch, the same way (systems/RemoteNotices.ts, RemoteMaintenance.ts); `create` waits a moment for them.
+    void RemoteNotices.refresh();
+    this.maintenance = RemoteMaintenance.check();
 
     // The characters: the small pictures of all of them now; the big illustration only of the Home hero and the party (the
     // rest are loaded when shown big - see characters/HeroArt.ts: all 161 together are ~1.4 GB, more than a phone holds).
@@ -91,13 +102,26 @@ export class BootScene extends Phaser.Scene {
     TutorialDirector.install(this.game);
     MusicDirector.install(this.game);
     const battle = battleFromUrl();
-    if (battle) this.scene.start(battle.scene, battle.data);
-    else if (friendId) this.scene.start('Friend', { tab: 'add', prefill: friendId });
+    let next: { scene: string; data?: object };
+    if (battle) next = { scene: battle.scene, data: battle.data };
+    else if (friendId) next = { scene: 'Friend', data: { tab: 'add', prefill: friendId } };
     // The very first launch: the opening story, which ends at Home where the tutorial starts.
-    else if (!save.tutorial.opening) {
-      const route = openingRoute();
-      this.scene.start(route.scene, route.data);
-    } else this.scene.start('Home');
+    else if (!save.tutorial.opening) next = openingRoute();
+    else next = { scene: 'Home' };
+    void this.enter(next);
+  }
+
+  /**
+   * Goes on to `next`, unless the operator has メンテナンス switched on (the メンテナンス screen first; it carries on to `next` when
+   * it is over). It waits at most BOOT_WAIT_MS for the operator's settings (the お知らせ too, so Home's red dot is right) and then
+   * goes on without them: a slow or missing connection never keeps a player out. Development: `?nomaint` skips the check.
+   */
+  private async enter(next: { scene: string; data?: object }): Promise<void> {
+    const dev = import.meta.env.DEV || import.meta.env.VITE_DEV_ENV === '1';
+    const skip = dev && new URLSearchParams(location.search).has('nomaint');
+    const [state] = await Promise.all([this.maintenance && !skip ? waitAtMost(this.maintenance, BOOT_WAIT_MS, null) : null, waitAtMost(RemoteNotices.refresh(), BOOT_WAIT_MS, null)]);
+    if (state?.enabled) this.scene.start('Maintenance', { message: state.message, next });
+    else this.scene.start(next.scene, next.data);
   }
 
   private buildLoadingUi(): void {
