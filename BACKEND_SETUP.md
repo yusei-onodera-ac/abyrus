@@ -225,12 +225,12 @@ service cloud.firestore {
 
 ### ログインボーナス（毎月の1〜31日の報酬）
 
-`loginBonusDays/{id}` `{ day: 1〜31, reward, note? }` を、起動時に1回、全部読みます（`systems/RemoteLoginBonus.ts`）。**`day` に当たる日だけ**、
+`loginBonusDays/{day}` `{ day: 1〜31, reward, note? }`（**ドキュメントidが日そのもの** `"1"`〜`"31"`。`day` と一致しないと保存できません）を、起動時に1回、全部読みます（`systems/RemoteLoginBonus.ts`）。**`day` に当たる日だけ**、
 ゲームに書いてある報酬（`data/loginBonus.ts`）の代わりにその報酬が出ます。ない日は、書いてある報酬のままです。
 
 - `reward` はゲームの報酬と同じ形: `{ type: gems|gold|stamina|phaseMaterials|skillEssence, amount }`、`{ type: item, item: exp_s|exp_m|exp_l|exp_xl|equip_essence, amount }`、
   `{ type: equipment, rarity: 1〜5, amount }`。数量は整数で 1〜10億。**魔晶石だけは 10万まで**（桁の打ち間違いを止めるため）。
-- 同じ日のドキュメントが2つあるときは、idが小さいほう。決まりに合わないドキュメントは、その1件だけ使いません（昔の「7日サイクル」の形 `dayNumber` / `rewardType` も使いません）。
+- 決まりに合わないドキュメントは、その1件だけ使いません（念のため、同じ日が2つあるときは、idが小さいほう）（昔の「7日サイクル」の形 `dayNumber` / `rewardType` も使いません）。
 - 毎月同じ表を使います（月ごとの表はありません）。すでに受け取った日は、直しても戻りません。
 - ルール: `loginBonusDays` は誰でも読める。書くのは管理者だけで、中身を検める（報酬は、プレミアムパスの入会パックと同じ検査）。**公開するまでは読めない（403）ので、書いてある報酬のまま。**
 

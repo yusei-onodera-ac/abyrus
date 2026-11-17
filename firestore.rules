@@ -252,19 +252,35 @@ service cloud.firestore {
 
     match /events/{docId} { allow read, write: if isAdmin(); }
     match /homeBanners/{docId} { allow read, write: if isAdmin(); }
-    // loginBonusDays/{id} { day: 1..31, reward, note? }: the reward of each day of the month. The game reads the whole table at launch
-    // (publicly, no sign-in); writes are admin-only and checked (the reward is the game's Reward, same check as the premium join pack;
-    // a day's gems are capped at 100000 as a guard against a slip of the finger).
-    function isValidLoginBonusDay(d) {
-      return d.keys().hasOnly(['day', 'reward', 'note', 'createdAt', 'updatedAt'])
-        && d.day is int && d.day >= 1 && d.day <= 31
-        && isValidPremiumReward(d.reward)
-        && (d.reward.type != 'gems' || d.reward.amount <= 100000)
-        && (!('note' in d) || d.note == null || (d.note is string && d.note.size() <= 100));
+    // loginBonusDays/{day} { day: 1..31, reward, note? }: the reward of each day of the month; the document id IS the day ("1".."31") and
+    // `day` must say the same, so the two can never drift apart. The game reads the whole table at launch (publicly, no sign-in);
+    // writes are admin-only and checked (the reward is the game's Reward; a day's gems are capped at 100000 as a guard against a slip of
+    // the finger). Design: abyrus-admin session, agreed with the game side.
+    function isValidLoginBonusReward(r) {
+      return r is map
+        && r.keys().hasOnly(['type', 'amount', 'item', 'rarity'])
+        && r.amount is int && r.amount >= 1
+        && (
+          (r.type == 'gems' && !('item' in r) && !('rarity' in r) && r.amount <= 100000)
+          || (r.type in ['gold', 'stamina', 'phaseMaterials', 'skillEssence']
+              && !('item' in r) && !('rarity' in r) && r.amount <= 1000000000)
+          || (r.type == 'item' && !('rarity' in r)
+              && r.item in ['exp_s', 'exp_m', 'exp_l', 'exp_xl', 'equip_essence']
+              && r.amount <= 1000000000)
+          || (r.type == 'equipment' && !('item' in r)
+              && r.rarity is int && r.rarity >= 1 && r.rarity <= 5
+              && r.amount <= 1000000000)
+        );
     }
-    match /loginBonusDays/{docId} {
+    function isValidLoginBonusDay(day, d) {
+      return d.keys().hasOnly(['day', 'reward', 'note', 'updatedAt'])
+        && d.day is int && d.day >= 1 && d.day <= 31 && string(d.day) == day
+        && isValidLoginBonusReward(d.reward)
+        && (!('note' in d) || d.note == null || d.note == '' || (d.note is string && d.note.size() <= 200));
+    }
+    match /loginBonusDays/{day} {
       allow read: if true;
-      allow create, update: if isAdmin() && isValidLoginBonusDay(request.resource.data);
+      allow create, update: if isAdmin() && isValidLoginBonusDay(day, request.resource.data);
       allow delete: if isAdmin();
     }
     match /heroDefinitions/{docId} { allow read, write: if isAdmin(); }
