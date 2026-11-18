@@ -6,6 +6,7 @@ import { createPanel, createDivider } from './Panel';
 import { AllianceService } from '../alliance/AllianceService';
 import { allianceTabIcon, enhanceTabIcon, eventTabIcon, homeTabIcon, shopTabIcon } from './Icons';
 import { CHROME } from './theme';
+import { t, type PlainKey } from '../i18n';
 
 // Sampled from the topbar artwork (see CHROME in theme.ts), so this
 // code-drawn bar reads as the same physical material as that illustrated bar.
@@ -17,12 +18,12 @@ const BRASS_BRIGHT = CHROME.brassBright;
 
 export type NavTab = 'event' | 'alliance' | 'home' | 'enhance' | 'shop';
 
-const TAB_LABELS: Record<NavTab, string> = {
-  event: 'イベント',
-  alliance: '同盟',
-  home: 'ホーム',
-  enhance: '強化',
-  shop: 'ショップ',
+const TAB_LABELS: Record<NavTab, PlainKey> = {
+  event: 'home.nav.event',
+  alliance: 'home.nav.alliance',
+  home: 'home.nav.home',
+  enhance: 'home.nav.enhance',
+  shop: 'home.nav.shop',
 };
 
 const TAB_SCENE: Record<NavTab, string> = {
@@ -150,7 +151,7 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
       if (tab === 'event' && eventDot) this.add(buildUnreadDot(scene, cx + iconSize * 0.3, iconCy - iconSize * 0.28, 9));
 
       const label = scene.add
-        .text(cx, barY + BAR_HEIGHT * 0.87, TAB_LABELS[tab], {
+        .text(cx, barY + BAR_HEIGHT * 0.87, t(TAB_LABELS[tab]), {
           fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
           fontSize: isActive ? '15px' : '13px',
           color: isActive ? '#ffe9b8' : '#d8c49a',

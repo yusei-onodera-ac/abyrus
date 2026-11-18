@@ -8,6 +8,7 @@ import { createPanel } from './Panel';
 import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
 import { COLORS, CHROME } from './theme';
 import type { ShopFocus } from '../data/shop';
+import { t as tl } from '../i18n';
 
 const INK = '#2a1608';
 
@@ -225,7 +226,7 @@ export class ResourceBar extends Phaser.GameObjects.Container {
   update(save: SaveData): void {
     const unit = this.hasArt ? '' : ' G';
     this.goldText.setText(`${SaveSystem.getGold(save).toString()}${unit}`);
-    this.gemText.setText(this.hasArt ? save.gems.toLocaleString('ja-JP') : `${save.gems.toLocaleString('ja-JP')} 魔晶石`);
+    this.gemText.setText(this.hasArt ? save.gems.toLocaleString('ja-JP') : tl('home.resourceBar.gems', { gems: save.gems.toLocaleString('ja-JP') }));
     this.levelText?.setText(`Lv${save.playerLevel}`);
     this.save = save;
     this.drawExpRing();
@@ -294,8 +295,8 @@ export class ResourceBar extends Phaser.GameObjects.Container {
     const { playerLevel, playerExp } = this.save;
     const text =
       playerLevel >= MAX_PLAYER_LEVEL
-        ? `プレイヤーLv${playerLevel}（最大）`
-        : `プレイヤーLv${playerLevel}　次のレベルまで あと${playerExpToNext(playerLevel) - playerExp}（クエスト勝利でたまります）`;
+        ? tl('home.resourceBar.playerLvMax', { playerLevel })
+        : tl('home.resourceBar.playerLvExpTo', { playerLevel, playerExpToNext: playerExpToNext(playerLevel) - playerExp });
     showToast(this.scene, text);
   }
 

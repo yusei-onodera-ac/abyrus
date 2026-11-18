@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { BannerEntry } from '../data/banners';
 import { createPanel } from './Panel';
 import { caption, CHROME } from './theme';
+import { t } from '../i18n';
 
 const AUTO_MS = 3000;
 const SLIDE_MS = 380;
@@ -37,7 +38,7 @@ function buildPage(scene: Phaser.Scene, entry: BannerEntry, w: number, h: number
     page.add(scene.add.image(w / 2, h / 2, key).setScale(scale));
   } else {
     page.add(createPanel(scene, w / 2, h / 2, w, h, { fillColor: 0x241810, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 4, gradient: false }));
-    page.add(caption(scene, w / 2, h / 2, 'バナー準備中', { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
+    page.add(caption(scene, w / 2, h / 2, t('home.bannerCarousel.bannerComingSoon'), { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
   }
   return page;
 }
