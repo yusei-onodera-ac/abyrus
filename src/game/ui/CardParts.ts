@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { createPanel } from './Panel';
-import { breakLines, measureWidth, NEWLINE } from './TextLayout';
+import { breakLines, lineText, NEWLINE, tokenize } from './TextLayout';
 import { CHROME } from './theme';
 
 const INK = '#1c130a';
@@ -54,24 +54,23 @@ export function buildUnreadDot(scene: Phaser.Scene, x: number, y: number, radius
 }
 
 /** Breaks `text` into lines no wider than `width` px in the given font (see
- *  breakLines for the rules). Explicit line breaks in `text` are kept. */
-function wrapJapanese(text: string, font: string, width: number, hangAllowance: number): string {
-  const tokens = Array.from(text).map((ch) => ({ ch, width: ch === NEWLINE ? 0 : measureWidth(font, ch) }));
-  // measureWidth of single characters ignores kerning, which is nil for CJK.
-  return breakLines(tokens, width, hangAllowance)
-    .map((line) => line.map((t) => t.ch).join(''))
+ *  breakLines for the rules): between any two characters of Japanese, at spaces in English (a mix of both works too).
+ *  Explicit line breaks in `text` are kept. */
+function wrapText(text: string, font: string, width: number, hangAllowance: number): string {
+  return breakLines(tokenize(text, font), width, hangAllowance)
+    .map(lineText)
     .join(NEWLINE);
 }
 
 /** `text` with line breaks put in so no line is wider than `width` px at
- *  `fontSize` (Japanese line-breaking rules, as wrappedText). Explicit breaks
+ *  `fontSize` (as wrappedText). Explicit breaks
  *  are kept. For text that is revealed gradually, where the Text object itself
  *  can't be left to wrap. */
 export function wrapToWidth(text: string, width: number, fontSize: number, strokeThickness = 0, fontStyle = 'normal'): string {
-  return wrapJapanese(text, `${fontStyle} ${fontSize}px ${FONT}`, width - strokeThickness - fontSize, fontSize);
+  return wrapText(text, `${fontStyle} ${fontSize}px ${FONT}`, width - strokeThickness - fontSize, fontSize);
 }
 
-/** Text that wraps at `width` with Japanese line-breaking rules (Phaser's own
+/** Text that wraps at `width`: Japanese line-breaking rules (kinsoku), words kept whole in English (Phaser's own
  *  wrap only breaks at spaces). */
 export function wrappedText(
   scene: Phaser.Scene,
@@ -87,7 +86,7 @@ export function wrappedText(
   // The outline adds to a line's drawn width; leave room for it.
   const room = width - (merged.strokeThickness ?? 0);
   // Normal characters wrap one character-width early, so closing punctuation can always hang in that space.
-  return scene.add.text(x, y, wrapJapanese(text, font, room - size, size), merged);
+  return scene.add.text(x, y, wrapText(text, font, room - size, size), merged);
 }
 
 const AVATAR_COLORS = [0x3f7fbf, 0xbf5f3f, 0x4f9f6f, 0x9f5fbf, 0xbf9f3f, 0x4fa0a8];

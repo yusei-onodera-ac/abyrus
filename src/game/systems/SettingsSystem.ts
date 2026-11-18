@@ -1,5 +1,6 @@
 import type { SaveData } from './SaveSystem';
 import pkg from '../../../package.json';
+import { defaultLanguageForNewSave, isLanguage, SOURCE_LANGUAGE, type Language } from '../i18n';
 
 export const APP_VERSION: string = pkg.version;
 
@@ -27,6 +28,8 @@ export interface SettingsState {
   autoSkill: boolean;
   /** 2倍速 (プレミアムパス): run fights at double speed. Only has an effect while the pass is active. */
   speed2x: boolean;
+  /** The language the game is shown in (see i18n/). A new save starts with the device's; a save from before this existed is Japanese. */
+  language: Language;
 }
 
 export type ReportKind = 'inquiry' | 'bug';
@@ -96,13 +99,15 @@ export const SettingsSystem = {
       notifications: { news: true, stamina: true, social: true },
       autoSkill: false,
       speed2x: false,
+      language: defaultLanguageForNewSave(),
     };
   },
 
   /** Keeps whatever a save holds that is well-formed, filling the rest with defaults. */
   restore(raw: Partial<SettingsState> | undefined): SettingsState {
     const fallback = this.createDefaultState();
-    if (!raw || typeof raw !== 'object') return fallback;
+    // (a save with no settings at all is an old one: its player has been playing in Japanese)
+    if (!raw || typeof raw !== 'object') return { ...fallback, language: SOURCE_LANGUAGE };
     return {
       email: typeof raw.email === 'string' && isValidEmail(raw.email) ? raw.email : '',
       twitter: typeof raw.twitter === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(raw.twitter) ? raw.twitter : '',
@@ -114,6 +119,7 @@ export const SettingsSystem = {
       },
       autoSkill: raw.autoSkill === true,
       speed2x: raw.speed2x === true,
+      language: isLanguage(raw.language) ? raw.language : SOURCE_LANGUAGE,
     };
   },
 

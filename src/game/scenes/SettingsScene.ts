@@ -29,6 +29,7 @@ import { copyText } from '../ui/share';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { LANGUAGES, getLanguage, setLanguage, type Language } from '../i18n';
 
 const PAD = 14;
 const INK = '#1c130a';
@@ -55,6 +56,7 @@ export class SettingsScene extends InboxScene {
     const cards: InboxCard[] = [];
     const guard = () => this.scroll.isTap();
 
+    cards.push(this.languageCard(guard));
     cards.push(this.sectionCard('アカウント'));
     cards.push(this.idCard(guard));
     cards.push(
@@ -197,6 +199,35 @@ export class SettingsScene extends InboxScene {
     });
     container.addAt(buildCardPanel(this, CARD_WIDTH, height), 0);
     return { container, height };
+  }
+
+  /** 言語 / Language: one button per language, named in its own language (never translated), the one in use lit. Applied at once:
+   *  the language is saved, then this screen is rebuilt in it (every other screen is built when it opens). */
+  private languageCard(guard: () => boolean): InboxCard {
+    const perRow = 3;
+    const gap = 10;
+    const buttonW = Math.floor((CARD_WIDTH - PAD * 2 - gap * (perRow - 1)) / perRow);
+    const rows = Math.ceil(LANGUAGES.length / perRow);
+    const height = 58 + rows * 66 + PAD - 6;
+    const container = this.add.container(0, 0);
+    container.add(caption(this, PAD + 4, PAD + 12, '言語 / Language', { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const current = getLanguage();
+    LANGUAGES.forEach((lang, i) => {
+      const cx = PAD + buttonW / 2 + (i % perRow) * (buttonW + gap);
+      const cy = 58 + Math.floor(i / perRow) * 66 + 29 - 6;
+      container.add(new Button(this, cx, cy, buttonW, 58, lang.name, () => this.chooseLanguage(lang.code), { variant: lang.code === current ? 'gold' : 'wood', fontSize: '23px', guard }));
+    });
+    container.addAt(buildCardPanel(this, CARD_WIDTH, height), 0);
+    return { container, height };
+  }
+
+  private chooseLanguage(code: Language): void {
+    if (code === getLanguage()) return;
+    this.save.settings.language = code;
+    SaveSystem.save(this.save);
+    setLanguage(code);
+    SoundSystem.play(this, 'confirm');
+    this.scene.restart();
   }
 
   /** プレイヤーID: shown big, copyable, never editable. */

@@ -32,6 +32,7 @@ import { RemoteMaintenance, type MaintenanceState } from '../systems/RemoteMaint
 import { waitAtMost } from '../systems/firestoreRead';
 import { isArtNeeded } from '../data/schedule';
 import { heading, caption, CHROME } from '../ui/theme';
+import { applyLanguageAtBoot } from '../i18n';
 
 /** The longest `create` waits for the operator's settings before it goes on without them (ms). */
 const BOOT_WAIT_MS = 2500;
@@ -49,6 +50,9 @@ export class BootScene extends Phaser.Scene {
     // load queue. CharacterGenerator/applyBackground fall back to
     // procedural art or a solid color whenever the texture failed to load.
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {});
+
+    // The language the player chose (the save's), before the first text is drawn.
+    applyLanguageAtBoot(SaveSystem.load().settings.language);
 
     // Who is in the game today (data/heroRelease.ts): decided here, with the game's clock (a development `?date=` is in force by now), before
     // anything below asks for the characters' small pictures.
