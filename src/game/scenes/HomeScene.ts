@@ -8,13 +8,11 @@ import { showRewardModal } from '../ui/RewardModal';
 import { tilesForGranted, tilesForIdleClaim } from '../ui/RewardTiles';
 import { ChatSystem, GLOBAL_CHANNEL, plainPreview } from '../systems/ChatSystem';
 import { clipboardIcon, expeditionIcon, hourglassIcon, supplyIcon, villageIcon } from '../ui/ItemIcons';
-import { SUPPLY_SLOTS } from '../data/supply';
 import { SupplySystem } from '../systems/SupplySystem';
 import { openSupplyModal } from '../ui/SupplyModal';
 import { VillageGoals } from '../systems/VillageGoals';
 import { ExpeditionSystem } from '../systems/ExpeditionSystem';
 import { VillageSystem } from '../systems/VillageSystem';
-import { StaminaSystem } from '../systems/StaminaSystem';
 import { MissionSystem } from '../systems/MissionSystem';
 import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
 import { getMissionGroup } from '../data/missions';
@@ -27,11 +25,10 @@ import { IconNavButton } from '../ui/IconNavButton';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { pinnedHeroIds, queueHeroArt, trimHeroArt } from '../characters/HeroArt';
 import { applyBackground } from '../ui/Background';
-import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, settingsIcon } from '../ui/Icons';
-import { buildAvatar } from '../ui/CardParts';
+import { questIcon, gachaIcon, rosterIcon, notificationIcon, giftBoxIcon, mailIcon, friendIcon, settingsIcon } from '../ui/Icons';
 import { Button } from '../ui/Button';
 import { formatAgo } from '../ui/format';
-import { createPanel } from '../ui/Panel';
+import { createPanel, type PanelOptions } from '../ui/Panel';
 import { addGoodIcon } from '../ui/RewardIcon';
 import { body, caption, CHROME } from '../ui/theme';
 import { enter, enterStagger, popIn } from '../ui/Transitions';
@@ -48,19 +45,33 @@ import { RARITY_COLORS, type HeroData } from '../types';
  *  diamonds line their left edge up with this one's. */
 const BANNER = { x: 28, y: 138, w: 336, h: 188 };
 
-/** The 遠征 / 村 / 朝夕の補給 boxes: a column on the right, below the round buttons, over the hero's body - the face
- *  (upper right, behind the old position of these boxes) is left clear. */
-const STATUS = { x: 476, w: 232, h: 84, y: 498, step: 92 };
-
-/** Where the Home hero's speech bubble sits: centred over the head, its lower edge here. */
-const BUBBLE_X = 494;
-const BUBBLE_BOTTOM = 262;
-
-/** "2時間30分" - mirrors IdleScene's own formatter so the two read the same. */
-function formatIdleHours(hours: number): string {
-  const total = Math.floor(hours * 60);
-  return `${Math.floor(total / 60)}時間${String(total % 60).padStart(2, '0')}分`;
+/** One of the round icon buttons in the right-hand column (see buildCornerButtons). */
+interface CornerItem {
+  texture: string;
+  open: () => void;
+  /** The red dot, for a button whose state is known when Home is built. */
+  unread: boolean;
+  /** The red dot, for one that changes by itself (asked now and every second after); wins over `unread`. */
+  watch?: (now: number) => boolean;
 }
+
+/** The look the Home info boxes share (放置報酬 / ミッション / メッセージ): dark navy glass with a lilac rim, like the round icon buttons. */
+const HOME_PANEL: PanelOptions = { fillColor: 0x1d2034, fillAlpha: 0.9, borderColor: 0x8f8bb3, glowColor: 0x6f6a96, radius: 20, gradient: false };
+const HOME_RIM = 0x8f8bb3;
+const HOME_TITLE = '#b7b2da';
+const HOME_INK = '#0e1020';
+/** Heights of 放置報酬 and ミッション (stacked under the promo banner, 8px apart). */
+const IDLE_H = 104;
+const MISSION_H = 86;
+
+/** The eight round icon buttons (see buildCornerButtons) hug the right edge: the right column's centre, and how far the left one is from it. */
+const CORNER_X = 666;
+const CORNER_COL_STEP = 80;
+
+/** Where the Home hero's speech bubble sits: centred over the head (clear of the icon buttons), its lower edge here. */
+const BUBBLE_X = 438;
+const BUBBLE_W = 208;
+const BUBBLE_BOTTOM = 262;
 
 export class HomeScene extends Phaser.Scene {
   private resourceBar!: ResourceBar;
@@ -102,9 +113,6 @@ export class HomeScene extends Phaser.Scene {
     this.buildNav();
     this.buildCornerButtons(save);
     this.buildBanners();
-    this.buildExpeditionBox(save);
-    this.buildVillageBox(save);
-    this.buildSupplyBox(save);
     this.buildIdleBox(save);
     this.buildMissionBox(save);
     this.buildMessageWidget(save);
@@ -193,7 +201,7 @@ export class HomeScene extends Phaser.Scene {
     this.bubbleTimer?.remove();
     // Above the character's head (the free space between the banner and the corner buttons),
     // growing upward, so it never covers the face.
-    const w = 252;
+    const w = BUBBLE_W;
     const text = body(this, 0, 0, wrapToWidth(line.text, w - 36, 22, 4, 'bold'), { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4, lineSpacing: 7 }).setOrigin(0.5);
     const nameText = caption(this, 0, 0, hero.name, { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5);
     const h = text.height + 54;
@@ -255,22 +263,45 @@ export class HomeScene extends Phaser.Scene {
     enter(this, carousel, { dx: 0, dy: 0, duration: 400, delay: 220 });
   }
 
-  /** Small round utility buttons stacked in the top-right corner, under the
-   *  resource bar: お知らせ / プレゼントBOX / メール / 設定. Each opens its
-   *  screen, and the red dot shows while that one has something new (unread
-   *  notice, claimable gift, unread mail). */
+  /** Eight round icon buttons of one size, two across and four down at the top right, under the resource bar. The right column:
+   *  お知らせ / プレゼントBOX / メール / フレンド; the left one: 遠征 / 村 / 朝夕の補給 / 設定. Each opens its screen, and the red dot
+   *  shows while that one has something waiting (unread notice, claimable gift, unread mail, a friend's request, an expedition back,
+   *  a village to see to, a supply to take). */
   private buildCornerButtons(save: SaveData): void {
     const size = 72;
-    const spacing = 92;
+    const rowStep = 88;
     const startY = 176;
     const unread = InboxSystem.getUnread(save);
-    const items: { texture: string; scene: string; unread: boolean }[] = [
-      { texture: notificationIcon(this, size), scene: 'Notice', unread: unread.notification },
-      { texture: giftBoxIcon(this, size), scene: 'Gift', unread: unread.giftBox },
-      { texture: mailIcon(this, size), scene: 'Mail', unread: unread.mail },
-      { texture: settingsIcon(this, size), scene: 'Settings', unread: false },
+    const go = (key: string, data?: object) => () => this.scene.start(key, data);
+    const right: CornerItem[] = [
+      { texture: notificationIcon(this, size), open: go('Notice'), unread: unread.notification },
+      { texture: giftBoxIcon(this, size), open: go('Gift'), unread: unread.giftBox },
+      { texture: mailIcon(this, size), open: go('Mail'), unread: unread.mail },
+      { texture: friendIcon(this, size), open: go('Friend'), unread: save.social.incoming.length > 0 },
     ];
-    const buttons = items.map((item, i) => this.buildCornerButton(656, startY + i * spacing, size, item));
+    const left: CornerItem[] = [
+      // 遠征: someone is back. (The data is always given: starting a scene without any would hand it the last screen's - see ExpeditionScene.init.)
+      { texture: expeditionIcon(this, size), open: go('Expedition', { view: 'board' }), unread: false, watch: (now) => ExpeditionSystem.readyCount(save, now) > 0 },
+      // 村: a 襲撃, broken buildings, 依頼 / 村の目標 to collect, 行商人 / 宝箱 on the map, or something that can be built.
+      {
+        texture: villageIcon(this, size),
+        open: go('Village'),
+        unread: false,
+        watch: (now) => {
+          // Brings the village up to date first, so a 襲撃 that has come (or gone) shows here without opening it.
+          VillageSystem.settle(save, now);
+          const need = VillageSystem.attention(save, now);
+          return need.raid || need.broken > 0 || need.quests > 0 || VillageGoals.claimable(save, now).length > 0 || need.wanderers > 0 || VillageSystem.hasJob(save, now);
+        },
+      },
+      // 朝夕の補給: a slot that can be taken now. Opens the list to take them from.
+      { texture: supplyIcon(this, size), open: () => openSupplyModal(this, save, () => this.resourceBar.update(save)), unread: false, watch: (now) => SupplySystem.openCount(save, now) > 0 },
+      { texture: settingsIcon(this, size), open: go('Settings'), unread: false },
+    ];
+    const buttons = [
+      ...right.map((item, i) => this.buildCornerButton(CORNER_X, startY + i * rowStep, size, item)),
+      ...left.map((item, i) => this.buildCornerButton(CORNER_X - CORNER_COL_STEP, startY + i * rowStep, size, item)),
+    ];
     enterStagger(this, buttons, { dx: 18, dy: 0, duration: 280, delay: 220, stagger: 70 });
   }
 
@@ -288,161 +319,6 @@ export class HomeScene extends Phaser.Scene {
     showRewardModal(this, { setEnabled: () => {} }, { title: 'ログインボーナス', tiles: tilesForGranted([granted]), note: `${LoginBonusSystem.dayOfMonth()}日目の報酬です` });
   }
 
-  /** A small status box on the right of the promo banner: an icon, a label, a line of state and a smaller one under
-   *  it, a row of pips, and a red dot when something is waiting. `read` is asked now and every second after, so
-   *  what it says (a countdown, a slot coming home) moves by itself. Tapping the box opens its screen. */
-  private buildStatusBox(opts: {
-    y: number;
-    icon: string;
-    label: string;
-    onOpen: () => void;
-    read: (now: number) => { main: string; mainColor: string; sub: string; pips: ('empty' | 'busy' | 'ready')[]; dot: boolean };
-    delay: number;
-  }): void {
-    const x = STATUS.x;
-    const w = STATUS.w;
-    const h = STATUS.h;
-    const box = this.add.container(x, opts.y);
-    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
-    box.add(this.add.image(38, h / 2, opts.icon).setDisplaySize(52, 52));
-    box.add(caption(this, 74, 18, opts.label, { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-    const main = body(this, 74, 45, '', { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5);
-    const sub = caption(this, 74, 67, '', { fontSize: '16px', fontStyle: 'bold', color: '#cdbb94', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5);
-    const pips = this.add.graphics();
-    const dot = this.add.graphics();
-    box.add([main, sub, pips, dot]);
-
-    const draw = (): void => {
-      const state = opts.read(Date.now());
-      main.setText(state.main).setColor(state.mainColor);
-      sub.setText(state.sub);
-      pips.clear();
-      state.pips.forEach((pip, i) => {
-        const cx = w - 22 - (state.pips.length - 1 - i) * 22;
-        pips.fillStyle(pip === 'ready' ? 0xffd23f : pip === 'busy' ? 0xe0822a : 0x0d0905, 1);
-        pips.fillCircle(cx, 18, 7);
-        pips.lineStyle(2, pip === 'ready' ? 0xfff0b0 : CHROME.brassDark, 1);
-        pips.strokeCircle(cx, 18, 7);
-      });
-      dot.clear();
-      if (state.dot) {
-        dot.fillStyle(0x1b1d29, 1);
-        dot.fillCircle(58, h / 2 - 20, 9);
-        dot.fillStyle(0xff4d4d, 1);
-        dot.fillCircle(58, h / 2 - 20, 7);
-      }
-    };
-    draw();
-    this.time.addEvent({ delay: 1000, loop: true, callback: draw });
-
-    const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
-    hit.setInteractive({ useHandCursor: true });
-    hit.on('pointerup', opts.onOpen);
-    box.add(hit);
-
-    enter(this, box, { dy: 10, duration: 320, delay: opts.delay });
-  }
-
-  /** 遠征: how many are back (gold, with a red dot), else how long until the next one, else a nudge to send
-   *  someone out. The three pips are the three slots (empty / away / back). */
-  private buildExpeditionBox(save: SaveData): void {
-    this.buildStatusBox({
-      y: STATUS.y,
-      icon: expeditionIcon(this, 52),
-      label: '遠征',
-      delay: 240,
-      // The data is always given: starting a scene without any would hand it the last screen's (see ExpeditionScene.init).
-      onOpen: () => this.scene.start('Expedition', { view: 'board' }),
-      read: (now) => {
-        const runs = save.expeditions.slots;
-        const ready = ExpeditionSystem.readyCount(save, now);
-        const running = ExpeditionSystem.runningCount(save, now);
-        const left = runs.filter((run) => run !== null && !ExpeditionSystem.isDone(run, now)).map((run) => ExpeditionSystem.secondsLeft(run!, now));
-        const state =
-          ready > 0
-            ? { main: `帰還 ${ready}`, mainColor: '#ffd23f', sub: running > 0 ? `遠征中 ${running}` : '受け取れます' }
-            : running > 0
-              ? { main: `遠征中 ${running}/${runs.length}`, mainColor: '#fff4dc', sub: `あと ${StaminaSystem.formatDuration(Math.min(...left))}` }
-              : { main: '出発できます', mainColor: '#9fe39f', sub: `${runs.length}枠 空き` };
-        return {
-          ...state,
-          pips: runs.map((run) => (run === null ? 'empty' : ExpeditionSystem.isDone(run, now) ? 'ready' : 'busy')),
-          dot: ready > 0,
-        };
-      },
-    });
-  }
-
-  /** 村: a nudge when a builder is free and something can be built or strengthened (red dot), else how the work is
-   *  going. The pips are the builders (dark = free). */
-  private buildVillageBox(save: SaveData): void {
-    this.buildStatusBox({
-      y: STATUS.y + STATUS.step,
-      icon: villageIcon(this, 52),
-      label: '村',
-      delay: 260,
-      onOpen: () => this.scene.start('Village'),
-      read: (now) => {
-        // Brings the village up to date first, so a 襲撃 that has come (or gone) shows here without opening it.
-        VillageSystem.settle(save, now);
-        const summary = VillageSystem.summary(save, now);
-        const job = VillageSystem.hasJob(save, now);
-        const need = VillageSystem.attention(save, now);
-        // 村の目標 that are met and not yet collected.
-        const goals = VillageGoals.claimable(save, now).length;
-        // The most pressing thing first: a 襲撃 waiting, then broken buildings, 依頼 to collect, 行商人 / 宝箱 on the map.
-        const state = need.raid
-          ? { main: '襲撃！', mainColor: '#ff9a8a', sub: `あと ${StaminaSystem.formatDuration(VillageSystem.raidSecondsLeft(save, now))}` }
-          : need.broken > 0
-            ? { main: '壊れています', mainColor: '#ffb07a', sub: `${need.broken}件　直しましょう` }
-            : need.quests > 0
-              ? { main: '依頼の報酬', mainColor: '#9fe39f', sub: `${need.quests}件　受け取れます` }
-              : goals > 0
-                ? { main: '村の目標', mainColor: '#9fe39f', sub: `${goals}件　達成しています` }
-                : need.wanderers > 0
-                ? { main: '宝箱・行商人', mainColor: '#9fe39f', sub: '村で受け取れます' }
-                : job
-                  ? { main: '建てられます', mainColor: '#9fe39f', sub: `売上 ×${summary.multiplier.toFixed(2)}` }
-                  : summary.busy > 0
-                    ? { main: `建築中 ${summary.busy}/${summary.builders}`, mainColor: '#fff4dc', sub: `あと ${StaminaSystem.formatDuration(summary.nextSeconds)}` }
-                    : { main: `売上 ×${summary.multiplier.toFixed(2)}`, mainColor: '#fff4dc', sub: 'ゴールドをためよう' };
-        const dot = need.raid || need.broken > 0 || need.quests > 0 || goals > 0 || need.wanderers > 0 || job;
-        return { ...state, pips: Array.from({ length: summary.builders }, (_, i) => (i < summary.busy ? 'busy' : 'empty')), dot };
-      },
-    });
-  }
-
-  /** 朝夕の補給, under 村: the slot that can be taken now (red dot, with how long it stays open), else the one coming next
-   *  and when, else that today is done. The two pips are the two slots (gold = can be taken, orange = taken). Tapping it
-   *  opens the list to take them from. */
-  private buildSupplyBox(save: SaveData): void {
-    this.buildStatusBox({
-      y: STATUS.y + STATUS.step * 2,
-      icon: supplyIcon(this, 52),
-      label: '朝夕の補給',
-      delay: 270,
-      onOpen: () => openSupplyModal(this, save, () => this.resourceBar.update(save)),
-      read: (now) => {
-        const next = SupplySystem.next(save, now);
-        let state: { main: string; mainColor: string; sub: string };
-        if (next?.state === 'open') state = { main: next.slot.name, mainColor: '#ffd23f', sub: `あと${StaminaSystem.formatDuration(next.seconds)}で終了` };
-        else if (next) state = { main: next.slot.name, mainColor: '#fff4dc', sub: `あと${StaminaSystem.formatDuration(next.seconds)}で開始` };
-        else {
-          const first = SUPPLY_SLOTS[0];
-          state = { main: SupplySystem.allTaken(save, now) ? '本日分 完了' : '本日は終了', mainColor: SupplySystem.allTaken(save, now) ? '#9fe39f' : '#cdbb94', sub: `次は ${first.startHour}:00から` };
-        }
-        return {
-          ...state,
-          pips: SUPPLY_SLOTS.map((slot) => {
-            const slotState = SupplySystem.state(save, slot, now);
-            return slotState === 'claimed' ? 'busy' : slotState === 'open' ? 'ready' : 'empty';
-          }),
-          dot: SupplySystem.openCount(save, now) > 0,
-        };
-      },
-    });
-  }
-
   /** 放置報酬, pinned just under the promo banner: how long has piled up (with a
    *  bar towards the cap) and a 受け取る button, so cashing in doesn't need a
    *  trip to the Idle screen. The rest of the box opens that screen (ad boost,
@@ -451,26 +327,37 @@ export class HomeScene extends Phaser.Scene {
     const x = BANNER.x;
     const y = BANNER.y + BANNER.h + 12;
     const w = BANNER.w;
-    const h = 100;
+    const h = IDLE_H;
     const box = this.add.container(x, y);
-    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
+    box.add(createPanel(this, w / 2, h / 2, w, h, HOME_PANEL));
 
     const preview = IdleSystem.preview(save);
     const claimable = preview.hours >= 1 / 60;
-    box.add(this.add.image(42, 38, hourglassIcon(this, 54)));
-    box.add(caption(this, 80, 20, '放置報酬', { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-    box.add(body(this, 80, 46, formatIdleHours(preview.hours), { fontSize: '22px', fontStyle: 'bold', color: preview.full ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5));
+    box.add(this.add.image(40, 46, hourglassIcon(this, 56)).setDisplaySize(56, 56));
+    box.add(caption(this, 80, 19, '放置報酬', { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
-    // How full it is, as a thin bar along the bottom of the box.
-    const barX = 18;
-    const barW = w - 36;
+    // How long has piled up: the numbers big, 時間 and 分 small.
+    const total = Math.floor(preview.hours * 60);
+    const numberColor = preview.full ? '#ffd23f' : '#ffffff';
+    let tx = 80;
+    const parts: [string, boolean][] = [[String(Math.floor(total / 60)), true], ['時間', false], [String(total % 60).padStart(2, '0'), true], ['分', false]];
+    for (const [text, big] of parts) {
+      const t = body(this, tx, big ? 55 : 60, text, big ? { fontSize: '32px', fontStyle: 'bold', color: numberColor, stroke: HOME_INK, strokeThickness: 5 } : { fontSize: '17px', fontStyle: 'bold', color: '#cfcbe8', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+      box.add(t);
+      tx += t.width + (big ? 3 : 8);
+    }
+
+    // How full it is, as a bar along the bottom of the box.
+    const barX = 20;
+    const barW = w - 40;
+    const barY = h - 20;
     const bar = this.add.graphics();
-    bar.fillStyle(0x0d0905, 1);
-    bar.fillRoundedRect(barX, 80, barW, 9, 4);
-    bar.fillStyle(preview.full ? 0xffd23f : 0xe0822a, 1);
-    bar.fillRoundedRect(barX, 80, Math.max(9, barW * Math.min(1, preview.hours / preview.capHours)), 9, 4);
-    bar.lineStyle(1.5, CHROME.brassDark, 1);
-    bar.strokeRoundedRect(barX, 80, barW, 9, 4);
+    bar.fillStyle(0x0e1020, 1);
+    bar.fillRoundedRect(barX, barY, barW, 10, 5);
+    bar.fillStyle(preview.full ? 0xffd23f : 0xf2a33a, 1);
+    bar.fillRoundedRect(barX, barY, Math.max(10, barW * Math.min(1, preview.hours / preview.capHours)), 10, 5);
+    bar.lineStyle(1.5, HOME_RIM, 1);
+    bar.strokeRoundedRect(barX, barY, barW, 10, 5);
     box.add(bar);
 
     // Tapping the box itself opens the full screen; the button on top claims.
@@ -479,9 +366,13 @@ export class HomeScene extends Phaser.Scene {
     hit.on('pointerup', () => this.scene.start('Idle'));
     box.add(hit);
 
-    box.add(addGoodIcon(this, 'gold', w - 124, 24, 24));
-    box.add(body(this, w - 108, 24, `+${preview.gold.toString()}`, { fontSize: '15px', fontStyle: 'bold', color: '#ffe79a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-    const claim = new Button(this, w - 74, 52, 124, 40, '受け取る', () => this.claimIdle(save, box), { variant: claimable ? 'gold' : 'wood', fontSize: '20px' });
+    // What the gold is worth, small, above the button (only when there is some).
+    if (claimable) {
+      const gold = body(this, w - 20, 19, `+${preview.gold.toString()}`, { fontSize: '17px', fontStyle: 'bold', color: '#ffe79a', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(1, 0.5);
+      box.add(gold);
+      box.add(addGoodIcon(this, 'gold', gold.x - gold.width - 14, 19, 22));
+    }
+    const claim = new Button(this, w - 62, 56, 98, 50, '受け取る', () => this.claimIdle(save, box), { variant: claimable ? 'gold' : 'wood', fontSize: '20px' });
     claim.setEnabled(claimable);
     box.add(claim);
 
@@ -493,30 +384,31 @@ export class HomeScene extends Phaser.Scene {
    *  waiting (the daily one otherwise). */
   private buildMissionBox(save: SaveData): void {
     const x = BANNER.x;
-    const y = BANNER.y + BANNER.h + 12 + 100 + 8;
+    const y = BANNER.y + BANNER.h + 12 + IDLE_H + 8;
     const w = BANNER.w;
-    const h = 74;
+    const h = MISSION_H;
     const box = this.add.container(x, y);
-    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
+    box.add(createPanel(this, w / 2, h / 2, w, h, HOME_PANEL));
 
     const summary = MissionSystem.summary(save);
     const waiting = summary.find((g) => g.claimable > 0 || MissionSystem.bonusClaimable(save, g.group));
-    box.add(this.add.image(38, h / 2, clipboardIcon(this, 54)).setDisplaySize(54, 54));
+    box.add(this.add.image(40, h / 2, clipboardIcon(this, 56)).setDisplaySize(56, 56));
     if (MissionSystem.hasReward(save)) {
       const dot = this.add.graphics();
       dot.fillStyle(0x1b1d29, 1);
-      dot.fillCircle(58, 14, 9);
+      dot.fillCircle(62, 18, 10);
       dot.fillStyle(0xff4d4d, 1);
-      dot.fillCircle(58, 14, 7);
+      dot.fillCircle(62, 18, 8);
       box.add(dot);
     }
-    box.add(caption(this, 76, 16, 'ミッション', { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-    const columns = [76, 154, 264];
+    box.add(caption(this, 84, 19, 'ミッション', { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    // done / total of デイリー, ウィークリー and 実績: the label small, the numbers big (gold while one can be taken).
+    const columns = [84, 158, 266];
     summary.forEach((g, i) => {
       const cx = columns[i];
       const ready = g.claimable > 0;
-      box.add(caption(this, cx, 40, getMissionGroup(g.group).short, { fontSize: '14px', color: '#cdbb94', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
-      box.add(body(this, cx, 58, `${g.done}/${g.total}`, { fontSize: '20px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#fff4dc', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5));
+      box.add(caption(this, cx, 43, getMissionGroup(g.group).short, { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(body(this, cx, 66, `${g.done}/${g.total}`, { fontSize: '25px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     });
 
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
@@ -549,20 +441,19 @@ export class HomeScene extends Phaser.Scene {
     const x = 720 - 14 - w;
     const y = 1280 - BottomNavBar.totalHeight() - 12 - h;
     const box = this.add.container(x, y).setDepth(5);
-    box.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 18, gradient: false }));
+    box.add(createPanel(this, w / 2, h / 2, w, h, HOME_PANEL));
 
     const latest = ChatSystem.latestMessage(save);
-    const textX = 104;
+    const textX = 26;
     const textW = w - textX - 18;
-    box.add(buildAvatar(this, 54, h / 2 + 6, 35, latest?.senderName ?? save.playerName));
-    box.add(caption(this, textX, 24, 'メッセージ', { fontSize: '19px', fontStyle: 'bold', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(caption(this, textX, 24, 'メッセージ', { fontSize: '19px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     if (latest) {
-      box.add(caption(this, w - 18, 24, formatAgo(latest.sentAt), { fontSize: '17px', color: '#a89a78', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(1, 0.5));
-      box.add(this.fitted(body(this, textX, 62, latest.senderName, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: '#1c130a', strokeThickness: 4 }).setOrigin(0, 0.5), textW));
-      box.add(this.fitted(caption(this, textX, 98, plainPreview(latest.text), { fontSize: '22px', color: '#f5e6c8', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0, 0.5), textW));
+      box.add(caption(this, w - 18, 24, formatAgo(latest.sentAt), { fontSize: '17px', color: '#9a96c0', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+      box.add(this.fitted(body(this, textX, 62, latest.senderName, { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5), textW));
+      box.add(this.fitted(caption(this, textX, 98, plainPreview(latest.text), { fontSize: '22px', color: '#e6e3f4', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5), textW));
     } else {
-      box.add(caption(this, textX, 76, 'まだメッセージがありません', { fontSize: '22px', color: '#9a8a6a' }).setOrigin(0, 0.5));
+      box.add(caption(this, textX, 76, 'まだメッセージがありません', { fontSize: '22px', color: '#9a96c0' }).setOrigin(0, 0.5));
     }
 
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);
@@ -596,23 +487,25 @@ export class HomeScene extends Phaser.Scene {
     }
   }
 
-  private buildCornerButton(
-    x: number,
-    y: number,
-    size: number,
-    item: { texture: string; scene: string; unread: boolean },
-  ): Phaser.GameObjects.Container {
+  /** One round icon button: the neutral badge, a red dot while `unread` (or, when `watch` is given, while that says so - asked now
+   *  and every second after), and a press / hover wobble. Tapping it runs `open`. */
+  private buildCornerButton(x: number, y: number, size: number, item: CornerItem): Phaser.GameObjects.Container {
     const container = this.add.container(x, y);
     const icon = this.add.image(0, 0, item.texture).setDisplaySize(size, size);
     container.add(icon);
 
-    if (item.unread) {
-      const dot = this.add.graphics();
-      dot.fillStyle(0x1b1d29, 1);
-      dot.fillCircle(size * 0.34, -size * 0.34, 9);
-      dot.fillStyle(0xff4d4d, 1);
-      dot.fillCircle(size * 0.34, -size * 0.34, 7);
-      container.add(dot);
+    const dot = this.add.graphics();
+    dot.fillStyle(0x1b1d29, 1);
+    dot.fillCircle(size * 0.34, -size * 0.34, 9);
+    dot.fillStyle(0xff4d4d, 1);
+    dot.fillCircle(size * 0.34, -size * 0.34, 7);
+    container.add(dot);
+    const { watch } = item;
+    if (watch) {
+      dot.setVisible(watch(Date.now()));
+      this.time.addEvent({ delay: 1000, loop: true, callback: () => dot.setVisible(watch(Date.now())) });
+    } else {
+      dot.setVisible(item.unread);
     }
 
     const hitZone = this.add.zone(0, 0, size, size).setOrigin(0.5);
@@ -622,7 +515,7 @@ export class HomeScene extends Phaser.Scene {
     hitZone.on('pointerdown', () => this.tweens.add({ targets: container, scale: 0.92, duration: 70, ease: 'Sine.easeOut' }));
     hitZone.on('pointerup', () => {
       this.tweens.add({ targets: container, scale: 1.08, duration: 90, ease: 'Sine.easeOut' });
-      this.scene.start(item.scene);
+      item.open();
     });
     container.add(hitZone);
     return container;

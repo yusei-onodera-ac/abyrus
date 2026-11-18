@@ -25,8 +25,6 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { AllianceService } from '../alliance/AllianceService';
-import { allianceAttention } from '../ui/AllianceParts';
 
 export type FriendTab = 'friends' | 'requests' | 'groups' | 'add';
 
@@ -51,7 +49,8 @@ const CARD_H_ADD = 232;
 export class FriendScene extends InboxScene {
   protected readonly screenTitle = 'フレンド';
   protected emptyText = '';
-  protected readonly navTab: NavTab = 'friend';
+  /** Reached from the フレンド icon on Home (no bottom tab of its own): 戻る goes back to Home. */
+  protected readonly navTab: NavTab | null = null;
   protected readonly toolbarHeight = 76;
 
   private tab: FriendTab = 'friends';
@@ -80,18 +79,13 @@ export class FriendScene extends InboxScene {
       [
         { key: 'friends', label: 'フレンド' },
         { key: 'requests', label: '申請', badge: incoming.length },
-        { key: 'groups', label: '同盟', badge: allianceAttention(AllianceService.cached(this.save)) },
         { key: 'add', label: '追加' },
       ],
       this.tab,
       SCREEN_VIEW.w,
       56,
       (key) => {
-        // 同盟 is a set of screens of its own (it used to be a group chat of friends here).
-        if (key === 'groups') {
-          this.scene.start(AllianceService.cached(this.save) === null ? 'AllianceFind' : 'AllianceHome');
-          return;
-        }
+        // (同盟 has its own tab on the bottom bar now.)
         this.tab = key as FriendTab;
         this.scroll.scrollTo(0);
         this.queueRender();
