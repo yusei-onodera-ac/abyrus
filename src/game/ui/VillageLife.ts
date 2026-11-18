@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
-import { VILLAGE_COLS, VILLAGE_ROWS, getBuilding, type BuildingKind } from '../data/village';
+import { getBuilding, type BuildingKind } from '../data/village';
 import type { PlacedBuilding, SaveData } from '../systems/SaveSystem';
-import { effectiveLevel, isMoving } from '../systems/VillageIncome';
+import { effectiveLevel, isMoving, villageSize } from '../systems/VillageIncome';
 import { VillageSystem, type WorkKind } from '../systems/VillageSystem';
 import { showToast } from './Toast';
 import { isoPoint, type Pt } from './VillageArt';
@@ -23,6 +23,7 @@ export interface VillageLifeHost {
   save: () => SaveData;
   pos: (gx: number, gy: number) => Pt;
   zoom: () => number;
+  /** The land's size in px (the clouds drift across it). The same object is kept and changed in place when the village is 拡張. */
   worldSize: { w: number; h: number };
   /** True while something is being placed or a popup is up: taps on people are ignored then. */
   busy: () => boolean;
@@ -322,8 +323,9 @@ export class VillageLife {
     const def = getBuilding(b.kind);
     let builder = this.builders.get(b.id);
     if (!builder) {
-      const gx = Math.min(VILLAGE_COLS - 0.3, b.x + def.w + 0.45);
-      const gy = Math.min(VILLAGE_ROWS - 0.3, b.y + def.h * 0.55);
+      const size = villageSize(this.host.save());
+      const gx = Math.min(size.cols - 0.3, b.x + def.w + 0.45);
+      const gy = Math.min(size.rows - 0.3, b.y + def.h * 0.55);
       const p = this.host.pos(gx, gy);
       const pdef = PEOPLE.find((d) => d.id === 'p_builder') ?? PEOPLE[0];
       const { key, scale } = peopleTexture(this.scene, pdef);

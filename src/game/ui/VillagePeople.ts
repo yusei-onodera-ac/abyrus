@@ -1,9 +1,9 @@
 import Phaser from 'phaser';
-import { VILLAGE_COLS, VILLAGE_ROWS, getBuilding, type BuildingKind } from '../data/village';
+import { VILLAGE_BASE_COLS, VILLAGE_BASE_ROWS, getBuilding, type BuildingKind } from '../data/village';
 import { VILLAGE_WATER_TILES } from '../data/villageWalk';
 import { villagePlotTierOf } from './VillageArt';
 import type { SaveData } from '../systems/SaveSystem';
-import { castleLevel, footprints } from '../systems/VillageIncome';
+import { castleLevel, footprints, villageSize } from '../systems/VillageIncome';
 import { showToast } from './Toast';
 import type { Pt } from './VillageArt';
 
@@ -166,11 +166,93 @@ export function peopleTexture(scene: Phaser.Scene, def: PeopleDef): { key: strin
   return { key, scale: def.height / source.height };
 }
 
+/** Where people can walk: every tile of the map as it is NOW (it grows with each 拡張), true where one can stand. */
+export interface WalkMap {
+  cols: number;
+  rows: number;
+  /** Row by row: `y * cols + x`. */
+  free: boolean[];
+  /** The buildings' footprints (for finding what a person likes to walk to). */
+  rects: { kind: BuildingKind; x: number; y: number; w: number; h: number }[];
+}
+
+/** Works out which tiles are free: not under any building (nor the place one is being moved to), nor under a 行商人 / 宝箱, nor on the
+ *  rim of the map or the plot's water. The map is as big as the save says it is now (拡張), not the size the plot's picture was drawn for. */
+export function walkMap(save: SaveData, now = Date.now()): WalkMap {
+  const { cols, rows } = villageSize(save);
+  const free = new Array<boolean>(cols * rows).fill(true);
+  const rects: WalkMap['rects'] = [];
+  // The outermost ring of the map (the plot's hedge or fence, or the rim of the land that was opened up) is not walked on. The
+  // plot's own ring is part of its picture and stays where it is when the land grows (the plot sits at the map's top corner), so
+  // it stays clear too: people on the land that was opened up and people inside the old fence keep to their own side of it.
+  const ring = (w: number, h: number): void => {
+    for (let i = 0; i < w && i < cols; i++) {
+      free[i] = false;
+      if (h - 1 < rows) free[(h - 1) * cols + i] = false;
+    }
+    for (let i = 0; i < h && i < rows; i++) {
+      free[i * cols] = false;
+      if (w - 1 < cols) free[i * cols + w - 1] = false;
+    }
+  };
+  ring(VILLAGE_BASE_COLS, VILLAGE_BASE_ROWS);
+  ring(cols, rows);
+  // ...and neither is the plot's water (the tiles are numbered for the plot's own size).
+  for (const at of VILLAGE_WATER_TILES[villagePlotTierOf(castleLevel(save, now))] ?? []) {
+    const x = at % VILLAGE_BASE_COLS;
+    const y = Math.floor(at / VILLAGE_BASE_COLS);
+    if (x < cols && y < rows) free[y * cols + x] = false;
+  }
+  for (const b of save.village.buildings) {
+    const def = getBuilding(b.kind);
+    if (def.road) continue; // paving is walked on
+    for (const at of footprints(b, now)) {
+      rects.push({ kind: b.kind, x: at.x, y: at.y, w: def.w, h: def.h });
+      for (let y = at.y; y < at.y + def.h; y++) for (let x = at.x; x < at.x + def.w; x++) if (x >= 0 && y >= 0 && x < cols && y < rows) free[y * cols + x] = false;
+    }
+  }
+  for (const w of save.village.wanderers.items) if (w.x >= 0 && w.y >= 0 && w.x < cols && w.y < rows) free[Math.floor(w.y) * cols + Math.floor(w.x)] = false;
+  return { cols, rows, free, rects };
+}
+
+/** True when (x, y) is on the map and free to stand on. */
+export function walkFree(map: WalkMap, x: number, y: number): boolean {
+  return x >= 0 && y >= 0 && x < map.cols && y < map.rows && map.free[y * map.cols + x] === true;
+}
+
+/** Breadth-first over the free tiles from (sx, sy): the distance to every tile that can be walked to (-1 for the rest), and the
+ *  tile each was reached from. Numbered `y * cols + x`. */
+export function walkReach(map: WalkMap, sx: number, sy: number): { dist: number[]; from: number[] } {
+  const { cols, rows } = map;
+  const dist = new Array<number>(cols * rows).fill(-1);
+  const from = new Array<number>(cols * rows).fill(-1);
+  const queue: number[] = [sy * cols + sx];
+  dist[queue[0]] = 0;
+  const steps: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
+  for (let head = 0; head < queue.length; head++) {
+    const at = queue[head];
+    const x = at % cols;
+    const y = Math.floor(at / cols);
+    for (const [dx, dy] of steps) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!walkFree(map, nx, ny)) continue;
+      // No cutting a corner of a building on a diagonal step.
+      if (dx !== 0 && dy !== 0 && (!walkFree(map, x + dx, y) || !walkFree(map, x, y + dy))) continue;
+      const to = ny * cols + nx;
+      if (dist[to] >= 0) continue;
+      dist[to] = dist[at] + 1;
+      from[to] = at;
+      queue.push(to);
+    }
+  }
+  return { dist, from };
+}
+
 export class VillageWalkers {
   private readonly walkers: Walker[] = [];
-  /** Tiles that are free to stand on (true), recomputed from the buildings. */
-  private free: boolean[] = [];
-  private rects: { kind: BuildingKind; x: number; y: number; w: number; h: number }[] = [];
+  /** Where people can walk, worked out again from the save whenever the village is redrawn (it can be 拡張). */
+  private map: WalkMap = { cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS, free: [], rects: [] };
   private destroyed = false;
   private readonly scene: Phaser.Scene;
   private readonly host: WalkersHost;
@@ -187,81 +269,41 @@ export class VillageWalkers {
   // ------------------------------------------------------------ the map --
 
   private cell(x: number, y: number): number {
-    return y * VILLAGE_COLS + x;
+    return y * this.map.cols + x;
   }
 
   private isFree(x: number, y: number): boolean {
-    return x >= 0 && y >= 0 && x < VILLAGE_COLS && y < VILLAGE_ROWS && this.free[this.cell(x, y)] === true;
+    return walkFree(this.map, x, y);
   }
 
-  /** Works out which tiles are free: not under any building (nor the place one is being moved to), nor under a 行商人 / 宝箱. */
+  /** Works out again where people can walk (see `walkMap`), with the map as big as the save says it is now. */
   private mapGround(now: number): void {
-    const save = this.host.save();
-    this.free = new Array<boolean>(VILLAGE_COLS * VILLAGE_ROWS).fill(true);
-    this.rects = [];
-    // The plot's picture has a hedge (or a fence) round its edge and water here and there: nobody walks on them.
-    for (let i = 0; i < VILLAGE_COLS; i++) {
-      this.free[this.cell(i, 0)] = false;
-      this.free[this.cell(i, VILLAGE_ROWS - 1)] = false;
-    }
-    for (let i = 0; i < VILLAGE_ROWS; i++) {
-      this.free[this.cell(0, i)] = false;
-      this.free[this.cell(VILLAGE_COLS - 1, i)] = false;
-    }
-    for (const at of VILLAGE_WATER_TILES[villagePlotTierOf(castleLevel(save, now))] ?? []) this.free[at] = false;
-    for (const b of save.village.buildings) {
-      const def = getBuilding(b.kind);
-      if (def.road) continue; // paving is walked on
-      for (const at of footprints(b, now)) {
-        this.rects.push({ kind: b.kind, x: at.x, y: at.y, w: def.w, h: def.h });
-        for (let y = at.y; y < at.y + def.h; y++) for (let x = at.x; x < at.x + def.w; x++) if (x >= 0 && y >= 0 && x < VILLAGE_COLS && y < VILLAGE_ROWS) this.free[this.cell(x, y)] = false;
-      }
-    }
-    for (const w of save.village.wanderers.items) if (w.x >= 0 && w.y >= 0 && w.x < VILLAGE_COLS && w.y < VILLAGE_ROWS) this.free[this.cell(Math.floor(w.x), Math.floor(w.y))] = false;
+    this.map = walkMap(this.host.save(), now);
   }
 
-  /** Breadth-first over the free tiles from (sx, sy): the distance to every tile that can be walked to (-1 for the rest). */
   private reach(sx: number, sy: number): { dist: number[]; from: number[] } {
-    const dist = new Array<number>(VILLAGE_COLS * VILLAGE_ROWS).fill(-1);
-    const from = new Array<number>(VILLAGE_COLS * VILLAGE_ROWS).fill(-1);
-    const queue: number[] = [this.cell(sx, sy)];
-    dist[queue[0]] = 0;
-    const steps: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]];
-    for (let head = 0; head < queue.length; head++) {
-      const at = queue[head];
-      const x = at % VILLAGE_COLS;
-      const y = Math.floor(at / VILLAGE_COLS);
-      for (const [dx, dy] of steps) {
-        const nx = x + dx;
-        const ny = y + dy;
-        if (!this.isFree(nx, ny)) continue;
-        // No cutting a corner of a building on a diagonal step.
-        if (dx !== 0 && dy !== 0 && (!this.isFree(x + dx, y) || !this.isFree(x, y + dy))) continue;
-        const to = this.cell(nx, ny);
-        if (dist[to] >= 0) continue;
-        dist[to] = dist[at] + 1;
-        from[to] = at;
-        queue.push(to);
-      }
-    }
-    return { dist, from };
+    return walkReach(this.map, sx, sy);
   }
 
   private randomFreeTile(): { x: number; y: number } | null {
     const tiles: number[] = [];
-    this.free.forEach((ok, i) => {
+    this.map.free.forEach((ok, i) => {
       if (ok) tiles.push(i);
     });
     if (tiles.length === 0) return null;
-    const at = tiles[Math.floor(Math.random() * tiles.length)];
-    return { x: at % VILLAGE_COLS, y: Math.floor(at / VILLAGE_COLS) };
+    return this.tileOf(tiles[Math.floor(Math.random() * tiles.length)]);
+  }
+
+  /** The tile a cell number stands for. */
+  private tileOf(at: number): { x: number; y: number } {
+    return { x: at % this.map.cols, y: Math.floor(at / this.map.cols) };
   }
 
   /** A tile near a building of the kind this one likes (merchants: shops, guards: gates and fences), when there is one. */
   private preferredTarget(prefer: Prefer, dist: number[]): { x: number; y: number } | null {
     const kinds: BuildingKind[] = prefer === 'shop' ? ['shop', 'market'] : ['gate', 'fence'];
     const spots: number[] = [];
-    for (const r of this.rects) {
+    for (const r of this.map.rects) {
       if (!kinds.includes(r.kind)) continue;
       for (let y = r.y - 1; y <= r.y + r.h; y++) {
         for (let x = r.x - 1; x <= r.x + r.w; x++) {
@@ -270,8 +312,7 @@ export class VillageWalkers {
       }
     }
     if (spots.length === 0) return null;
-    const at = spots[Math.floor(Math.random() * spots.length)];
-    return { x: at % VILLAGE_COLS, y: Math.floor(at / VILLAGE_COLS) };
+    return this.tileOf(spots[Math.floor(Math.random() * spots.length)]);
   }
 
   // ------------------------------------------------------------ walkers --
@@ -379,12 +420,12 @@ export class VillageWalkers {
       });
       if (options.length === 0) return;
       const at = options[Math.floor(Math.random() * options.length)];
-      target = { x: at % VILLAGE_COLS, y: Math.floor(at / VILLAGE_COLS) };
+      target = this.tileOf(at);
     }
     const path: { x: number; y: number }[] = [];
     let at = this.cell(target.x, target.y);
     while (at >= 0 && at !== this.cell(sx, sy)) {
-      path.push({ x: at % VILLAGE_COLS, y: Math.floor(at / VILLAGE_COLS) });
+      path.push(this.tileOf(at));
       at = from[at];
     }
     path.reverse();

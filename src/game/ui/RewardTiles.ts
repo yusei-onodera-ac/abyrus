@@ -19,7 +19,7 @@ export const TILE_H = 132;
 const GAP = 10;
 const PER_ROW = 5;
 
-export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'coin' | 'item' | 'equipment' | 'material' | 'token';
+export type RewardTileKind = 'gold' | 'gems' | 'phaseMaterials' | 'stamina' | 'exp' | 'essence' | 'rank' | 'coin' | 'item' | 'equipment' | 'material' | 'token' | 'land';
 
 export interface RewardTile {
   kind: RewardTileKind;
@@ -87,6 +87,25 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
     container.add(g);
     container.add(body(scene, x, y, badge.glyph, { fontSize: `${Math.round(r * (badge.glyph.length > 1 ? 0.8 : 1.08))}px`, fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
     return badge.label;
+  }
+  if (tile.kind === 'land') {
+    // 村の拡張: a small map - the old land (dark) at the top corner of the bigger, newly opened one (light).
+    const hw = size / 2;
+    const hh = size / 4;
+    const top = { x, y: y - hh };
+    const at = (k: number, p: { x: number; y: number }): { x: number; y: number } => ({ x: top.x + (p.x - top.x) * k, y: top.y + (p.y - top.y) * k });
+    const corners = [top, { x: x + hw, y }, { x, y: y + hh }, { x: x - hw, y }];
+    const g = scene.add.graphics();
+    g.fillStyle(0x000000, 0.35);
+    g.fillPoints(corners.map((p) => ({ x: p.x, y: p.y + 4 })), true);
+    g.fillStyle(0x6bb751, 1);
+    g.fillPoints(corners, true);
+    g.fillStyle(0x3f8731, 1);
+    g.fillPoints(corners.map((p) => at(0.68, p)), true);
+    g.lineStyle(2.5, CHROME.brassBright, 0.95);
+    g.strokePoints(corners, true);
+    container.add(g);
+    return '新しい土地';
   }
   if (tile.kind === 'item' && tile.item) {
     container.add(scene.add.image(x, y, itemIcon(scene, tile.item, size)));

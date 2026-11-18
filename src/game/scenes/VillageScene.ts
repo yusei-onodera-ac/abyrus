@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BUILD_TABS, VILLAGE_COLS, VILLAGE_ROWS, VILLAGE_MATERIALS, VILLAGE_START, BUILDINGS, WANDERERS, getBuilding, materialName, type BuildTab, type BuildingKind, type BuildingLevel, type MaterialBundle } from '../data/village';
+import { BUILD_TABS, VILLAGE_BASE_COLS, VILLAGE_BASE_ROWS, VILLAGE_MATERIALS, VILLAGE_START, BUILDINGS, WANDERERS, getBuilding, materialName, type BuildTab, type BuildingKind, type BuildingLevel, type MaterialBundle, type VillageSize } from '../data/village';
 import { VILLAGE_QUESTS } from '../data/villageQuests';
 import { IdleSystem } from '../systems/IdleSystem';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
@@ -7,7 +7,7 @@ import { SaveSystem, type PlacedBuilding, type SaveData, type Wanderer } from '.
 import { StaminaSystem } from '../systems/StaminaSystem';
 import { VillageSystem, settleChanged, type SettleResult, type WorkKind } from '../systems/VillageSystem';
 import { VillageQuests } from '../systems/VillageQuests';
-import { builderCount, busyBuilders, castleLevel, effectiveLevel, footprints, houseBonus, isMoving, levelValue, movePhase } from '../systems/VillageIncome';
+import { builderCount, busyBuilders, castleLevel, effectiveLevel, footprints, houseBonus, isMoving, levelValue, movePhase, villageSize } from '../systems/VillageIncome';
 import { BackButton } from '../ui/BackButton';
 import { Button } from '../ui/Button';
 import { openConfirm } from '../ui/Dialogs';
@@ -30,15 +30,47 @@ import { VillageGoals } from '../systems/VillageGoals';
 
 const INK = '#1c130a';
 
-/** The land the village stands on, in px at 100%. The map's diamond sits in the middle of it. */
-const WORLD = { w: 2200, h: 1900 };
-const GRID_H = ((VILLAGE_COLS + VILLAGE_ROWS) * ISO.tileH) / 2;
-/** Where the map's top corner is in the world. */
-const ORIGIN: Pt = { x: WORLD.w / 2 - ((VILLAGE_COLS - VILLAGE_ROWS) * ISO.tileW) / 4, y: (WORLD.h - GRID_H) / 2 };
-/** Zoom: never so far out that the screen is not full of land, never closer than MAX_ZOOM. */
-const MIN_ZOOM = Math.max(720 / WORLD.w, 1280 / WORLD.h);
+/** The land the village stands on, in px at 100%: the map's diamond with this much land round it (it is as big as the map is NOW,
+ *  so it grows with every 拡張). */
+const LAND_MARGIN = { x: 164, y: 482 };
+/** Where the map's top corner is in the world. It never moves: 拡張 adds land at the far edges, so everything already drawn
+ *  (buildings, roads, people) stays exactly where it is. */
+const ORIGIN: Pt = { x: 1100, y: LAND_MARGIN.y };
+
+/** A rectangle of the world, in px at 100%. */
+interface Land {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** The land for a map of `size`. For the starting map it is 2200 x 1900, as it always was. */
+function landFor(size: VillageSize): Land {
+  return {
+    x0: ORIGIN.x - (size.rows * ISO.tileW) / 2 - LAND_MARGIN.x,
+    y0: ORIGIN.y - LAND_MARGIN.y,
+    x1: ORIGIN.x + (size.cols * ISO.tileW) / 2 + LAND_MARGIN.x,
+    y1: ORIGIN.y + ((size.cols + size.rows) * ISO.tileH) / 2 + LAND_MARGIN.y,
+  };
+}
+
+/** Zoom: never so far out that the screen is not full of land (see `minZoomFor`), never closer than MAX_ZOOM. */
+function minZoomFor(land: Land): number {
+  return Math.max(720 / (land.x1 - land.x0), 1280 / (land.y1 - land.y0));
+}
 const MAX_ZOOM = 1.8;
 const START_ZOOM = 0.9;
+
+/** A number 0..1 that depends only on the cell (ix, iy) and `k`: what goes where on the ground is worked out from this, so that
+ *  the land drawn again after a 拡張 has everything where it was. */
+function cellRand(ix: number, iy: number, k: number): number {
+  let h = (Math.imul(ix, 0x27d4eb2d) ^ Math.imul(iy, 0x165667b1) ^ Math.imul(k + 1, 0x9e3779b1)) | 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
 
 /** The bar for the selected building / placing, along the bottom (right of the 戻る tab). */
 const DOCK = { x: 166, w: 518, h: 196 };
@@ -161,7 +193,9 @@ const noLock = { setEnabled: () => {} };
  * stands can only be moved by taking it down and putting it up again, which takes time too. Everything that spends
  * something or takes time asks first (so does 撤去, which frees a place and gives back some of the 素材). 装飾 is looks only: it is put
  * up and moved at once, with no builder. 建築 (bottom-left) and 受け取る (bottom-right) sit in the corners; a tapped
- * building gets a label, and a bar along the bottom with what it does and what strengthening it costs.
+ * building gets a label, and a bar along the bottom with what it does and what strengthening it costs. 拡張 (above 城へ) buys
+ * more land at the far edges of the map (data/village.ts VILLAGE_EXPANSIONS): the map is as big as the save says (`size`), the
+ * land beyond it is shown dimmed and marked 未開拓, and nothing here uses the base size except what is drawn for the starting plot.
  */
 export class VillageScene extends Phaser.Scene {
   private save!: SaveData;
@@ -196,6 +230,16 @@ export class VillageScene extends Phaser.Scene {
   private lawn?: Phaser.GameObjects.Graphics;
   private plot?: Phaser.GameObjects.Image;
   private plotKey = '';
+  // 拡張: the land as big as the map is now (everything below follows `size`, which is read from the save), and what is drawn for it.
+  private size: VillageSize = { cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS };
+  private land: Land = landFor({ cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS });
+  private minZoom = 0.5;
+  /** The land's size in px, shared with VillageLife (changed in place when the land grows). */
+  private worldSize = { w: 0, h: 0 };
+  /** The grass, trees and sea (redrawn when the land grows), the plot's picture over it, and the opened / unopened land beyond the plot. */
+  private groundLayer!: Phaser.GameObjects.Container;
+  private plotLayer!: Phaser.GameObjects.Container;
+  private extraLayer!: Phaser.GameObjects.Container;
   private footprint!: Phaser.GameObjects.Graphics;
   private dock!: Phaser.GameObjects.Container;
   private dockTick?: () => void;
@@ -269,6 +313,9 @@ export class VillageScene extends Phaser.Scene {
     this.raidBanner = undefined;
     this.raidText = undefined;
     this.raidKey = '';
+    this.lawn = undefined;
+    this.plot = undefined;
+    this.plotKey = '';
   }
 
   create(): void {
@@ -277,6 +324,7 @@ export class VillageScene extends Phaser.Scene {
     const done = VillageSystem.settle(this.save);
     VillageQuests.refresh(this.save);
     if (settleChanged(done)) SaveSystem.save(this.save);
+    this.measureLand();
 
     this.cameras.main.setBackgroundColor('#3a6b2f');
     this.input.addPointer(1);
@@ -286,7 +334,12 @@ export class VillageScene extends Phaser.Scene {
     groundZone.on('pointerdown', (p: Phaser.Input.Pointer) => this.onGroundDown(p));
 
     this.world = this.add.container(0, 0).setDepth(2);
+    this.groundLayer = this.add.container(0, 0);
+    this.plotLayer = this.add.container(0, 0);
+    this.extraLayer = this.add.container(0, 0);
+    this.world.add([this.groundLayer, this.plotLayer, this.extraLayer]);
     this.buildGround();
+    this.refreshExtension();
     this.grid = this.add.graphics().setVisible(false);
     this.drawGrid();
     this.footprint = this.add.graphics();
@@ -303,7 +356,7 @@ export class VillageScene extends Phaser.Scene {
       save: () => this.save,
       pos: (gx, gy) => this.pos(gx, gy),
       zoom: () => this.zoom,
-      worldSize: WORLD,
+      worldSize: this.worldSize,
       busy: () => this.mode === 'place' || this.blocked(),
     });
 
@@ -354,62 +407,93 @@ export class VillageScene extends Phaser.Scene {
     return isoGrid((p.x - this.world.x) / this.zoom - ORIGIN.x, (p.y - this.world.y) / this.zoom - ORIGIN.y);
   }
 
-  /** Grass, the village's own diamond a shade different, trees round it, a beach and the sea along the bottom. */
+  /** Works out how big the map is now (from the save) and the land, zoom limits and cloud sky that go with it. */
+  private measureLand(): void {
+    this.size = villageSize(this.save);
+    this.land = landFor(this.size);
+    this.minZoom = minZoomFor(this.land);
+    this.worldSize.w = this.land.x1;
+    this.worldSize.h = this.land.y1;
+  }
+
+  /** Grass, trees round the map, a beach and the sea along the bottom, and (without a picture of the plot) the plot's own lawn.
+   *  Drawn for the land as it is now; where the grass patches and trees go comes from the spot they are at, so redrawing it
+   *  after a 拡張 leaves everything that was there where it was (except the trees the new land has taken the place of). */
   private buildGround(): void {
+    this.groundLayer.removeAll(true);
+    this.lawn = undefined;
+    const { x0, y0, x1, y1 } = this.land;
+    const w = x1 - x0;
+    const h = y1 - y0;
     if (this.textures.exists(VILLAGE_GROUND_KEY)) {
-      this.world.add(this.add.image(0, 0, VILLAGE_GROUND_KEY).setOrigin(0).setDisplaySize(WORLD.w, WORLD.h));
+      this.groundLayer.add(this.add.image(x0, y0, VILLAGE_GROUND_KEY).setOrigin(0).setDisplaySize(w, h));
       return;
     }
     const g = this.add.graphics();
     g.fillStyle(0x4f9a3c, 1);
-    g.fillRect(0, 0, WORLD.w, WORLD.h);
+    g.fillRect(x0, y0, w, h);
 
-    let seed = 11;
-    const rand = () => {
-      seed = (seed * 1664525 + 1013904223) % 4294967296;
-      return seed / 4294967296;
-    };
-    // Patches of darker and lighter grass.
-    for (let i = 0; i < 120; i++) {
-      g.fillStyle(rand() < 0.5 ? 0x3f8731 : 0x63ad4b, 0.35);
-      g.fillEllipse(rand() * WORLD.w, rand() * (WORLD.h - 300), 160 + rand() * 260, 70 + rand() * 120);
+    // Patches of darker and lighter grass: one a try in each cell of a coarse grid of the world.
+    const inside = (x: number, y: number): boolean => x >= x0 - 200 && x <= x1 + 200 && y >= y0 - 100 && y <= y1;
+    const cell = { w: 190, h: 150 };
+    for (let ix = Math.floor(x0 / cell.w) - 1; ix <= Math.ceil(x1 / cell.w); ix++) {
+      for (let iy = Math.floor(y0 / cell.h) - 1; iy <= Math.ceil((y1 - 300) / cell.h); iy++) {
+        if (cellRand(ix, iy, 1) > 0.68) continue;
+        const x = (ix + cellRand(ix, iy, 2)) * cell.w;
+        const y = (iy + cellRand(ix, iy, 3)) * cell.h;
+        if (!inside(x, y) || y > y1 - 300) continue;
+        g.fillStyle(cellRand(ix, iy, 4) < 0.5 ? 0x3f8731 : 0x63ad4b, 0.35);
+        g.fillEllipse(x, y, 160 + cellRand(ix, iy, 5) * 260, 70 + cellRand(ix, iy, 6) * 120);
+      }
     }
     // The sea, and a beach between it and the grass.
-    const beachY = WORLD.h - 330;
+    const beachY = y1 - 330;
     g.fillStyle(0xe9d9a0, 1);
-    g.fillRect(0, beachY, WORLD.w, 120);
+    g.fillRect(x0, beachY, w, 120);
     g.fillStyle(0xf6ecc4, 1);
-    g.fillRect(0, beachY + 70, WORLD.w, 50);
+    g.fillRect(x0, beachY + 70, w, 50);
     g.fillStyle(0x3fa6cf, 1);
-    g.fillRect(0, beachY + 120, WORLD.w, WORLD.h - beachY - 120);
+    g.fillRect(x0, beachY + 120, w, y1 - beachY - 120);
     g.fillStyle(0xffffff, 0.45);
-    for (let i = 0; i < 40; i++) g.fillEllipse(rand() * WORLD.w, beachY + 130 + rand() * 60, 90 + rand() * 120, 8);
+    for (let ix = Math.floor(x0 / 150) - 1; ix <= Math.ceil(x1 / 150); ix++) {
+      const x = (ix + cellRand(ix, 0, 7)) * 150;
+      if (x < x0 - 60 || x > x1 + 60) continue;
+      g.fillEllipse(x, beachY + 130 + cellRand(ix, 0, 8) * 60, 90 + cellRand(ix, 0, 9) * 120, 8);
+    }
 
-    // The village's own diamond: two greens, close enough together to read as one lawn (hidden once a picture of the plot is there).
+    // The plot's own diamond: two greens, close enough together to read as one lawn (hidden once a picture of the plot is there).
     const lawn = this.add.graphics();
-    for (let gx = 0; gx < VILLAGE_COLS; gx++) {
-      for (let gy = 0; gy < VILLAGE_ROWS; gy++) {
+    for (let gx = 0; gx < VILLAGE_BASE_COLS; gx++) {
+      for (let gy = 0; gy < VILLAGE_BASE_ROWS; gy++) {
         lawn.fillStyle((gx + gy) % 2 === 0 ? 0x6bb751 : 0x66b14d, 1);
         lawn.fillPoints([this.pos(gx, gy), this.pos(gx + 1, gy), this.pos(gx + 1, gy + 1), this.pos(gx, gy + 1)], true);
       }
     }
     lawn.lineStyle(4, 0xffffff, 0.25);
-    lawn.strokePoints([this.pos(0, 0), this.pos(VILLAGE_COLS, 0), this.pos(VILLAGE_COLS, VILLAGE_ROWS), this.pos(0, VILLAGE_ROWS)], true);
+    lawn.strokePoints([this.pos(0, 0), this.pos(VILLAGE_BASE_COLS, 0), this.pos(VILLAGE_BASE_COLS, VILLAGE_BASE_ROWS), this.pos(0, VILLAGE_BASE_ROWS)], true);
+    lawn.setVisible(this.plotKey === '');
     this.lawn = lawn;
 
-    // Trees and bushes on the land round the village, none on it.
+    // Trees and bushes on the land round the village (the map as it is now), none on it. The land that has not been opened yet
+    // (the next 拡張) stays wooded: it is dimmed by `refreshExtension`, and its trees go when it is opened.
     const onVillage = (x: number, y: number): boolean => {
       const t = isoGrid(x - ORIGIN.x, y - ORIGIN.y);
-      return t.gx > -1.5 && t.gx < VILLAGE_COLS + 1.5 && t.gy > -1.5 && t.gy < VILLAGE_ROWS + 1.5;
+      return t.gx > -1.5 && t.gx < this.size.cols + 1.5 && t.gy > -1.5 && t.gy < this.size.rows + 1.5;
     };
-    const trees: Pt[] = [];
-    for (let i = 0; i < 420 && trees.length < 150; i++) {
-      const p = { x: rand() * WORLD.w, y: 40 + rand() * (beachY - 70) };
-      if (!onVillage(p.x, p.y)) trees.push(p);
+    const trees: { x: number; y: number; s: number }[] = [];
+    const tc = { w: 150, h: 96 };
+    for (let ix = Math.floor(x0 / tc.w); ix <= Math.ceil(x1 / tc.w); ix++) {
+      for (let iy = Math.floor(y0 / tc.h); iy <= Math.ceil(beachY / tc.h); iy++) {
+        if (cellRand(ix, iy, 11) > 0.5) continue;
+        const x = (ix + cellRand(ix, iy, 12)) * tc.w;
+        const y = (iy + cellRand(ix, iy, 13)) * tc.h;
+        if (x < x0 || x > x1 || y < y0 + 40 || y > beachY - 30 || onVillage(x, y)) continue;
+        trees.push({ x, y, s: 0.8 + cellRand(ix, iy, 14) * 0.7 });
+      }
     }
     trees.sort((a, b) => a.y - b.y);
     for (const t of trees) {
-      const s = 0.8 + rand() * 0.7;
+      const s = t.s;
       g.fillStyle(0x000000, 0.18);
       g.fillEllipse(t.x, t.y + 6, 70 * s, 22 * s);
       g.fillStyle(0x6b4a2a, 1);
@@ -419,7 +503,7 @@ export class VillageScene extends Phaser.Scene {
         g.fillCircle(t.x + dx * s, t.y + dy * s, r * s);
       }
     }
-    this.world.add([g, lawn]);
+    this.groundLayer.add([g, lawn]);
     this.refreshPlot();
   }
 
@@ -442,13 +526,14 @@ export class VillageScene extends Phaser.Scene {
       this.plot = undefined;
       return;
     }
+    // The picture is drawn for the plot the village started with, which stays at the map's top corner however far the land grows.
     const top = this.pos(0, 0);
-    const bottom = this.pos(VILLAGE_COLS, VILLAGE_ROWS);
-    const right = this.pos(VILLAGE_COLS, 0);
-    const left = this.pos(0, VILLAGE_ROWS);
+    const bottom = this.pos(VILLAGE_BASE_COLS, VILLAGE_BASE_ROWS);
+    const right = this.pos(VILLAGE_BASE_COLS, 0);
+    const left = this.pos(0, VILLAGE_BASE_ROWS);
     const image = this.add.image((top.x + bottom.x) / 2, (top.y + bottom.y) / 2, key).setDisplaySize((right.x - left.x) * VillageScene.PLOT_MARGIN, (bottom.y - top.y) * VillageScene.PLOT_MARGIN);
-    // Just above the drawn ground, under every building.
-    this.world.addAt(image, this.world.getIndex(this.lawn as Phaser.GameObjects.Graphics) + 1);
+    // Just above the drawn ground, under every building (and under the land opened up beyond it).
+    this.plotLayer.add(image);
     this.plot = image;
     if (old) {
       // Growing into the next stage: the old plot melts into the new one.
@@ -458,18 +543,94 @@ export class VillageScene extends Phaser.Scene {
     }
   }
 
+  /** The land beyond the plot's picture: what has been opened (grass, with a rim of soil along its two front edges) and, dimmed
+   *  and marked 未開拓, the strip the next 拡張 would open. (The plot's picture stays as it was, in the map's top corner.) */
+  private refreshExtension(fadeIn = false): void {
+    this.extraLayer.removeAll(true);
+    const { cols, rows } = this.size;
+    const lawnTile = (g: Phaser.GameObjects.Graphics, gx: number, gy: number): void => {
+      g.fillStyle((gx + gy) % 2 === 0 ? 0x6bb751 : 0x66b14d, 1);
+      g.fillPoints([this.pos(gx, gy), this.pos(gx + 1, gy), this.pos(gx + 1, gy + 1), this.pos(gx, gy + 1)], true);
+    };
+    if (cols > VILLAGE_BASE_COLS || rows > VILLAGE_BASE_ROWS) {
+      const open = this.add.graphics();
+      // The soil the land stands on, seen along the two edges that face us.
+      const right = this.pos(cols, 0);
+      const bottom = this.pos(cols, rows);
+      const left = this.pos(0, rows);
+      const down = (p: Pt, d: number): Pt => ({ x: p.x, y: p.y + d });
+      open.fillStyle(0x6b4a2a, 1);
+      open.fillPoints([right, bottom, left, down(left, 22), down(bottom, 22), down(right, 22)], true);
+      open.fillStyle(0x4f361d, 1);
+      open.fillPoints([down(right, 14), down(bottom, 14), down(left, 14), down(left, 22), down(bottom, 22), down(right, 22)], true);
+      for (let gx = 0; gx < cols; gx++) for (let gy = 0; gy < rows; gy++) if (gx >= VILLAGE_BASE_COLS || gy >= VILLAGE_BASE_ROWS) lawnTile(open, gx, gy);
+      // A little life on the grass: tufts and the odd flower, where the spot's own number says so.
+      for (let gx = 0; gx < cols; gx++) {
+        for (let gy = 0; gy < rows; gy++) {
+          if (gx < VILLAGE_BASE_COLS && gy < VILLAGE_BASE_ROWS) continue;
+          const r = cellRand(gx, gy, 21);
+          if (r > 0.22) continue;
+          const c = this.pos(gx + 0.25 + cellRand(gx, gy, 22) * 0.5, gy + 0.25 + cellRand(gx, gy, 23) * 0.5);
+          if (r < 0.05) {
+            open.fillStyle([0xf4a8d0, 0xf6e27a, 0xffffff][Math.floor(cellRand(gx, gy, 24) * 3)], 1);
+            open.fillCircle(c.x, c.y - 4, 3.5);
+          } else {
+            open.lineStyle(2, 0x3f8731, 0.9);
+            open.lineBetween(c.x, c.y, c.x - 4, c.y - 8);
+            open.lineBetween(c.x, c.y, c.x, c.y - 10);
+            open.lineBetween(c.x, c.y, c.x + 4, c.y - 8);
+          }
+        }
+      }
+      // The rim of the land: a pale line along its two front edges.
+      open.lineStyle(4, 0xffffff, 0.25);
+      open.strokePoints([right, bottom, left], false);
+      this.extraLayer.add(open);
+      if (fadeIn) {
+        open.setAlpha(0);
+        this.tweens.add({ targets: open, alpha: 1, duration: 900, ease: 'Sine.easeOut' });
+      }
+    }
+
+    // What the next 拡張 would open: still wooded, dimmed, with a dashed gold edge and a label.
+    const next = VillageSystem.nextExpansion(this.save);
+    if (!next) return;
+    const outline = [this.pos(cols, 0), this.pos(next.cols, 0), this.pos(next.cols, next.rows), this.pos(0, next.rows), this.pos(0, rows), this.pos(cols, rows)];
+    const wild = this.add.graphics();
+    wild.fillStyle(0x0e2410, 0.52);
+    wild.fillPoints(outline, true);
+    wild.lineStyle(4, 0xffe27a, 0.9);
+    for (let i = 0; i < outline.length; i++) {
+      const a = outline[i];
+      const b = outline[(i + 1) % outline.length];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const ux = (b.x - a.x) / len;
+      const uy = (b.y - a.y) / len;
+      for (let d = 0; d < len; d += 30) wild.lineBetween(a.x + ux * d, a.y + uy * d, a.x + ux * Math.min(len, d + 18), a.y + uy * Math.min(len, d + 18));
+    }
+    this.extraLayer.add(wild);
+    // (towards the bottom corner, where the two strips are nearest the middle of the screen)
+    const east = this.pos((cols + next.cols) / 2, rows * 0.8);
+    const west = this.pos(cols * 0.8, (rows + next.rows) / 2);
+    this.extraLayer.add([this.plate(east.x, east.y, '未開拓', 26), this.plate(west.x, west.y, '未開拓', 26)]);
+  }
+
+  /** The grid shown while placing, over the map as big as it is now. */
   private drawGrid(): void {
+    const { cols, rows } = this.size;
+    this.grid.clear();
     this.grid.lineStyle(1.5, 0xffffff, 0.3);
-    for (let c = 0; c <= VILLAGE_COLS; c++) this.grid.strokePoints([this.pos(c, 0), this.pos(c, VILLAGE_ROWS)], false);
-    for (let r = 0; r <= VILLAGE_ROWS; r++) this.grid.strokePoints([this.pos(0, r), this.pos(VILLAGE_COLS, r)], false);
+    for (let c = 0; c <= cols; c++) this.grid.strokePoints([this.pos(c, 0), this.pos(c, rows)], false);
+    for (let r = 0; r <= rows; r++) this.grid.strokePoints([this.pos(0, r), this.pos(cols, r)], false);
   }
 
   /** Puts the view where `zoom` and the world's position say, never showing past the edge of the land. */
   private applyView(): void {
-    this.zoom = Phaser.Math.Clamp(this.zoom, MIN_ZOOM, MAX_ZOOM);
+    const land = this.land;
+    this.zoom = Phaser.Math.Clamp(this.zoom, this.minZoom, MAX_ZOOM);
     this.world.setScale(this.zoom);
-    this.world.x = Phaser.Math.Clamp(this.world.x, 720 - WORLD.w * this.zoom, 0);
-    this.world.y = Phaser.Math.Clamp(this.world.y, 1280 - WORLD.h * this.zoom, 0);
+    this.world.x = Phaser.Math.Clamp(this.world.x, 720 - land.x1 * this.zoom, -land.x0 * this.zoom);
+    this.world.y = Phaser.Math.Clamp(this.world.y, 1280 - land.y1 * this.zoom, -land.y0 * this.zoom);
     this.positionFloat();
   }
 
@@ -477,7 +638,7 @@ export class VillageScene extends Phaser.Scene {
   private zoomAt(sx: number, sy: number, zoom: number): void {
     const lx = (sx - this.world.x) / this.zoom;
     const ly = (sy - this.world.y) / this.zoom;
-    this.zoom = Phaser.Math.Clamp(zoom, MIN_ZOOM, MAX_ZOOM);
+    this.zoom = Phaser.Math.Clamp(zoom, this.minZoom, MAX_ZOOM);
     this.world.x = sx - lx * this.zoom;
     this.world.y = sy - ly * this.zoom;
     this.applyView();
@@ -485,7 +646,7 @@ export class VillageScene extends Phaser.Scene {
 
   private focusOn(b: PlacedBuilding | undefined): void {
     const def = b ? getBuilding(b.kind) : undefined;
-    const c = b && def ? this.pos(b.x + def.w / 2, b.y + def.h / 2) : this.pos(VILLAGE_COLS / 2, VILLAGE_ROWS / 2);
+    const c = b && def ? this.pos(b.x + def.w / 2, b.y + def.h / 2) : this.pos(this.size.cols / 2, this.size.rows / 2);
     this.world.x = 360 - c.x * this.zoom;
     this.world.y = 600 - c.y * this.zoom;
     this.applyView();
@@ -509,7 +670,7 @@ export class VillageScene extends Phaser.Scene {
   private recenter(): void {
     const castle = this.save.village.buildings.find((b) => b.kind === 'castle');
     const def = castle ? getBuilding(castle.kind) : undefined;
-    const c = castle && def ? this.pos(castle.x + def.w / 2, castle.y + def.h / 2) : this.pos(VILLAGE_COLS / 2, VILLAGE_ROWS / 2);
+    const c = castle && def ? this.pos(castle.x + def.w / 2, castle.y + def.h / 2) : this.pos(this.size.cols / 2, this.size.rows / 2);
     const z0 = this.zoom;
     const x0 = this.world.x;
     const y0 = this.world.y;
@@ -1088,8 +1249,8 @@ export class VillageScene extends Phaser.Scene {
     if (!lift || !b) return;
     const def = getBuilding(b.kind);
     const g = this.gridAt(p);
-    const x = Phaser.Math.Clamp(Math.round(g.gx - lift.gx), 0, VILLAGE_COLS - def.w);
-    const y = Phaser.Math.Clamp(Math.round(g.gy - lift.gy), 0, VILLAGE_ROWS - def.h);
+    const x = Phaser.Math.Clamp(Math.round(g.gx - lift.gx), 0, this.size.cols - def.w);
+    const y = Phaser.Math.Clamp(Math.round(g.gy - lift.gy), 0, this.size.rows - def.h);
     if (x === lift.x && y === lift.y && lift.moved) return;
     lift.x = x;
     lift.y = y;
@@ -1180,7 +1341,7 @@ export class VillageScene extends Phaser.Scene {
     const b = this.input.pointer2;
     const mx = (a.x + b.x) / 2;
     const my = (a.y + b.y) / 2;
-    this.zoom = Phaser.Math.Clamp(pinch.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.dist), MIN_ZOOM, MAX_ZOOM);
+    this.zoom = Phaser.Math.Clamp(pinch.zoom * (Math.hypot(a.x - b.x, a.y - b.y) / pinch.dist), this.minZoom, MAX_ZOOM);
     this.world.x = mx - pinch.lx * this.zoom;
     this.world.y = my - pinch.ly * this.zoom;
     this.applyView();
@@ -1213,8 +1374,8 @@ export class VillageScene extends Phaser.Scene {
       if (!ghost) return;
       const g = this.gridAt(p);
       const def = getBuilding(ghost.kind);
-      ghost.x = Phaser.Math.Clamp(Math.round(g.gx - drag.gx), 0, VILLAGE_COLS - def.w);
-      ghost.y = Phaser.Math.Clamp(Math.round(g.gy - drag.gy), 0, VILLAGE_ROWS - def.h);
+      ghost.x = Phaser.Math.Clamp(Math.round(g.gx - drag.gx), 0, this.size.cols - def.w);
+      ghost.y = Phaser.Math.Clamp(Math.round(g.gy - drag.gy), 0, this.size.rows - def.h);
       this.placeGhost();
       return;
     }
@@ -1292,8 +1453,8 @@ export class VillageScene extends Phaser.Scene {
       } else if (this.mode === 'place' && this.ghost) {
         const def = getBuilding(this.ghost.kind);
         const g = this.gridAt(p);
-        this.ghost.x = Phaser.Math.Clamp(Math.round(g.gx - def.w / 2), 0, VILLAGE_COLS - def.w);
-        this.ghost.y = Phaser.Math.Clamp(Math.round(g.gy - def.h / 2), 0, VILLAGE_ROWS - def.h);
+        this.ghost.x = Phaser.Math.Clamp(Math.round(g.gx - def.w / 2), 0, this.size.cols - def.w);
+        this.ghost.y = Phaser.Math.Clamp(Math.round(g.gy - def.h / 2), 0, this.size.rows - def.h);
         this.placeGhost();
       } else if (this.selectedId) {
         this.select(undefined);
@@ -1731,6 +1892,7 @@ export class VillageScene extends Phaser.Scene {
     const home = this.roundButton({ glyph: 'castle', label: '城へ', tone: 'wood', enabled: true, radius: 28, onTap: () => this.recenter() });
     home.setPosition(720 - 14 - 40, 1060);
     this.dock.add(home);
+    this.dock.add(this.buildExpandButton());
     this.addFirstBuildGuide();
     const pillW = 270;
     const pill = this.add.container(720 - 14 - pillW / 2, 1136);
@@ -2386,6 +2548,165 @@ export class VillageScene extends Phaser.Scene {
         showToast(this, '建築員が1人増えました', '#9fe39f');
         this.drawBuildMenu(menu, content);
       },
+    });
+  }
+
+  // ---------------------------------------------------------------- 拡張
+
+  /** 拡張: a plain utility button above 城へ. It says what the next size is - or what has to come first, or that this is as big as
+   *  it gets - and has a red dot when the land can be 拡張 right now. The popup it opens has the price. */
+  private buildExpandButton(): Phaser.GameObjects.Container {
+    const next = VillageSystem.nextExpansion(this.save);
+    const reason = VillageSystem.checkExpand(this.save);
+    const sub = !next ? `最大 ${this.size.cols}×${this.size.rows}` : castleLevel(this.save) < next.needCastle ? `城Lv${next.needCastle}で解放` : `${next.cols}×${next.rows}へ`;
+    const w = 156;
+    const x = 720 - 14 - w / 2;
+    const y = 962;
+    const box = this.add.container(x, y);
+    const button = new Button(this, 0, 0, w, 72, '拡張', () => this.openExpand(), { variant: 'wood', fontSize: '28px', subLabel: sub });
+    // Not yet possible: dimmed, but still pressable (the popup says why).
+    if (reason) button.setAlpha(0.78);
+    box.add(button);
+    if (!reason) {
+      const dot = this.add.graphics();
+      dot.fillStyle(0xe03a2a, 1);
+      dot.fillCircle(w / 2 - 6, -30, 12);
+      dot.lineStyle(3, 0xffffff, 1);
+      dot.strokeCircle(w / 2 - 6, -30, 12);
+      box.add(dot);
+    }
+    return box;
+  }
+
+  private openExpand(): void {
+    if (this.blocked() || this.mode !== 'browse') return;
+    const modal = openModal(this, noLock, 0.75, true);
+    this.modal = modal;
+    const content = this.add.container(0, 0);
+    modal.container.add(content);
+    this.drawExpand(modal, content);
+  }
+
+  /** A small map: the bigger land `to` (light) with the land `from` (dark) in its top corner, `width` px across, its top corner at (cx, top). */
+  private landPicture(parent: Phaser.GameObjects.Container, cx: number, top: number, from: VillageSize, to: VillageSize, width: number): void {
+    const k = width / (to.cols + to.rows);
+    const at = (gx: number, gy: number): Pt => ({ x: cx + (gx - gy) * k, y: top + ((gx + gy) * k) / 2 });
+    const g = this.add.graphics();
+    const soil = [at(to.cols, 0), at(to.cols, to.rows), at(0, to.rows)];
+    g.fillStyle(0x6b4a2a, 1);
+    g.fillPoints([...soil, ...soil.map((p) => ({ x: p.x, y: p.y + 9 })).reverse()], true);
+    g.fillStyle(0x6bb751, 1);
+    g.fillPoints([at(0, 0), at(to.cols, 0), at(to.cols, to.rows), at(0, to.rows)], true);
+    g.fillStyle(0x3f8731, 1);
+    g.fillPoints([at(0, 0), at(from.cols, 0), at(from.cols, from.rows), at(0, from.rows)], true);
+    g.lineStyle(3, CHROME.brassBright, 1);
+    g.strokePoints([at(0, 0), at(to.cols, 0), at(to.cols, to.rows), at(0, to.rows)], true);
+    g.lineStyle(2, 0xffffff, 0.45);
+    g.strokePoints([at(from.cols, 0), at(from.cols, from.rows), at(0, from.rows)], false);
+    parent.add(g);
+  }
+
+  /** The 拡張 popup: how big the land is now and would be, what it takes, and 拡張する (grey, with the reason, until it can be done). */
+  private drawExpand(modal: ModalHandle, content: Phaser.GameObjects.Container): void {
+    if (!content.active) return;
+    content.removeAll(true);
+    const now = Date.now();
+    const size = this.size;
+    const next = VillageSystem.nextExpansion(this.save);
+    const reason = VillageSystem.checkExpand(this.save, now);
+    const w = 620;
+    const h = next ? 664 : 470;
+    const top = 640 - h / 2;
+    const left = 360 - w / 2 + 34;
+    const close = (): void => {
+      modal.close();
+      this.modal = undefined;
+      this.renderDock();
+    };
+    content.add(createPanel(this, 360, 640, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 5, gradient: false }));
+    content.add(this.add.zone(360, 640, w, h).setInteractive());
+    content.add(heading(this, 360, top + 46, '村の拡張', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+
+    if (!next) {
+      this.landPicture(content, 360, top + 100, { cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS }, size, 300);
+      content.add(heading(this, 360, top + 290, `${size.cols}×${size.rows}マス`, { fontSize: '36px', color: '#ffe79a', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+      content.add(caption(this, 360, top + 340, '村はこれ以上、広げられません。\nいちばん広い村になりました。', { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5));
+      content.add(new Button(this, 360, top + h - 52, 220, 60, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
+      return;
+    }
+
+    const added = VillageSystem.expansionTiles(this.save, next);
+    this.landPicture(content, left + 150, top + 104, size, next, 300);
+    // Beside the picture: now, and after.
+    const right = left + 330;
+    content.add(caption(this, right, top + 112, '今の広さ', { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(body(this, right, top + 146, `${size.cols}×${size.rows}`, { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    const arrow = this.add.graphics();
+    arrow.fillStyle(0xffd23f, 1);
+    arrow.lineStyle(3, 0x4a2406, 1);
+    arrow.fillTriangle(right + 14, top + 196, right, top + 176, right + 28, top + 176);
+    arrow.strokeTriangle(right + 14, top + 196, right, top + 176, right + 28, top + 176);
+    content.add(arrow);
+    content.add(caption(this, right, top + 224, '広げると', { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(body(this, right, top + 262, `${next.cols}×${next.rows}`, { fontSize: '40px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    // Under the picture: what the two colours are.
+    const chip = (x: number, y: number, color: number, text: string, textColor: string): void => {
+      const g = this.add.graphics();
+      g.fillStyle(color, 1);
+      g.fillRoundedRect(x, y - 10, 22, 20, 5);
+      g.lineStyle(2, CHROME.brassDark, 1);
+      g.strokeRoundedRect(x, y - 10, 22, 20, 5);
+      content.add(g);
+      content.add(caption(this, x + 32, y, text, { fontSize: '19px', fontStyle: 'bold', color: textColor, stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    };
+    chip(left, top + 302, 0x3f8731, '今の村', '#d8c49a');
+    chip(left + 190, top + 302, 0x6bb751, `新しい土地 +${added.toLocaleString('ja-JP')}マス`, '#9fe39f');
+
+    // What it takes.
+    content.add(heading(this, left, top + 356, '必要なもの', { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    this.costLines(content, left, top + 402, top + 442, VillageSystem.expansionLevel(next), 28, 22);
+    const castleNeeded = castleLevel(this.save, now) < next.needCastle;
+    content.add(caption(this, left, top + 488, `城Lv${next.needCastle}以上　${castleNeeded ? `（今 Lv${castleLevel(this.save, now)}）` : '（満たしています）'}`, { fontSize: '20px', fontStyle: 'bold', color: castleNeeded ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    if (reason) content.add(caption(this, left, top + 534, reason, { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    else content.add(caption(this, left, top + 534, 'すぐに広がります。建築員はいりません。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+
+    content.add(new Button(this, 360 - 140, top + h - 50, 230, 64, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
+    const go = new Button(this, 360 + 140, top + h - 50, 230, 64, '拡張する', () => this.doExpand(modal), { variant: 'gold', fontSize: '28px' });
+    go.setEnabled(!reason);
+    content.add(go);
+  }
+
+  /** 拡張する: pays, opens the land and shows what it gave. */
+  private doExpand(modal: ModalHandle): void {
+    const now = Date.now();
+    const result = VillageSystem.expand(this.save, now);
+    if (!result) {
+      showToast(this, VillageSystem.checkExpand(this.save, now) ?? '広げられません', '#ffb0a0');
+      return;
+    }
+    SaveSystem.save(this.save);
+    modal.close();
+    this.modal = undefined;
+    // The land is bigger from here on: the camera's limits, the ground, the grid and the people's paths all follow.
+    this.measureLand();
+    this.buildGround();
+    this.refreshExtension(true);
+    this.drawGrid();
+    this.resourceBar.update(this.save);
+    this.refreshMaterials();
+    this.refreshQueued = false;
+    this.flushRefresh();
+    // Slide to the new land, then say what it came to.
+    this.glideTo(result.to.cols - 3, result.to.rows - 3, () => {
+      this.modal = showRewardModal(this, noLock, {
+        title: '村を広げました',
+        tiles: [{ kind: 'land', amount: `+${result.tiles.toLocaleString('ja-JP')}マス` }],
+        note: `村の広さ　${result.from.cols}×${result.from.rows} → ${result.to.cols}×${result.to.rows}`,
+        onClose: () => {
+          this.modal = undefined;
+          this.renderDock();
+        },
+      });
     });
   }
 
