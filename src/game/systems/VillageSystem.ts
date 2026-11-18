@@ -15,18 +15,19 @@ import {
   RAID_WINDOW_HOURS,
   REMOVE_REFUND_SHARE,
   REPAIR_SHARE,
-  VILLAGE_COLS,
   VILLAGE_MATERIALS,
-  VILLAGE_ROWS,
   WANDERERS,
   WANDERER_LIFE_HOURS,
   WANDERER_MAX,
   WANDERER_SPAWN_HOURS,
   getBuilding,
   materialName,
+  nextExpansion as expansionAfter,
   type BuildingKind,
   type BuildingLevel,
   type MaterialBundle,
+  type VillageExpansion,
+  type VillageSize,
   type WandererKind,
 } from '../data/village';
 import { BigNumber } from './BigNumber';
@@ -49,6 +50,8 @@ import {
   movePhase,
   regionReached,
   shopPoints,
+  expansionCount,
+  villageSize,
 } from './VillageIncome';
 import { MAIN_STAGE_COUNT } from './ProgressionSystem';
 import { VillageQuests } from './VillageQuests';
@@ -130,11 +133,20 @@ export interface RaidWin {
   gold: BigNumber;
 }
 
-/** True when `w` x `h` tiles at (x, y) are on the map and clear of every building but `ignoreId` (the ones
+/** What a 拡張 gave: the map before and after, and how many tiles of land were added. */
+export interface Expanded {
+  step: VillageExpansion;
+  from: VillageSize;
+  to: VillageSize;
+  tiles: number;
+}
+
+/** True when `w` x `h` tiles at (x, y) are on the map (as big as it is NOW) and clear of every building but `ignoreId` (the ones
  *  being moved count at their old place until it is taken down, and at the new one all along). */
 function fits(save: SaveData, def: { w: number; h: number; road?: boolean }, x: number, y: number, ignoreId: string | undefined, now: number): boolean {
   if (!Number.isInteger(x) || !Number.isInteger(y)) return false;
-  if (x < 0 || y < 0 || x + def.w > VILLAGE_COLS || y + def.h > VILLAGE_ROWS) return false;
+  const size = villageSize(save);
+  if (x < 0 || y < 0 || x + def.w > size.cols || y + def.h > size.rows) return false;
   for (const other of save.village.buildings) {
     if (other.id === ignoreId) continue;
     const o = getBuilding(other.kind);
@@ -164,9 +176,10 @@ function shortOf(save: SaveData, level: BuildingLevel): string | null {
 
 /** A free single tile for a 行商人 / 宝箱, or null (after a number of tries) when the map is too crowded. */
 function randomFreeTile(save: SaveData, rng: () => number, now: number): { x: number; y: number } | null {
+  const size = villageSize(save);
   for (let i = 0; i < 60; i++) {
-    const x = Math.floor(rng() * VILLAGE_COLS);
-    const y = Math.floor(rng() * VILLAGE_ROWS);
+    const x = Math.floor(rng() * size.cols);
+    const y = Math.floor(rng() * size.rows);
     if (!fits(save, { w: 1, h: 1 }, x, y, undefined, now)) continue;
     if (save.village.wanderers.items.some((w) => w.x === x && w.y === y)) continue;
     return { x, y };
@@ -247,9 +260,10 @@ export const VillageSystem = {
   /** The free spot nearest to (x, y) for something of this kind, or null when the map is full. */
   findSpot(save: SaveData, kind: BuildingKind, x: number, y: number, ignoreId?: string, now = Date.now()): { x: number; y: number } | null {
     const def = getBuilding(kind);
+    const size = villageSize(save);
     let best: { x: number; y: number; d: number } | null = null;
-    for (let ty = 0; ty + def.h <= VILLAGE_ROWS; ty++) {
-      for (let tx = 0; tx + def.w <= VILLAGE_COLS; tx++) {
+    for (let ty = 0; ty + def.h <= size.rows; ty++) {
+      for (let tx = 0; tx + def.w <= size.cols; tx++) {
         if (!fits(save, def, tx, ty, ignoreId, now)) continue;
         const d = (tx - x) ** 2 + (ty - y) ** 2;
         if (!best || d < best.d) best = { x: tx, y: ty, d };
@@ -493,6 +507,46 @@ export const VillageSystem = {
     const times = VillageSystem.moveTimes(b, now);
     b.move = { startedAt: now, demolish: times.demolish, rebuild: times.rebuild, toX: x, toY: y };
     return true;
+  },
+
+  // --------------------------------------------------------- 拡張
+
+  /** The 拡張 that would come next, or null when the land is as big as it gets. */
+  nextExpansion(save: SaveData): VillageExpansion | null {
+    return expansionAfter(expansionCount(save));
+  },
+
+  /** A 拡張's price as a level, so that it is paid and checked like one (no time: it is done at once). */
+  expansionLevel(step: VillageExpansion): BuildingLevel {
+    return { costHours: step.costHours, materials: step.materials, seconds: 0, needCastle: step.needCastle, value: 0 };
+  },
+
+  /** How many tiles of land `step` adds to the map as it is now. */
+  expansionTiles(save: SaveData, step: VillageExpansion): number {
+    const size = villageSize(save);
+    return step.cols * step.rows - size.cols * size.rows;
+  },
+
+  /** Why the land cannot be 拡張 now, or null when it can: already as big as it gets, the 城 not high enough, or short of ゴールド / 素材. */
+  checkExpand(save: SaveData, now = Date.now()): string | null {
+    const step = VillageSystem.nextExpansion(save);
+    if (!step) return '村はこれ以上、広げられません';
+    if (castleLevel(save, now) < step.needCastle) return `城をLv${step.needCastle}にすると、村を広げられます`;
+    return shortOf(save, VillageSystem.expansionLevel(step));
+  },
+
+  /** Pays for the next 拡張 and opens the land: the map is bigger at once, with every building where it was. Returns what
+   *  it gave, or null (nothing changed, nothing paid) when `checkExpand` says no. */
+  expand(save: SaveData, now = Date.now()): Expanded | null {
+    // Work that has run its time is taken in first, so the 城 counts at the level it really is.
+    VillageSystem.settle(save, now);
+    const step = VillageSystem.nextExpansion(save);
+    if (!step || VillageSystem.checkExpand(save, now) !== null) return null;
+    if (!pay(save, VillageSystem.expansionLevel(step))) return null;
+    const from = villageSize(save);
+    const tiles = VillageSystem.expansionTiles(save, step);
+    save.village.expansions = expansionCount(save) + 1;
+    return { step, from, to: villageSize(save), tiles };
   },
 
   // --------------------------------------------------------- 撤去

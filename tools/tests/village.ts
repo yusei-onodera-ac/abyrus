@@ -8,7 +8,7 @@ import { EXPEDITIONS, getExpedition } from '../../src/game/data/expeditions';
 import { VILLAGE_QUESTS, QUEST_REGION_MULTIPLIER } from '../../src/game/data/villageQuests';
 import type { PlacedBuilding as PlacedBuildingT } from '../../src/game/systems/SaveSystem';
 import { castleLevel, builderCount, busyBuilders, incomeMultiplier, effectiveLevel, isMoving, isMoveDone, movePhase, footprints, levelValue, defensePoints } from '../../src/game/systems/VillageIncome';
-import { BUILDINGS, VILLAGE_COLS, VILLAGE_ROWS, VILLAGE_START, VILLAGE_BUILDERS, VILLAGE_MATERIALS, VILLAGE_START_MATERIALS, VILLAGE_STAGE_DROPS, MOVE_MIN_SECONDS, RAID_POWER, RAID_WINDOW_HOURS, RAID_INTERVAL_HOURS, RAID_REWARD_MATERIALS, RAID_REWARD_GOLD_HOURS, RAID_STAGES_BELOW, EXTRA_BUILDER_GEMS, FINISH_GEMS_MAX, WANDERERS, WANDERER_MAX, WANDERER_LIFE_HOURS, getBuilding } from '../../src/game/data/village';
+import { BUILDINGS, VILLAGE_BASE_COLS as VILLAGE_COLS, VILLAGE_BASE_ROWS as VILLAGE_ROWS, VILLAGE_START, VILLAGE_BUILDERS, VILLAGE_MATERIALS, VILLAGE_START_MATERIALS, VILLAGE_STAGE_DROPS, MOVE_MIN_SECONDS, RAID_POWER, RAID_WINDOW_HOURS, RAID_INTERVAL_HOURS, RAID_REWARD_MATERIALS, RAID_REWARD_GOLD_HOURS, RAID_STAGES_BELOW, EXTRA_BUILDER_GEMS, FINISH_GEMS_MAX, WANDERERS, WANDERER_MAX, WANDERER_LIFE_HOURS, getBuilding } from '../../src/game/data/village';
 import { IDLE_VILLAGE_MATERIALS_PER_HOUR } from '../../src/game/data/idle';
 import { WEEKDAY_DUNGEONS } from '../../src/game/data/weekdayDungeons';
 import { StageRewardSystem } from '../../src/game/systems/StageRewardSystem';

@@ -10,12 +10,17 @@
  * then (answer one in battle, or let the walls turn it away - or lose some buildings until they are repaired);
  * 装飾 (木・花壇・噴水・銅像) is looks only: put up at once with no builder, moved for free, and never broken by a 襲撃;
  * any building but the 城 can be removed (撤去) for some of its 素材 back;
- * 行商人 and 宝箱 turn up on the map to be tapped; 村の依頼 (data/villageQuests.ts) pay materials for each day's chores.
+ * 行商人 and 宝箱 turn up on the map to be tapped; 村の依頼 (data/villageQuests.ts) pay materials for each day's chores;
+ * the land itself can be 拡張 (VILLAGE_EXPANSIONS below): up to six times, each paid for at once, adding ground at the far edges.
  */
 
-/** The map: tiles across and down (drawn as a diamond of 2:1 tiles, see ui/VillageArt.ts). A building covers `w` x `h` of them. */
-export const VILLAGE_COLS = 18;
-export const VILLAGE_ROWS = 18;
+/**
+ * The map a new village has (拡張 0 回): tiles across and down (drawn as a diamond of 2:1 tiles, see ui/VillageArt.ts). A building
+ * covers `w` x `h` of them. This is also the size the plot's pictures (ui/VillageArt.ts) and the water tiles (data/villageWalk.ts)
+ * are drawn for. How big the map is NOW depends on the save: use `villageSize(save)` (systems/VillageIncome.ts), never these.
+ */
+export const VILLAGE_BASE_COLS = 18;
+export const VILLAGE_BASE_ROWS = 18;
 
 export type BuildingKind = 'castle' | 'shop' | 'market' | 'house' | 'lumber' | 'quarry' | 'mine' | 'fence' | 'gate' | 'tree' | 'flowers' | 'fountain' | 'statue' | 'road';
 
@@ -55,6 +60,65 @@ export function materialName(id: VillageMaterial): string {
 
 /** What a new village (or a save from before 村 had materials) starts with: enough for the first few buildings. */
 export const VILLAGE_START_MATERIALS: Record<VillageMaterial, number> = { wood: 100, iron: 0, stone: 60 };
+
+// ---- 拡張: the land grows.
+/** The map's size: tiles across and down. */
+export interface VillageSize {
+  cols: number;
+  rows: number;
+}
+
+/**
+ * One step of 拡張. Step 1 takes the map from VILLAGE_BASE_COLS x VILLAGE_BASE_ROWS to `cols` x `rows`, step 2 to the next row of
+ * this table, and so on; the land is added at the far edges only (more columns and rows, never before the first), so every
+ * building keeps its place. Paid for at once - ゴールド, 素材 - with no builder and no waiting (it is land, not a building; like
+ * 装飾 it never ties up a builder), and gated by the 城's level. Numbers are 仮.
+ */
+export interface VillageExpansion {
+  cols: number;
+  rows: number;
+  /** ゴールド, in hours of the 放置報酬 gold at the stage reached (the same scale as BuildingLevel.costHours). */
+  costHours: number;
+  /** 素材 it takes besides. */
+  materials: MaterialBundle;
+  /** The 城 level needed before this step can be taken. */
+  needCastle: number;
+}
+
+export const VILLAGE_EXPANSIONS: VillageExpansion[] = [
+  { cols: 20, rows: 20, costHours: 5, materials: { wood: 80, stone: 60 }, needCastle: 2 },
+  { cols: 22, rows: 22, costHours: 15, materials: { wood: 250, stone: 200, iron: 40 }, needCastle: 3 },
+  { cols: 24, rows: 24, costHours: 40, materials: { wood: 600, stone: 500, iron: 120 }, needCastle: 3 },
+  { cols: 26, rows: 26, costHours: 100, materials: { wood: 1500, stone: 1200, iron: 350 }, needCastle: 4 },
+  { cols: 28, rows: 28, costHours: 250, materials: { wood: 3500, stone: 3000, iron: 1000 }, needCastle: 5 },
+  { cols: 30, rows: 30, costHours: 600, materials: { wood: 7000, stone: 6000, iron: 2500 }, needCastle: 6 },
+];
+
+/** The most 拡張 that can be done. */
+export const MAX_EXPANSIONS = VILLAGE_EXPANSIONS.length;
+
+/** A 拡張 count pulled into 0..MAX_EXPANSIONS (a whole number). */
+export function clampExpansions(count: number): number {
+  return Number.isFinite(count) ? Math.max(0, Math.min(MAX_EXPANSIONS, Math.floor(count))) : 0;
+}
+
+/** The map after `expansions` 拡張. 0 = the map every village started with, so an old save is just this. */
+export function villageSizeAt(expansions: number): VillageSize {
+  const n = clampExpansions(expansions);
+  if (n === 0) return { cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS };
+  const step = VILLAGE_EXPANSIONS[n - 1];
+  return { cols: step.cols, rows: step.rows };
+}
+
+/** The step that would come next after `expansions` 拡張, or null when the land is as big as it gets. */
+export function nextExpansion(expansions: number): VillageExpansion | null {
+  return VILLAGE_EXPANSIONS[clampExpansions(expansions)] ?? null;
+}
+
+/** The biggest the map ever gets. */
+export function villageMaxSize(): VillageSize {
+  return villageSizeAt(MAX_EXPANSIONS);
+}
 
 /**
  * Moving a building takes it down and puts it up again: the 解体 takes this share of the time the building's
