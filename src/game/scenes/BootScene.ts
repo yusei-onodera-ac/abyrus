@@ -24,6 +24,7 @@ import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
+import { applyHeroReleases } from '../data/heroes';
 import { RemoteNotices } from '../systems/RemoteNotices';
 import { RemoteInbox } from '../systems/RemoteInbox';
 import { RemoteLoginBonus } from '../systems/RemoteLoginBonus';
@@ -48,6 +49,10 @@ export class BootScene extends Phaser.Scene {
     // load queue. CharacterGenerator/applyBackground fall back to
     // procedural art or a solid color whenever the texture failed to load.
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => {});
+
+    // Who is in the game today (data/heroRelease.ts): decided here, with the game's clock (a development `?date=` is in force by now), before
+    // anything below asks for the characters' small pictures.
+    applyHeroReleases();
 
     this.buildLoadingUi();
 

@@ -1,4 +1,5 @@
 import { emptyGear, type HeroClass, type HeroData, type Rarity } from '../types';
+import { isHeroReleased } from './heroRelease';
 import { MAX_SKILL_SLOTS } from './skills';
 
 /** A roster slot: one fixed character with its own portrait, name and class.
@@ -10,7 +11,8 @@ export interface HeroDefinition {
   rarity: Rarity;
 }
 
-export const HERO_ROSTER: HeroDefinition[] = [
+/** Every character in the game, released or not: the 30 made ahead of time (the last block) come out two at a time (data/heroRelease.ts). */
+export const ALL_HEROES: HeroDefinition[] = [
   { id: 'gauss', name: '算盤王ガウス', heroClass: 'tank', rarity: 5 },
   { id: 'aria', name: '虚数姫アリア', heroClass: 'healer', rarity: 5 },
   { id: 'zeno', name: '無限桁のゼノ', heroClass: 'mage', rarity: 5 },
@@ -194,10 +196,56 @@ export const HERO_ROSTER: HeroDefinition[] = [
   { id: 'mio', name: '見習い僧のミオ', heroClass: 'healer', rarity: 1 },
   { id: 'tiko', name: '見習い魔法使いのティコ', heroClass: 'mage', rarity: 1 },
   { id: 'ryo', name: '木刀のリョウ', heroClass: 'warrior', rarity: 1 },
+  // Made ahead of time (2026-11, tools/art/newCharacters2.mjs): ★6 x10 and ★5 x20, released two at a time (data/heroRelease.ts).
+  { id: 'omega', name: '終焉の覇王オメガ', heroClass: 'warrior', rarity: 6 },
+  { id: 'alpha', name: '始源の剣姫アルファ', heroClass: 'warrior', rarity: 6 },
+  { id: 'zero', name: '虚空の守護者ゼロ', heroClass: 'tank', rarity: 6 },
+  { id: 'godel', name: '不完全の騎士ゲーデル', heroClass: 'tank', rarity: 6 },
+  { id: 'euler', name: '螺旋の賢帝オイラー', heroClass: 'mage', rarity: 6 },
+  { id: 'riemann', name: '零点の魔女リーマン', heroClass: 'mage', rarity: 6 },
+  { id: 'cantor', name: '階梯のカントル', heroClass: 'archer', rarity: 6 },
+  { id: 'fermat', name: '余白の狩人フェルマー', heroClass: 'archer', rarity: 6 },
+  { id: 'pi', name: '円環の歌姫パイ', heroClass: 'healer', rarity: 6 },
+  { id: 'noether', name: '対称の聖女ネーター', heroClass: 'healer', rarity: 6 },
+  { id: 'lambda', name: '疾駆のラムダ', heroClass: 'warrior', rarity: 5 },
+  { id: 'kappa', name: '剛断のカッパ', heroClass: 'warrior', rarity: 5 },
+  { id: 'theta', name: '角度の剣士シータ', heroClass: 'warrior', rarity: 5 },
+  { id: 'xi', name: '影走りのクシー', heroClass: 'warrior', rarity: 5 },
+  { id: 'rho', name: '紅蓮の槍騎士ロー', heroClass: 'warrior', rarity: 5 },
+  { id: 'psi', name: '精神の魔導師プサイ', heroClass: 'mage', rarity: 5 },
+  { id: 'eta', name: '蒼穹の術者エータ', heroClass: 'mage', rarity: 5 },
+  { id: 'nu', name: '流星弓のニュー', heroClass: 'archer', rarity: 5 },
+  { id: 'mu', name: '微細のミュー', heroClass: 'archer', rarity: 5 },
+  { id: 'chi', name: '交差射のカイ', heroClass: 'archer', rarity: 5 },
+  { id: 'iota', name: '一矢のイオタ', heroClass: 'archer', rarity: 5 },
+  { id: 'omicron', name: '小円の盾オミクロン', heroClass: 'tank', rarity: 5 },
+  { id: 'upsilon', name: '大地の壁ウプシロン', heroClass: 'tank', rarity: 5 },
+  { id: 'beta', name: '堅守のベータ', heroClass: 'tank', rarity: 5 },
+  { id: 'gamma', name: '烈光の城壁ガンマ', heroClass: 'tank', rarity: 5 },
+  { id: 'epsilon', name: '微光のイプシロン', heroClass: 'healer', rarity: 5 },
+  { id: 'oasis', name: '泉の巫女オアシス', heroClass: 'healer', rarity: 5 },
+  { id: 'aurum', name: '黄金の治癒師アウルム', heroClass: 'healer', rarity: 5 },
+  { id: 'lumen', name: '灯火の看護師ルーメン', heroClass: 'healer', rarity: 5 },
+  { id: 'pax', name: '平和の使徒パックス', heroClass: 'healer', rarity: 5 },
 ];
 
+/**
+ * The characters in the game right now: ALL_HEROES without the ones that are not out yet (data/heroRelease.ts). The gacha pools, the 図鑑,
+ * the pictures that are loaded at start-up and so on all read this one. It is rebuilt IN PLACE by applyHeroReleases - once when this file
+ * is loaded, and again by Boot with the game's clock (so a development `?date=` is honoured).
+ */
+export const HERO_ROSTER: HeroDefinition[] = [];
+
+/** Puts into HERO_ROSTER the characters that are out at `now`. Returns how many there are. */
+export function applyHeroReleases(now = Date.now()): number {
+  HERO_ROSTER.splice(0, HERO_ROSTER.length, ...ALL_HEROES.filter((h) => isHeroReleased(h.id, now)));
+  return HERO_ROSTER.length;
+}
+applyHeroReleases();
+
+/** Any character, out or not (a save may hold one whose day has not come on this device's clock). */
 export function getHeroDefinition(heroId: string): HeroDefinition | undefined {
-  return HERO_ROSTER.find((h) => h.id === heroId);
+  return ALL_HEROES.find((h) => h.id === heroId);
 }
 
 export function getHeroesByRarity(rarity: Rarity): HeroDefinition[] {

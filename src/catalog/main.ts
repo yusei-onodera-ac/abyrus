@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { createHeroInstance, HERO_ROSTER } from '../game/data/heroes';
+import { ALL_HEROES, createHeroInstance, HERO_ROSTER } from '../game/data/heroes';
+import { HERO_RELEASES } from '../game/data/heroRelease';
 import { EQUIP_DEFS, EQUIP_MAX_LEVEL, EQUIP_STAT_LABEL, equipValue, type EquipDef } from '../game/data/equipment';
 import { EXP_ITEMS, ITEMS, type ItemId } from '../game/data/items';
 import { FERAL_PREFIXES, REGIONS } from '../game/data/regions';
@@ -29,7 +30,9 @@ const picture = (src: string): string => `<img src="${src}" loading="lazy" onerr
 // ------------------------------------------------------------------ heroes --
 
 function heroesSection(): string {
-  const rows = HERO_ROSTER.map((def) => {
+  // every character, including the ones that are not out yet (their day is shown)
+  const comesOut = new Map(HERO_RELEASES.map((r) => [r.id, r.date]));
+  const rows = ALL_HEROES.map((def) => {
     const at = (level: number) => ProgressionSystem.computeHeroStats(createHeroInstance(def.id, `catalog-${def.id}`, level));
     const lo = at(1);
     const hi = at(MAX_LEVEL);
@@ -43,7 +46,7 @@ function heroesSection(): string {
     return (
       `<tr ${attr(`${def.id} ${def.name} ${CLASS_LABELS[def.heroClass]}`, def.rarity)}>` +
       `<td class="img">${picture(`/assets/characters/${def.id}.png`)}</td>` +
-      `<td><b>${esc(def.name)}</b><br><code>${def.id}</code><br>${stars(def.rarity)}<br><span class="tag">${CLASS_LABELS[def.heroClass]}</span></td>` +
+      `<td><b>${esc(def.name)}</b><br><code>${def.id}</code><br>${stars(def.rarity)}<br><span class="tag">${CLASS_LABELS[def.heroClass]}</span>${comesOut.has(def.id) ? `<br><span class="tag">${HERO_ROSTER.some((h) => h.id === def.id) ? '登場済み' : '登場予定'} ${comesOut.get(def.id)}</span>` : ''}</td>` +
       `<td class="num">${lo.maxHp.toString()}<br><small>→ ${hi.maxHp.toString()}</small></td>` +
       `<td class="num">${lo.atk.toString()}<br><small>→ ${hi.atk.toString()}</small></td>` +
       `<td class="num">${lo.def}</td><td class="num">${lo.spd}</td>` +
@@ -52,7 +55,7 @@ function heroesSection(): string {
     );
   });
   return (
-    `<section id="heroes"><h2>キャラ（${HERO_ROSTER.length}体）</h2>` +
+    `<section id="heroes"><h2>キャラ（いま ${HERO_ROSTER.length}体 / 全部で ${ALL_HEROES.length}体）</h2>` +
     `<p class="note">HP・攻撃は Lv.1 と、Lv.${MAX_LEVEL} のとき（→）。フェーズ（最大${MAX_PHASE}）・装備なしの値です。防御・素早さ・会心はレベルで変わりません。</p>` +
     `<table><thead><tr><th>画像</th><th>名前 / ID / ★ / 職</th><th>HP</th><th>攻撃</th><th>防御</th><th>素早さ</th><th>会心率 / 倍率</th><th>スキル（解放レベル順）</th></tr></thead><tbody>${rows.join('')}</tbody></table></section>`
   );

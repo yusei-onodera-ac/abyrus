@@ -24,12 +24,18 @@ HEROES = ['viara', 'astra', 'dias', 'celes', 'noct', 'gauss', 'aria', 'zeno', 's
           'noel', 'gen', 'jin', 'kaede', 'lune', 'miru', 'rosa', 'lena', 'taiga', 'toxar', 'nyx', 'haruka', 'sora', 'ines', 'felix',
           'tsubame', 'morrigan', 'orga', 'elrin', 'gustav', 'doris', 'bruno', 'mina', 'kai', 'fros', 'robin',
           # style references for the ★1 and ★2 characters added to double the roster (newCharacters.mjs)
-          'mizuki', 'ald', 'momo', 'lumi', 'fern', 'enju']
+          'mizuki', 'ald', 'momo', 'lumi', 'fern', 'enju',
+          # the one existing ★6, the reference for the ten new ★6 (newCharacters2.mjs)
+          'aion']
 # the 80 characters added to double the roster (tools/art/newCharacters.mjs) headline the year's pickup banners too
 import re
 
 HEROES += re.findall(r"^\s*\['(\w+)', \d,", (Path(__file__).resolve().parent / 'newCharacters.mjs').read_text(encoding='utf-8'), re.M)
+# the 30 made ahead of their release (tools/art/newCharacters2.mjs): their pictures may not exist yet - skip those
+HEROES += re.findall(r"^\s*\['(\w+)', \d,", (Path(__file__).resolve().parent / 'newCharacters2.mjs').read_text(encoding='utf-8'), re.M)
 for n in HEROES:
+    if not (root / 'characters' / f'{n}.png').exists():
+        continue
     save(root / 'characters' / f'{n}.png', f'{n}.jpg', (640, 860))
 for n in ['wolf', 'lion', 'necrodraco', 'garumudo', 'arachnea', 'kongo', 'snake', 'bear']:
     save(root / 'enemies' / f'{n}.png', f'e_{n}.jpg', (640, 640))

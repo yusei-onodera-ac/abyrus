@@ -11,6 +11,7 @@
 //           that this one is the "next level" of (its raw picture is passed as a reference when it exists)
 
 import { NEW_CHARACTERS } from './newCharacters.mjs';
+import { NEW_CHARACTERS_2 } from './newCharacters2.mjs';
 
 const NO_TEXT = 'No text of any kind: no letters, no characters, no captions, no signs with writing, no logos, no watermark, no user interface.';
 
@@ -527,6 +528,21 @@ const characters2 = NEW_CHARACTERS.map(([id, rarity, , , , what]) => ({
   prompt: `${CHAR}${CHAR_QUALITY_MORE[rarity]} The character: ${what}.`,
 }));
 
+// ---------------------------------------------------------------------------------------------- 30 more, made ahead of their release (★6 x10, ★5 x20)
+// The list is in newCharacters2.mjs; they are released two at a time (src/game/data/heroRelease.ts). The ★6s take the one existing ★6 (aion) as their reference.
+const CHAR_REFS_3 = { 5: CHAR_REFS_MORE[5], 6: ['ref:aion.jpg', 'ref:astra.jpg'] };
+const characters3 = NEW_CHARACTERS_2.map(([id, rarity, , , , what]) => ({
+  id: `hero_${id}`,
+  group: 'chars3',
+  out: `characters/${id}.png`,
+  mode: 'portrait',
+  size: [1008, 1344],
+  aspect: '3:4',
+  refs: CHAR_REFS_3[rarity],
+  refNote: CHAR_NOTE,
+  prompt: `${CHAR}${CHAR_QUALITY_MORE[rarity]} The character: ${what}.`,
+}));
+
 // ---------------------------------------------------------------------------------------------- 特設ガチャ banner, 通常ガチャ banner, loading screen
 const GACHA_CHARS = 'The characters shown must be the SAME characters as in the reference pictures (same faces, hair, outfits and weapons), only posed differently - do not invent other characters.';
 const castBanners = [
@@ -762,7 +778,7 @@ const equipFest = [
   },
 ];
 
-export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...limited, ...pickups, ...equipFest, ...characters, ...characters2, ...loading, ...logo, ...land, ...peopleSheets, ...road];
+export const MANIFEST = [...finalBoss, ...weekdayPlaces, ...expeditionPlaces, ...items, ...gear, ...banners, ...castBanners, ...screens, ...battles, ...regions, ...stories, ...village, ...decor, ...construction, ...events, ...premiumHeader, ...notices, ...limited, ...pickups, ...equipFest, ...characters, ...characters2, ...characters3, ...loading, ...logo, ...land, ...peopleSheets, ...road];
 
 /** Approximate price of one picture (USD, 2K) used for the estimate printed before generating. */
 export const PRICE_PER_IMAGE = 0.0504;
