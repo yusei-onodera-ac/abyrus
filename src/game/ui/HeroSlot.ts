@@ -4,6 +4,7 @@ import { bustKey } from '../characters/HeroArt';
 import { hex, RARITY_COLORS, type HeroData } from '../types';
 import { addRainbowFrame } from './Rainbow';
 import { CHROME } from './theme';
+import { t } from '../i18n';
 
 export const HERO_SLOT_SIZE = 108;
 
@@ -91,7 +92,7 @@ export class HeroSlot extends Phaser.GameObjects.Container {
       }
     }
 
-    const ribbon = opts.inDeck ? { text: '編成中', color: hex(CHROME.brassBright) } : opts.twinInDeck ? { text: '同キャラ', color: '#c9b6ff' } : null;
+    const ribbon = opts.inDeck ? { text: t('hero.slot.inParty'), color: hex(CHROME.brassBright) } : opts.twinInDeck ? { text: t('hero.slot.twinInParty'), color: '#c9b6ff' } : null;
     if (ribbon) {
       const strip = scene.add.rectangle(0, 0, size - 6, 32, 0x000000, 0.72);
       this.add(strip);

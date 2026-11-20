@@ -24,6 +24,7 @@ import { enter, enterStagger } from '../ui/Transitions';
 import { describeEquip, equipMaxLevel, getEquipDef } from '../data/equipment';
 import { equipIcon } from '../ui/ItemIcons';
 import { EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, hex, type EquipSlot, type HeroData, type Row } from '../types';
+import { t } from '../i18n';
 
 interface RosterSceneData {
   /** Hero id to arrive with, ready to drop into a slot of the deck in use -
@@ -101,7 +102,7 @@ export class RosterScene extends Phaser.Scene {
     resourceBar.update(this.save);
     enter(this, resourceBar, { dy: -20, duration: 280 });
 
-    buildTitlePlate(this, 'キャラ編成');
+    buildTitlePlate(this, t('hero.roster.title'));
     this.scroll = buildFramedScrollView(this);
     this.render(true);
     new BottomNavBar(this, 720, 1280, null);
@@ -193,7 +194,7 @@ export class RosterScene extends Phaser.Scene {
     container.add(bar);
 
     const name = body(this, PAD + 18, y + barH / 2, `${isActive ? '★' : ''}${deck.name}`, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
-    const power = body(this, PAD + barW - 16, y + barH / 2, `総合力：${ProgressionSystem.computeDeckTotals(this.deckHeroes(index)).power.toString()}`, {
+    const power = body(this, PAD + barW - 16, y + barH / 2, t('hero.stat.powerValue', { power: ProgressionSystem.computeDeckTotals(this.deckHeroes(index)).power.toString() }), {
       fontSize: '26px',
       fontStyle: 'bold',
       color: '#fff4dc',
@@ -206,7 +207,7 @@ export class RosterScene extends Phaser.Scene {
     container.add([name, power]);
 
     container.add(
-      new Button(this, PAD + barW + 10 + editW / 2, y + barH / 2, editW, barH, editing ? '完了' : '編集', () => (editing ? this.finishEditing() : this.startEditing(index)), {
+      new Button(this, PAD + barW + 10 + editW / 2, y + barH / 2, editW, barH, editing ? t('hero.roster.done') : t('hero.roster.edit'), () => (editing ? this.finishEditing() : this.startEditing(index)), {
         variant: editing ? 'gold' : 'wood',
         fontSize: '26px',
         guard,
@@ -227,8 +228,8 @@ export class RosterScene extends Phaser.Scene {
     });
 
     const captionStyle = { fontSize: '16px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 };
-    container.add(caption(this, xs[0] - size / 2, y + 10, '前衛', captionStyle).setOrigin(0, 0.5));
-    container.add(caption(this, xs[3] - size / 2, y + 10, '後衛', captionStyle).setOrigin(0, 0.5));
+    container.add(caption(this, xs[0] - size / 2, y + 10, t('hero.roster.front'), captionStyle).setOrigin(0, 0.5));
+    container.add(caption(this, xs[3] - size / 2, y + 10, t('hero.roster.back'), captionStyle).setOrigin(0, 0.5));
     y += 24;
 
     const slotY = y + size / 2;
@@ -254,10 +255,10 @@ export class RosterScene extends Phaser.Scene {
       const btnW = (innerW - btnGap * (count - 1)) / count;
       const at = (i: number) => PAD + btnW / 2 + i * (btnW + btnGap);
       const opts = (variant: 'wood' | 'gold' | 'danger') => ({ variant, fontSize: '20px', guard });
-      container.add(new Button(this, at(0), actionY, btnW, ACTION_H, '名前変更', () => this.onRename(index), opts('wood')));
-      container.add(new Button(this, at(1), actionY, btnW, ACTION_H, 'お任せ編成', () => this.onAutoFormation(index), opts('gold')));
-      container.add(new Button(this, at(2), actionY, btnW, ACTION_H, '詳細', () => this.showDeckDetail(index), opts('wood')));
-      container.add(new Button(this, at(3), actionY, btnW, ACTION_H, '削除', () => this.onDeleteDeck(index), opts('danger')));
+      container.add(new Button(this, at(0), actionY, btnW, ACTION_H, t('hero.roster.rename'), () => this.onRename(index), opts('wood')));
+      container.add(new Button(this, at(1), actionY, btnW, ACTION_H, t('hero.roster.autoParty'), () => this.onAutoFormation(index), opts('gold')));
+      container.add(new Button(this, at(2), actionY, btnW, ACTION_H, t('common.details'), () => this.showDeckDetail(index), opts('wood')));
+      container.add(new Button(this, at(3), actionY, btnW, ACTION_H, t('common.delete'), () => this.onDeleteDeck(index), opts('danger')));
     } else {
       const useW = 150;
       if (isActive) {
@@ -267,11 +268,11 @@ export class RosterScene extends Phaser.Scene {
         chip.lineStyle(2, CHROME.brassBright, 0.9);
         chip.strokeRoundedRect(PAD, actionY - ACTION_H / 2, useW, ACTION_H, 10);
         container.add(chip);
-        container.add(body(this, PAD + useW / 2, actionY, '★ 使用中', { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+        container.add(body(this, PAD + useW / 2, actionY, t('hero.roster.active'), { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
       } else {
-        container.add(new Button(this, PAD + useW / 2, actionY, useW, ACTION_H, '使用する', () => this.useDeck(index), { variant: 'wood', fontSize: '22px', guard }));
+        container.add(new Button(this, PAD + useW / 2, actionY, useW, ACTION_H, t('hero.roster.setActive'), () => this.useDeck(index), { variant: 'wood', fontSize: '22px', guard }));
       }
-      container.add(new Button(this, PAD + innerW - 56, actionY, 112, ACTION_H, '詳細', () => this.showDeckDetail(index), { variant: 'wood', fontSize: '22px', guard }));
+      container.add(new Button(this, PAD + innerW - 56, actionY, 112, ACTION_H, t('common.details'), () => this.showDeckDetail(index), { variant: 'wood', fontSize: '22px', guard }));
     }
     y += ACTION_H + PAD;
 
@@ -296,7 +297,7 @@ export class RosterScene extends Phaser.Scene {
     const h = 92;
     const full = this.save.decks.length >= MAX_DECKS;
     container.add(createPanel(this, w / 2, h / 2, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.97, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false }));
-    const label = full ? `デッキは最大${MAX_DECKS}つまで` : `＋ デッキを追加　${this.save.decks.length} / ${MAX_DECKS}`;
+    const label = full ? t('hero.roster.deckLimit', { MAX_DECKS }) : t('hero.roster.addDeck', { count: this.save.decks.length, MAX_DECKS });
     const button = new Button(this, w / 2, h / 2, w - PAD * 2, 66, label, () => this.onAddDeck(), { variant: 'wood', fontSize: '26px', guard: () => this.scroll.isTap() });
     if (full) button.setEnabled(false);
     container.add(button);
@@ -304,9 +305,9 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private editHint(): string {
-    if (this.armedHeroId) return '編成する枠を上からタップしてください';
-    if (this.targetSlot) return '入れ替えるキャラを下から選んでください';
-    return '下のキャラをタップで編成　枠をタップで入れ替え先を選択';
+    if (this.armedHeroId) return t('hero.roster.hintPickSlot');
+    if (this.targetSlot) return t('hero.roster.hintPickHero');
+    return t('hero.roster.hintDefault');
   }
 
   /** The hero's three pieces of equipment as small icons (an empty ring where nothing
@@ -355,8 +356,8 @@ export class RosterScene extends Phaser.Scene {
     modal.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: hero.rarity, gradient: false }));
     // Swallows taps so touching the panel itself doesn't dismiss the popup.
     modal.add(this.add.zone(360, cy, w, h).setInteractive());
-    modal.add(heading(this, 360, top + 48, `${hero.name} の装備`, { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    modal.add(caption(this, 360, top + 92, `Lv.${hero.level}　総合力 ${ProgressionSystem.computeHeroPower(hero).toString()}`, { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    modal.add(heading(this, 360, top + 48, t('hero.roster.gearTitle', { name: hero.name }), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(caption(this, 360, top + 92, t('hero.roster.gearSubtitle', { level: hero.level, computeHeroPower: ProgressionSystem.computeHeroPower(hero).toString() }), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
 
     EQUIP_SLOTS.forEach((slot: EquipSlot, i) => {
       const rowTop = top + 130 + i * rowH;
@@ -370,7 +371,7 @@ export class RosterScene extends Phaser.Scene {
         if (name.width > 280) name.setScale(280 / name.width);
         modal.add(name);
         modal.add(this.add.text(left + 112, y + 2, '★'.repeat(def.rarity), { fontSize: '18px', color: hex(RARITY_COLORS[def.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-        modal.add(caption(this, left + 112 + def.rarity * 20 + 12, y + 2, `${EQUIP_SLOT_LABELS[slot]}　Lv.${item.level}/${equipMaxLevel(item)}`, { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        modal.add(caption(this, left + 112 + def.rarity * 20 + 12, y + 2, t('hero.roster.gearSlotLevel', { EQUIP_SLOT_LABELS: EQUIP_SLOT_LABELS[slot], level: item.level, equipMaxLevel: equipMaxLevel(item) }), { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
         modal.add(body(this, left + 112, y + 32, describeEquip(item), { fontSize: '22px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       } else {
         const g = this.add.graphics();
@@ -379,12 +380,12 @@ export class RosterScene extends Phaser.Scene {
         g.lineStyle(3, CHROME.brassDark, 0.7);
         g.strokeCircle(left + 56, y, 34);
         modal.add(g);
-        modal.add(body(this, left + 112, y, `${EQUIP_SLOT_LABELS[slot]}　なし`, { fontSize: '24px', color: '#a89a78', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+        modal.add(body(this, left + 112, y, t('hero.gear.slotNone', { EQUIP_SLOT_LABELS: EQUIP_SLOT_LABELS[slot] }), { fontSize: '24px', color: '#a89a78', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       }
-      modal.add(new Button(this, left + w - 36 - 70, y, 140, 60, item ? '変更' : 'つける', () => this.scene.start('GearPick', { heroId: hero.id, slot, from: 'Roster', direct: true }), { variant: item ? 'wood' : 'gold', fontSize: '24px' }));
+      modal.add(new Button(this, left + w - 36 - 70, y, 140, 60, item ? t('common.change') : t('hero.roster.putOn'), () => this.scene.start('GearPick', { heroId: hero.id, slot, from: 'Roster', direct: true }), { variant: item ? 'wood' : 'gold', fontSize: '24px' }));
     });
 
-    modal.add(new Button(this, 360, top + h - 52, 240, 66, '閉じる', () => this.modal?.close(), { variant: 'wood', fontSize: '24px' }));
+    modal.add(new Button(this, 360, top + h - 52, 240, 66, t('common.close'), () => this.modal?.close(), { variant: 'wood', fontSize: '24px' }));
   }
 
   /** Red × on a filled slot while editing. */
@@ -420,11 +421,11 @@ export class RosterScene extends Phaser.Scene {
     const party = this.deckHeroes(index);
     const totals = ProgressionSystem.computeDeckTotals(party);
     const rows: { label: string; value: string; accent?: boolean }[] = [
-      { label: '総合力', value: totals.power.toString(), accent: true },
+      { label: t('hero.stat.power'), value: totals.power.toString(), accent: true },
       { label: 'HP', value: totals.maxHp.toString() },
-      { label: '攻撃力', value: totals.atk.toString() },
-      { label: '防御力', value: totals.def.toLocaleString('ja-JP') },
-      { label: '素早さ', value: totals.spd.toLocaleString('ja-JP') },
+      { label: t('hero.stat.atk'), value: totals.atk.toString() },
+      { label: t('hero.stat.def'), value: totals.def.toLocaleString('ja-JP') },
+      { label: t('hero.stat.spd'), value: totals.spd.toLocaleString('ja-JP') },
     ];
 
     const w = 580;
@@ -440,8 +441,8 @@ export class RosterScene extends Phaser.Scene {
     const block = this.add.zone(360, cy, w, h).setInteractive();
     modal.add([panel, block]);
 
-    modal.add(heading(this, 360, top + 48, `${this.save.decks[index].name} の合計`, { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    modal.add(caption(this, 360, top + 92, `編成 ${party.length} / ${DECK_SLOTS.length} 体`, { fontSize: '18px', color: '#d8c49a' }).setOrigin(0.5));
+    modal.add(heading(this, 360, top + 48, t('hero.roster.deckTotals', { name: this.save.decks[index].name }), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(caption(this, 360, top + 92, t('hero.roster.deckSize', { count: party.length, count2: DECK_SLOTS.length }), { fontSize: '18px', color: '#d8c49a' }).setOrigin(0.5));
 
     rows.forEach((row, i) => {
       const y = top + 140 + i * rowH + rowH / 2;
@@ -460,7 +461,7 @@ export class RosterScene extends Phaser.Scene {
       modal.add([label, value]);
     });
 
-    modal.add(new Button(this, 360, top + h - 56, 240, 68, '閉じる', () => this.modal?.close(), { variant: 'wood', fontSize: '24px' }));
+    modal.add(new Button(this, 360, top + h - 56, 240, 68, t('common.close'), () => this.modal?.close(), { variant: 'wood', fontSize: '24px' }));
   }
 
   // --- roster card -------------------------------------------------------
@@ -482,13 +483,13 @@ export class RosterScene extends Phaser.Scene {
 
     const headerH = 48;
     container.add(createPanel(this, w / 2, y + headerH / 2, innerW, headerH, { fillColor: HEADER_FILL, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
-    container.add(body(this, PAD + 16, y + headerH / 2, '所持キャラ', { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(body(this, PAD + 16, y + headerH / 2, t('hero.roster.ownedHeroes'), { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const total = this.save.heroes.length;
     // 図鑑 (every character of the game, and the rewards for collecting them) is one tap away from the list of what is held.
-    const book = new Button(this, PAD + 196, y + headerH / 2, 112, 38, '図鑑', () => this.scene.start('Collection'), { variant: 'wood', fontSize: '20px', guard });
+    const book = new Button(this, PAD + 196, y + headerH / 2, 112, 38, t('hero.collection.title'), () => this.scene.start('Collection'), { variant: 'wood', fontSize: '20px', guard });
     container.add(book);
     if (CollectionSystem.claimable(this.save) > 0) container.add(buildUnreadDot(this, PAD + 196 + 50, y + headerH / 2 - 14, 7));
-    container.add(body(this, PAD + innerW - 16, y + headerH / 2, heroes.length === total ? `${total}体` : `${heroes.length} / ${total}体`, { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+    container.add(body(this, PAD + innerW - 16, y + headerH / 2, heroes.length === total ? t('hero.roster.heroCount', { total }) : t('hero.roster.heroCountFiltered', { count: heroes.length, total }), { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
     y += headerH + 12;
     const controls = buildHeroListControls(this, innerW, view, (next) => {
       writeHeroListView(this.game.registry, next);
@@ -498,7 +499,7 @@ export class RosterScene extends Phaser.Scene {
     container.add(controls.container);
     y += controls.height + 14;
     if (heroes.length === 0) {
-      container.add(body(this, w / 2, y + 40, 'この条件のキャラはいません', { fontSize: '22px', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      container.add(body(this, w / 2, y + 40, t('hero.list.noMatch'), { fontSize: '22px', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
       y += 100;
     }
 
@@ -590,7 +591,7 @@ export class RosterScene extends Phaser.Scene {
     }
     // Deck is full and no slot picked yet: hold this hero until one is.
     this.armedHeroId = hero.id;
-    showToast(this, '入れ替える枠をタップしてください');
+    showToast(this, t('hero.roster.toastPickSlot'));
     this.queueRender();
   }
 
@@ -621,7 +622,7 @@ export class RosterScene extends Phaser.Scene {
     SaveSystem.setDeckSlot(this.save, index, ref.row, ref.slot, heroId);
     SaveSystem.save(this.save);
     if (twin && (twin.row !== ref.row || twin.slot !== ref.slot)) {
-      showToast(this, '同じキャラは編成に1体までです。前の枠から移しました', '#ffd9a0');
+      showToast(this, t('hero.roster.toastTwinMoved'), '#ffd9a0');
     }
     this.armedHeroId = null;
     this.targetSlot = null;
@@ -632,7 +633,7 @@ export class RosterScene extends Phaser.Scene {
     const index = this.editingDeck!;
     // The deck in use can't be emptied: it would send an empty party to fight.
     if (index === this.save.activeDeck && SaveSystem.countDeckHeroes(this.save, index) <= 1) {
-      showToast(this, '使用中のデッキは最低1体必要です', '#ff8a8a');
+      showToast(this, t('hero.roster.toastKeepOne'), '#ff8a8a');
       return;
     }
     SaveSystem.setDeckSlot(this.save, index, ref.row, ref.slot, null);
@@ -643,11 +644,11 @@ export class RosterScene extends Phaser.Scene {
 
   private useDeck(index: number): void {
     if (!SaveSystem.setActiveDeck(this.save, index)) {
-      showToast(this, '空のデッキは使用できません', '#ff8a8a');
+      showToast(this, t('hero.roster.toastEmptyDeck'), '#ff8a8a');
       return;
     }
     SaveSystem.save(this.save);
-    showToast(this, `「${this.save.decks[index].name}」を使用中にしました`);
+    showToast(this, t('hero.roster.toastDeckActive', { name: this.save.decks[index].name }));
     this.queueRender();
   }
 
@@ -657,17 +658,17 @@ export class RosterScene extends Phaser.Scene {
   }
 
   private onAddDeck(): void {
-    this.promptDeckName('新しいデッキを作成', defaultDeckName(this.save.decks), 'このままOKを押しても作成できます', (name) => {
+    this.promptDeckName(t('hero.roster.newDeckTitle'), defaultDeckName(this.save.decks), t('hero.roster.newDeckHint'), (name) => {
       const index = SaveSystem.addDeck(this.save, name);
       if (index === null) return;
       SaveSystem.save(this.save);
-      showToast(this, `「${this.save.decks[index].name}」を作成しました`);
+      showToast(this, t('hero.roster.toastDeckCreated', { name: this.save.decks[index].name }));
       this.startEditing(index);
     });
   }
 
   private onRename(index: number): void {
-    this.promptDeckName('デッキ名を変更', this.save.decks[index].name, '書き換えてOKを押してください', (name) => {
+    this.promptDeckName(t('hero.roster.renameTitle'), this.save.decks[index].name, t('hero.roster.renameHint'), (name) => {
       SaveSystem.renameDeck(this.save, index, name);
       SaveSystem.save(this.save);
       this.queueRender();
@@ -679,25 +680,25 @@ export class RosterScene extends Phaser.Scene {
     SaveSystem.save(this.save);
     this.targetSlot = null;
     this.armedHeroId = null;
-    showToast(this, 'お任せ編成しました');
+    showToast(this, t('hero.roster.toastAutoParty'));
     this.queueRender();
   }
 
   private onDeleteDeck(index: number): void {
     if (index === this.save.activeDeck) {
-      showToast(this, '使用中のデッキは削除できません', '#ff8a8a');
+      showToast(this, t('hero.roster.toastDeleteActive'), '#ff8a8a');
       return;
     }
     const name = this.save.decks[index].name;
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
-      title: 'デッキを削除',
-      message: `「${name}」を削除しますか？\nこの操作は元に戻せません`,
-      confirmLabel: '削除する',
+      title: t('hero.roster.deleteTitle'),
+      message: t('hero.roster.deleteMessage', { name }),
+      confirmLabel: t('hero.roster.deleteConfirm'),
       onConfirm: () => {
         if (!SaveSystem.removeDeck(this.save, index)) return;
         SaveSystem.save(this.save);
-        showToast(this, `「${name}」を削除しました`);
+        showToast(this, t('hero.roster.toastDeckDeleted', { name }));
         this.finishEditing();
       },
     });

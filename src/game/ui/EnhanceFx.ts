@@ -4,6 +4,7 @@ import type { CharacterGenerator } from '../characters/CharacterGenerator';
 import { MAX_PHASE, type HeroData } from '../types';
 import { HeroSlot } from './HeroSlot';
 import { body } from './theme';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 /** Above the scene's popups (200), under the tutorial (300). */
@@ -26,10 +27,11 @@ export interface EnhanceFxOptions {
   materials?: HeroData[];
 }
 
-const LOOK: Record<EnhanceFxOptions['kind'], { title: string; color: number; text: string; stroke: string; palette: FxPalette }> = {
-  level: { title: 'LEVEL UP!', color: 0xffd23f, text: '#fff4a8', stroke: '#8a3a00', palette: 'gold' },
-  phase: { title: 'PHASE UP!', color: 0xb07bff, text: '#f0e4ff', stroke: '#3a1a7a', palette: 'violet' },
-  fuse: { title: '合成！', color: 0x5fe08a, text: '#e4ffee', stroke: '#0e5a3a', palette: 'green' },
+/** (title is looked up where it is drawn, so that it follows the language) */
+const LOOK: Record<EnhanceFxOptions['kind'], { title: () => string; color: number; text: string; stroke: string; palette: FxPalette }> = {
+  level: { title: () => 'LEVEL UP!', color: 0xffd23f, text: '#fff4a8', stroke: '#8a3a00', palette: 'gold' },
+  phase: { title: () => 'PHASE UP!', color: 0xb07bff, text: '#f0e4ff', stroke: '#3a1a7a', palette: 'violet' },
+  fuse: { title: () => tl('hero.fx.fuse'), color: 0x5fe08a, text: '#e4ffee', stroke: '#0e5a3a', palette: 'green' },
 };
 
 /** One shared set of spark emitters per scene (BattleFx), dropped when the scene shuts down. */
@@ -95,7 +97,7 @@ export function playEnhanceFx(scene: Phaser.Scene, opts: EnhanceFxOptions): void
   tween({ targets: slot, scale: 1, duration: 460, delay: 120, ease: 'Back.easeOut' });
 
   const title = scene.add
-    .text(CX, 250, look.title, { fontFamily: 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: opts.kind === 'fuse' ? '92px' : '78px', color: look.text, stroke: look.stroke, strokeThickness: 14 })
+    .text(CX, 250, look.title(), { fontFamily: 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: opts.kind === 'fuse' ? '92px' : '78px', color: look.text, stroke: look.stroke, strokeThickness: 14 })
     .setOrigin(0.5)
     .setScale(0)
     .setAlpha(0);
@@ -138,7 +140,7 @@ export function playEnhanceFx(scene: Phaser.Scene, opts: EnhanceFxOptions): void
         fx.celebrate(x0 + i * gap, y, look.palette);
       });
     }
-    popText(y + 66, `フェーズ ${opts.from} → ${opts.to}`, 36, '#e6d6ff', startAt);
+    popText(y + 66, tl('hero.fx.phaseFromTo', { from: opts.from, to: opts.to }), 36, '#e6d6ff', startAt);
     return startAt + gained * 360 + 300;
   };
 
@@ -202,7 +204,7 @@ export function playEnhanceFx(scene: Phaser.Scene, opts: EnhanceFxOptions): void
   let canClose = false;
   let closed = false;
   later(650, () => (canClose = true));
-  const hint = body(scene, CX, 1200, 'タップで閉じる', { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
+  const hint = body(scene, CX, 1200, tl('hero.fx.tapToClose'), { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
   layer.add(hint);
   later(doneAt, () => tween({ targets: hint, alpha: { from: 0, to: 0.85 }, duration: 600, yoyo: true, repeat: -1 }));
   dim.on('pointerup', () => {
