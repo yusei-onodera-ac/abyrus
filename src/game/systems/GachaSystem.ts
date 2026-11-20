@@ -5,6 +5,7 @@ import type { EquipmentItem, HeroData, Rarity } from '../types';
 import { EquipmentSystem } from './EquipmentSystem';
 import type { SaveData } from './SaveSystem';
 import { recordMission } from './MissionProgress';
+import { t } from '../i18n';
 
 export interface RateRow {
   rarity: Rarity;
@@ -110,14 +111,14 @@ export function ratesOf(banner: GachaBannerEntry): RateRow[] {
 
 /** The ten-pull promise of a banner as a sentence for the player, or null for a banner without one. */
 export function tenPullNote(banner: GachaBannerEntry): string | null {
-  return banner.tenMin ? `10連のうち1体は、必ず★${banner.tenMin}以上です。` : null;
+  return banner.tenMin ? t('gacha.tenPullNote', { tenMin: banner.tenMin }) : null;
 }
 
 /** The ピックアップ line of a banner for a player ("★5 星導のアストラ ／ ★4 閃光のノヴァ…"), or null for a banner without one. */
 export function pickupNote(banner: GachaBannerEntry): string | null {
   const picks = pickupHeroesOf(banner);
   if (picks.length === 0) return null;
-  return [...picks].sort((a, b) => b.rarity - a.rarity).map((h) => `★${h.rarity} ${h.name}`).join('　');
+  return [...picks].sort((a, b) => b.rarity - a.rarity).map((h) => `★${h.rarity} ${h.name}`).join('　'); // i18n-ignore (a separator)
 }
 
 export function costOf(banner: GachaBannerEntry, count: 1 | 10): number {

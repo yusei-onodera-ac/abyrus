@@ -6,6 +6,7 @@ import { openModal, type ModalHandle } from './Modal';
 import { createDivider, createPanel } from './Panel';
 import { ScrollView } from './ScrollView';
 import { heading, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -24,7 +25,7 @@ export function openDocument(scene: Phaser.Scene, scroll: ScrollView, doc: Legal
   modal.add(createPanel(scene, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false }));
   modal.add(scene.add.zone(360, cy, w, h).setInteractive());
   modal.add(heading(scene, 360, top + 50, doc.title, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-  modal.add(wrappedText(scene, 360, top + 90, `最終更新日：${doc.updatedAt}`, inner, { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0.5, 0));
+  modal.add(wrappedText(scene, 360, top + 90, t('settings.document.updated', { updatedAt: doc.updatedAt }), inner, { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0.5, 0));
 
   const viewTop = top + 128;
   modal.add(createDivider(scene, 360, viewTop - 8, inner, CHROME.brassDark));
@@ -49,6 +50,6 @@ export function openDocument(scene: Phaser.Scene, scroll: ScrollView, doc: Legal
     view.destroy();
     handle.close();
   };
-  modal.add(new Button(scene, 360, top + h - 56, 240, 68, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
+  modal.add(new Button(scene, 360, top + h - 56, 240, 68, t('common.close'), close, { variant: 'wood', fontSize: '24px' }));
   return { container: modal, close };
 }

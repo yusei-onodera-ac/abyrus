@@ -23,6 +23,7 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 type ShopTab = 'gems' | 'items';
 
@@ -36,11 +37,11 @@ const CARD_GAP = 12;
 const GOOD_SLOT = 104;
 const PRICE_W = 190;
 
-const BLOCK_TEXT: Record<BlockReason, string> = {
-  not_started: 'まだ販売前です',
-  ended: '販売は終了しました',
-  sold_out: '購入できる回数を超えています',
-  stamina_full: 'スタミナはすでに満タンです',
+const BLOCK_TEXT: Record<BlockReason, PlainKey> = {
+  not_started: 'shop.blocked.notStarted',
+  ended: 'shop.blocked.ended',
+  sold_out: 'shop.blocked.soldOut',
+  stamina_full: 'shop.blocked.staminaFull',
 };
 
 /** Which tab and which section a top-bar + button lands on. */
@@ -51,10 +52,10 @@ const yen = (n: number): string => `¥${n.toLocaleString('ja-JP')}`;
 /** A product's contents, one good per line: "魔晶石 ×300". */
 /** How many of a good the player holds, as a line for its card. */
 function heldLine(save: SaveData, type: GoodType): string {
-  if (type === 'stamina') return `スタミナ ${save.stamina[0]} / ${save.stamina[1]}`;
-  if (type === 'phaseMaterials') return `所持 ${save.phaseMaterials.toLocaleString('ja-JP')}個`;
-  if (type === 'skillEssence') return `所持 ${save.skillEssence.toLocaleString('ja-JP')}`;
-  if (isItemId(type)) return `所持 ${SaveSystem.getItem(save, type).toLocaleString('ja-JP')}個`;
+  if (type === 'stamina') return t('shop.staminaNow', { stamina: save.stamina[0], stamina2: save.stamina[1] });
+  if (type === 'phaseMaterials') return t('shop.held.phaseMaterials', { phaseMaterials: save.phaseMaterials.toLocaleString('ja-JP') });
+  if (type === 'skillEssence') return t('shop.held.skillEssence', { skillEssence: save.skillEssence.toLocaleString('ja-JP') });
+  if (isItemId(type)) return t('shop.held.item', { getItem: SaveSystem.getItem(save, type).toLocaleString('ja-JP') });
   return '';
 }
 
@@ -64,7 +65,7 @@ function goodLines(goods: Good[]): string[] {
 
 function priceText(price: Price): string {
   if (price.currency === 'yen') return yen(price.amount);
-  return `${price.currency === 'gems' ? '魔晶石' : 'ゴールド'} ${price.amount.toLocaleString('ja-JP')}`;
+  return t(price.currency === 'gems' ? 'shop.price.gems' : 'shop.price.gold', { amount: price.amount.toLocaleString('ja-JP') });
 }
 
 /** ショップ: two shops under one tab. The 魔晶石ショップ sells お得パック and
@@ -75,7 +76,9 @@ function priceText(price: Price): string {
  *  Real-money purchases go through PaymentSystem, which has no real store behind
  *  it yet (see there): a dev build "pays" for free, a production build refuses. */
 export class ShopScene extends InboxScene {
-  protected readonly screenTitle = 'ショップ';
+  protected get screenTitle(): string {
+    return t('shop.title');
+  }
   protected emptyText = '';
   protected readonly navTab: NavTab = 'shop';
   protected readonly toolbarHeight = 76;
@@ -113,8 +116,8 @@ export class ShopScene extends InboxScene {
     const strip = buildTabStrip(
       this,
       [
-        { key: 'gems', label: '魔晶石ショップ' },
-        { key: 'items', label: 'アイテムショップ' },
+        { key: 'gems', label: t('shop.tab.gems') },
+        { key: 'items', label: t('shop.tab.items') },
       ],
       this.tab,
       SCREEN_VIEW.w,
@@ -152,25 +155,25 @@ export class ShopScene extends InboxScene {
     };
 
     if (this.tab === 'gems') {
-      add(this.sectionCard('プレミアムパス', PremiumSystem.isActive(this.save) ? `加入中（あと${PremiumSystem.daysLeft(this.save)}日）` : `月額 ${yen(PREMIUM.yen)}`), 'premium');
+      add(this.sectionCard(t('shop.premiumPass'), PremiumSystem.isActive(this.save) ? t('shop.section.premiumActive', { daysLeft: PremiumSystem.daysLeft(this.save) }) : t('shop.section.premiumMonthly', { yen: yen(PREMIUM.yen) })), 'premium');
       add(buildPremiumBenefitsCard(this));
       add(buildPremiumPackCard(this));
       add(buildPremiumActionCard(this, this.save, { guard: () => this.scroll.isTap(), onBuy: () => this.buyPremium(), onClaimDaily: () => this.claimPremiumDaily() }));
       const packs = ShopSystem.visible(PACKS, now);
       if (packs.length > 0) {
-        add(this.sectionCard('お得パック', '円・魔晶石で購入'), 'packs');
+        add(this.sectionCard(t('shop.section.packs'), t('shop.section.packsNote')), 'packs');
         for (const pack of packs) add(this.packCard(pack, now));
       }
-      add(this.sectionCard('魔晶石', '価格は税込です'), 'gems');
+      add(this.sectionCard(t('shop.gems'), t('shop.section.gemsNote')), 'gems');
       for (const product of ShopSystem.visible(GEM_PRODUCTS, now)) add(this.currencyCard(product));
-      add(this.sectionCard('ゴールド', '魔晶石で購入できます'), 'gold');
+      add(this.sectionCard(t('shop.gold'), t('shop.section.goldNote')), 'gold');
       for (const product of ShopSystem.visible(GOLD_PRODUCTS, now)) add(this.currencyCard(product));
       add(this.legalCard());
     } else {
       const { stamina } = this.save;
-      add(this.sectionCard('スタミナ回復', `スタミナ ${stamina[0]} / ${stamina[1]}`), 'stamina');
+      add(this.sectionCard(t('shop.section.stamina'), t('shop.staminaNow', { stamina: stamina[0], stamina2: stamina[1] })), 'stamina');
       for (const item of ShopSystem.visible(ITEM_PRODUCTS, now).filter((p) => p.category === 'stamina')) add(this.itemCard(item, now));
-      add(this.sectionCard('育成素材', `フェーズ素材 ${this.save.phaseMaterials}個　技素 ${this.save.skillEssence.toLocaleString('ja-JP')}`), 'materials');
+      add(this.sectionCard(t('shop.section.materials'), t('shop.section.materialsNote', { phaseMaterials: this.save.phaseMaterials, skillEssence: this.save.skillEssence.toLocaleString('ja-JP') })), 'materials');
       for (const item of ShopSystem.visible(ITEM_PRODUCTS, now).filter((p) => p.category === 'material')) add(this.itemCard(item, now));
     }
     return cards;
@@ -276,7 +279,7 @@ export class ShopScene extends InboxScene {
     );
     let tagX = textX;
     if (product.bonus) {
-      const chip = buildChip(this, tagX, cy + 22, `おまけ +${product.bonus.toLocaleString('ja-JP')}`, { fill: 0x9a4a12, color: '#ffe9b8', fontSize: 17 });
+      const chip = buildChip(this, tagX, cy + 22, t('shop.bonus', { bonus: product.bonus.toLocaleString('ja-JP') }), { fill: 0x9a4a12, color: '#ffe9b8', fontSize: 17 });
       container.add(chip.container);
       tagX += chip.width + 8;
     }
@@ -318,11 +321,11 @@ export class ShopScene extends InboxScene {
   private legalCard(): InboxCard {
     const height = 138;
     const card = this.shell(height);
-    card.container.add(caption(this, CARD_WIDTH / 2, 26, '表示価格はすべて消費税込みです。', { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    card.container.add(caption(this, CARD_WIDTH / 2, 26, t('shop.taxNote'), { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
     const w = (CARD_WIDTH - PAD * 2 - 14) / 2;
     const guard = () => this.scroll.isTap();
-    card.container.add(new Button(this, PAD + w / 2, 88, w, 60, '特定商取引法に基づく表記', () => this.openLegal('commerce'), { variant: 'wood', fontSize: '19px', guard }));
-    card.container.add(new Button(this, CARD_WIDTH - PAD - w / 2, 88, w, 60, '資金決済法に基づく表示', () => this.openLegal('funds'), { variant: 'wood', fontSize: '19px', guard }));
+    card.container.add(new Button(this, PAD + w / 2, 88, w, 60, t('shop.legal.commerce'), () => this.openLegal('commerce'), { variant: 'wood', fontSize: '19px', guard }));
+    card.container.add(new Button(this, CARD_WIDTH - PAD - w / 2, 88, w, 60, t('shop.legal.funds'), () => this.openLegal('funds'), { variant: 'wood', fontSize: '19px', guard }));
     return card;
   }
 
@@ -338,15 +341,15 @@ export class ShopScene extends InboxScene {
     const limit = describeLimit(product);
     if (limit) {
       const left = ShopSystem.remaining(this.save, product, now);
-      parts.push(left === null ? limit : `${limit}（残り${left}回）`);
+      parts.push(left === null ? limit : t('shop.limit.withLeft', { limit, left }));
       if (left === 0) color = '#ff9a7a';
     }
     const end = ShopSystem.endsAt(product);
     if (end !== null) {
-      parts.push(`販売期間：${formatDateTime(end)}まで（${formatRemaining(end - now)}）`);
+      parts.push(t('shop.limit.saleEnds', { formatDateTime: formatDateTime(end), formatRemaining: formatRemaining(end - now) }));
       if (end - now < 3 * 86_400_000) color = '#ffb07a';
     }
-    return parts.length > 0 ? { text: parts.join('　'), color } : null;
+    return parts.length > 0 ? { text: parts.join('　'), color } : null; // i18n-ignore (a separator)
   }
 
   // --- buying -----------------------------------------------------------
@@ -357,11 +360,11 @@ export class ShopScene extends InboxScene {
     const onTap = () => this.onBuy(product);
     const blocked = ShopSystem.blocked(this.save, product, Date.now());
     if (blocked) {
-      const label = blocked === 'sold_out' ? '購入済み' : blocked === 'stamina_full' ? '満タン' : '販売外';
+      const label = blocked === 'sold_out' ? t('shop.button.soldOut') : blocked === 'stamina_full' ? t('shop.button.full') : t('shop.button.unavailable');
       return new Button(this, x, y, w, h, label, onTap, { variant: 'wood', fontSize: '24px', guard }).setEnabled(false);
     }
     const { price } = product;
-    if (price.currency === 'yen') return new Button(this, x, y, w, h, yen(price.amount), onTap, { variant: 'gold', fontSize: '30px', subLabel: '税込', guard });
+    if (price.currency === 'yen') return new Button(this, x, y, w, h, yen(price.amount), onTap, { variant: 'gold', fontSize: '30px', subLabel: t('shop.taxIncluded'), guard });
     // 魔晶石 / ゴールド: the currency's own icon in front of the amount.
     const button = new Button(this, x, y, w, h, '', onTap, { variant: 'gold', guard });
     const icon = addGoodIcon(this, price.currency, 0, 0, 40);
@@ -379,7 +382,7 @@ export class ShopScene extends InboxScene {
     if (this.paying) return;
     const blocked = ShopSystem.blocked(this.save, product, Date.now());
     if (blocked) {
-      showToast(this, BLOCK_TEXT[blocked], '#ff8a8a');
+      showToast(this, t(BLOCK_TEXT[blocked]), '#ff8a8a');
       return;
     }
     const { currency } = product.price;
@@ -397,12 +400,13 @@ export class ShopScene extends InboxScene {
 
   /** Not enough 魔晶石 / ゴールド: offer to go and buy some. */
   private offerTopUp(currency: 'gems' | 'gold', short: number): void {
-    const name = currency === 'gems' ? '魔晶石' : 'ゴールド';
+    const gems = currency === 'gems';
+    const amount = Math.ceil(short).toLocaleString('ja-JP');
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
-      title: `${name}が足りません`,
-      message: `あと${name} ${Math.ceil(short).toLocaleString('ja-JP')} 必要です。\n${name}を購入しますか？`,
-      confirmLabel: `${name}を購入`,
+      title: gems ? t('shop.topUp.notEnoughGems') : t('shop.topUp.notEnoughGold'),
+      message: gems ? t('shop.topUp.needMoreGems', { short: amount }) : t('shop.topUp.needMoreGold', { short: amount }),
+      confirmLabel: gems ? t('shop.topUp.buyGems') : t('shop.topUp.buyGold'),
       confirmVariant: 'gold',
       onConfirm: () => this.openShop(currency),
     });
@@ -410,13 +414,13 @@ export class ShopScene extends InboxScene {
 
   private confirm(product: ShopProduct): void {
     const gateway = PaymentSystem.getGateway();
-    const lines = [product.name, ...goodLines(product.goods), '', `${priceText(product.price)}${product.price.currency === 'yen' ? '（税込）' : ''}で購入しますか？`];
-    if (product.price.currency === 'yen' && gateway.isTest) lines.push('※開発版のテスト購入です。実際には課金されません。');
+    const lines = [product.name, ...goodLines(product.goods), '', t(product.price.currency === 'yen' ? 'shop.confirm.buyYen' : 'shop.confirm.buy', { price: priceText(product.price) })];
+    if (product.price.currency === 'yen' && gateway.isTest) lines.push(t('shop.confirm.devNote'));
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
-      title: '購入確認',
+      title: t('shop.confirm.title'),
       message: lines.join('\n'),
-      confirmLabel: '購入する',
+      confirmLabel: t('shop.buy'),
       confirmVariant: 'gold',
       onConfirm: () => (product.price.currency === 'yen' ? this.pay(product) : this.buyWithCurrency(product)),
     });
@@ -426,7 +430,7 @@ export class ShopScene extends InboxScene {
     const result = ShopSystem.buyWithCurrency(this.save, product);
     if (!result.ok) {
       if (result.reason === 'gems' || result.reason === 'gold') this.offerTopUp(result.reason, ShopSystem.shortfall(this.save, product));
-      else showToast(this, BLOCK_TEXT[result.reason], '#ff8a8a');
+      else showToast(this, t(BLOCK_TEXT[result.reason]), '#ff8a8a');
       return;
     }
     SaveSystem.save(this.save);
@@ -454,14 +458,14 @@ export class ShopScene extends InboxScene {
           return;
         }
         if (!this.scene.isActive()) return;
-        if (result.status === 'unavailable') showToast(this, '決済は準備中のため、まだ購入できません', '#ff8a8a');
-        else if (result.status === 'failed') showToast(this, '購入できませんでした。もう一度お試しください', '#ff8a8a');
+        if (result.status === 'unavailable') showToast(this, t('shop.toast.paymentNotReady'), '#ff8a8a');
+        else if (result.status === 'failed') showToast(this, t('shop.toast.purchaseFailed'), '#ff8a8a');
       });
   }
 
   /** What a purchase handed over, shown as a popup with a 確認 button. */
   private announce(product: ShopProduct, goods: Good[]): void {
     this.modal?.close();
-    this.modal = showRewardModal(this, this.scroll, { title: '購入完了', note: product.name, tiles: tilesForGoods(goods) });
+    this.modal = showRewardModal(this, this.scroll, { title: t('shop.purchaseComplete'), note: product.name, tiles: tilesForGoods(goods) });
   }
 }

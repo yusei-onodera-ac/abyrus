@@ -1,2 +1,40 @@
 // Japanese (source) messages: gacha.* (see docs/I18N.md)
-export const gacha = {} as const;
+export const gacha = {
+  // GachaDetailScene.ts / GachaPanels.ts (written by hand)
+  'gacha.detail.title': 'ガチャ詳細',
+  'gacha.detail.periodRange': '開催期間：{start} 〜 {end}',
+  'gacha.detail.periodEnd': '開催期間：{end}まで',
+  'gacha.detail.heroCount': '{count}体',
+  'gacha.detail.gearCount': '{count}種',
+  'gacha.detail.rateUpChip': 'PICK UP',
+  'gacha.banner.titleEnds': '{title}　{end}まで',
+  // GachaScene.ts
+  'gacha.title': 'ガチャ',
+  'gacha.toast.friendSoon': 'フレンドガチャ: 準備中です',
+  'gacha.noBanners': '開催中のガチャはありません',
+  'gacha.toast.notEnoughGems': '魔晶石が足りません',
+  'gacha.gearAddedNote': '装備はバッグに入りました（装備画面で確認・強化できます）',
+  'gacha.tapHeroHint': 'キャラをタップすると、詳細を見られます',
+  'gacha.tenPullNote': '10連のうち1体は、必ず★{tenMin}以上です。',
+  // GachaDetailScene.ts
+  'gacha.detail.price': '1回 {costOf} 魔晶石　／　10連 {costOf2} 魔晶石',
+  'gacha.detail.rateUpLine': '【ピックアップ】{pickup}',
+  'gacha.detail.pityRateUp': '【天井】{at}回目のガチャで、ピックアップの★{minRarity}以上が必ず1体出ます。',
+  'gacha.detail.pity': '【天井】{at}回目のガチャで、★{minRarity}以上が必ず1体出ます。',
+  'gacha.detail.pityReset': '★{minRarity}以上が出ると、回数は0に戻ります。（現在 あと{left}回で確定）',
+  'gacha.detail.noPity': 'このガチャに天井はありません。',
+  'gacha.detail.tenGuarantee': '【10連保証】{ten}',
+  'gacha.detail.previewHint': 'キャラをタップすると、レベル・フェーズ・スキルが最大のときの姿を見られます。',
+  'gacha.detail.duplicateNote': 'すでに持っているキャラも、名鑑に増えます。（編成に入れられるのは、同じキャラ1体まで）',
+  'gacha.detail.rates': '排出率',
+  // GachaPanels.ts
+  'gacha.bannerSoon': 'バナー準備中',
+  'gacha.friendSummon': 'フレンドガチャ',
+  'gacha.banner.pityRateUpNext': '次の1回でピックアップが確定！',
+  'gacha.banner.pityRateUpIn': 'あと{left}回でピックアップ確定',
+  'gacha.banner.pityNext': '次の1回で★{minRarity}以上が確定！',
+  'gacha.banner.pityIn': 'あと{left}回で★{minRarity}以上が確定',
+  'gacha.banner.single': 'シングルガチャ',
+  'gacha.banner.cost': '{costOf} 魔晶石',
+  'gacha.banner.ten': '10連ガチャ',
+} as const;

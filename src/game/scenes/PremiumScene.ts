@@ -4,6 +4,7 @@ import { buildPremiumActionCard, buildPremiumBenefitsCard, buildPremiumPackCard,
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t } from '../i18n';
 
 /** プレミアムパス: what it gives, whether the player has it (and for how long),
  *  buying or renewing it through PaymentSystem, and taking the day's 魔晶石. It
@@ -11,7 +12,9 @@ import { InboxScene, type InboxCard } from './InboxScene';
  *  are shown in the shop (ui/PremiumPanels.ts). There is no store behind it
  *  yet: it does not renew by itself. */
 export class PremiumScene extends InboxScene {
-  protected readonly screenTitle = 'プレミアムパス';
+  protected get screenTitle(): string {
+    return t('shop.premiumPass');
+  }
   protected emptyText = '';
   private paying = false;
   /** Set when opened over a paused fight (from the 2倍速 button): 戻る then carries the fight on instead of going to イベント. */
@@ -43,7 +46,7 @@ export class PremiumScene extends InboxScene {
 
   protected openShop(focus: ShopFocus): void {
     // The fight underneath would be lost: the shop is for after it.
-    if (this.overlayOf) showToast(this, '戦闘中はショップを開けません');
+    if (this.overlayOf) showToast(this, t('shop.toast.noShopInBattle'));
     else super.openShop(focus);
   }
 

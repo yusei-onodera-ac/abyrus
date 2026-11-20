@@ -1,6 +1,6 @@
 import type { SaveData } from './SaveSystem';
 import pkg from '../../../package.json';
-import { defaultLanguageForNewSave, isLanguage, SOURCE_LANGUAGE, type Language } from '../i18n';
+import { defaultLanguageForNewSave, isLanguage, SOURCE_LANGUAGE, type Language, type PlainKey } from '../i18n';
 
 export const APP_VERSION: string = pkg.version;
 
@@ -47,13 +47,18 @@ export interface Report {
   sent: boolean;
 }
 
-export const INQUIRY_CATEGORIES = ['ゲームの内容', 'お支払い・購入', 'アカウント', 'ご意見・ご要望', 'その他'];
-export const BUG_CATEGORIES = ['表示がおかしい', '操作できない・固まる', '数値・報酬が違う', '落ちる・動かない', 'その他'];
+/** What a report stores as its category: Japanese text by design (it is what the operator reads, and what is already saved in
+ *  old reports). The player sees the *_LABELS below instead (same order): translate the label, never these. */
+export const INQUIRY_CATEGORIES = ['ゲームの内容', 'お支払い・購入', 'アカウント', 'ご意見・ご要望', 'その他']; // i18n-ignore (stored value)
+export const BUG_CATEGORIES = ['表示がおかしい', '操作できない・固まる', '数値・報酬が違う', '落ちる・動かない', 'その他']; // i18n-ignore (stored value)
 
-export const NOTIFICATION_LABEL: Record<NotificationKind, string> = {
-  news: 'お知らせ・イベント',
-  stamina: 'スタミナ回復',
-  social: 'フレンド・メッセージ',
+export const INQUIRY_CATEGORY_LABELS: PlainKey[] = ['settings.inquiry.game', 'settings.inquiry.payment', 'settings.account', 'settings.inquiry.feedback', 'settings.other'];
+export const BUG_CATEGORY_LABELS: PlainKey[] = ['settings.bug.display', 'settings.bug.freeze', 'settings.bug.values', 'settings.bug.crash', 'settings.other'];
+
+export const NOTIFICATION_LABEL: Record<NotificationKind, PlainKey> = {
+  news: 'settings.notify.news',
+  stamina: 'settings.notify.stamina',
+  social: 'settings.notify.social',
 };
 
 const VOLUME_DEFAULT = 7;
