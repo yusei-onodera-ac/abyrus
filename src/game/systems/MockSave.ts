@@ -1,7 +1,7 @@
 import { REGION_COUNT } from '../data/regions';
 import { EXTRA_STAGE_COUNT, FINAL_STAGE_INDEX } from './ProgressionSystem';
 import { HERO_ROSTER, createHeroInstance } from '../data/heroes';
-import { SaveSystem, type SaveData } from './SaveSystem';
+import { SaveSystem, TUTORIAL_REV, type SaveData } from './SaveSystem';
 
 /** Development only: `?mock=allheroes` gives one copy of every character; `?mock=allclear` on the address puts the save in the state
  *  of a player who has finished everything - all 150 main stages, the final
@@ -16,7 +16,7 @@ export function applyMockFromUrl(save: SaveData): boolean {
   const which = params.get('mock');
   if (which === 'tutorial') {
     // A brand-new player: opening story and tutorial start over (progress is left alone).
-    save.tutorial = { opening: false, step: 0, done: false, village: { step: 0, done: false } };
+    save.tutorial = { opening: false, step: 0, done: false, village: { step: 0, done: false }, rev: TUTORIAL_REV };
     save.stageProgress = 0;
     SaveSystem.save(save);
     params.delete('mock');

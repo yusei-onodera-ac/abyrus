@@ -1,5 +1,6 @@
 import type { Reward } from './rewards';
 import type { RuriPortrait } from './storyScript';
+import { TRANSFER_TEXT } from './transferText';
 
 /**
  * チュートリアル: the pet (ルリ) walks a new player through the game, in text and - when
@@ -10,6 +11,9 @@ import type { RuriPortrait } from './storyScript';
  *  - advance 'tap'    the player taps to go on (a highlighted `target` is only shown)
  *  - advance 'target' the player has to press the highlighted spot, which then does its
  *                     normal job (so the step is finished by doing the thing)
+ *  - advance 'name'   the player types their name (or carries their data over from another
+ *                     device instead): only the very first step of a brand-new save, and it can
+ *                     not be skipped (see TutorialSystem.confirmName / ui/TutorialOverlay.ts)
  *  - on 'result'      shown when the fight's result panel appears, not when the screen opens
  *
  * Coordinates are in game pixels (the screen is 720 x 1280) as a top-left rectangle.
@@ -29,7 +33,7 @@ export interface TutorialStep {
   /** What she says: one line per entry, shown together. */
   lines: string[];
   target?: TutorialRect;
-  advance: 'tap' | 'target';
+  advance: 'tap' | 'target' | 'name';
   /** Her expression while she says it (default 'normal'). */
   mood?: RuriPortrait;
 }
@@ -37,6 +41,14 @@ export interface TutorialStep {
 const HOME_TAB: TutorialRect = { x: 288, y: 1156, w: 144, h: 124 };
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
+  {
+    // No voice file for this one (public/assets/voice/name_entry.mp3 is simply not played if it is missing).
+    id: 'name_entry',
+    mood: 'happy',
+    scene: 'Home',
+    lines: [...TRANSFER_TEXT.nameStep.lines],
+    advance: 'name',
+  },
   {
     id: 'home_welcome',
     mood: 'happy',
