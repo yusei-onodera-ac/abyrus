@@ -11,6 +11,7 @@ import { createPanel } from '../ui/Panel';
 import { drawScenery } from '../ui/StageMap';
 import { CHROME, COLORS, body, subheading } from '../ui/theme';
 import { enter } from '../ui/Transitions';
+import { t } from '../i18n';
 
 /** What flag (if any) to persist once the player reaches the end of this
  *  script, so re-entering the same trigger point later skips straight to
@@ -154,8 +155,8 @@ export class StoryScene extends Phaser.Scene {
     }
     const cover = this.add.container(0, 0).setDepth(4);
     cover.add(this.add.rectangle(360, 640, 720, 1280, 0x000000, 1).setInteractive());
-    cover.add(subheading(this, 360, 600, 'ムービー', { fontSize: '44px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
-    const tap = body(this, 360, 690, 'タップで再生', { fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    cover.add(subheading(this, 360, 600, t('quest.story.movie'), { fontSize: '44px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
+    const tap = body(this, 360, 690, t('quest.story.tapToPlay'), { fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     cover.add(tap);
     this.tweens.add({ targets: tap, alpha: { from: 1, to: 0.3 }, duration: 700, yoyo: true, repeat: -1 });
     cover.once('destroy', () => this.tweens.killTweensOf(tap));
@@ -209,7 +210,7 @@ export class StoryScene extends Phaser.Scene {
   }
 
   private buildSkipButton(): void {
-    const btn = new Button(this, 626, 62, 158, 60, 'スキップ', () => this.finish(), { variant: 'wood', fontSize: '24px' });
+    const btn = new Button(this, 626, 62, 158, 60, t('common.skip'), () => this.finish(), { variant: 'wood', fontSize: '24px' });
     btn.setDepth(6);
     enter(this, btn, { duration: 240 });
   }
@@ -353,7 +354,7 @@ export class StoryScene extends Phaser.Scene {
       this.nameplate = this.add.container(0, 0, [plate, text]).setDepth(4);
       enter(this, this.nameplate, { duration: 180, dy: 0, dx: -10 });
 
-      const badgeKey = speaker === 'ルリ' ? ruriTexture(this, portrait ?? 'normal') : this.silhouetteTexture();
+      const badgeKey = speaker === 'ルリ' ? ruriTexture(this, portrait ?? 'normal') : this.silhouetteTexture(); // i18n-ignore (the speaker's id in the story data)
       const badge = this.add.image(left + 66, top - 66, badgeKey).setOrigin(0.5).setDisplaySize(130, 130).setDepth(4);
       this.portrait = this.add.container(0, 0, [badge]).setDepth(4);
       enter(this, this.portrait, { duration: 220, dy: 12 });

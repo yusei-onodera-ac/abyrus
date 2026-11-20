@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SoundSystem } from '../systems/SoundSystem';
 import { body } from './theme';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 /** Under the movie (300), over the scene's popups (200): the movie covers this, and this covers the results being built. */
@@ -77,10 +78,10 @@ export function playGemDrop(scene: Phaser.Scene, opts: GemDropOptions): GemDropL
   }
 
   // ---- the words ----
-  const title = body(scene, 360, 150, '魔晶石を 魔法陣へ！', { fontSize: '44px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 8 }).setOrigin(0.5);
-  const sub = body(scene, 360, 208, 'ドラッグ、またはタップ', { fontSize: '26px', fontStyle: 'bold', color: '#cfe4ff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+  const title = body(scene, 360, 150, tl('battle.gemDrop.title'), { fontSize: '44px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 8 }).setOrigin(0.5);
+  const sub = body(scene, 360, 208, tl('battle.gemDrop.hint'), { fontSize: '26px', fontStyle: 'bold', color: '#cfe4ff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
   const arrow = body(scene, 360, HOME.y - 132, '▲', { fontSize: '40px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
-  const cost = body(scene, 360, HOME.y + 130, `魔晶石 ${opts.cost.toLocaleString('ja-JP')}`, { fontSize: '30px', fontStyle: 'bold', color: '#7cd6ff', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
+  const cost = body(scene, 360, HOME.y + 130, tl('battle.gemDrop.cost', { cost: opts.cost.toLocaleString('ja-JP') }), { fontSize: '30px', fontStyle: 'bold', color: '#7cd6ff', stroke: INK, strokeThickness: 6 }).setOrigin(0.5);
   layer.add([title, sub, arrow, cost]);
   scene.tweens.add({ targets: sub, alpha: { from: 1, to: 0.45 }, duration: 700, yoyo: true, repeat: -1 });
   scene.tweens.add({ targets: arrow, y: arrow.y - 16, duration: 480, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -112,7 +113,7 @@ export function playGemDrop(scene: Phaser.Scene, opts: GemDropOptions): GemDropL
   let idle: Phaser.Time.TimerEvent | undefined;
 
   const blackout = scene.add.rectangle(360, 640, 720, 1280, 0x000000, 1).setAlpha(0);
-  const skip = body(scene, 652, 64, 'スキップ', { fontSize: '24px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+  const skip = body(scene, 652, 64, tl('common.skip'), { fontSize: '24px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
   const skipZone = scene.add.zone(652, 64, 150, 60).setInteractive({ useHandCursor: true });
   layer.add([blackout, skip, skipZone]);
   layer.bringToTop(blackout);

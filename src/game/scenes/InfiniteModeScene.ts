@@ -20,6 +20,7 @@ import { LeaderboardSystem } from '../systems/LeaderboardSystem';
 import { formatSurvival } from '../ui/format';
 import { SoundSystem } from '../systems/SoundSystem';
 import { recordMission } from '../systems/MissionProgress';
+import { t } from '../i18n';
 
 type SceneState = 'running' | 'result';
 
@@ -175,7 +176,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.scene.pause();
     this.scene.launch('Pause', {
       of: 'InfiniteRun',
-      lines: ['戦闘はここで止まっています。'],
+      lines: [t('quest.infiniteMode.pauseNote')],
       onSuspend: () => {
         this.saveSuspended();
         this.scene.start('InfiniteMode');
@@ -261,16 +262,16 @@ export class InfiniteModeScene extends Phaser.Scene {
     this.stateContainer = container;
 
     container.add(createPanel(this, 360, 72, 696, 116, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
-    const retreatBtn = new Button(this, 104, 72, 160, 64, 'リタイア', () => this.retreat(), { variant: 'wood', fontSize: '24px' });
+    const retreatBtn = new Button(this, 104, 72, 160, 64, t('quest.infiniteMode.retire'), () => this.retreat(), { variant: 'wood', fontSize: '24px' });
     container.add(retreatBtn);
-    const pauseBtn = new Button(this, 236, 72, 92, 64, '一時停止', () => this.openPause(), { variant: 'wood', fontSize: '19px' });
+    const pauseBtn = new Button(this, 236, 72, 92, 64, t('quest.infiniteMode.pause'), () => this.openPause(), { variant: 'wood', fontSize: '19px' });
     container.add(pauseBtn);
 
     const style = (size: number, color: string) => ({ fontSize: `${size}px`, fontStyle: 'bold', color, stroke: INK, strokeThickness: 5 });
     const timeText = body(this, 356, 50, '0:00', style(36, '#ffe9b8')).setOrigin(0.5);
-    const scoreText = body(this, 356, 92, 'スコア 0', style(24, '#fff4dc')).setOrigin(0.5);
-    const diffText = body(this, 694, 50, '難易度 Lv.1', style(24, '#ffd9a0')).setOrigin(1, 0.5);
-    const killText = body(this, 694, 92, '撃破 0体', style(24, '#fff4dc')).setOrigin(1, 0.5);
+    const scoreText = body(this, 356, 92, t('quest.infiniteMode.scoreZero'), style(24, '#fff4dc')).setOrigin(0.5);
+    const diffText = body(this, 694, 50, t('quest.infiniteMode.difficultyStart'), style(24, '#ffd9a0')).setOrigin(1, 0.5);
+    const killText = body(this, 694, 92, t('quest.infiniteMode.killsZero'), style(24, '#fff4dc')).setOrigin(1, 0.5);
     container.add([timeText, diffText, killText, scoreText]);
     enter(this, container, { dy: -20, duration: 260 });
 
@@ -281,9 +282,9 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (!this.hud || !this.engine) return;
     const snap = this.engine.getSnapshot();
     this.hud.timeText.setText(formatSurvival(snap.survivalSeconds));
-    this.hud.diffText.setText(`難易度 Lv.${Math.floor(snap.difficultyIndex) + 1}`);
-    this.hud.killText.setText(`撃破 ${snap.enemiesDefeated}体`);
-    this.hud.scoreText.setText(`スコア ${snap.score.toLocaleString('ja-JP')}`);
+    this.hud.diffText.setText(t('quest.infiniteMode.difficulty', { difficultyIndex: Math.floor(snap.difficultyIndex) + 1 }));
+    this.hud.killText.setText(t('quest.infiniteMode.kills', { enemiesDefeated: snap.enemiesDefeated }));
+    this.hud.scoreText.setText(t('quest.infiniteMode.score', { score: snap.score.toLocaleString('ja-JP') }));
   }
 
   private createUnitView(unit: UnitInstance, x: number, y: number, isPlayer: boolean, entrance = false): void {
@@ -380,7 +381,7 @@ export class InfiniteModeScene extends Phaser.Scene {
     const target = targetView.sprite;
     this.anim.lunge(attackerView.sprite, target);
     if (event.blocked) {
-      this.popups.pop(target.x, target.y - 30, event.damage, { label: '無敵' });
+      this.popups.pop(target.x, target.y - 30, event.damage, { label: t('quest.infiniteMode.immune') });
       this.fx.block(target.x, target.y);
       return;
     }
@@ -414,7 +415,7 @@ export class InfiniteModeScene extends Phaser.Scene {
         const pos = this.computePlayerUnitPosition(unit);
         this.createUnitView(unit, pos.x, pos.y, true);
         const view = this.views.get(unit.id);
-        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', '復活');
+        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', t('quest.infiniteMode.revive'));
         if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
         continue;
       }
@@ -443,16 +444,16 @@ export class InfiniteModeScene extends Phaser.Scene {
         this.fx.status(x, y, 'heal');
       } else if (result.buffAtk || result.buffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.gold);
-        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? '攻防UP' : result.buffAtk ? '攻撃UP' : '防御UP');
+        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? t('quest.infiniteMode.atkDefUp') : result.buffAtk ? t('quest.infiniteMode.atkUp') : t('quest.infiniteMode.defUp'));
       } else if (result.debuffAtk || result.debuffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
-        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? '攻防DOWN' : result.debuffAtk ? '攻撃DOWN' : '防御DOWN');
+        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? t('quest.infiniteMode.atkDefDown') : result.debuffAtk ? t('quest.infiniteMode.atkDown') : t('quest.infiniteMode.defDown'));
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
-        this.fx.status(x, y, 'stun', 'スタン');
+        this.fx.status(x, y, 'stun', t('quest.infiniteMode.stun'));
       } else if (result.invincible) {
         this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
-        this.fx.status(x, y, 'invincible', '無敵');
+        this.fx.status(x, y, 'invincible', t('quest.infiniteMode.immune'));
       }
     }
     return hold;
@@ -550,20 +551,20 @@ export class InfiniteModeScene extends Phaser.Scene {
     panel.setScale(0.9);
     popIn(this, panel, { duration: 320, delay: 80 });
 
-    const title = heading(this, 360, top + 62, 'ランアウト', { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
+    const title = heading(this, 360, top + 62, t('quest.infiniteMode.runOver'), { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     container.add(title);
     title.setScale(0);
     popIn(this, title, { duration: 340, delay: 160 });
 
-    const scoreText = body(this, 360, top + 148, `スコア ${result.score.toLocaleString('ja-JP')}`, { fontSize: '44px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
+    const scoreText = body(this, 360, top + 148, t('quest.infiniteMode.score', { score: result.score.toLocaleString('ja-JP') }), { fontSize: '44px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     container.add(scoreText);
     enter(this, scoreText, { dy: 12, delay: 300 });
 
     const rows: [string, string][] = [
-      ['生存時間', formatSurvival(result.survivalSeconds)],
-      ['撃破数', `${result.enemiesDefeated.toLocaleString('ja-JP')}体`],
-      ['到達難易度', `Lv.${Math.floor(result.difficultyReached) + 1}`],
-      ['獲得', `${skillEssenceGained.toLocaleString('ja-JP')} 技素`],
+      [t('quest.infiniteMode.survivalTime'), formatSurvival(result.survivalSeconds)],
+      [t('quest.infiniteMode.enemiesDefeated'), t('quest.infiniteMode.enemiesDefeatedValue', { enemiesDefeated: result.enemiesDefeated.toLocaleString('ja-JP') })],
+      [t('quest.infiniteMode.difficultyReached'), `Lv.${Math.floor(result.difficultyReached) + 1}`],
+      [t('quest.infiniteMode.reward'), t('quest.infiniteMode.skillEssenceReward', { skillEssenceGained: skillEssenceGained.toLocaleString('ja-JP') })],
     ];
     rows.forEach(([label, value], i) => {
       const y = top + 222 + i * 48;
@@ -572,14 +573,14 @@ export class InfiniteModeScene extends Phaser.Scene {
     });
 
     if (isNewLocalBest) {
-      container.add(body(this, 360, top + 430, '自己ベスト更新！', { fontSize: '26px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+      container.add(body(this, 360, top + 430, t('quest.infiniteMode.newPersonalBest'), { fontSize: '26px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     }
-    const rankText = caption(this, 360, top + 476, '送信中…', { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
+    const rankText = caption(this, 360, top + 476, t('quest.infiniteMode.submitting'), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
     container.add(rankText);
     void this.submitResult(token, result, rankText);
 
-    const retryBtn = new Button(this, 218, top + panelH - 60, 270, 76, 'もう一度', () => this.scene.restart(), { variant: 'gold', fontSize: '28px' });
-    const lobbyBtn = new Button(this, 502, top + panelH - 60, 270, 76, 'ロビーへ', () => this.scene.start('InfiniteMode'), { variant: 'wood', fontSize: '28px' });
+    const retryBtn = new Button(this, 218, top + panelH - 60, 270, 76, t('quest.infiniteMode.retry'), () => this.scene.restart(), { variant: 'gold', fontSize: '28px' });
+    const lobbyBtn = new Button(this, 502, top + panelH - 60, 270, 76, t('quest.infiniteMode.lobby'), () => this.scene.start('InfiniteMode'), { variant: 'wood', fontSize: '28px' });
     container.add([retryBtn, lobbyBtn]);
     [retryBtn, lobbyBtn].forEach((btn) => {
       btn.setScale(0);
@@ -592,12 +593,12 @@ export class InfiniteModeScene extends Phaser.Scene {
     if (token !== this.stateToken) return;
 
     if (submission.status === 'not_configured') {
-      rankText.setText('ランキング準備中(この端末のベストのみ記録されました)');
+      rankText.setText(t('quest.infiniteMode.rankingNotReady'));
     } else if (submission.status === 'error') {
-      rankText.setText('ランキングへの送信に失敗しました');
+      rankText.setText(t('quest.infiniteMode.rankingError'));
     } else {
       rankText.setText(
-        submission.isNewBest ? `グローバル順位 ${submission.rank.toLocaleString('ja-JP')}位(ベスト更新!)` : `グローバル順位 ${submission.rank.toLocaleString('ja-JP')}位`,
+        submission.isNewBest ? t('quest.infiniteMode.globalRankNewBest', { rank: submission.rank.toLocaleString('ja-JP') }) : t('quest.infiniteMode.globalRank', { rank: submission.rank.toLocaleString('ja-JP') }),
       );
     }
   }

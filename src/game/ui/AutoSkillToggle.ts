@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { SettingsSystem } from '../systems/SettingsSystem';
 import { BATTLE_CONTROL_POS, RoundControl } from './BattleControl';
+import { t } from '../i18n';
 
 /** The オート button at the bottom right of a fight: while it is ON, a hero's
  *  skill is cast as soon as its gauge is full, without tapping the hero. The
@@ -24,7 +25,7 @@ export class AutoSkillToggle extends Phaser.GameObjects.Container {
   private render(): void {
     this.removeAll(true);
     const on = this.isOn();
-    this.add(new RoundControl(this.scene, 'オート', on ? 'ON' : 'OFF', on, () => this.toggle()));
+    this.add(new RoundControl(this.scene, t('battle.auto.label'), on ? 'ON' : 'OFF', on, () => this.toggle()));
   }
 
   private toggle(): void {

@@ -2,11 +2,11 @@ import { addChainRow, CHAIN_ROW_HEIGHT, stopAutoAdvance } from '../ui/AutoAdvanc
 import { addHelperRow, canBorrowHelpers, HELPER_ROW_HEIGHT, launchWithHelper, type HelperChoice } from '../ui/HelperRow';
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT } from '../systems/ProgressionSystem';
+import { FINAL_STAGE_INDEX, STAGES_PER_REGION, EXTRA_STAGES_PER_REGION, EXTRA_STAGE_COUNT, weekdayShort } from '../systems/ProgressionSystem';
 import { StaminaSystem, stageStaminaCost } from '../systems/StaminaSystem';
 import { questRoute, questStageName, type QuestStage } from '../systems/QuestRoute';
 import { REGIONS, REGION_COUNT, type RegionDef } from '../data/regions';
-import { WEEKDAY_NAMES, getWeekdayDungeon } from '../data/weekdayDungeons';
+import { getWeekdayDungeon } from '../data/weekdayDungeons';
 import { WeekdayDungeonSystem } from '../systems/WeekdayDungeonSystem';
 import { BackButton } from '../ui/BackButton';
 import { BottomNavBar } from '../ui/BottomNavBar';
@@ -24,6 +24,7 @@ import { buildRegionBackdrop, drawPadlock, drawRoad, mixColor, stageMedallion, t
 import { showToast } from '../ui/Toast';
 import { body, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
+import { t } from '../i18n';
 
 /** 0-4 = a region's 30-stage page (region 4's page also carries the final
  *  battle node); 'extra' = the post-ending Extra page. */
@@ -80,7 +81,7 @@ export class StageSelectScene extends Phaser.Scene {
     resourceBar.update(save);
     enter(this, resourceBar, { dy: -20, duration: 280 });
 
-    buildTitlePlate(this, 'クエスト');
+    buildTitlePlate(this, t('quest.stageSelect.title'));
     this.buildWeekdayEntry();
     this.view = buildFramedScrollView(this, TAB_H + TAB_GAP);
     this.buildTabs(save);
@@ -101,10 +102,11 @@ export class StageSelectScene extends Phaser.Scene {
     const w = 244;
     const h = 52;
     const day = WeekdayDungeonSystem.today();
+    const dayName = weekdayShort(day);
     const box = this.add.container(SCREEN_VIEW.x + SCREEN_VIEW.w - w / 2 - 4, 166);
     box.add(createPanel(this, 0, 0, w, h, { fillColor: CHROME.woodFill, fillAlpha: 0.96, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 12, gradient: false }));
-    box.add(body(this, -w / 2 + 16, -11, '曜日ダンジョン', { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    box.add(caption(this, -w / 2 + 16, 14, `今日は${WEEKDAY_NAMES[day]}曜　${getWeekdayDungeon(day).name}`, { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(body(this, -w / 2 + 16, -11, t('quest.dailyDungeon'), { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    box.add(caption(this, -w / 2 + 16, 14, t('quest.stageSelect.todayDungeon', { dayName, name: getWeekdayDungeon(day).name }), { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     box.add(body(this, w / 2 - 16, 0, '›', { fontSize: '34px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
 
     const hit = this.add.zone(0, 0, w, h).setOrigin(0.5);
@@ -167,7 +169,7 @@ export class StageSelectScene extends Phaser.Scene {
       hit.setInteractive({ useHandCursor: true });
       hit.on('pointerup', () => {
         if (!unlocked) {
-          showToast(this, key === 'extra' ? 'エンディング後に解放されます' : '前の地方をクリアすると解放されます', '#ffd9a0');
+          showToast(this, key === 'extra' ? t('quest.stageSelect.lockedExtra') : t('quest.stageSelect.lockedRegion'), '#ffd9a0');
           return;
         }
         if (key !== this.activeTab) this.scene.restart({ initialTab: key });
@@ -253,7 +255,7 @@ export class StageSelectScene extends Phaser.Scene {
         size: SIZE[kind],
         accent: isFinal ? COLORS.gold : region.themeColor,
         kind,
-        label: isFinal ? '最終\n決戦' : `${local + 1}`,
+        label: isFinal ? t('quest.stageSelect.finalBattleNode') : `${local + 1}`,
         guard: () => view.isTap(),
         onTap: isFinal
           ? () => this.askToEnter({ kind: 'final', index: FINAL_STAGE_INDEX })
@@ -284,7 +286,7 @@ export class StageSelectScene extends Phaser.Scene {
     base.fillGradientStyle(0x120a1c, 0x120a1c, 0x2a1030, 0x2a1030, 1);
     base.fillRect(0, 0, w, contentHeight + BackButton.ROOM);
     content.add(base);
-    content.add(this.buildHeaderCard('エクストラ: 野に放たれた狂獣', 'エンディング後に挑戦できる、各地方の後日談。', save.extraProgress, EXTRA_STAGE_COUNT, COLORS.gold));
+    content.add(this.buildHeaderCard(t('quest.stageSelect.extraTitle'), t('quest.stageSelect.extraDescription'), save.extraProgress, EXTRA_STAGE_COUNT, COLORS.gold));
 
     const nodes: Phaser.GameObjects.Container[] = [];
     REGIONS.forEach((region: RegionDef, r) => {
@@ -305,7 +307,7 @@ export class StageSelectScene extends Phaser.Scene {
       banner.lineStyle(2, CHROME.brassDark, 1);
       banner.lineBetween(0, groupTop + 5 + bannerH, w, groupTop + 5 + bannerH);
       content.add(banner);
-      content.add(body(this, 24, groupTop + 5 + bannerH / 2, `${region.name}（特別）`, { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      content.add(body(this, 24, groupTop + 5 + bannerH / 2, t('quest.stageSelect.extraRegion', { name: region.name }), { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       const done = Math.max(0, Math.min(EXTRA_STAGES_PER_REGION, save.extraProgress - r * EXTRA_STAGES_PER_REGION));
       content.add(body(this, w - 20, groupTop + 5 + bannerH / 2, `${done} / ${EXTRA_STAGES_PER_REGION}`, { fontSize: '20px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
 
@@ -352,9 +354,9 @@ export class StageSelectScene extends Phaser.Scene {
     const party = SaveSystem.getPartyHeroes(save);
     if (party.front.length + party.back.length === 0) {
       this.openDialog({
-        title: '編成が空です',
-        message: 'パーティが空のため出撃できません。\n名鑑で編成しますか？',
-        confirmLabel: '名鑑へ',
+        title: t('quest.shared.emptyParty'),
+        message: t('quest.shared.emptyPartyMessage'),
+        confirmLabel: t('quest.shared.toCollection'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Roster'),
       });
@@ -365,9 +367,9 @@ export class StageSelectScene extends Phaser.Scene {
     if (!StaminaSystem.canAfford(save, cost)) {
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(save, cost));
       this.openDialog({
-        title: 'スタミナが足りません',
-        message: `${name}はスタミナ ${cost} 必要です。（現在 ${save.stamina[0]}）\n回復まで あと ${wait}\nショップでスタミナを回復しますか？`,
-        confirmLabel: 'ショップへ',
+        title: t('quest.shared.notEnoughStamina'),
+        message: t('quest.shared.notEnoughStaminaMessage', { name, cost, stamina: save.stamina[0], wait }),
+        confirmLabel: t('quest.shared.toShop'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
       });
@@ -385,8 +387,8 @@ export class StageSelectScene extends Phaser.Scene {
     const extraHeight = (chain ? CHAIN_ROW_HEIGHT : 0) + (helpers ? HELPER_ROW_HEIGHT : 0) + (sweep ? SWEEP_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
-      message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
-      confirmLabel: '出撃',
+      message: t('quest.shared.deployMessage', { cost, have, have2: have - cost }),
+      confirmLabel: t('quest.shared.deploy'),
       confirmVariant: 'gold',
       // The final battle has no next stage to chain on to.
       extra:

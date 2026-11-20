@@ -1,6 +1,7 @@
 import type { HeroClass, HeroData } from '../types';
 import { ProgressionSystem } from './ProgressionSystem';
 import type { Deck } from './SaveSystem';
+import { t } from '../i18n';
 
 export const MAX_DECKS = 5;
 /** Longest deck name, in characters. */
@@ -18,7 +19,7 @@ export function emptyDeck(name: string): Deck {
 export function defaultDeckName(decks: Deck[]): string {
   const taken = new Set(decks.map((d) => d.name));
   for (let n = 1; ; n++) {
-    const name = `デッキ${n}`;
+    const name = t('battle.deck.defaultName', { n });
     if (!taken.has(name)) return name;
   }
 }
