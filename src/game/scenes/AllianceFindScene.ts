@@ -15,6 +15,7 @@ import { showToast } from '../ui/Toast';
 import { formatAgo } from '../ui/format';
 import type { InboxCard } from './InboxScene';
 import { AllianceScene, INK, PAD } from './AllianceBase';
+import { t } from '../i18n';
 
 type FindTab = 'recommended' | 'search' | 'invites' | 'create';
 
@@ -23,7 +24,9 @@ const CREATE_COST = ALLIANCE_CREATE_GEMS;
 /** 同盟を探す: where a player with no 同盟 starts - the ones that suit them, a search by name, the invitations that came
  *  (from friends) and making a new one. A player already in one is sent to its home. */
 export class AllianceFindScene extends AllianceScene {
-  protected readonly screenTitle = '同盟を探す';
+  protected get screenTitle(): string {
+    return t('alliance.find.title');
+  }
   protected readonly navTab: NavTab = 'alliance';
   protected readonly toolbarHeight = 76;
   protected readonly needsAlliance = false;
@@ -67,10 +70,10 @@ export class AllianceFindScene extends AllianceScene {
     const strip = buildTabStrip(
       this,
       [
-        { key: 'recommended', label: 'おすすめ' },
-        { key: 'search', label: '検索' },
-        { key: 'invites', label: '招待', badge: this.invites.length },
-        { key: 'create', label: '作成' },
+        { key: 'recommended', label: t('alliance.find.tabSuggested') },
+        { key: 'search', label: t('alliance.find.tabSearch') },
+        { key: 'invites', label: t('alliance.shared.invites'), badge: this.invites.length },
+        { key: 'create', label: t('alliance.find.tabCreate') },
       ],
       this.tab,
       SCREEN_VIEW.w,
@@ -120,11 +123,11 @@ export class AllianceFindScene extends AllianceScene {
     const cards: InboxCard[] = [];
     if (this.tab === 'search') cards.push(this.searchCard());
     if (this.list === undefined) {
-      cards.push(this.hintCard('探しています…'));
+      cards.push(this.hintCard(t('alliance.find.searching')));
       return cards;
     }
     if (this.list.length === 0) {
-      cards.push(this.hintCard(this.tab === 'search' ? '見つかりませんでした。名前の一部だけで探すと、見つかりやすくなります。' : 'いま入れる同盟がありません。「作成」から、自分の同盟を作れます。'));
+      cards.push(this.hintCard(this.tab === 'search' ? t('alliance.find.noResults') : t('alliance.find.noneToJoin')));
       return cards;
     }
     for (const summary of this.list) cards.push(this.allianceCard(summary));
@@ -136,23 +139,23 @@ export class AllianceFindScene extends AllianceScene {
   private searchCard(): InboxCard {
     const guard = () => this.scroll.isTap();
     const card = this.shell(164);
-    card.container.add(body(this, PAD + 6, 30, '同盟の名前で探す', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    card.container.add(body(this, PAD + 6, 30, t('alliance.find.searchByName'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     card.container.add(
-      new Button(this, CARD_WIDTH / 2, 82, CARD_WIDTH - PAD * 2, 62, this.searchText ? `「${this.searchText}」で検索中（変える）` : '名前を入力して探す', () => this.promptSearch(), { variant: 'gold', fontSize: '24px', guard }),
+      new Button(this, CARD_WIDTH / 2, 82, CARD_WIDTH - PAD * 2, 62, this.searchText ? t('alliance.find.searchingFor', { searchText: this.searchText }) : t('alliance.find.enterName'), () => this.promptSearch(), { variant: 'gold', fontSize: '24px', guard }),
     );
     const only = this.joinableOnly;
-    card.container.add(new Button(this, CARD_WIDTH / 2, 130, CARD_WIDTH - PAD * 2, 36, only ? '✔ 入れる同盟だけ' : '　入れる同盟だけ', () => this.toggleJoinable(), { variant: 'wood', fontSize: '19px', guard }));
+    card.container.add(new Button(this, CARD_WIDTH / 2, 130, CARD_WIDTH - PAD * 2, 36, only ? t('alliance.find.joinableOnlyOn') : t('alliance.find.joinableOnlyOff'), () => this.toggleJoinable(), { variant: 'wood', fontSize: '19px', guard }));
     return card;
   }
 
   private promptSearch(): void {
     this.setModal(
       openTextPrompt(this, this.scroll, {
-        title: '同盟を探す',
-        label: '同盟名（一部でも可）',
+        title: t('alliance.find.title'),
+        label: t('alliance.find.searchLabel'),
         initial: this.searchText,
         maxLength: NAME_MAX,
-        hint: '空にして OK を押すと、すべて出ます',
+        hint: t('alliance.find.searchHint'),
         onSubmit: (text) => {
           this.searchText = text.trim();
           void this.loadTab();
@@ -177,11 +180,11 @@ export class AllianceFindScene extends AllianceScene {
     card.container.add(buildEmblem(this, PAD + 52, 79, 92, a.emblem));
     const x = PAD + 118;
     card.container.add(body(this, x, 30, a.name, { fontSize: '28px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    this.line(card, x, 62, `Lv.${a.level}　${a.memberCount} / ${a.memberMax}人　同盟長 ${a.leaderName}`, '#f5e6c8', 19);
+    this.line(card, x, 62, t('alliance.find.cardInfo', { level: a.level, memberCount: a.memberCount, memberMax: a.memberMax, leaderName: a.leaderName }), '#f5e6c8', 19);
     const chip = policyChip(this, x, 94, a.joinPolicy);
     card.container.add(chip.container);
-    this.line(card, x + chip.width + 10, 94, a.minPlayerLevel > 0 ? `プレイヤーLv.${a.minPlayerLevel}以上` : '条件なし', '#cdbb94', 17);
-    const desc = wrappedText(this, x, 114, a.description || '（説明はありません）', CARD_WIDTH - x - PAD - 4, { fontSize: '16px', color: '#9a8a6a' });
+    this.line(card, x + chip.width + 10, 94, a.minPlayerLevel > 0 ? t('alliance.find.playerLevelReq', { minPlayerLevel: a.minPlayerLevel }) : t('alliance.shared.noRequirement'), '#cdbb94', 17);
+    const desc = wrappedText(this, x, 114, a.description || t('alliance.find.noDescription'), CARD_WIDTH - x - PAD - 4, { fontSize: '16px', color: '#9a8a6a' });
     if (desc.height > 36) desc.setCrop(0, 0, desc.width, 36);
     card.container.add(desc);
 
@@ -189,17 +192,17 @@ export class AllianceFindScene extends AllianceScene {
     const applied = this.requested.has(a.id);
     const full = a.memberCount >= a.memberMax;
     const low = mine.level < a.minPlayerLevel;
-    let label = a.joinPolicy === 'open' ? '参加する' : '申請する';
+    let label = a.joinPolicy === 'open' ? t('alliance.find.join') : t('alliance.find.apply');
     let enabled = true;
-    if (applied) label = '申請中';
+    if (applied) label = t('alliance.find.applied');
     else if (a.joinPolicy === 'invite') {
-      label = '招待のみ';
+      label = t('alliance.find.inviteOnly');
       enabled = false;
     } else if (full) {
-      label = '満員';
+      label = t('alliance.find.full');
       enabled = false;
     } else if (low) {
-      label = `Lv.${a.minPlayerLevel}必要`;
+      label = t('alliance.find.needLv', { minPlayerLevel: a.minPlayerLevel });
       enabled = false;
     }
     const button = new Button(this, CARD_WIDTH - PAD - 80, 44, 150, 60, label, () => (applied ? this.cancelRequest(a) : this.askJoin(a)), {
@@ -215,9 +218,9 @@ export class AllianceFindScene extends AllianceScene {
   private askJoin(a: AllianceSummary): void {
     this.setModal(
       openConfirm(this, this.scroll, {
-        title: a.joinPolicy === 'open' ? '同盟に参加' : '参加を申請',
-        message: a.joinPolicy === 'open' ? `「${a.name}」に参加しますか？\n（抜けてから24時間は、別の同盟に入れません）` : `「${a.name}」に参加を申請しますか？\n同盟長や幹部が承認すると参加できます。`,
-        confirmLabel: a.joinPolicy === 'open' ? '参加する' : '申請する',
+        title: a.joinPolicy === 'open' ? t('alliance.find.joinAlliance') : t('alliance.find.applyToJoin'),
+        message: a.joinPolicy === 'open' ? t('alliance.find.confirmJoin', { name: a.name }) : t('alliance.find.confirmApply', { name: a.name }),
+        confirmLabel: a.joinPolicy === 'open' ? t('alliance.find.join') : t('alliance.find.apply'),
         confirmVariant: 'gold',
         onConfirm: () => void this.join(a),
       }),
@@ -228,11 +231,11 @@ export class AllianceFindScene extends AllianceScene {
     await this.run(AllianceService.backend().join(this.profile, a.id), async (outcome) => {
       if (outcome === 'joined') {
         await AllianceService.refresh(this.save);
-        showToast(this, `「${a.name}」に参加しました`);
+        showToast(this, t('alliance.find.joined', { name: a.name }));
         this.scene.start('AllianceHome');
       } else {
         this.requested.add(a.id);
-        showToast(this, '申請しました。承認を待ちましょう');
+        showToast(this, t('alliance.find.applicationSent'));
       }
     });
     this.queueRender();
@@ -241,7 +244,7 @@ export class AllianceFindScene extends AllianceScene {
   private async cancelRequest(a: AllianceSummary): Promise<void> {
     await this.run(AllianceService.backend().cancelRequest(this.profile, a.id), () => {
       this.requested.delete(a.id);
-      showToast(this, '申請を取り消しました');
+      showToast(this, t('alliance.find.applicationCanceled'));
     });
     this.queueRender();
   }
@@ -250,16 +253,16 @@ export class AllianceFindScene extends AllianceScene {
 
   private inviteCards(): InboxCard[] {
     const guard = () => this.scroll.isTap();
-    if (this.invites.length === 0) return [this.hintCard('招待は届いていません。\nフレンドが同盟に入っていると、招待が届きます。')];
+    if (this.invites.length === 0) return [this.hintCard(t('alliance.find.noInvites'))];
     const now = Date.now();
     return this.invites.map((invite) => {
       const card = this.shell(124, true);
       card.container.add(buildEmblem(this, PAD + 40, 62, 70, invite.emblem));
       const x = PAD + 96;
       card.container.add(body(this, x, 34, invite.allianceName, { fontSize: '26px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      this.line(card, x, 72, `${invite.fromName}さんからの招待　${formatAgo(invite.at, now)}`, '#d8c49a', 17);
-      card.container.add(new Button(this, CARD_WIDTH - PAD - 178, 62, 104, 54, '参加', () => void this.answerInvite(invite, true), { variant: 'gold', fontSize: '22px', guard }));
-      card.container.add(new Button(this, CARD_WIDTH - PAD - 56, 62, 104, 54, '断る', () => void this.answerInvite(invite, false), { variant: 'wood', fontSize: '22px', guard }));
+      this.line(card, x, 72, t('alliance.find.inviteFrom', { fromName: invite.fromName, formatAgo: formatAgo(invite.at, now) }), '#d8c49a', 17);
+      card.container.add(new Button(this, CARD_WIDTH - PAD - 178, 62, 104, 54, t('alliance.find.acceptInvite'), () => void this.answerInvite(invite, true), { variant: 'gold', fontSize: '22px', guard }));
+      card.container.add(new Button(this, CARD_WIDTH - PAD - 56, 62, 104, 54, t('alliance.find.declineInvite'), () => void this.answerInvite(invite, false), { variant: 'wood', fontSize: '22px', guard }));
       return card;
     });
   }
@@ -270,9 +273,9 @@ export class AllianceFindScene extends AllianceScene {
       this.invites = this.invites.filter((i) => i.allianceId !== invite.allianceId);
       if (accept) {
         await AllianceService.refresh(this.save);
-        showToast(this, `「${invite.allianceName}」に参加しました`);
+        showToast(this, t('alliance.find.joinedByInvite', { allianceName: invite.allianceName }));
         this.scene.start('AllianceHome');
-      } else showToast(this, '招待を断りました');
+      } else showToast(this, t('alliance.find.inviteDeclined'));
     });
     this.queueRender();
   }
@@ -287,15 +290,15 @@ export class AllianceFindScene extends AllianceScene {
 
     // 名前と説明
     const text = this.shell(236, true);
-    text.container.add(body(this, PAD + 6, 30, '同盟の名前', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    text.container.add(new Button(this, CARD_WIDTH / 2, 82, CARD_WIDTH - PAD * 2, 62, f.name || `名前を決める（${NAME_MIN}〜${NAME_MAX}文字）`, () => this.promptName(), { variant: f.name ? 'wood' : 'gold', fontSize: '26px', guard }));
-    text.container.add(body(this, PAD + 6, 138, '同盟の説明', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    text.container.add(new Button(this, CARD_WIDTH / 2, 190, CARD_WIDTH - PAD * 2, 62, f.description || `ひとこと（${DESCRIPTION_MAX}文字まで・なくてもよい）`, () => this.promptDescription(), { variant: 'wood', fontSize: '21px', guard }));
+    text.container.add(body(this, PAD + 6, 30, t('alliance.shared.allianceName'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    text.container.add(new Button(this, CARD_WIDTH / 2, 82, CARD_WIDTH - PAD * 2, 62, f.name || t('alliance.find.setName', { NAME_MIN, NAME_MAX }), () => this.promptName(), { variant: f.name ? 'wood' : 'gold', fontSize: '26px', guard }));
+    text.container.add(body(this, PAD + 6, 138, t('alliance.shared.description'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    text.container.add(new Button(this, CARD_WIDTH / 2, 190, CARD_WIDTH - PAD * 2, 62, f.description || t('alliance.find.setDescription', { DESCRIPTION_MAX }), () => this.promptDescription(), { variant: 'wood', fontSize: '21px', guard }));
     cards.push(text);
 
     // 紋章
     const emblemCard = this.shell(96 + Math.ceil(EMBLEM_COUNT / 6) * 100);
-    emblemCard.container.add(body(this, PAD + 6, 30, '紋章', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    emblemCard.container.add(body(this, PAD + 6, 30, t('alliance.find.emblem'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     for (let i = 0; i < EMBLEM_COUNT; i++) {
       const cx = PAD + 56 + (i % 6) * 100;
       const cy = 100 + Math.floor(i / 6) * 100;
@@ -320,18 +323,18 @@ export class AllianceFindScene extends AllianceScene {
 
     // 参加方式と条件
     const rules = this.shell(268);
-    rules.container.add(body(this, PAD + 6, 30, '参加のしかた', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    rules.container.add(body(this, PAD + 6, 30, t('alliance.shared.howToJoin'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     (['open', 'approval', 'invite'] as JoinPolicy[]).forEach((policy, i) => {
       const w = (CARD_WIDTH - PAD * 2 - 20) / 3;
       rules.container.add(
-        new Button(this, PAD + w / 2 + i * (w + 10), 84, w, 62, JOIN_POLICY_LABEL[policy], () => {
+        new Button(this, PAD + w / 2 + i * (w + 10), 84, w, 62, t(JOIN_POLICY_LABEL[policy]), () => {
           f.joinPolicy = policy;
           this.queueRender();
         }, { variant: f.joinPolicy === policy ? 'gold' : 'wood', fontSize: '23px', guard }),
       );
     });
-    this.line(rules, PAD + 6, 132, f.joinPolicy === 'open' ? 'だれでも、すぐに入れます' : f.joinPolicy === 'approval' ? '申請を、同盟長や幹部が承認します' : '招待したフレンドだけが入れます', '#cdbb94', 18);
-    rules.container.add(body(this, PAD + 6, 180, '参加できるプレイヤーLv', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    this.line(rules, PAD + 6, 132, f.joinPolicy === 'open' ? t('alliance.find.policyOpen') : f.joinPolicy === 'approval' ? t('alliance.find.policyApproval') : t('alliance.find.policyInvite'), '#cdbb94', 18);
+    rules.container.add(body(this, PAD + 6, 180, t('alliance.shared.requiredLevel'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const step = (delta: number, x: number, label: string): void => {
       rules.container.add(
         new Button(this, x, 232, 70, 56, label, () => {
@@ -342,7 +345,7 @@ export class AllianceFindScene extends AllianceScene {
     };
     step(-10, PAD + 50, '-10');
     step(-1, PAD + 130, '-1');
-    rules.container.add(body(this, CARD_WIDTH / 2, 232, f.minPlayerLevel > 0 ? `Lv.${f.minPlayerLevel}以上` : '条件なし', { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+    rules.container.add(body(this, CARD_WIDTH / 2, 232, f.minPlayerLevel > 0 ? t('alliance.shared.minLevel', { minPlayerLevel: f.minPlayerLevel }) : t('alliance.shared.noRequirement'), { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
     step(1, CARD_WIDTH - PAD - 130, '+1');
     step(10, CARD_WIDTH - PAD - 50, '+10');
     cards.push(rules);
@@ -351,8 +354,8 @@ export class AllianceFindScene extends AllianceScene {
     const gems = save.gems;
     const valid = Array.from(f.name.trim()).length >= NAME_MIN;
     const make = this.shell(150, true);
-    make.container.add(body(this, PAD + 6, 34, `必要な魔晶石　${CREATE_COST.toLocaleString('ja-JP')}個（いま ${gems.toLocaleString('ja-JP')}個）`, { fontSize: '22px', fontStyle: 'bold', color: gems >= CREATE_COST ? '#ffe9b8' : '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    const button = new Button(this, CARD_WIDTH / 2, 98, CARD_WIDTH - PAD * 2, 70, valid ? '同盟を作る' : '名前を決めてください', () => this.askCreate(), { variant: 'gold', fontSize: '30px', guard });
+    make.container.add(body(this, PAD + 6, 34, t('alliance.find.gemsNeeded', { CREATE_COST: CREATE_COST.toLocaleString('ja-JP'), gems: gems.toLocaleString('ja-JP') }), { fontSize: '22px', fontStyle: 'bold', color: gems >= CREATE_COST ? '#ffe9b8' : '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    const button = new Button(this, CARD_WIDTH / 2, 98, CARD_WIDTH - PAD * 2, 70, valid ? t('alliance.shared.createAlliance') : t('alliance.find.enterNameFirst'), () => this.askCreate(), { variant: 'gold', fontSize: '30px', guard });
     button.setEnabled(valid && gems >= CREATE_COST);
     make.container.add(button);
     cards.push(make);
@@ -362,11 +365,11 @@ export class AllianceFindScene extends AllianceScene {
   private promptName(): void {
     this.setModal(
       openTextPrompt(this, this.scroll, {
-        title: '同盟の名前',
-        label: '同盟名',
+        title: t('alliance.shared.allianceName'),
+        label: t('alliance.find.nameLabel'),
         initial: this.form.name,
         maxLength: NAME_MAX,
-        hint: `${NAME_MIN}〜${NAME_MAX}文字`,
+        hint: t('alliance.find.nameHint', { NAME_MIN, NAME_MAX }),
         onSubmit: (text) => {
           this.form.name = text.trim();
           this.queueRender();
@@ -378,11 +381,11 @@ export class AllianceFindScene extends AllianceScene {
   private promptDescription(): void {
     this.setModal(
       openTextPrompt(this, this.scroll, {
-        title: '同盟の説明',
-        label: '説明',
+        title: t('alliance.shared.description'),
+        label: t('alliance.shared.descriptionLabel'),
         initial: this.form.description,
         maxLength: DESCRIPTION_MAX,
-        hint: `${DESCRIPTION_MAX}文字まで。空でもかまいません`,
+        hint: t('alliance.find.descriptionHint', { DESCRIPTION_MAX }),
         onSubmit: (text) => {
           this.form.description = text.trim();
           this.queueRender();
@@ -395,9 +398,9 @@ export class AllianceFindScene extends AllianceScene {
     const f = this.form;
     this.setModal(
       openConfirm(this, this.scroll, {
-        title: '同盟を作る',
-        message: `「${f.name}」を作ります。\n魔晶石 ${CREATE_COST}個を使います。`,
-        confirmLabel: '作る',
+        title: t('alliance.shared.createAlliance'),
+        message: t('alliance.find.confirmCreate', { name: f.name, CREATE_COST }),
+        confirmLabel: t('alliance.find.create'),
         confirmVariant: 'gold',
         onConfirm: () => void this.create2(),
       }),
@@ -410,7 +413,7 @@ export class AllianceFindScene extends AllianceScene {
       AllianceService.create(this.save, { ...f, name: f.name.trim(), description: f.description.trim() }),
       (summary) => {
         SaveSystem.save(this.save);
-        showToast(this, `同盟「${summary.name}」を作りました`);
+        showToast(this, t('alliance.find.created', { name: summary.name }));
         this.scene.start('AllianceHome');
       },
       false,

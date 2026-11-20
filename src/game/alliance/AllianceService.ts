@@ -36,6 +36,7 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { isAllianceConfigured } from '../systems/firebaseConfig';
 import type { EquipmentItem, EquipSlot, HeroData } from '../types';
 import { EQUIP_SLOTS } from '../types';
+import { t } from '../i18n';
 
 /**
  * 同盟の、画面とゲームが使う入口 (設計: docs/ALLIANCE_DESIGN.md)。画面は、同盟の状態を、ここだけを通して読み書きする。
@@ -186,7 +187,7 @@ export const AllianceService = {
     } catch {
       power = 0;
     }
-    return { uid: save.social.playerId, name: save.playerName || 'プレイヤー', level: save.playerLevel, power: Number.isFinite(power) ? Math.max(0, Math.min(1e280, power)) : 1e280 };
+    return { uid: save.social.playerId, name: save.playerName || 'プレイヤー', level: save.playerLevel, power: Number.isFinite(power) ? Math.max(0, Math.min(1e280, power)) : 1e280 }; // i18n-ignore (the default name is stored with the alliance)
   },
 
   /** 入っている同盟の、ゲーム側の恩恵 (同期)。放置ゴールド・経験値素材・スタミナ上限は、ゲームの側で、これを使っている。 */
@@ -255,8 +256,8 @@ export const AllianceService = {
   /** 同盟を作る: 魔晶石300個を払ってから Backend に頼み、失敗したら返す。 */
   async create(save: SaveData, params: CreateAllianceParams): Promise<Result<AllianceSummary>> {
     remember(save);
-    if (hasAlliance(save)) return fail('already_in_alliance', 'すでに同盟に入っています。');
-    if (!SaveSystem.spendGems(save, ALLIANCE_CREATE_GEMS)) return fail('not_enough', `魔晶石が足りません（${ALLIANCE_CREATE_GEMS}個かかります）。`);
+    if (hasAlliance(save)) return fail('already_in_alliance', t('alliance.error.alreadyInAlliance'));
+    if (!SaveSystem.spendGems(save, ALLIANCE_CREATE_GEMS)) return fail('not_enough', t('alliance.error.gemsForCreate', { ALLIANCE_CREATE_GEMS }));
     const result = await (await pick()).create(AllianceService.profile(save), params);
     if (!result.ok) SaveSystem.addGems(save, ALLIANCE_CREATE_GEMS);
     else {
@@ -271,22 +272,22 @@ export const AllianceService = {
   /** 寄付する: 表のぶんを払ってから Backend に頼み、失敗したら返す。 */
   async donate(save: SaveData, kind: DonationKind): Promise<Result<DonationResult>> {
     remember(save);
-    if (!hasAlliance(save)) return fail('not_in_alliance', '同盟に入っていません。');
+    if (!hasAlliance(save)) return fail('not_in_alliance', t('alliance.error.notInAlliance'));
     const rule = DONATIONS[kind];
-    if (!rule) return fail('bad_input', 'その寄付は、できません。');
+    if (!rule) return fail('bad_input', t('alliance.error.badDonation'));
     let refund: () => void;
     if (rule.cost.gems) {
       const gems = rule.cost.gems;
-      if (!SaveSystem.spendGems(save, gems)) return fail('not_enough', `魔晶石が足りません（${gems}個）。`);
+      if (!SaveSystem.spendGems(save, gems)) return fail('not_enough', t('alliance.error.gemsForDonation', { gems }));
       refund = () => SaveSystem.addGems(save, gems);
     } else if (rule.cost.goldHours) {
       const gold = IdleSystem.perHour(save).gold.mul(rule.cost.goldHours);
-      if (!SaveSystem.spendGold(save, gold)) return fail('not_enough', 'ゴールドが足りません。');
+      if (!SaveSystem.spendGold(save, gold)) return fail('not_enough', t('alliance.error.notEnoughGold'));
       refund = () => SaveSystem.addGold(save, gold);
     } else {
       const total = rule.cost.materials ?? 0;
       const paid = payMaterials(save, total);
-      if (!paid) return fail('not_enough', `素材が足りません（木材・鉄・石の合計で${total}個）。`);
+      if (!paid) return fail('not_enough', t('alliance.error.notEnoughMaterials', { total }));
       refund = () => SaveSystem.addMaterials(save, paid);
     }
     const result = await (await pick()).donate(AllianceService.profile(save), kind);
@@ -343,11 +344,11 @@ export const AllianceService = {
   async buy(save: SaveData, itemId: string): Promise<Result<AllianceReward>> {
     remember(save);
     const item = getShopItem(itemId);
-    if (!item) return fail('not_found', 'その品は、ありません。');
-    if (!hasAlliance(save)) return fail('not_in_alliance', '同盟に入っていません。');
+    if (!item) return fail('not_found', t('alliance.error.noSuchItem'));
+    if (!hasAlliance(save)) return fail('not_in_alliance', t('alliance.error.notInAlliance'));
     const week = weekIdOf(Date.now());
     if (save.alliance.shop.week !== week) save.alliance.shop = { week, bought: {} };
-    if (item.weeklyLimit > 0 && (save.alliance.shop.bought[itemId] ?? 0) >= item.weeklyLimit) return fail('limit_reached', '今週は、もう買えません。');
+    if (item.weeklyLimit > 0 && (save.alliance.shop.bought[itemId] ?? 0) >= item.weeklyLimit) return fail('limit_reached', t('alliance.error.weeklyLimit'));
     const spent = await (await pick()).spendCoins(AllianceService.profile(save), item.cost);
     if (!spent.ok) return spent;
     save.alliance.shop.bought[itemId] = (save.alliance.shop.bought[itemId] ?? 0) + 1;
@@ -375,7 +376,7 @@ export const AllianceService = {
     }
     return {
       ownerUid: save.social.playerId,
-      ownerName: save.playerName || 'プレイヤー',
+      ownerName: save.playerName || 'プレイヤー', // i18n-ignore (stored with the helper)
       heroId: hero.heroId,
       name: hero.name,
       heroClass: hero.heroClass,
@@ -392,9 +393,9 @@ export const AllianceService = {
   /** 助っ人に登録する (null で外す)。 */
   async setHelper(save: SaveData, heroInstanceId: string | null): Promise<Result<true>> {
     remember(save);
-    if (!hasAlliance(save)) return fail('not_in_alliance', '同盟に入っていません。');
+    if (!hasAlliance(save)) return fail('not_in_alliance', t('alliance.error.notInAlliance'));
     const snapshot = heroInstanceId ? AllianceService.helperSnapshot(save, heroInstanceId) : null;
-    if (heroInstanceId && !snapshot) return fail('not_found', 'そのキャラは、持っていません。');
+    if (heroInstanceId && !snapshot) return fail('not_found', t('alliance.error.noSuchHero'));
     const result = await (await pick()).setHelper(AllianceService.profile(save), snapshot);
     if (result.ok) {
       save.alliance.helperHeroId = heroInstanceId ?? '';

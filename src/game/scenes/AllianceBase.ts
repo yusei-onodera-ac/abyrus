@@ -7,6 +7,7 @@ import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t as tl } from '../i18n';
 
 export const PAD = 14;
 export const INK = '#1c130a';
@@ -87,8 +88,8 @@ export abstract class AllianceScene extends InboxScene {
 
   protected buildCards(): InboxCard[] {
     this.emptyText = '';
-    if (this.detail === undefined) return [this.hintCard('読み込み中…')];
-    if (this.failure) return [this.hintCard(`読み込めませんでした。\n${this.failure.message}`)];
+    if (this.detail === undefined) return [this.hintCard(tl('alliance.base.loading'))];
+    if (this.failure) return [this.hintCard(tl('alliance.base.loadFailed', { message: this.failure.message }))];
     return this.cards(this.detail);
   }
 

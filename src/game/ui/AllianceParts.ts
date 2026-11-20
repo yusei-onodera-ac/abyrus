@@ -5,6 +5,7 @@ import { ALLIANCE_ROLE_LABEL, EMBLEM_COUNT, JOIN_POLICY_LABEL, type AllianceDeta
 import { buildChip } from './CardParts';
 import type { RewardTile } from './RewardTiles';
 import { CHROME } from './theme';
+import { t } from '../i18n';
 
 /** Small things the 同盟 screens share: the emblems (drawn from code), reward tiles, chips and number text. */
 
@@ -109,9 +110,9 @@ export function timeLeft(endsAt: number, now = Date.now()): string {
   const minutes = Math.floor(ms / 60000);
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
-  if (days >= 1) return `あと${days}日${hours}時間`;
-  if (minutes >= 60) return `あと${hours}時間${String(minutes % 60).padStart(2, '0')}分`;
-  return `あと${minutes}分`;
+  if (days >= 1) return t('alliance.parts.daysLeft', { days, hours });
+  if (minutes >= 60) return t('alliance.parts.hoursLeft', { hours, minutes: String(minutes % 60).padStart(2, '0') });
+  return t('alliance.parts.minutesLeft', { minutes });
 }
 
 // ---------------------------------------------------------------------------------------------- 報酬
@@ -122,7 +123,7 @@ export function tilesForAllianceReward(reward: AllianceReward): RewardTile[] {
   if (reward.gems) tiles.push({ kind: 'gems', amount: `+${reward.gems.toLocaleString('ja-JP')}` });
   if (reward.phaseMaterials) tiles.push({ kind: 'phaseMaterials', amount: `+${reward.phaseMaterials.toLocaleString('ja-JP')}` });
   if (reward.coins) tiles.push({ kind: 'coin', amount: `+${reward.coins.toLocaleString('ja-JP')}` });
-  if (reward.goldHours) tiles.push({ kind: 'gold', amount: `${reward.goldHours}時間分` });
+  if (reward.goldHours) tiles.push({ kind: 'gold', amount: t('alliance.parts.goldTile', { goldHours: reward.goldHours }) });
   for (const [id, amount] of Object.entries(reward.items ?? {})) if (amount > 0 && isItemId(id)) tiles.push({ kind: 'item', item: id, amount: `+${amount.toLocaleString('ja-JP')}` });
   return tiles;
 }
@@ -130,12 +131,12 @@ export function tilesForAllianceReward(reward: AllianceReward): RewardTile[] {
 /** One line for a reward ("魔晶石 50・同盟コイン 30"), for lists where there is no room for tiles. */
 export function rewardLine(reward: AllianceReward): string {
   const parts: string[] = [];
-  if (reward.gems) parts.push(`魔晶石 ${reward.gems.toLocaleString('ja-JP')}`);
-  if (reward.phaseMaterials) parts.push(`フェーズ素材 ${reward.phaseMaterials}`);
-  if (reward.coins) parts.push(`同盟コイン ${reward.coins.toLocaleString('ja-JP')}`);
-  if (reward.goldHours) parts.push(`ゴールド ${reward.goldHours}時間分`);
+  if (reward.gems) parts.push(t('alliance.parts.lineGems', { gems: reward.gems.toLocaleString('ja-JP') }));
+  if (reward.phaseMaterials) parts.push(t('alliance.parts.linePhaseMaterial', { phaseMaterials: reward.phaseMaterials }));
+  if (reward.coins) parts.push(t('alliance.parts.lineCoins', { coins: reward.coins.toLocaleString('ja-JP') }));
+  if (reward.goldHours) parts.push(t('alliance.parts.lineGold', { goldHours: reward.goldHours }));
   for (const [id, amount] of Object.entries(reward.items ?? {})) if (amount > 0) parts.push(`${id} ×${amount}`);
-  return parts.join('・') || 'なし';
+  return parts.join(t('alliance.parts.separator')) || t('alliance.parts.none');
 }
 
 // ---------------------------------------------------------------------------------------------- 通知
@@ -158,13 +159,13 @@ export function allianceAttention(d: AllianceDetail | null | undefined): number 
 const ROLE_FILL: Record<AllianceRole, number> = { leader: 0xb8841f, officer: 0x3a6fb0, member: 0x4a3a28 };
 
 export function roleChip(scene: Phaser.Scene, x: number, y: number, role: AllianceRole, fontSize = 15): { container: Phaser.GameObjects.Container; width: number } {
-  return buildChip(scene, x, y, ALLIANCE_ROLE_LABEL[role], { fill: ROLE_FILL[role], color: '#fff4dc', fontSize });
+  return buildChip(scene, x, y, t(ALLIANCE_ROLE_LABEL[role]), { fill: ROLE_FILL[role], color: '#fff4dc', fontSize });
 }
 
 const POLICY_FILL: Record<JoinPolicy, number> = { open: 0x2f7a4a, approval: 0x3a6fb0, invite: 0x6a3fb0 };
 
 export function policyChip(scene: Phaser.Scene, x: number, y: number, policy: JoinPolicy, fontSize = 15): { container: Phaser.GameObjects.Container; width: number } {
-  return buildChip(scene, x, y, JOIN_POLICY_LABEL[policy], { fill: POLICY_FILL[policy], color: '#fff4dc', fontSize });
+  return buildChip(scene, x, y, t(JOIN_POLICY_LABEL[policy]), { fill: POLICY_FILL[policy], color: '#fff4dc', fontSize });
 }
 
 /** A thin progress bar (brass rim, orange fill) with its left edge at (x, y). */

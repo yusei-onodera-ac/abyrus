@@ -18,6 +18,7 @@ import { ScrollView } from '../ui/ScrollView';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { enter } from '../ui/Transitions';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 const VIEW_TOP = 218;
@@ -64,7 +65,7 @@ export class AllianceChatScene extends Phaser.Scene {
     const bar = new ResourceBar(this, 0, 0, 720);
     bar.update(this.save);
     enter(this, bar, { dy: -20, duration: 280 });
-    buildTitlePlate(this, '同盟チャット');
+    buildTitlePlate(this, tl('alliance.chat.title'));
     buildFrame(this);
     new BottomNavBar(this, 720, 1280, null);
     this.buildHeader();
@@ -80,8 +81,8 @@ export class AllianceChatScene extends Phaser.Scene {
   }
 
   private buildHeader(): void {
-    this.add.existing(new Button(this, SCREEN_VIEW.x + 70, VIEW_TOP + 26, 140, 48, '◀ 同盟', () => this.scene.start('AllianceHome'), { variant: 'wood', fontSize: '21px' }));
-    this.add.existing(new Button(this, SCREEN_VIEW.x + SCREEN_VIEW.w - 90, VIEW_TOP + 26, 170, 48, '救援を求める', () => this.openHelpMenu(), { variant: 'wood', fontSize: '20px' }));
+    this.add.existing(new Button(this, SCREEN_VIEW.x + 70, VIEW_TOP + 26, 140, 48, tl('alliance.chat.backToAlliance'), () => this.scene.start('AllianceHome'), { variant: 'wood', fontSize: '21px' }));
+    this.add.existing(new Button(this, SCREEN_VIEW.x + SCREEN_VIEW.w - 90, VIEW_TOP + 26, 170, 48, tl('alliance.shared.askForHelp'), () => this.openHelpMenu(), { variant: 'wood', fontSize: '20px' }));
   }
 
   private async reload(): Promise<void> {
@@ -113,7 +114,7 @@ export class AllianceChatScene extends Phaser.Scene {
     const now = Date.now();
     let y = 10;
     if (this.messages.length === 0) {
-      scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 90, 'まだメッセージがありません\n最初のひと言をどうぞ', { fontSize: '22px', color: '#9a8a6a', align: 'center' }).setOrigin(0.5));
+      scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 90, tl('alliance.chat.empty'), { fontSize: '22px', color: '#9a8a6a', align: 'center' }).setOrigin(0.5));
       y += 170;
     }
     for (const message of this.messages) y += this.addMessage(scroll.content, message, y, now) + 14;
@@ -152,12 +153,12 @@ export class AllianceChatScene extends Phaser.Scene {
     g.lineStyle(3, open ? CHROME.brassBright : CHROME.brassDark, 1);
     g.strokeRoundedRect(x, y, w, h, 14);
     parent.add(g);
-    parent.add(buildChip(this, x + 14, y + 24, '救援要請', { fill: 0xb8472a, color: '#fff4dc', fontSize: 16 }).container);
-    parent.add(body(this, x + 120, y + 24, `${m.senderName}　${formatChatTime(m.sentAt, now)}`, { fontSize: '18px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    parent.add(body(this, x + 14, y + 62, help?.what === 'village' ? '村に襲撃が来ています。助けて！' : '共闘ボスが強くて…手伝ってください！', { fontSize: '21px', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    parent.add(body(this, x + 14, y + 100, `助けてくれた人 ${help?.helpers.length ?? 0}人`, { fontSize: '17px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    parent.add(buildChip(this, x + 14, y + 24, tl('alliance.chat.helpChip'), { fill: 0xb8472a, color: '#fff4dc', fontSize: 16 }).container);
+    parent.add(body(this, x + 120, y + 24, tl('alliance.chat.senderAndTime', { senderName: m.senderName, formatChatTime: formatChatTime(m.sentAt, now) }), { fontSize: '18px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    parent.add(body(this, x + 14, y + 62, help?.what === 'village' ? tl('alliance.chat.villageUnderAttack') : tl('alliance.chat.raidBossTooStrong'), { fontSize: '21px', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    parent.add(body(this, x + 14, y + 100, tl('alliance.chat.helpedBy', { count: help?.helpers.length ?? 0 }), { fontSize: '17px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const meHelped = !!help?.helpers.includes(AllianceService.profile(this.save).uid);
-    const button = new Button(this, x + w - 92, y + 92, 160, 56, mine ? '要請中' : meHelped ? '手伝った' : open ? '手伝う' : '終了', () => void this.answer(m), { variant: 'gold', fontSize: '22px' });
+    const button = new Button(this, x + w - 92, y + 92, 160, 56, mine ? tl('alliance.chat.requested') : meHelped ? tl('alliance.chat.helped') : open ? tl('alliance.chat.help') : tl('alliance.chat.closed'), () => void this.answer(m), { variant: 'gold', fontSize: '22px' });
     button.setEnabled(open && !mine && !meHelped);
     parent.add(button);
     return h;
@@ -197,7 +198,7 @@ export class AllianceChatScene extends Phaser.Scene {
       showToast(this, result.message, '#ff8a8a');
       return;
     }
-    showToast(this, `${m.senderName}を手伝いました（貢献 +5）`);
+    showToast(this, tl('alliance.chat.helpedToast', { senderName: m.senderName }));
     SaveSystem.save(this.save);
     await this.reload();
   }
@@ -210,17 +211,17 @@ export class AllianceChatScene extends Phaser.Scene {
     const panel = createPanel(this, 360, 640, 560, 380, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, gradient: false });
     picker.add(panel);
     picker.add(this.add.zone(360, 640, 560, 380).setInteractive());
-    picker.add(body(this, 360, 500, '救援を求める', { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    picker.add(body(this, 360, 500, tl('alliance.shared.askForHelp'), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     const send = async (what: 'raid' | 'village'): Promise<void> => {
       picker.destroy();
       const result = await AllianceService.backend().requestHelp(profile, what);
       if (!this.alive) return;
-      showToast(this, result.ok ? '救援を求めました' : result.message, result.ok ? undefined : '#ff8a8a');
+      showToast(this, result.ok ? tl('alliance.chat.helpRequestSent') : result.message, result.ok ? undefined : '#ff8a8a');
       if (result.ok) await this.reload();
     };
-    picker.add(new Button(this, 360, 580, 460, 66, 'ボスが強い！（共闘ボス）', () => void send('raid'), { variant: 'gold', fontSize: '24px' }));
-    picker.add(new Button(this, 360, 662, 460, 66, '村に襲撃が来た！', () => void send('village'), { variant: 'gold', fontSize: '24px' }));
-    picker.add(new Button(this, 360, 750, 240, 58, 'やめる', () => picker.destroy(), { variant: 'wood', fontSize: '22px' }));
+    picker.add(new Button(this, 360, 580, 460, 66, tl('alliance.chat.askRaidBoss'), () => void send('raid'), { variant: 'gold', fontSize: '24px' }));
+    picker.add(new Button(this, 360, 662, 460, 66, tl('alliance.chat.askVillage'), () => void send('village'), { variant: 'gold', fontSize: '24px' }));
+    picker.add(new Button(this, 360, 750, 240, 58, tl('alliance.chat.cancelAsk'), () => picker.destroy(), { variant: 'wood', fontSize: '22px' }));
   }
 
   // --- composer ----------------------------------------------------------------------
@@ -233,7 +234,7 @@ export class AllianceChatScene extends Phaser.Scene {
     const emojiBtn = new Button(this, x0 + 12 + 36, cy, 72, 68, '', () => this.togglePicker(composerTop), { variant: 'wood' });
     emojiBtn.add(this.add.image(0, 0, emojiTexture(this, 'smile')).setDisplaySize(44, 44));
     const sendW = 118;
-    new Button(this, x0 + w - 12 - sendW / 2, cy, sendW, 68, '送信', () => void this.send(), { variant: 'gold', fontSize: '26px' });
+    new Button(this, x0 + w - 12 - sendW / 2, cy, sendW, 68, tl('common.send'), () => void this.send(), { variant: 'gold', fontSize: '26px' });
     const inputW = w - 12 - 72 - 10 - 10 - sendW - 12;
     const inputX = x0 + 12 + 72 + 10 + inputW / 2;
     this.chatField = this.add.dom(
@@ -247,7 +248,7 @@ export class AllianceChatScene extends Phaser.Scene {
     const field = this.chatField.node as HTMLInputElement;
     field.type = 'text';
     field.maxLength = MAX_TEXT;
-    field.placeholder = 'メッセージを入力';
+    field.placeholder = tl('alliance.chat.placeholder');
     field.autocomplete = 'off';
     field.spellcheck = false;
     field.addEventListener('input', (event) => {
@@ -267,7 +268,7 @@ export class AllianceChatScene extends Phaser.Scene {
     const result = await AllianceService.backend().sendChat(AllianceService.profile(this.save), text);
     if (!this.alive) return;
     if (!result.ok) {
-      showToast(this, result.message || '文字か絵文字を入力してください', '#ff8a8a');
+      showToast(this, result.message || tl('alliance.chat.enterSomething'), '#ff8a8a');
       return;
     }
     field.value = '';
@@ -320,7 +321,7 @@ export class AllianceChatScene extends Phaser.Scene {
     if (!field) return;
     const token = `:${id}:`;
     if (Array.from(field.value).length + token.length > MAX_TEXT) {
-      showToast(this, 'これ以上入力できません', '#ff8a8a');
+      showToast(this, tl('alliance.chat.limitReached'), '#ff8a8a');
       return;
     }
     const start = field.selectionStart ?? field.value.length;

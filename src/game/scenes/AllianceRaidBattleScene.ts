@@ -21,6 +21,7 @@ import { SpeedToggle } from '../ui/SpeedToggle';
 import { body, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, popIn } from '../ui/Transitions';
 import { DURATION_FALLBACK_MS } from './allianceRaidConstants';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -89,7 +90,7 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
 
     const { front, back } = SaveSystem.getPartyHeroes(this.save);
     if (front.length + back.length === 0) {
-      caption(this, 360, 640, '編成が空です。', { fontSize: '24px', color: '#ff8080' }).setOrigin(0.5);
+      caption(this, 360, 640, tl('alliance.raidBattle.emptyParty'), { fontSize: '24px', color: '#ff8080' }).setOrigin(0.5);
       this.time.delayedCall(1500, () => this.scene.start('AllianceRaid'));
       return;
     }
@@ -133,13 +134,13 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
   private buildHud(): void {
     const hud = this.add.container(0, 0).setDepth(30);
     hud.add(createPanel(this, 360, 84, 696, 148, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
-    hud.add(new Button(this, 104, 62, 160, 62, '一時停止', () => this.openPause(), { variant: 'wood', fontSize: '24px' }));
+    hud.add(new Button(this, 104, 62, 160, 62, tl('alliance.raidBattle.pause'), () => this.openPause(), { variant: 'wood', fontSize: '24px' }));
     const title = heading(this, 370, 38, this.ticket.boss.name, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     if (title.width > 290) title.setScale(290 / title.width);
     hud.add(title);
     this.timeText = body(this, 672, 40, '1:00', { fontSize: '36px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 6 }).setOrigin(1, 0.5);
     hud.add(this.timeText);
-    this.damageText = body(this, 360, 92, 'ダメージ 0', { fontSize: '30px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    this.damageText = body(this, 360, 92, tl('alliance.raidBattle.damageZero'), { fontSize: '30px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     hud.add(this.damageText);
     this.bossBar = this.add.graphics();
     hud.add(this.bossBar);
@@ -167,7 +168,7 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
     this.scene.pause();
     this.scene.launch('Pause', {
       of: 'AllianceRaidBattle',
-      lines: ['戦闘はここで止まっています。', 'リタイアすると、ここまでのダメージで終わります。'],
+      lines: [tl('alliance.raidBattle.pausedLine1'), tl('alliance.raidBattle.pausedLine2')],
       onRetire: () => this.finish(),
     });
     this.scene.bringToTop('Pause');
@@ -246,7 +247,7 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
     const sec = Math.ceil(left / 1000);
     this.timeText?.setText(`${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`);
     const damage = this.damageDealt();
-    this.damageText?.setText(`ダメージ ${fullDigits(damage)}`);
+    this.damageText?.setText(tl('alliance.raidBattle.damage', { fullDigits: fullDigits(damage) }));
     this.drawBossBar(this.ticket.maxDamage > 0 ? damage / this.ticket.maxDamage : 0);
     for (const view of this.views.values()) {
       if (!view.unit.isPlayer) continue;
@@ -287,7 +288,7 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
     const target = targetView.sprite;
     this.anim.lunge(attackerView.sprite, target);
     if (event.blocked) {
-      this.popups.pop(target.x, target.y - 30, event.damage, { label: '無敵' });
+      this.popups.pop(target.x, target.y - 30, event.damage, { label: tl('alliance.shared.invincible') });
       this.fx.block(target.x, target.y);
       return;
     }
@@ -316,7 +317,7 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
         const pos = this.positionOf(unit);
         this.createUnitView(unit, pos.x, pos.y, true);
         const view = this.views.get(unit.id);
-        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', '復活');
+        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', tl('alliance.raidBattle.revive'));
         if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
         continue;
       }
@@ -342,16 +343,16 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
         this.fx.status(x, y, 'heal');
       } else if (result.buffAtk || result.buffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.gold);
-        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? '攻防UP' : result.buffAtk ? '攻撃UP' : '防御UP');
+        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? tl('alliance.raidBattle.atkDefUp') : result.buffAtk ? tl('alliance.raidBattle.atkUp') : tl('alliance.raidBattle.defUp'));
       } else if (result.debuffAtk || result.debuffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
-        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? '攻防DOWN' : result.debuffAtk ? '攻撃DOWN' : '防御DOWN');
+        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? tl('alliance.raidBattle.atkDefDown') : result.debuffAtk ? tl('alliance.raidBattle.atkDown') : tl('alliance.raidBattle.defDown'));
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
-        this.fx.status(x, y, 'stun', 'スタン');
+        this.fx.status(x, y, 'stun', tl('alliance.raidBattle.stun'));
       } else if (result.invincible) {
         this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
-        this.fx.status(x, y, 'invincible', '無敵');
+        this.fx.status(x, y, 'invincible', tl('alliance.shared.invincible'));
       }
     }
     return hold;
@@ -408,15 +409,15 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
     container.add(panel);
     panel.setScale(0.9);
     popIn(this, panel, { duration: 320, delay: 80 });
-    container.add(heading(this, 360, top + 62, outcome?.defeated ? 'ボス撃破！' : '挑戦おわり', { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5));
+    container.add(heading(this, 360, top + 62, outcome?.defeated ? tl('alliance.raidBattle.bossDefeated') : tl('alliance.raidBattle.attemptOver'), { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5));
     container.add(body(this, 360, top + 150, `${fullDigits(outcome?.damage ?? damage)}`, { fontSize: '50px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 7 }).setOrigin(0.5));
-    container.add(caption(this, 360, top + 196, 'ダメージ', { fontSize: '22px', color: '#cdbb94', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+    container.add(caption(this, 360, top + 196, tl('alliance.raidBattle.damageLabel'), { fontSize: '22px', color: '#cdbb94', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
     const rows: [string, string][] = [];
     if (outcome) {
-      if (outcome.damage < damage) rows.push(['切り捨て', '1回の上限をこえた分は入りません']);
-      rows.push(['ボスの残りHP', outcome.defeated ? 'なし（撃破）' : `${fullDigits(outcome.hpLeft)}`]);
-      rows.push(['同盟ポイント', `+${outcome.points.toLocaleString('ja-JP')}`]);
-      if (outcome.lastHit) rows.push(['とどめ', 'あなたが倒しました！']);
+      if (outcome.damage < damage) rows.push([tl('alliance.raidBattle.capped'), tl('alliance.raidBattle.cappedNote')]);
+      rows.push([tl('alliance.raidBattle.bossHpLeft'), outcome.defeated ? tl('alliance.raidBattle.bossHpNone') : `${fullDigits(outcome.hpLeft)}`]);
+      rows.push([tl('alliance.raidBattle.alliancePoints'), `+${outcome.points.toLocaleString('ja-JP')}`]);
+      if (outcome.lastHit) rows.push([tl('alliance.raidBattle.finalBlow'), tl('alliance.raidBattle.youDefeatedIt')]);
     }
     rows.forEach(([label, value], i) => {
       const y = top + 270 + i * 54;
@@ -425,8 +426,8 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
       if (t.width > 380) t.setScale(380 / t.width);
       container.add(t);
     });
-    if (error) container.add(caption(this, 360, top + 300, `送れませんでした。\n${error}`, { fontSize: '22px', color: '#ff9a8a', stroke: INK, strokeThickness: 4, align: 'center' }).setOrigin(0.5));
-    const back = new Button(this, 360, top + panelH - 70, 360, 80, '同盟に戻る', () => this.scene.start('AllianceRaid'), { variant: 'gold', fontSize: '32px' });
+    if (error) container.add(caption(this, 360, top + 300, tl('alliance.raidBattle.sendFailed', { error }), { fontSize: '22px', color: '#ff9a8a', stroke: INK, strokeThickness: 4, align: 'center' }).setOrigin(0.5));
+    const back = new Button(this, 360, top + panelH - 70, 360, 80, tl('alliance.raidBattle.backToAlliance'), () => this.scene.start('AllianceRaid'), { variant: 'gold', fontSize: '32px' });
     container.add(back);
     back.setScale(0);
     this.tweens.add({ targets: back, scale: 1, duration: 280, delay: 380, ease: 'Back.easeOut' });

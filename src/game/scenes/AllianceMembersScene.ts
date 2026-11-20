@@ -16,6 +16,7 @@ import { showToast } from '../ui/Toast';
 import { formatAgo } from '../ui/format';
 import type { InboxCard } from './InboxScene';
 import { AllianceScene, INK, PAD } from './AllianceBase';
+import { t } from '../i18n';
 
 type MembersTab = 'members' | 'requests' | 'invite';
 
@@ -24,7 +25,9 @@ const ROLE_ORDER: Record<AllianceRole, number> = { leader: 0, officer: 1, member
 /** メンバー: who is in the 同盟 (role, Lv, power, this week's part), with what the player may do to each; the 申請 waiting for an
  *  answer (幹部以上) and the フレンド to 招待. */
 export class AllianceMembersScene extends AllianceScene {
-  protected readonly screenTitle = '同盟メンバー';
+  protected get screenTitle(): string {
+    return t('alliance.members.title');
+  }
   protected readonly navTab = null;
   protected readonly toolbarHeight = 76;
 
@@ -44,9 +47,9 @@ export class AllianceMembersScene extends AllianceScene {
   protected buildToolbar(toolbar: Phaser.GameObjects.Container): void {
     const d = this.detail;
     const manage = !!d && d.me.role !== 'member';
-    const tabs = [{ key: 'members', label: 'メンバー' }];
-    if (manage) tabs.push({ key: 'requests', label: `申請`, badge: d.requests.length } as { key: string; label: string; badge?: number });
-    if (manage) tabs.push({ key: 'invite', label: '招待' });
+    const tabs = [{ key: 'members', label: t('alliance.shared.members') }];
+    if (manage) tabs.push({ key: 'requests', label: t('alliance.members.tabRequests'), badge: d.requests.length } as { key: string; label: string; badge?: number });
+    if (manage) tabs.push({ key: 'invite', label: t('alliance.shared.invites') });
     if (tabs.length === 1) return;
     const strip = buildTabStrip(this, tabs, this.tab, SCREEN_VIEW.w, 56, (key) => {
       this.tab = key as MembersTab;
@@ -62,7 +65,7 @@ export class AllianceMembersScene extends AllianceScene {
     if (this.tab === 'requests' && d.me.role !== 'member') return this.requestCards(d);
     if (this.tab === 'invite' && d.me.role !== 'member') return this.inviteCards(d);
     const sorted = [...d.members].sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || b.weekContribution - a.weekContribution);
-    return [this.sectionCard(`メンバー　${d.members.length} / ${d.summary.memberMax}人`), ...sorted.map((m) => this.memberCard(d, m))];
+    return [this.sectionCard(t('alliance.members.header', { count: d.members.length, memberMax: d.summary.memberMax })), ...sorted.map((m) => this.memberCard(d, m))];
   }
 
   // --- メンバー -------------------------------------------------------------------
@@ -75,8 +78,9 @@ export class AllianceMembersScene extends AllianceScene {
     const name = body(this, x, 30, m.name, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
     card.container.add(name);
     card.container.add(roleChip(this, x + name.width + 10, 30, m.role).container);
-    this.line(card, x, 62, `Lv.${m.level}　総合力 ${fullDigits(m.power)}`, '#f5e6c8', 18);
-    this.line(card, x, 92, `今週の貢献 ${fullDigits(m.weekContribution)}　${mine ? 'いま' : formatAgo(m.lastActiveAt)}`, '#cdbb94', 16);
+    this.line(card, x, 62, t('alliance.members.levelAndPower', { level: m.level, fullDigits: fullDigits(m.power) }), '#f5e6c8', 18);
+    const ago = mine ? t('alliance.members.activeNow') : formatAgo(m.lastActiveAt);
+    this.line(card, x, 92, t('alliance.members.weekContribution', { fullDigits: fullDigits(m.weekContribution), ago }), '#cdbb94', 16);
     const guard = () => this.scroll.isTap();
     const hit = this.add.zone(CARD_WIDTH / 2, 61, CARD_WIDTH, 122).setOrigin(0.5);
     hit.setInteractive({ useHandCursor: true });
@@ -98,12 +102,12 @@ export class AllianceMembersScene extends AllianceScene {
     const actions: { label: string; variant: 'gold' | 'wood' | 'danger'; onTap: () => void }[] = [];
     if (!mine) {
       const friend = this.save.social.friends.some((f) => f.id === m.uid);
-      if (!friend) actions.push({ label: 'フレンド申請', variant: 'wood', onTap: () => this.requestFriend(m) });
+      if (!friend) actions.push({ label: t('alliance.members.addFriend'), variant: 'wood', onTap: () => this.requestFriend(m) });
       if (myRole === 'leader') {
-        actions.push({ label: m.role === 'officer' ? '幹部をやめさせる' : '幹部にする', variant: 'wood', onTap: () => void this.setRole(m, m.role === 'officer' ? 'member' : 'officer') });
-        actions.push({ label: '同盟長をゆずる', variant: 'wood', onTap: () => this.askTransfer(m) });
+        actions.push({ label: m.role === 'officer' ? t('alliance.members.removeOfficer') : t('alliance.members.makeOfficer'), variant: 'wood', onTap: () => void this.setRole(m, m.role === 'officer' ? 'member' : 'officer') });
+        actions.push({ label: t('alliance.shared.transferLeader'), variant: 'wood', onTap: () => this.askTransfer(m) });
       }
-      if ((myRole === 'leader' && m.role !== 'leader') || (myRole === 'officer' && m.role === 'member')) actions.push({ label: '除名する', variant: 'danger', onTap: () => this.askKick(m) });
+      if ((myRole === 'leader' && m.role !== 'leader') || (myRole === 'officer' && m.role === 'member')) actions.push({ label: t('alliance.members.removeMember'), variant: 'danger', onTap: () => this.askKick(m) });
     }
     // The name and four lines take 372px; each action 76px; then the 閉じる button under them all.
     const h = 480 + actions.length * 76;
@@ -114,10 +118,10 @@ export class AllianceMembersScene extends AllianceScene {
     panel.add(buildAvatar(this, 360, top + 70, 44, m.name));
     panel.add(heading(this, 360, top + 140, m.name, { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     const rows: [string, string][] = [
-      ['役職', ALLIANCE_ROLE_LABEL[m.role]],
-      ['レベル / 総合力', `Lv.${m.level}　${fullDigits(m.power)}`],
-      ['今週のボスダメージ', fullDigits(m.weekDamage)],
-      ['これまでの貢献', fullDigits(m.contribution)],
+      [t('alliance.members.role'), t(ALLIANCE_ROLE_LABEL[m.role])],
+      [t('alliance.members.levelPowerLabel'), t('alliance.members.levelPowerValue', { level: m.level, fullDigits: fullDigits(m.power) })],
+      [t('alliance.members.weekDamage'), fullDigits(m.weekDamage)],
+      [t('alliance.members.totalContribution'), fullDigits(m.contribution)],
     ];
     rows.forEach(([label, value], i) => {
       const y = top + 190 + i * 38;
@@ -135,32 +139,32 @@ export class AllianceMembersScene extends AllianceScene {
       );
       y += 76;
     }
-    panel.add(new Button(this, 360, top + h - 44, 220, 56, '閉じる', () => handle.close(), { variant: 'wood', fontSize: '22px' }));
+    panel.add(new Button(this, 360, top + h - 44, 220, 56, t('common.close'), () => handle.close(), { variant: 'wood', fontSize: '22px' }));
   }
 
   private requestFriend(m: AllianceMember): void {
     const result = SocialSystem.sendRequest(this.save.social, m.uid);
     if (!result.ok) {
-      const reasons: Record<string, string> = { invalid: 'IDが正しくありません', self: '自分には申請できません', already_friend: 'すでにフレンドです', already_requested: 'すでに申請済みです', friends_full: 'フレンドが上限です', too_many_requests: '申請中の数が上限です' };
-      showToast(this, reasons[result.reason] ?? '申請できませんでした', '#ff8a8a');
+      const reasons: Record<string, string> = { invalid: t('alliance.members.friendInvalid'), self: t('alliance.members.friendSelf'), already_friend: t('alliance.members.friendAlready'), already_requested: t('alliance.members.friendRequested'), friends_full: t('alliance.members.friendsFull'), too_many_requests: t('alliance.members.friendTooMany') };
+      showToast(this, reasons[result.reason] ?? t('alliance.members.friendFailed'), '#ff8a8a');
       return;
     }
     SaveSystem.save(this.save);
-    showToast(this, `${m.name}にフレンド申請しました`);
+    showToast(this, t('alliance.members.friendSent', { name: m.name }));
   }
 
   private async setRole(m: AllianceMember, role: 'officer' | 'member'): Promise<void> {
-    await this.run(AllianceService.backend().setRole(this.profile, m.uid, role), () => showToast(this, role === 'officer' ? `${m.name}を幹部にしました` : `${m.name}を幹部から外しました`));
+    await this.run(AllianceService.backend().setRole(this.profile, m.uid, role), () => showToast(this, role === 'officer' ? t('alliance.members.nowOfficer', { name: m.name }) : t('alliance.members.noLongerOfficer', { name: m.name })));
   }
 
   private askTransfer(m: AllianceMember): void {
     this.setModal(
       openConfirm(this, this.scroll, {
-        title: '同盟長をゆずる',
-        message: `${m.name}に、同盟長をゆずりますか？\nあなたは幹部になります。`,
-        confirmLabel: 'ゆずる',
+        title: t('alliance.shared.transferLeader'),
+        message: t('alliance.members.confirmTransfer', { name: m.name }),
+        confirmLabel: t('alliance.members.transferConfirm'),
         confirmVariant: 'gold',
-        onConfirm: () => void this.run(AllianceService.backend().transferLeader(this.profile, m.uid), () => showToast(this, `${m.name}が同盟長になりました`)),
+        onConfirm: () => void this.run(AllianceService.backend().transferLeader(this.profile, m.uid), () => showToast(this, t('alliance.members.nowLeader', { name: m.name }))),
       }),
     );
   }
@@ -168,10 +172,10 @@ export class AllianceMembersScene extends AllianceScene {
   private askKick(m: AllianceMember): void {
     this.setModal(
       openConfirm(this, this.scroll, {
-        title: '除名',
-        message: `${m.name}を同盟から外しますか？`,
-        confirmLabel: '除名する',
-        onConfirm: () => void this.run(AllianceService.backend().kick(this.profile, m.uid), () => showToast(this, `${m.name}を除名しました`)),
+        title: t('alliance.members.kickTitle'),
+        message: t('alliance.members.confirmKick', { name: m.name }),
+        confirmLabel: t('alliance.members.kickConfirm'),
+        onConfirm: () => void this.run(AllianceService.backend().kick(this.profile, m.uid), () => showToast(this, t('alliance.members.kicked', { name: m.name }))),
       }),
     );
   }
@@ -179,7 +183,7 @@ export class AllianceMembersScene extends AllianceScene {
   // --- 申請 -------------------------------------------------------------------------
 
   private requestCards(d: AllianceDetail): InboxCard[] {
-    if (d.requests.length === 0) return [this.hintCard('参加の申請は、来ていません。')];
+    if (d.requests.length === 0) return [this.hintCard(t('alliance.members.noRequests'))];
     const now = Date.now();
     const guard = () => this.scroll.isTap();
     return d.requests.map((r: AllianceRequest) => {
@@ -187,24 +191,24 @@ export class AllianceMembersScene extends AllianceScene {
       card.container.add(buildAvatar(this, PAD + 34, 59, 30, r.name));
       const x = PAD + 80;
       card.container.add(body(this, x, 34, r.name, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      this.line(card, x, 72, `Lv.${r.level}　総合力 ${fullDigits(r.power)}　${formatAgo(r.at, now)}`, '#d8c49a', 17);
-      card.container.add(new Button(this, CARD_WIDTH - PAD - 178, 59, 104, 54, '承認', () => void this.resolve(r, true), { variant: 'gold', fontSize: '22px', guard }));
-      card.container.add(new Button(this, CARD_WIDTH - PAD - 56, 59, 104, 54, '却下', () => void this.resolve(r, false), { variant: 'wood', fontSize: '22px', guard }));
+      this.line(card, x, 72, t('alliance.members.requestInfo', { level: r.level, fullDigits: fullDigits(r.power), formatAgo: formatAgo(r.at, now) }), '#d8c49a', 17);
+      card.container.add(new Button(this, CARD_WIDTH - PAD - 178, 59, 104, 54, t('alliance.members.approve'), () => void this.resolve(r, true), { variant: 'gold', fontSize: '22px', guard }));
+      card.container.add(new Button(this, CARD_WIDTH - PAD - 56, 59, 104, 54, t('alliance.members.decline'), () => void this.resolve(r, false), { variant: 'wood', fontSize: '22px', guard }));
       return card;
     });
   }
 
   private async resolve(r: AllianceRequest, accept: boolean): Promise<void> {
-    await this.run(AllianceService.backend().resolveRequest(this.profile, r.uid, accept), () => showToast(this, accept ? `${r.name}を迎えました` : `${r.name}の申請を断りました`));
+    await this.run(AllianceService.backend().resolveRequest(this.profile, r.uid, accept), () => showToast(this, accept ? t('alliance.members.accepted', { name: r.name }) : t('alliance.members.declined', { name: r.name })));
   }
 
   // --- 招待 -------------------------------------------------------------------------
 
   private inviteCards(d: AllianceDetail): InboxCard[] {
     const friends = SocialSystem.sortedFriends(this.save.social).filter((f) => !d.members.some((m) => m.uid === f.id));
-    const cards: InboxCard[] = [this.hintCard('フレンドを同盟に招待できます。招待は、相手のフレンドごとに1日1回です。')];
+    const cards: InboxCard[] = [this.hintCard(t('alliance.members.inviteHint'))];
     if (friends.length === 0) {
-      cards.push(this.hintCard('招待できるフレンドがいません。'));
+      cards.push(this.hintCard(t('alliance.members.noFriendsToInvite')));
       return cards;
     }
     const guard = () => this.scroll.isTap();
@@ -212,9 +216,9 @@ export class AllianceMembersScene extends AllianceScene {
       const card = this.shell(104);
       card.container.add(buildAvatar(this, PAD + 34, 52, 30, f.name));
       card.container.add(body(this, PAD + 80, 34, f.name, { fontSize: '25px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      this.line(card, PAD + 80, 70, `Lv.${f.level}　${formatAgo(f.lastLoginAt)}`, '#d8c49a', 17);
+      this.line(card, PAD + 80, 70, t('alliance.members.friendInfo', { level: f.level, formatAgo: formatAgo(f.lastLoginAt) }), '#d8c49a', 17);
       const sent = this.invited.has(f.id);
-      const button = new Button(this, CARD_WIDTH - PAD - 70, 52, 130, 54, sent ? '招待済み' : '招待する', () => void this.invite(f.id, f.name), { variant: sent ? 'wood' : 'gold', fontSize: '21px', guard });
+      const button = new Button(this, CARD_WIDTH - PAD - 70, 52, 130, 54, sent ? t('alliance.members.invited') : t('alliance.members.invite'), () => void this.invite(f.id, f.name), { variant: sent ? 'wood' : 'gold', fontSize: '21px', guard });
       button.setEnabled(!sent);
       card.container.add(button);
       cards.push(card);
@@ -225,7 +229,7 @@ export class AllianceMembersScene extends AllianceScene {
   private async invite(uid: string, name: string): Promise<void> {
     await this.run(AllianceService.backend().invite(this.profile, uid), () => {
       this.invited.add(uid);
-      showToast(this, `${name}を招待しました`);
+      showToast(this, t('alliance.members.invitedToast', { name }));
     });
   }
 }

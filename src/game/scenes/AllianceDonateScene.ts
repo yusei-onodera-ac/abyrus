@@ -1,5 +1,5 @@
 import { AllianceService } from '../alliance/AllianceService';
-import type { AllianceDetail, DonationKind } from '../alliance/AllianceBackend';
+import { DONATION_LABEL, type AllianceDetail, type DonationKind } from '../alliance/AllianceBackend';
 import { DONATIONS, DONATION_KINDS } from '../data/alliance';
 import { SaveSystem } from '../systems/SaveSystem';
 import { playAllianceLevelUp } from '../ui/AllianceFx';
@@ -9,15 +9,18 @@ import { openConfirm } from '../ui/Dialogs';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body } from '../ui/theme';
 import { showToast } from '../ui/Toast';
+import { t, type PlainKey } from '../i18n';
 import type { InboxCard } from './InboxScene';
 import { AllianceScene, INK, PAD } from './AllianceBase';
 
-const WHAT: Record<DonationKind, string> = { gold: '放置報酬 1時間分のゴールド', materials: '素材（木材・鉄・石）合わせて100個', gems: '魔晶石 10個' };
+const WHAT: Record<DonationKind, PlainKey> = { gold: 'alliance.donate.whatGold', materials: 'alliance.donate.whatMaterials', gems: 'alliance.donate.whatGems' };
 
 /** 寄付: gold, 素材 and 魔晶石 given to the 同盟 raise its level (and everyone's perks) and give the donor 貢献, which are also
  *  同盟コイン for the ショップ. Each kind has a daily limit. */
 export class AllianceDonateScene extends AllianceScene {
-  protected readonly screenTitle = '寄付';
+  protected get screenTitle(): string {
+    return t('alliance.shared.donate');
+  }
   protected readonly navTab = null;
 
   constructor() {
@@ -31,24 +34,25 @@ export class AllianceDonateScene extends AllianceScene {
 
   private statusCard(d: AllianceDetail): InboxCard {
     const card = this.shell(176, true);
-    card.container.add(body(this, PAD + 6, 30, `同盟Lv.${d.summary.level}`, { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    card.container.add(body(this, PAD + 6, 30, t('alliance.shared.level', { level: d.summary.level }), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     const need = d.expToNext;
     card.container.add(buildBar(this, PAD + 6, 62, CARD_WIDTH - PAD * 2 - 12, 22, need ? d.exp / need : 1, 0x3a7fd6));
-    this.line(card, PAD + 6, 106, need ? `同盟EXP ${fullDigits(d.exp)} / ${fullDigits(need)}` : '同盟Lv 最大です', '#f5e6c8', 19);
-    this.line(card, PAD + 6, 142, `あなたの同盟コイン ${fullDigits(d.coins)}　これまでの貢献 ${fullDigits(d.me.contribution)}`, '#cdbb94', 18);
+    this.line(card, PAD + 6, 106, need ? t('alliance.donate.exp', { fullDigits: fullDigits(d.exp), fullDigits2: fullDigits(need) }) : t('alliance.donate.maxLevel'), '#f5e6c8', 19);
+    this.line(card, PAD + 6, 142, t('alliance.donate.coinsAndContribution', { fullDigits: fullDigits(d.coins), fullDigits2: fullDigits(d.me.contribution) }), '#cdbb94', 18);
     return card;
   }
 
   private kindCard(d: AllianceDetail, kind: DonationKind): InboxCard {
     const guard = () => this.scroll.isTap();
     const rule = DONATIONS[kind];
+    const what = t(WHAT[kind]);
     const left = d.donationLeft[kind] ?? 0;
     const card = this.shell(154, left > 0);
-    card.container.add(body(this, PAD + 6, 30, rule.label, { fontSize: '27px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    this.line(card, PAD + 6, 66, `1回　${WHAT[kind]}`, '#f5e6c8', 18);
-    this.line(card, PAD + 6, 98, `同盟EXP +${rule.allianceExp}　貢献・同盟コイン +${rule.contribution}`, '#9fe39f', 18);
-    this.line(card, PAD + 6, 128, `今日あと ${left}回（1日${rule.limit}回まで）`, left > 0 ? '#cdbb94' : '#ff9a8a', 17);
-    const button = new Button(this, CARD_WIDTH - PAD - 90, 78, 170, 66, left > 0 ? '寄付する' : '今日は終了', () => this.ask(kind), { variant: 'gold', fontSize: '26px', guard });
+    card.container.add(body(this, PAD + 6, 30, t(DONATION_LABEL[kind]), { fontSize: '27px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    this.line(card, PAD + 6, 66, t('alliance.donate.each', { what }), '#f5e6c8', 18);
+    this.line(card, PAD + 6, 98, t('alliance.donate.gains', { allianceExp: rule.allianceExp, contribution: rule.contribution }), '#9fe39f', 18);
+    this.line(card, PAD + 6, 128, t('alliance.donate.leftToday', { left, limit: rule.limit }), left > 0 ? '#cdbb94' : '#ff9a8a', 17);
+    const button = new Button(this, CARD_WIDTH - PAD - 90, 78, 170, 66, left > 0 ? t('alliance.donate.donate') : t('alliance.donate.doneToday'), () => this.ask(kind), { variant: 'gold', fontSize: '26px', guard });
     button.setEnabled(left > 0);
     card.container.add(button);
     return card;
@@ -56,11 +60,12 @@ export class AllianceDonateScene extends AllianceScene {
 
   private ask(kind: DonationKind): void {
     const rule = DONATIONS[kind];
+    const what = t(WHAT[kind]);
     this.setModal(
       openConfirm(this, this.scroll, {
-        title: `${rule.label}を寄付`,
-        message: `${WHAT[kind]}を、同盟に寄付します。\n同盟EXP +${rule.allianceExp}、貢献 +${rule.contribution}`,
-        confirmLabel: '寄付する',
+        title: t('alliance.donate.confirmTitle', { label: t(DONATION_LABEL[kind]) }),
+        message: t('alliance.donate.confirmMessage', { what, allianceExp: rule.allianceExp, contribution: rule.contribution }),
+        confirmLabel: t('alliance.donate.donate'),
         confirmVariant: 'gold',
         onConfirm: () => void this.donate(kind),
       }),
@@ -70,7 +75,7 @@ export class AllianceDonateScene extends AllianceScene {
   private async donate(kind: DonationKind): Promise<void> {
     await this.run(AllianceService.donate(this.save, kind), (r) => {
       SaveSystem.save(this.save);
-      showToast(this, `同盟EXP +${r.allianceExp}　貢献 +${r.contribution}`);
+      showToast(this, t('alliance.donate.donated', { allianceExp: r.allianceExp, contribution: r.contribution }));
       if (r.levelUp !== null) playAllianceLevelUp(this, r.levelUp);
     });
   }

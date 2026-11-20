@@ -78,6 +78,7 @@ import {
   weekId,
   weekStartMs,
 } from './onlineLogic';
+import { t as tl } from '../i18n';
 
 // ---------------------------------------------------------------------------------------------- SDK
 
@@ -156,14 +157,14 @@ function toFailure(err: unknown): Failure {
   if (err instanceof Stop) return err.failure;
   const code = (err as { code?: string } | null)?.code ?? '';
   const text = err instanceof Error ? err.message : String(err);
-  if (code.includes('permission-denied')) return fail('no_permission', 'この操作は、できません（権限がありません）。');
-  if (code.includes('unauthenticated')) return fail('not_signed_in', 'サインインできていません。');
+  if (code.includes('permission-denied')) return fail('no_permission', tl('alliance.error.noPermission'));
+  if (code.includes('unauthenticated')) return fail('not_signed_in', tl('alliance.error.notSignedIn'));
   if (code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('network') || /network|offline|Failed to fetch/i.test(text)) {
-    return fail('offline', '通信できませんでした。しばらくしてから、もう一度ためしてください。');
+    return fail('offline', tl('alliance.error.offline'));
   }
-  if (code.includes('resource-exhausted')) return fail('limit_reached', '回数の上限です。');
-  if (code.includes('not-found')) return fail('not_found', '見つかりませんでした。');
-  return fail('error', `うまくいきませんでした（${text.slice(0, 80)}）`);
+  if (code.includes('resource-exhausted')) return fail('limit_reached', tl('alliance.error.limitReached'));
+  if (code.includes('not-found')) return fail('not_found', tl('alliance.error.notFound'));
+  return fail('error', tl('alliance.error.unknown', { slice: text.slice(0, 80) }));
 }
 
 // ---------------------------------------------------------------------------------------------- 小さな道具
@@ -183,7 +184,7 @@ export function nameKey(name: string): string {
 }
 
 function cleanName(name: string): string {
-  return name.trim().slice(0, 24) || 'プレイヤー';
+  return name.trim().slice(0, 24) || 'プレイヤー'; // i18n-ignore (the default name is sent to the server and kept there)
 }
 
 const ROLE_RANK: Record<AllianceRole, number> = { member: 0, officer: 1, leader: 2 };
@@ -289,12 +290,12 @@ export class OnlineAllianceBackend implements AllianceBackend {
           await batch.commit();
         } catch (err) {
           if ((err as { code?: string }).code?.includes('permission-denied')) {
-            stop('not_signed_in', 'この端末のIDは、すでに別の端末で使われています。');
+            stop('not_signed_in', tl('alliance.error.idInUse'));
           }
           throw err;
         }
       } else {
-        if (snap.data().playerId !== me.uid) stop('not_signed_in', 'この端末のアカウントは、別のIDで使われています。');
+        if (snap.data().playerId !== me.uid) stop('not_signed_in', tl('alliance.error.accountMismatch'));
         await fs.updateDoc(userRef, { ...profile, updatedAt: fs.serverTimestamp() });
       }
       // サーバー時刻との差を測る (書いた updatedAt を、読み戻す)。
@@ -317,7 +318,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
     const sdk = await this.sdk();
     const res = await sdk.fn.httpsCallable<unknown, FnResult<T>>(sdk.functions, name)(data);
     const body = res.data;
-    if (!body || typeof body !== 'object') stop('error', 'サーバーの返事が、おかしいです。');
+    if (!body || typeof body !== 'object') stop('error', tl('alliance.error.badServerReply'));
     if (!body.ok) throw new Stop(fail(body.reason, body.message));
     return body.value;
   }
@@ -338,7 +339,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
 
   private async requireAlliance(s: Session): Promise<string> {
     const id = this.cached?.allianceId ?? (await this.myAllianceId(s));
-    if (!id) return stop('not_in_alliance', '同盟に入っていません。');
+    if (!id) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
     return id;
   }
 
@@ -348,7 +349,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
     if (known) return known.authUid;
     const { fs, db } = await this.sdk();
     const snap = await fs.getDocs(fs.query(fs.collection(db, 'alliances', allianceId, 'members'), fs.where('playerId', '==', playerId), fs.limit(1)));
-    if (snap.empty) return stop('not_found', 'そのメンバーは、見つかりません。');
+    if (snap.empty) return stop('not_found', tl('alliance.error.memberNotFound'));
     const doc = snap.docs[0];
     this.directory.set(playerId, { authUid: doc.id, playerId, name: str(doc.data().name), role: doc.data().role });
     return doc.id;
@@ -402,7 +403,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
     return this.run(async () => {
       const name = params.name.trim();
       const length = Array.from(name).length;
-      if (length < NAME_MIN || length > NAME_MAX) stop('bad_name', `名前は、${NAME_MIN}〜${NAME_MAX}文字にしてください。`);
+      if (length < NAME_MIN || length > NAME_MAX) stop('bad_name', tl('alliance.error.nameLength', { NAME_MIN, NAME_MAX }));
       const s = await this.session(me);
       await this.repairStale(s);
       const { fs, db } = await this.sdk();
@@ -418,7 +419,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
         const user = await t.get(userRef);
         await this.assertFree(t, s, user.data());
         const taken = await t.get(fs.doc(db, 'allianceNames', key));
-        if (taken.exists()) stop('name_taken', 'その名前は、すでに使われています。');
+        if (taken.exists()) stop('name_taken', tl('alliance.error.nameTaken'));
         t.set(allianceRef, {
           name,
           nameLower: key,
@@ -471,10 +472,10 @@ export class OnlineAllianceBackend implements AllianceBackend {
     const current = user?.allianceId;
     if (typeof current === 'string' && current) {
       const member = await t.get(fs.doc(db, 'alliances', current, 'members', s.authUid));
-      if (member.exists()) stop('already_in_alliance', 'すでに同盟に入っています。');
+      if (member.exists()) stop('already_in_alliance', tl('alliance.error.alreadyInAlliance'));
     }
     const left = toMillis(user?.leftAt);
-    if (left > 0 && this.now() < left + 24 * 3_600_000) stop('cooldown', '同盟を抜けてから24時間は、別の同盟に入れません。');
+    if (left > 0 && this.now() < left + 24 * 3_600_000) stop('cooldown', tl('alliance.error.cooldown'));
   }
 
   async join(me: PlayerProfile, allianceId: string): Promise<Result<'joined' | 'requested'>> {
@@ -492,13 +493,13 @@ export class OnlineAllianceBackend implements AllianceBackend {
         const user = await t.get(userRef);
         await this.assertFree(t, s, user.data());
         const alliance = await t.get(allianceRef);
-        if (!alliance.exists()) return stop('not_found', 'その同盟は、見つかりません。');
+        if (!alliance.exists()) return stop('not_found', tl('alliance.error.noSuchAllianceOnline'));
         const a = alliance.data();
         const request = await t.get(requestRef);
         const invite = await t.get(inviteRef);
         const approved = request.exists() && request.data().status === 'approved';
         const full = num(a.memberCount) >= num(a.memberMax, 20);
-        if (full) return stop('full', 'この同盟は、満員です。');
+        if (full) return stop('full', tl('alliance.error.allianceFull'));
         const enter = (): 'joined' => {
           t.set(fs.doc(db, 'alliances', allianceId, 'members', s.authUid), this.newMemberDoc(fs, s, profile, 'member'));
           t.update(allianceRef, { memberCount: num(a.memberCount) + 1, updatedAt: fs.serverTimestamp() });
@@ -510,13 +511,13 @@ export class OnlineAllianceBackend implements AllianceBackend {
         };
         if (approved || invite.exists()) return enter();
         if (a.joinPolicy === 'open') {
-          if (me.level < num(a.minPlayerLevel)) return stop('level_too_low', `プレイヤーLv${num(a.minPlayerLevel)}以上で、入れます。`);
+          if (me.level < num(a.minPlayerLevel)) return stop('level_too_low', tl('alliance.error.needLevelToJoin', { num: num(a.minPlayerLevel) }));
           return enter();
         }
-        if (a.joinPolicy === 'invite') return stop('invite_only', 'この同盟は、招待された人だけが入れます。');
+        if (a.joinPolicy === 'invite') return stop('invite_only', tl('alliance.error.onlyInvited'));
         // 承認制: 申請する。
-        if (me.level < num(a.minPlayerLevel)) return stop('level_too_low', `プレイヤーLv${num(a.minPlayerLevel)}以上で、申請できます。`);
-        if (request.exists()) return stop('already_requested', 'すでに申請しています。');
+        if (me.level < num(a.minPlayerLevel)) return stop('level_too_low', tl('alliance.error.needLevelToApply', { num: num(a.minPlayerLevel) }));
+        if (request.exists()) return stop('already_requested', tl('alliance.error.alreadyApplied'));
         t.set(requestRef, { playerId: s.playerId, name: profile.name, level: profile.level, power: profile.power, at: fs.serverTimestamp(), status: 'pending' });
         t.set(outRef, { at: fs.serverTimestamp() });
         return 'requested' as const;
@@ -526,7 +527,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
         if (out.size > MAX_PENDING_REQUESTS_OUT) {
           // 申請の出しすぎ: いま出した分を、取り消す。
           await this.cancelRequest(me, allianceId);
-          return stop('limit_reached', `同時に出せる申請は、${MAX_PENDING_REQUESTS_OUT}つまでです。`);
+          return stop('limit_reached', tl('alliance.error.tooManyPending', { MAX_PENDING_REQUESTS_OUT }));
         }
       }
       this.invalidate();
@@ -583,15 +584,15 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
       const mine = await fs.getDoc(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
-      if (!mine.exists() || ROLE_RANK[mine.data().role as AllianceRole] < ROLE_RANK.officer) return stop('no_permission', '招待できるのは、幹部以上です。');
+      if (!mine.exists() || ROLE_RANK[mine.data().role as AllianceRole] < ROLE_RANK.officer) return stop('no_permission', tl('alliance.error.inviteOfficerUp'));
       const index = await fs.getDoc(fs.doc(db, 'playerIndex', friendUid));
-      if (!index.exists()) return stop('not_found', 'そのフレンドは、まだ同盟のしくみを使っていません。');
+      if (!index.exists()) return stop('not_found', tl('alliance.error.friendNotReady'));
       const friendAuth = str(index.data().authUid);
       const alliance = await fs.getDoc(fs.doc(db, 'alliances', allianceId));
       const inviteRef = fs.doc(db, 'users', friendAuth, 'invites', allianceId);
       await fs.runTransaction(db, async (t) => {
         const existing = await t.get(inviteRef);
-        if (existing.exists() && this.now() - toMillis(existing.data().at) < 24 * 3_600_000) stop('limit_reached', 'その人には、きょうすでに招待しています。');
+        if (existing.exists() && this.now() - toMillis(existing.data().at) < 24 * 3_600_000) stop('limit_reached', tl('alliance.error.invitedToday'));
         t.set(inviteRef, { allianceName: str(alliance.data()?.name), emblem: num(alliance.data()?.emblem), fromAuth: s.authUid, fromName: cleanName(me.name), at: fs.serverTimestamp() });
       });
       return true as const;
@@ -618,15 +619,15 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
       const mine = await fs.getDoc(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
-      if (!mine.exists() || ROLE_RANK[mine.data().role as AllianceRole] < ROLE_RANK.officer) return stop('no_permission', '承認できるのは、幹部以上です。');
+      if (!mine.exists() || ROLE_RANK[mine.data().role as AllianceRole] < ROLE_RANK.officer) return stop('no_permission', tl('alliance.error.approveOfficerUp'));
       const found = await fs.getDocs(fs.query(fs.collection(db, 'alliances', allianceId, 'requests'), fs.where('playerId', '==', uid), fs.limit(1)));
-      if (found.empty) return stop('not_found', 'その申請は、もうありません。');
+      if (found.empty) return stop('not_found', tl('alliance.error.requestGone'));
       const ref = found.docs[0].ref;
       if (!accept) {
         await fs.deleteDoc(ref);
       } else {
         const alliance = await fs.getDoc(fs.doc(db, 'alliances', allianceId));
-        if (num(alliance.data()?.memberCount) >= num(alliance.data()?.memberMax, 20)) return stop('full', '満員です。');
+        if (num(alliance.data()?.memberCount) >= num(alliance.data()?.memberMax, 20)) return stop('full', tl('alliance.error.full'));
         // 承認は「印」をつけるだけ。申請した本人が、次に開いたときに、自分で入る (users 文書は、本人だけが書ける)。
         await fs.updateDoc(ref, { status: 'approved' });
       }
@@ -645,11 +646,11 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const userRef = fs.doc(db, 'users', s.authUid);
       await fs.runTransaction(db, async (t) => {
         const member = await t.get(memberRef);
-        if (!member.exists()) return stop('not_in_alliance', '同盟に入っていません。');
+        if (!member.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
         const alliance = await t.get(allianceRef);
         const count = num(alliance.data()?.memberCount, 1);
         if (member.data().role === 'leader') {
-          if (count > 1) return stop('no_permission', '同盟長は、ほかのメンバーに譲ってから、抜けてください。');
+          if (count > 1) return stop('no_permission', tl('alliance.error.leaderMustTransferOnline'));
           // 1人だけ: 抜けると解散。
           t.delete(allianceRef);
           t.delete(memberRef);
@@ -675,11 +676,11 @@ export class OnlineAllianceBackend implements AllianceBackend {
       await fs.runTransaction(db, async (t) => {
         const mine = await t.get(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
         const theirs = await t.get(fs.doc(db, 'alliances', allianceId, 'members', target));
-        if (!mine.exists()) return stop('not_in_alliance', '同盟に入っていません。');
-        if (!theirs.exists()) return stop('not_found', 'そのメンバーは、もういません。');
+        if (!mine.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
+        if (!theirs.exists()) return stop('not_found', tl('alliance.error.memberGone'));
         const my = ROLE_RANK[mine.data().role as AllianceRole];
         const their = ROLE_RANK[theirs.data().role as AllianceRole];
-        if (target === s.authUid || my < ROLE_RANK.officer || their >= my) return stop('no_permission', 'このメンバーは、外せません。');
+        if (target === s.authUid || my < ROLE_RANK.officer || their >= my) return stop('no_permission', tl('alliance.error.cantRemove'));
         const alliance = await t.get(allianceRef);
         t.delete(fs.doc(db, 'alliances', allianceId, 'members', target));
         t.update(allianceRef, { memberCount: Math.max(1, num(alliance.data()?.memberCount, 1) - 1), updatedAt: fs.serverTimestamp() });
@@ -697,11 +698,11 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const allianceId = await this.requireAlliance(s);
       const target = await this.authOf(allianceId, uid);
       const mine = await fs.getDoc(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
-      if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', '役職を変えられるのは、同盟長だけです。');
-      if (target === s.authUid) return stop('bad_input', '自分の役職は、変えられません。');
+      if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', tl('alliance.error.leaderOnlyChangeRoles'));
+      if (target === s.authUid) return stop('bad_input', tl('alliance.error.ownRole'));
       if (role === 'officer') {
         const officers = await fs.getDocs(fs.query(fs.collection(db, 'alliances', allianceId, 'members'), fs.where('role', '==', 'officer')));
-        if (officers.size >= 3) return stop('limit_reached', '幹部は、3人までです。');
+        if (officers.size >= 3) return stop('limit_reached', tl('alliance.error.officerMax3'));
       }
       await fs.updateDoc(fs.doc(db, 'alliances', allianceId, 'members', target), { role });
       this.invalidate();
@@ -720,8 +721,8 @@ export class OnlineAllianceBackend implements AllianceBackend {
       await fs.runTransaction(db, async (t) => {
         const mine = await t.get(myRef);
         const theirs = await t.get(theirRef);
-        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', '同盟長だけが、譲れます。');
-        if (!theirs.exists() || target === s.authUid) return stop('not_found', 'そのメンバーは、見つかりません。');
+        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', tl('alliance.error.leaderOnlyTransferOnline'));
+        if (!theirs.exists() || target === s.authUid) return stop('not_found', tl('alliance.error.memberNotFound'));
         t.update(myRef, { role: 'officer' });
         t.update(theirRef, { role: 'leader' });
         t.update(fs.doc(db, 'alliances', allianceId), { leaderAuth: target, leaderName: str(theirs.data().name), updatedAt: fs.serverTimestamp() });
@@ -739,19 +740,19 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const allianceRef = fs.doc(db, 'alliances', allianceId);
       await fs.runTransaction(db, async (t) => {
         const mine = await t.get(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
-        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', '設定を変えられるのは、同盟長だけです。');
+        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', tl('alliance.error.leaderOnlySettings'));
         const alliance = await t.get(allianceRef);
-        if (!alliance.exists()) return stop('not_found', '同盟が見つかりません。');
+        if (!alliance.exists()) return stop('not_found', tl('alliance.error.allianceNotFound'));
         const a = alliance.data();
         const next: DocumentData = { updatedAt: fs.serverTimestamp() };
         if (patch.name !== undefined && patch.name.trim() !== a.name) {
           const name = patch.name.trim();
           const length = Array.from(name).length;
-          if (length < NAME_MIN || length > NAME_MAX) return stop('bad_name', `名前は、${NAME_MIN}〜${NAME_MAX}文字にしてください。`);
+          if (length < NAME_MIN || length > NAME_MAX) return stop('bad_name', tl('alliance.error.nameLength', { NAME_MIN, NAME_MAX }));
           const key = nameKey(name);
           if (key !== a.nameLower) {
             const taken = await t.get(fs.doc(db, 'allianceNames', key));
-            if (taken.exists()) return stop('name_taken', 'その名前は、すでに使われています。');
+            if (taken.exists()) return stop('name_taken', tl('alliance.error.nameTaken'));
             t.delete(fs.doc(db, 'allianceNames', str(a.nameLower)));
             t.set(fs.doc(db, 'allianceNames', key), { allianceId });
           }
@@ -778,7 +779,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const allianceRef = fs.doc(db, 'alliances', allianceId);
       await fs.runTransaction(db, async (t) => {
         const mine = await t.get(fs.doc(db, 'alliances', allianceId, 'members', s.authUid));
-        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', '解散できるのは、同盟長だけです。');
+        if (!mine.exists() || mine.data().role !== 'leader') return stop('no_permission', tl('alliance.error.leaderOnlyDisband'));
         const alliance = await t.get(allianceRef);
         t.delete(allianceRef);
         t.delete(fs.doc(db, 'allianceNames', str(alliance.data()?.nameLower)));
@@ -858,7 +859,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       fs.getDocs(fs.collection(db, 'alliances', allianceId, 'members', s.authUid, 'inbox')),
       fs.getDoc(fs.doc(db, 'alliances', allianceId, 'raid', week, 'claims', s.authUid)),
     ]);
-    if (!allianceSnap.exists()) stop('not_found', '同盟が見つかりません。');
+    if (!allianceSnap.exists()) stop('not_found', tl('alliance.error.allianceNotFound'));
     const a = allianceSnap.data() ?? {};
     const summary = summaryFrom(allianceId, a);
     const perks = perksForLevel(summary.level);
@@ -887,7 +888,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       };
     });
     const mineDoc = memberSnaps.docs.find((d) => d.id === s.authUid);
-    if (!mineDoc) stop('not_in_alliance', '同盟に入っていません。');
+    if (!mineDoc) stop('not_in_alliance', tl('alliance.error.notInAlliance'));
     const meMember = members.find((m) => m.uid === s.playerId) as AllianceMember;
     // 自分の情報 (名前・Lv・総合力) が変わっていたら、同盟側にも反映する (最終ログインも、ここで更新)。
     const stale = Date.now() - toMillis(mineDoc!.data().lastActiveAt) > PROFILE_SYNC_MS || mineDoc!.data().name !== cleanName(me.name) || num(mineDoc!.data().level) !== Math.floor(me.level);
@@ -1123,7 +1124,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
   async donate(me: PlayerProfile, kind: DonationKind): Promise<Result<DonationResult>> {
     return this.run(async () => {
       const rule = DONATION[kind];
-      if (!rule) return stop('bad_input', '寄付の種類が、おかしいです。');
+      if (!rule) return stop('bad_input', tl('alliance.error.badDonationType'));
       const s = await this.session(me);
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
@@ -1137,10 +1138,10 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const field = kind === 'gold' ? 'donGold' : kind === 'materials' ? 'donMaterials' : 'donGems';
       const result = await fs.runTransaction(db, async (t) => {
         const [alliance, member, daily, entry] = await Promise.all([t.get(allianceRef), t.get(memberRef), t.get(dailyRef), t.get(entryRef)]);
-        if (!alliance.exists() || !member.exists()) return stop('not_in_alliance', '同盟に入っていません。');
+        if (!alliance.exists() || !member.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
         const d = daily.data() ?? {};
         const used = num(d[field]);
-        if (used >= rule.perDay) return stop('limit_reached', 'きょうは、この寄付は、もうできません。');
+        if (used >= rule.perDay) return stop('limit_reached', tl('alliance.error.donationDoneToday'));
         const a = alliance.data() ?? {};
         const grown = addAllianceExp(num(a.level, 1), num(a.exp), rule.allianceExp);
         t.update(allianceRef, {
@@ -1174,16 +1175,16 @@ export class OnlineAllianceBackend implements AllianceBackend {
   async spendCoins(me: PlayerProfile, amount: number): Promise<Result<number>> {
     return this.run(async () => {
       const cost = Math.floor(amount);
-      if (!(cost > 0)) return stop('bad_input', '金額が、おかしいです。');
+      if (!(cost > 0)) return stop('bad_input', tl('alliance.error.badAmountOnline'));
       const s = await this.session(me);
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
       const memberRef = fs.doc(db, 'alliances', allianceId, 'members', s.authUid);
       const balance = await fs.runTransaction(db, async (t) => {
         const member = await t.get(memberRef);
-        if (!member.exists()) return stop('not_in_alliance', '同盟に入っていません。');
+        if (!member.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
         const coins = num(member.data().coins);
-        if (coins < cost) return stop('not_enough', '同盟コインが足りません。');
+        if (coins < cost) return stop('not_enough', tl('alliance.error.notEnoughCoins'));
         t.update(memberRef, { coins: coins - cost });
         return coins - cost;
       });
@@ -1222,7 +1223,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const claimedThisWeek = (await fs.getDoc(fs.doc(db, 'alliances', allianceId, 'raid', weekId(this.now()), 'claims', s.authUid))).exists();
       const raidSnap = await fs.getDoc(fs.doc(db, 'alliances', allianceId, 'raid', weekId(this.now())));
       const target = await this.claimTarget(s, allianceId, this.now(), claimedThisWeek, raidSnap.exists() ? raidSnap.data() ?? null : null, detail.raid.myDamage, detail.members);
-      if (!target) return stop('not_found', '受け取れる報酬は、ありません。');
+      if (!target) return stop('not_found', tl('alliance.error.nothingToClaim'));
       // 1人1回: 同じ ID の文書は、二度は作れない (ルールが、update / delete を禁じている)。
       await fs.setDoc(fs.doc(db, 'alliances', allianceId, 'raid', target.week, 'claims', s.authUid), { at: fs.serverTimestamp(), rank: target.rank });
       this.invalidate();
@@ -1235,7 +1236,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
   async addWarPoints(me: PlayerProfile, source: WarPointSource, points: number): Promise<Result<true>> {
     return this.run(async () => {
       // ボスのポイントは、サーバーが finishRaid で入れる。寄付のポイントは、donate が入れる。
-      if (source !== 'stages' && source !== 'helpers') return stop('bad_input', 'このポイントは、ここからは入れられません。');
+      if (source !== 'stages' && source !== 'helpers') return stop('bad_input', tl('alliance.error.pointsNotAllowed'));
       const cap = source === 'stages' ? WAR.stagePoints : WAR.helperPoints;
       const p = Math.max(0, Math.min(cap, Math.floor(points)));
       if (p === 0) return true as const;
@@ -1253,7 +1254,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
         const field = source === 'stages' ? 'stages' : 'helpers';
         if (source === 'stages') {
           const used = num(daily.data()?.stages);
-          if (used + p > WAR.stagePointsPerDay) return stop('limit_reached', 'きょうは、ステージのポイントは、もう入りません。');
+          if (used + p > WAR.stagePointsPerDay) return stop('limit_reached', tl('alliance.error.stagePointsDone'));
           t.set(dailyRef, { stages: used + p, total: num(daily.data()?.total), updatedAt: fs.serverTimestamp() }, { merge: true });
         }
         t.update(entryRef, { [field]: num(e[field]) + p, points: num(e.points) + p, updatedAt: fs.serverTimestamp() });
@@ -1270,7 +1271,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const allianceId = await this.requireAlliance(s);
       const prev = weekId(this.now() - 7 * 86_400_000);
       const result = await fs.getDoc(fs.doc(db, 'seasons', prev, 'results', allianceId));
-      if (!result.exists()) return stop('not_found', '受け取れる報酬は、ありません。');
+      if (!result.exists()) return stop('not_found', tl('alliance.error.nothingToClaim'));
       const rank = num(result.data()?.rank, WAR.groupSize);
       await fs.setDoc(fs.doc(db, 'seasons', prev, 'claims', `${allianceId}_${s.authUid}`), { at: fs.serverTimestamp(), rank });
       this.invalidate();
@@ -1294,7 +1295,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
 
   async borrowHelper(me: PlayerProfile, ownerUid: string): Promise<Result<HelperHero>> {
     return this.run(async () => {
-      if (ownerUid === me.uid) return stop('bad_input', '自分の助っ人は、借りられません。');
+      if (ownerUid === me.uid) return stop('bad_input', tl('alliance.error.ownHelper'));
       const s = await this.session(me);
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
@@ -1307,7 +1308,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const entryRef = fs.doc(db, 'seasons', week, 'entries', allianceId);
       const helper = await fs.runTransaction(db, async (t) => {
         const [ownerSnap, lend, entry] = await Promise.all([t.get(ownerRef), t.get(lendRef), t.get(entryRef)]);
-        if (!ownerSnap.exists() || !ownerSnap.data().helper) return stop('not_found', 'そのメンバーは、助っ人を登録していません。');
+        if (!ownerSnap.exists() || !ownerSnap.data().helper) return stop('not_found', tl('alliance.error.memberNoHelper'));
         const found = { ...(ownerSnap.data().helper as HelperHero), ownerUid, ownerName: str(ownerSnap.data().name) };
         const n = lend.exists() ? num(lend.data()?.n) : 0;
         if (n < SUPPORT.lendRewardPerDay) {
@@ -1325,7 +1326,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
 
   async sendStamina(me: PlayerProfile, toUid: string): Promise<Result<true>> {
     return this.run(async () => {
-      if (toUid === me.uid) return stop('bad_input', '自分には、贈れません。');
+      if (toUid === me.uid) return stop('bad_input', tl('alliance.error.cantSendSelf'));
       const s = await this.session(me);
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);
@@ -1334,7 +1335,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       await fs.runTransaction(db, async (t) => {
         const daily = await t.get(dailyRef);
         const sent = num(daily.data()?.staminaSent);
-        if (sent >= SUPPORT.sendPerDay) return stop('limit_reached', 'きょう贈れるのは、5人までです。');
+        if (sent >= SUPPORT.sendPerDay) return stop('limit_reached', tl('alliance.error.sendLimit5'));
         t.set(dailyRef, { staminaSent: sent + 1, total: num(daily.data()?.total), updatedAt: fs.serverTimestamp() }, { merge: true });
         t.set(fs.doc(fs.collection(db, 'alliances', allianceId, 'members', target, 'inbox')), { kind: 'stamina', amount: SUPPORT.staminaAmount, fromAuth: s.authUid, fromName: cleanName(me.name), at: fs.serverTimestamp() });
       });
@@ -1401,7 +1402,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
         senderAuth: s.authUid,
         senderPlayerId: s.playerId,
         senderName: cleanName(me.name),
-        text: what === 'raid' ? '共闘ボスを倒すため、手を貸してください！' : '村が襲われています！ 手を貸してください！',
+        text: what === 'raid' ? '共闘ボスを倒すため、手を貸してください！' : '村が襲われています！ 手を貸してください！', // i18n-ignore (stored text of the request; the card draws its own wording)
         sentAt: fs.serverTimestamp(),
         help: { what, helpers: [], open: true },
       });
@@ -1421,10 +1422,10 @@ export class OnlineAllianceBackend implements AllianceBackend {
       const name = cleanName(me.name);
       await fs.runTransaction(db, async (t) => {
         const [chat, daily, member] = await Promise.all([t.get(chatRef), t.get(dailyRef), t.get(memberRef)]);
-        if (!chat.exists() || chat.data().kind !== 'help') return stop('not_found', 'その救援は、もうありません。');
+        if (!chat.exists() || chat.data().kind !== 'help') return stop('not_found', tl('alliance.error.helpRequestGone'));
         const help = chat.data().help as { what: 'raid' | 'village'; helpers: string[]; open: boolean };
-        if (chat.data().senderAuth === s.authUid) return stop('bad_input', '自分の救援には、答えられません。');
-        if (!help.open || help.helpers.includes(name)) return stop('limit_reached', 'すでに答えています。');
+        if (chat.data().senderAuth === s.authUid) return stop('bad_input', tl('alliance.error.cantAnswerOwnOnline'));
+        if (!help.open || help.helpers.includes(name)) return stop('limit_reached', tl('alliance.error.alreadyAnsweredOnline'));
         t.update(chatRef, { help: { ...help, helpers: [...help.helpers, name] } });
         const answers = num(daily.data()?.answers);
         if (answers < SUPPORT.answersPerDay) {
@@ -1451,7 +1452,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       id,
       kind,
       senderUid: kind === 'system' ? 'system' : str(d.senderPlayerId),
-      senderName: kind === 'system' ? '同盟' : str(d.senderName),
+      senderName: kind === 'system' ? '同盟' : str(d.senderName), // i18n-ignore (stored sender; system lines are drawn without it)
       text: str(d.text),
       sentAt: toMillis(d.sentAt) || this.now(),
     };
@@ -1472,7 +1473,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
   async sendChat(me: PlayerProfile, text: string): Promise<Result<AllianceChatMessage>> {
     return this.run(async () => {
       const clean = sanitizeText(text);
-      if (!clean) return stop('bad_input', 'メッセージが、空です。');
+      if (!clean) return stop('bad_input', tl('alliance.error.emptyMessageOnline'));
       const s = await this.session(me);
       const { fs, db } = await this.sdk();
       const allianceId = await this.requireAlliance(s);

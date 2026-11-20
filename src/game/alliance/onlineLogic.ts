@@ -6,6 +6,7 @@
  * それまで、ここは docs/ALLIANCE_DESIGN.md の数字をそのまま写してある。
  */
 import type { AllianceReward, AlliancePerks, DonationKind, League, RaidBossDef } from './AllianceBackend';
+import { t as tl } from '../i18n';
 
 // ---------------------------------------------------------------------------------------------- 時刻
 
@@ -143,11 +144,12 @@ export function raidPoints(damage: number): number {
 
 /** 週ごとに回すボス (5体)。サーバーが、週の頭に raid ドキュメントへ、この定義ごと書く。 */
 export const RAID_BOSSES: RaidBossDef[] = [
-  { id: 'garumudo', name: '紅角の大鹿・ガルムード', art: 'garumudo', heroClass: 'tank', description: '燃える角で、突っ込んでくる大鹿。' },
-  { id: 'arachnea', name: '砂塵の女王蠍・アラクネア', art: 'arachnea', heroClass: 'archer', description: '砂を巻き上げる、毒針の女王。' },
-  { id: 'kongo', name: '白銀の山王虎・コンゴウ', art: 'kongo', heroClass: 'warrior', description: '鎖を引きずる、雪山の王。' },
-  { id: 'necrodraco', name: '古骨の竜・ネクロドラコ', art: 'necrodraco', heroClass: 'mage', description: 'よみがえった、骨の竜。' },
-  { id: 'kurogane', name: '闇走りの大狼・クロガネ', art: 'wolf', heroClass: 'warrior', description: '夜を駆ける、黒鉄の狼。' },
+  // i18n-ignore (boss data: phase 2; the server writes the same definition)
+  { id: 'garumudo', name: '紅角の大鹿・ガルムード', art: 'garumudo', heroClass: 'tank', description: '燃える角で、突っ込んでくる大鹿。' }, // i18n-ignore
+  { id: 'arachnea', name: '砂塵の女王蠍・アラクネア', art: 'arachnea', heroClass: 'archer', description: '砂を巻き上げる、毒針の女王。' }, // i18n-ignore
+  { id: 'kongo', name: '白銀の山王虎・コンゴウ', art: 'kongo', heroClass: 'warrior', description: '鎖を引きずる、雪山の王。' }, // i18n-ignore
+  { id: 'necrodraco', name: '古骨の竜・ネクロドラコ', art: 'necrodraco', heroClass: 'mage', description: 'よみがえった、骨の竜。' }, // i18n-ignore
+  { id: 'kurogane', name: '闇走りの大狼・クロガネ', art: 'wolf', heroClass: 'warrior', description: '夜を駆ける、黒鉄の狼。' }, // i18n-ignore
 ];
 
 export function raidBossFor(ms: number): RaidBossDef {
@@ -157,10 +159,10 @@ export function raidBossFor(ms: number): RaidBossDef {
 
 /** 撃破・参加の報酬 (仮の数字)。rank は、ダメージの順位 (1〜)。 */
 export function raidReward(defeated: boolean, rank: number): { label: string; reward: AllianceReward } {
-  if (!defeated) return { label: '参加報酬', reward: { gems: 10, coins: 15 } };
+  if (!defeated) return { label: tl('alliance.reward.participation'), reward: { gems: 10, coins: 15 } };
   const extra = rank === 1 ? 50 : rank === 2 ? 30 : rank === 3 ? 20 : 0;
   const reward: AllianceReward = { gems: 30 + extra, phaseMaterials: 2, coins: 50 + extra };
-  return { label: rank <= 3 ? `撃破報酬（ダメージ${rank}位）` : '撃破報酬', reward };
+  return { label: rank <= 3 ? tl('alliance.reward.defeatRankOnline', { rank }) : tl('alliance.reward.defeat'), reward };
 }
 
 // ---------------------------------------------------------------------------------------------- 対抗戦
@@ -178,15 +180,16 @@ export const WAR = {
 };
 
 export const WAR_REWARD_TIERS: { fromRank: number; toRank: number; label: string; reward: AllianceReward }[] = [
-  { fromRank: 1, toRank: 1, label: '1位', reward: { gems: 300, coins: 200, badge: 'war_champion' } },
-  { fromRank: 2, toRank: 3, label: '2〜3位', reward: { gems: 200, coins: 150 } },
-  { fromRank: 4, toRank: 10, label: '4〜10位', reward: { gems: 100, coins: 80 } },
-  { fromRank: 11, toRank: 20, label: '11〜20位', reward: { gems: 50, coins: 40 } },
+  // i18n-ignore (the war screen draws its own rank label from fromRank / toRank)
+  { fromRank: 1, toRank: 1, label: '1位', reward: { gems: 300, coins: 200, badge: 'war_champion' } }, // i18n-ignore
+  { fromRank: 2, toRank: 3, label: '2〜3位', reward: { gems: 200, coins: 150 } }, // i18n-ignore
+  { fromRank: 4, toRank: 10, label: '4〜10位', reward: { gems: 100, coins: 80 } }, // i18n-ignore
+  { fromRank: 11, toRank: 20, label: '11〜20位', reward: { gems: 50, coins: 40 } }, // i18n-ignore
 ];
 
 export function warRewardForRank(rank: number): { label: string; reward: AllianceReward } {
   const tier = WAR_REWARD_TIERS.find((t) => rank >= t.fromRank && rank <= t.toRank) ?? WAR_REWARD_TIERS[WAR_REWARD_TIERS.length - 1];
-  return { label: `対抗戦 ${rank}位の報酬`, reward: tier.reward };
+  return { label: tl('alliance.reward.war', { rank }), reward: tier.reward };
 }
 
 export function nextLeague(league: League, rank: number, groupSize: number): { league: League; promoted: boolean; demoted: boolean } {

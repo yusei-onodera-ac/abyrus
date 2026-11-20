@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { perksForLevel } from '../data/alliance';
 import { body, heading } from './theme';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 const DEPTH = 260;
@@ -57,7 +58,7 @@ export function playAllianceLevelUp(scene: Phaser.Scene, level: number, onClose?
   tween({ targets: rays, angle: 360, duration: 16000, repeat: -1 });
 
   const title = heading(scene, 360, 300, 'LEVEL UP!', { fontSize: '78px', color: '#bfe0ff', stroke: '#14407a', strokeThickness: 14 }).setOrigin(0.5).setScale(0).setAlpha(0);
-  const lv = body(scene, 360, 420, `同盟Lv.${level}`, { fontSize: '84px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 12 }).setOrigin(0.5).setScale(0.4).setAlpha(0);
+  const lv = body(scene, 360, 420, tl('alliance.shared.level', { level }), { fontSize: '84px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 12 }).setOrigin(0.5).setScale(0.4).setAlpha(0);
   layer.add([title, lv]);
   tween({ targets: title, scale: 1, alpha: 1, duration: 420, delay: 200, ease: 'Back.easeOut' });
   tween({ targets: lv, scale: 1, alpha: 1, duration: 420, delay: 420, ease: 'Back.easeOut' });
@@ -67,11 +68,11 @@ export function playAllianceLevelUp(scene: Phaser.Scene, level: number, onClose?
   const pct = (v: number): string => `+${Math.round(v * 100)}%`;
   // Only what this level actually changes (a line that reads "+0% → +0%" says nothing).
   const lines = [
-    before.idleGoldBonus !== now.idleGoldBonus ? `放置ゴールド ${pct(before.idleGoldBonus)} → ${pct(now.idleGoldBonus)}` : '',
-    before.expDropBonus !== now.expDropBonus ? `経験値素材 ${pct(before.expDropBonus)} → ${pct(now.expDropBonus)}` : '',
-    before.staminaMaxBonus !== now.staminaMaxBonus ? `スタミナ上限 +${before.staminaMaxBonus} → +${now.staminaMaxBonus}` : '',
-    before.raidAttemptsPerDay !== now.raidAttemptsPerDay ? `ボス挑戦 ${before.raidAttemptsPerDay}回 → ${now.raidAttemptsPerDay}回/日` : '',
-    before.memberMax !== now.memberMax ? `メンバー上限 ${before.memberMax}人 → ${now.memberMax}人` : '',
+    before.idleGoldBonus !== now.idleGoldBonus ? tl('alliance.fx.idleGold', { pct: pct(before.idleGoldBonus), pct2: pct(now.idleGoldBonus) }) : '',
+    before.expDropBonus !== now.expDropBonus ? tl('alliance.fx.expMaterial', { pct: pct(before.expDropBonus), pct2: pct(now.expDropBonus) }) : '',
+    before.staminaMaxBonus !== now.staminaMaxBonus ? tl('alliance.fx.maxStamina', { staminaMaxBonus: before.staminaMaxBonus, staminaMaxBonus2: now.staminaMaxBonus }) : '',
+    before.raidAttemptsPerDay !== now.raidAttemptsPerDay ? tl('alliance.fx.bossAttempts', { raidAttemptsPerDay: before.raidAttemptsPerDay, raidAttemptsPerDay2: now.raidAttemptsPerDay }) : '',
+    before.memberMax !== now.memberMax ? tl('alliance.fx.maxMembers', { memberMax: before.memberMax, memberMax2: now.memberMax }) : '',
   ].filter((text) => text !== '');
   lines.forEach((text, i) => {
     const t = body(scene, 360, 560 + i * 54, text, { fontSize: '30px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0).setScale(0.7);
@@ -81,7 +82,7 @@ export function playAllianceLevelUp(scene: Phaser.Scene, level: number, onClose?
 
   let canClose = false;
   timers.push(scene.time.delayedCall(700, () => (canClose = true)));
-  const hint = body(scene, 360, 1200, 'タップで閉じる', { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
+  const hint = body(scene, 360, 1200, tl('alliance.fx.tapToClose'), { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
   layer.add(hint);
   timers.push(scene.time.delayedCall(1800, () => tween({ targets: hint, alpha: { from: 0, to: 0.85 }, duration: 600, yoyo: true, repeat: -1 })));
   dim.on('pointerup', () => {
