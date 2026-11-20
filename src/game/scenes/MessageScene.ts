@@ -18,6 +18,7 @@ import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { enter } from '../ui/Transitions';
 import { AllianceService } from '../alliance/AllianceService';
+import { t } from '../i18n';
 
 type MessageTab = 'global' | 'groups' | 'friends';
 
@@ -78,7 +79,7 @@ export class MessageScene extends Phaser.Scene {
     bar.update(this.save);
     enter(this, bar, { dy: -20, duration: 280 });
 
-    buildTitlePlate(this, 'メッセージ');
+    buildTitlePlate(this, t('social.message.title'));
     buildFrame(this);
     this.show();
     // No longer a tab of its own: reached from the Home screen's message box and the Friend screen.
@@ -114,9 +115,9 @@ export class MessageScene extends Phaser.Scene {
     const strip = buildTabStrip(
       this,
       [
-        { key: 'global', label: '全体' },
-        { key: 'groups', label: '同盟' },
-        { key: 'friends', label: 'フレンド' },
+        { key: 'global', label: t('social.message.tabGlobal') },
+        { key: 'groups', label: t('social.message.tabAlliance') },
+        { key: 'friends', label: t('social.friends') },
       ],
       this.tab,
       SCREEN_VIEW.w,
@@ -150,7 +151,7 @@ export class MessageScene extends Phaser.Scene {
     const { friends } = this.save.social;
     this.channel = null;
     if (friends.length === 0) {
-      this.emptyState(top, 'フレンドがいません', '「フレンド」画面で、IDや共有リンクから申請できます', 'フレンドを追加', () => this.scene.start('Friend', { tab: 'add' }));
+      this.emptyState(top, t('social.message.noFriends'), t('social.message.noFriendsHint'), t('social.message.addFriends'), () => this.scene.start('Friend', { tab: 'add' }));
       return;
     }
     const rows = friends.map((friend) => ({
@@ -176,7 +177,7 @@ export class MessageScene extends Phaser.Scene {
       card.add(buildAvatar(this, 52, ROW_H / 2, 30, row.name));
       card.add(body(this, 100, 28, row.name, { fontSize: '26px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       card.add(body(this, 624, 28, row.sub, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 2 }).setOrigin(1, 0.5));
-      const preview = row.last ? Array.from(plainPreview(row.last.text)).slice(0, 26).join('') : 'まだメッセージがありません';
+      const preview = row.last ? Array.from(plainPreview(row.last.text)).slice(0, 26).join('') : t('social.message.noMessagesYet');
       card.add(body(this, 100, 66, preview, { fontSize: '19px', color: row.last ? '#f5e6c8' : '#8d7d5e', stroke: INK, strokeThickness: 2 }).setOrigin(0, 0.5));
       const hit = this.add.zone(320, ROW_H / 2, 640, ROW_H).setOrigin(0.5);
       hit.setInteractive({ useHandCursor: true });
@@ -203,7 +204,7 @@ export class MessageScene extends Phaser.Scene {
     const view = this.view!;
     let y = top;
     if (header) {
-      view.add(new Button(this, SCREEN_VIEW.x + 70, y + 24, 140, 48, '◀ 一覧', () => {
+      view.add(new Button(this, SCREEN_VIEW.x + 70, y + 24, 140, 48, t('social.message.backToList'), () => {
         this.openFriendId = null;
         this.queueShow();
       }, { variant: 'wood', fontSize: '21px' }));
@@ -223,11 +224,11 @@ export class MessageScene extends Phaser.Scene {
     scroll.content.removeAll(true);
     const now = Date.now();
     let y = 10;
-    scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 8, '※サーバー未接続：メッセージはこの端末内にのみ保存されます', { fontSize: '16px', color: '#8d7d5e' }).setOrigin(0.5));
+    scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 8, t('social.message.offlineNote'), { fontSize: '16px', color: '#8d7d5e' }).setOrigin(0.5));
     y += 38;
     const messages = ChatSystem.messagesOf(this.save, this.channel);
     if (messages.length === 0) {
-      scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 60, 'まだメッセージがありません\n最初のひと言をどうぞ', { fontSize: '22px', color: '#9a8a6a', align: 'center' }).setOrigin(0.5));
+      scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 60, t('social.message.firstWord'), { fontSize: '22px', color: '#9a8a6a', align: 'center' }).setOrigin(0.5));
       y += 140;
     }
     for (const message of messages) y += this.addBubble(scroll.content, message, y, now) + 14;
@@ -260,7 +261,7 @@ export class MessageScene extends Phaser.Scene {
     if (!mine) {
       let nx = bx + 6;
       if (system) {
-        const chip = buildChip(this, nx, y + 12, '運営', { fill: 0x8c1d1d, color: '#ffffff', fontSize: 15 });
+        const chip = buildChip(this, nx, y + 12, t('social.message.staffChip'), { fill: 0x8c1d1d, color: '#ffffff', fontSize: 15 });
         parent.add(chip.container);
         nx += chip.width + 8;
       }
@@ -286,7 +287,7 @@ export class MessageScene extends Phaser.Scene {
     view.add(emojiBtn);
 
     const sendW = 118;
-    view.add(new Button(this, x0 + w - 12 - sendW / 2, cy, sendW, 68, '送信', () => this.send(), { variant: 'gold', fontSize: '26px' }));
+    view.add(new Button(this, x0 + w - 12 - sendW / 2, cy, sendW, 68, t('common.send'), () => this.send(), { variant: 'gold', fontSize: '26px' }));
 
     const inputW = w - 12 - 72 - 10 - 10 - sendW - 12;
     const inputX = x0 + 12 + 72 + 10 + inputW / 2;
@@ -301,7 +302,7 @@ export class MessageScene extends Phaser.Scene {
     const field = this.chatInput.node as HTMLInputElement;
     field.type = 'text';
     field.maxLength = MAX_TEXT;
-    field.placeholder = 'メッセージを入力';
+    field.placeholder = t('social.message.placeholder');
     field.autocomplete = 'off';
     field.spellcheck = false;
     field.addEventListener('input', (event) => {
@@ -319,7 +320,7 @@ export class MessageScene extends Phaser.Scene {
     const field = this.chatInput?.node as HTMLInputElement | undefined;
     if (!field || !this.channel) return;
     if (!ChatSystem.send(this.save, this.channel, field.value)) {
-      showToast(this, '文字か絵文字を入力してください', '#ff8a8a');
+      showToast(this, t('social.message.enterSomething'), '#ff8a8a');
       return;
     }
     SaveSystem.save(this.save);
@@ -377,7 +378,7 @@ export class MessageScene extends Phaser.Scene {
     if (!field) return;
     const token = `:${id}:`;
     if (Array.from(field.value).length + token.length > MAX_TEXT) {
-      showToast(this, 'これ以上入力できません', '#ff8a8a');
+      showToast(this, t('social.message.limitReached'), '#ff8a8a');
       return;
     }
     const start = field.selectionStart ?? field.value.length;

@@ -1,6 +1,7 @@
 import type { Friend, FriendRequest, Group, GiftReward, SaveData, SocialState } from './SaveSystem';
 import { dmChannel, groupChannel } from './ChatSystem';
 import { SEED_FRIENDS, SEED_INCOMING } from '../data/socialSeed';
+import { t } from '../i18n';
 
 export const MAX_FRIENDS = 30;
 /** Cap on requests waiting either way (received, and sent without an answer). */
@@ -12,7 +13,13 @@ export const GROUP_NAME_MAX = 10;
 
 /** What a friend gets when the player sends them a present - free to send,
  *  once per friend per day. */
-export const FRIEND_GIFT: { reward: GiftReward; label: string } = { reward: { type: 'gold', amount: 100 }, label: 'ゴールド ×100' };
+export const FRIEND_GIFT: { reward: GiftReward; readonly label: string } = {
+  reward: { type: 'gold', amount: 100 },
+  // (a getter, so the text is made when it is shown, in the language of the moment)
+  get label(): string {
+    return t('social.gift.friendGiftLabel', { amount: this.reward.amount });
+  },
+};
 
 // No I/O/0/1 so an ID read aloud or off a screenshot can't be mistyped.
 const ID_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -155,7 +162,7 @@ export const SocialSystem = {
   defaultGroupName(groups: Group[]): string {
     const taken = new Set(groups.map((g) => g.name));
     for (let n = 1; ; n++) {
-      const name = `軍団${n}`;
+      const name = t('social.group.defaultName', { n });
       if (!taken.has(name)) return name;
     }
   },

@@ -2,6 +2,7 @@ import { describeCampaign } from '../data/campaigns';
 import { GACHA_BANNERS } from '../data/gachaBanners';
 import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULE_NEXT, SCHEDULED_GACHAS } from '../data/schedule';
 import { pickupHeroesOf } from './GachaSystem';
+import { t } from '../i18n';
 
 /**
  * The year's calendar (data/schedule.ts) as one list of lines for the 年間予定 screen and for docs/EVENT_SCHEDULE.md: every 期間限定イベント, ピックアップガチャ
@@ -22,7 +23,19 @@ export interface ScheduleItem {
 
 export type ScheduleStatus = 'live' | 'upcoming' | 'ended';
 
-export const KIND_NAME: Record<ScheduleKind, string> = { event: 'イベント', gacha: 'ガチャ', campaign: 'キャンペーン' };
+/** The kind's name for the chips and the filter. Getters, so the text is made when it is read (in the language of the moment); the
+ *  schedule document (tools/schedule/doc.ts) and the tests read them as plain strings. */
+export const KIND_NAME: Record<ScheduleKind, string> = {
+  get event() {
+    return t('mission.schedule.kindEvent');
+  },
+  get gacha() {
+    return t('mission.schedule.kindGacha');
+  },
+  get campaign() {
+    return t('mission.schedule.kindCampaign');
+  },
+};
 const KIND_ORDER: Record<ScheduleKind, number> = { event: 0, gacha: 1, campaign: 2 };
 
 /** One short line about a gacha: its top-★ ピックアップ by name, and how many more ("★5 虚数姫アリア　ほか4体"). */
@@ -32,13 +45,13 @@ function pickupSummary(banner: Parameters<typeof pickupHeroesOf>[0]): string | n
   const top = Math.max(...picks.map((h) => h.rarity));
   const best = picks.filter((h) => h.rarity === top);
   const rest = picks.length - best.length;
-  return `★${top} ${best.map((h) => h.name).join('・')}${rest > 0 ? `　ほか${rest}体` : ''}`;
+  return `★${top} ${best.map((h) => h.name).join(t('mission.schedule.nameSeparator'))}${rest > 0 ? t('mission.schedule.andMore', { rest }) : ''}`;
 }
 
 export function scheduleItems(): ScheduleItem[] {
   const items: ScheduleItem[] = [];
   for (const e of SCHEDULED_EVENTS) {
-    items.push({ kind: 'event', id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, detail: `${e.kind === 'dungeon' ? 'イベントダンジョン' : 'ミッション型'}　${e.token.name}を集めて交換`, accent: e.accent });
+    items.push({ kind: 'event', id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, detail: e.kind === 'dungeon' ? t('mission.schedule.dungeonDetail', { token: e.token.name }) : t('mission.schedule.missionDetail', { token: e.token.name }), accent: e.accent });
   }
   for (const g of SCHEDULED_GACHAS) {
     const banner = GACHA_BANNERS.find((b) => b.id === g.id) ?? g;
@@ -62,7 +75,7 @@ export function formatSpan(item: Pick<ScheduleItem, 'startsAt' | 'endsAt'>): str
     const d = new Date(iso);
     return `${d.getMonth() + 1}/${d.getDate()}`;
   };
-  return `${md(item.startsAt)} 〜 ${md(item.endsAt)}`;
+  return t('mission.schedule.span', { md: md(item.startsAt), md2: md(item.endsAt) });
 }
 
 export interface ScheduleMonth {
@@ -81,7 +94,7 @@ export function groupByMonth(items: ScheduleItem[]): ScheduleMonth[] {
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     let month = months[months.length - 1];
     if (!month || month.key !== key) {
-      month = { key, label: `${d.getFullYear()}年${d.getMonth() + 1}月`, items: [] };
+      month = { key, label: t('mission.schedule.month', { year: d.getFullYear(), month: d.getMonth() + 1 }), items: [] };
       months.push(month);
     }
     month.items.push(item);

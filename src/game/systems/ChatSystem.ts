@@ -1,6 +1,7 @@
 import type { ChatMessage, ChatState, SaveData } from './SaveSystem';
 import { isEmojiId, type EmojiId } from '../data/emoji';
 import { SEED_CHAT } from '../data/socialSeed';
+import { t } from '../i18n';
 
 export const SELF_ID = 'self';
 export const SYSTEM_ID = 'system';
@@ -32,7 +33,7 @@ export function stripForbidden(raw: string): string {
 
 /** A message as one plain line for a list preview (emoji become [絵文字]). */
 export function plainPreview(text: string): string {
-  return text.replace(/:([a-z0-9_]+):/g, (whole, id: string) => (isEmojiId(id) ? '[絵文字]' : whole));
+  return text.replace(/:([a-z0-9_]+):/g, (whole, id: string) => (isEmojiId(id) ? t('social.chat.emojiPreview') : whole));
 }
 
 export type ChatPart = { kind: 'text'; text: string } | { kind: 'emoji'; id: EmojiId };

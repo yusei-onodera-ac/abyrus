@@ -11,6 +11,7 @@ import { ScrollView } from '../ui/ScrollView';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 const PAD = 14;
 const THUMB_W = 210;
@@ -18,6 +19,18 @@ const FALLBACK_ASPECT = 1024 / 572;
 const NEW_RED = 0xc23232;
 
 const noticeKey = (notice: NoticeEntry) => notice.textureKey ?? `notice_${notice.id}`;
+
+/** A notice's tag is the operator's data (a Japanese word, data/notices.ts and RemoteNotices): the known ones are shown in the
+ *  player's language, anything else as written. */
+const CATEGORY_LABELS = new Map<string, PlainKey>([
+  ['お知らせ', 'social.notice.categoryNotice'], // i18n-ignore (data key)
+  ['イベント', 'social.notice.categoryEvent'], // i18n-ignore (data key)
+  ['ガチャ', 'social.notice.categorySummon'], // i18n-ignore (data key)
+]);
+const categoryLabel = (category: string): string => {
+  const key = CATEGORY_LABELS.get(category);
+  return key ? t(key) : category;
+};
 
 /** Queues every notice's image for loading (BootScene.preload). A missing
  *  file is fine - the card shows a "画像準備中" box instead. */
@@ -31,8 +44,12 @@ export function preloadNoticeArt(scene: Phaser.Scene): void {
  *  and date (a red NEW until opened); tapping one opens the full text and
  *  picture. Content comes from data/notices.ts. */
 export class NoticeScene extends InboxScene {
-  protected readonly screenTitle = 'お知らせ';
-  protected readonly emptyText = 'お知らせはありません';
+  protected get screenTitle(): string {
+    return t('social.notice.title');
+  }
+  protected get emptyText(): string {
+    return t('social.notice.empty');
+  }
 
   constructor() {
     super('Notice');
@@ -58,7 +75,7 @@ export class NoticeScene extends InboxScene {
       } else {
         thumbH = Math.round(THUMB_W / FALLBACK_ASPECT);
         container.add(createPanel(this, PAD + THUMB_W / 2, PAD + thumbH / 2, THUMB_W, thumbH, { fillColor: 0x241810, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 8, gradient: false }));
-        container.add(this.add.text(PAD + THUMB_W / 2, PAD + thumbH / 2, '画像準備中', { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#9a8a6a' }).setOrigin(0.5));
+        container.add(this.add.text(PAD + THUMB_W / 2, PAD + thumbH / 2, t('social.notice.imageComingSoon'), { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#9a8a6a' }).setOrigin(0.5));
       }
       const outline = this.add.graphics();
       outline.lineStyle(2, 0x120a04, 0.9);
@@ -71,7 +88,7 @@ export class NoticeScene extends InboxScene {
     let y = PAD;
 
     // Tag row.
-    const tag = buildChip(this, textX, y + 14, notice.category, { fill: 0x3b2a12, color: '#ffe9b8' });
+    const tag = buildChip(this, textX, y + 14, categoryLabel(notice.category), { fill: 0x3b2a12, color: '#ffe9b8' });
     container.add(tag.container);
     if (unread) container.add(buildChip(this, textX + tag.width + 8, y + 14, 'NEW', { fill: NEW_RED, color: '#ffffff' }).container);
     y += 36;
@@ -118,7 +135,7 @@ export class NoticeScene extends InboxScene {
     modal.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false }));
     modal.add(this.add.zone(360, cy, w, h).setInteractive());
 
-    const tag = buildChip(this, left, top + 40, notice.category, { fill: 0x3b2a12, color: '#ffe9b8' });
+    const tag = buildChip(this, left, top + 40, categoryLabel(notice.category), { fill: 0x3b2a12, color: '#ffe9b8' });
     modal.add(tag.container);
     modal.add(wrappedText(this, left + inner, top + 40, notice.date, inner, { fontSize: '17px', color: '#9a8a6a' }).setOrigin(1, 0.5));
     const title = wrappedText(this, left, top + 72, notice.title, inner, { fontSize: '29px', fontStyle: 'bold', color: '#ffe9b8', strokeThickness: 4 });
@@ -146,7 +163,7 @@ export class NoticeScene extends InboxScene {
       view.destroy();
       handle.close();
     };
-    modal.add(new Button(this, 360, top + h - 56, 240, 68, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
+    modal.add(new Button(this, 360, top + h - 56, 240, 68, t('common.close'), close, { variant: 'wood', fontSize: '24px' }));
     this.modal = { container: modal, close };
   }
 }

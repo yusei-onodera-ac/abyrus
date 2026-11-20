@@ -6,6 +6,7 @@ import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
 import { mixColor } from './StageMap';
 import { body, CHROME } from './theme';
+import { t, type PlainKey } from '../i18n';
 
 export const EVENT_CARD_WIDTH = CARD_WIDTH;
 const PAD = 12;
@@ -37,11 +38,11 @@ export interface EventCardHandlers {
   guard: () => boolean;
 }
 
-const PHASE_CHIP: Record<EventPhase, { text: string; fill: number; color: string }> = {
-  live: { text: '開催中', fill: 0x2f7a3a, color: '#e6ffe0' },
-  exchange: { text: '交換期間', fill: 0x8a5a1c, color: '#fff0d0' },
-  upcoming: { text: '開催予定', fill: 0x3a4f7a, color: '#e0ecff' },
-  ended: { text: '終了', fill: 0x4a3a3a, color: '#d8c8c8' },
+const PHASE_CHIP: Record<EventPhase, { text: PlainKey; fill: number; color: string }> = {
+  live: { text: 'mission.phase.live', fill: 0x2f7a3a, color: '#e6ffe0' },
+  exchange: { text: 'mission.phase.exchange', fill: 0x8a5a1c, color: '#fff0d0' },
+  upcoming: { text: 'mission.phase.upcoming', fill: 0x3a4f7a, color: '#e0ecff' },
+  ended: { text: 'mission.phase.ended', fill: 0x4a3a3a, color: '#d8c8c8' },
 };
 
 /** The banner when there is no image: the event's color shading from dark to
@@ -83,7 +84,7 @@ export function buildEventCard(
   const headerH = 48;
   container.add(createPanel(scene, w / 2, y + headerH / 2, innerW, headerH, { fillColor: 0x150e07, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
   container.add(body(scene, PAD + 16, y + headerH / 2, entry.title, { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-  const chip = buildChip(scene, 0, y + headerH / 2, PHASE_CHIP[phase].text, { fill: PHASE_CHIP[phase].fill, color: PHASE_CHIP[phase].color, fontSize: 18 });
+  const chip = buildChip(scene, 0, y + headerH / 2, t(PHASE_CHIP[phase].text), { fill: PHASE_CHIP[phase].fill, color: PHASE_CHIP[phase].color, fontSize: 18 });
   chip.container.setX(w - PAD - 12 - chip.width);
   container.add(chip.container);
   y += headerH + 8;
@@ -113,11 +114,11 @@ export function buildEventCard(
   const description = wrappedText(scene, PAD + 6, y, entry.description, innerW - 12, { fontSize: '20px', color: '#f5e6c8' });
   container.add(description);
   y += description.height + 8;
-  container.add(body(scene, PAD + 6, y, `開催期間　${formatEventPeriod(entry)}`, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0));
+  container.add(body(scene, PAD + 6, y, t('mission.eventPanel.period', { formatEventPeriod: formatEventPeriod(entry) }), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0));
   y += 34;
 
   const canOpen = (phase === 'live' || phase === 'exchange') && entry.kind !== undefined;
-  const label = canOpen ? (phase === 'exchange' ? '交換所へ' : (entry.actionLabel ?? 'イベントへ')) : phase === 'upcoming' ? '開催予定' : '準備中';
+  const label = canOpen ? (phase === 'exchange' ? t('mission.eventPanel.toExchange') : (entry.actionLabel ?? t('mission.eventPanel.toEvent'))) : phase === 'upcoming' ? t('mission.phase.upcoming') : t('mission.eventPanel.comingSoon');
   const button = new Button(scene, w / 2, y + 36, innerW, 72, label, handlers.onOpen, { variant: canOpen ? 'gold' : 'wood', fontSize: '28px', guard: handlers.guard });
   if (!canOpen) button.setEnabled(false);
   container.add(button);

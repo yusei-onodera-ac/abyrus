@@ -3,6 +3,7 @@ import type { InfiniteModeRunResult } from './SaveSystem';
 import type { FirebaseApp } from 'firebase/app';
 import type { Auth, User } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
+import { t } from '../i18n';
 
 export interface LeaderboardEntry {
   playerId: string;
@@ -89,7 +90,7 @@ async function ensureSignedIn(): Promise<User> {
 }
 
 function clampName(name: string): string {
-  const trimmed = name.trim() || 'プレイヤー';
+  const trimmed = name.trim() || t('social.leaderboard.player');
   return trimmed.slice(0, MAX_NAME_LENGTH);
 }
 
@@ -156,7 +157,7 @@ export const LeaderboardSystem = {
         const v = d.data();
         return {
           playerId: d.id,
-          playerName: typeof v.playerName === 'string' ? v.playerName : 'プレイヤー',
+          playerName: typeof v.playerName === 'string' ? v.playerName : t('social.leaderboard.player'),
           score: typeof v.score === 'number' ? v.score : 0,
           survivalSeconds: typeof v.survivalSeconds === 'number' ? v.survivalSeconds : 0,
           enemiesDefeated: typeof v.enemiesDefeated === 'number' ? v.enemiesDefeated : 0,
