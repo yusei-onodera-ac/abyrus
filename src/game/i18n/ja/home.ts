@@ -3,7 +3,7 @@ export const home = {
   // HomeScene.ts
   'home.quest': 'クエスト',
   'home.summon': '召喚',
-  'home.collection': '名鑑',
+  'home.roster': '名鑑',
   'home.loginBonus': 'ログインボーナス',
   'home.dayReward': '{dayOfMonth}日目の報酬です',
   'home.idleRewards': '放置報酬',

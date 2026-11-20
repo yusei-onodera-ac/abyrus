@@ -1,4 +1,5 @@
 import { formatDateTime } from '../ui/format';
+import { t } from '../i18n';
 import type { LimitedEventDef } from './limitedEvents';
 import { SCHEDULED_EVENTS } from './schedule';
 
@@ -113,8 +114,8 @@ const formatMoment = (iso: string): string => formatDateTime(new Date(iso).getTi
 
 /** The period line on a card: "常時開催", "12/14 23:59まで", "12/1 0:00 〜 12/14 23:59". */
 export function formatEventPeriod(entry: EventEntry): string {
-  if (entry.startsAt && entry.endsAt) return `${formatMoment(entry.startsAt)} 〜 ${formatMoment(entry.endsAt)}`;
-  if (entry.startsAt) return `${formatMoment(entry.startsAt)} 〜`;
-  if (entry.endsAt) return `${formatMoment(entry.endsAt)}まで`;
-  return '常時開催';
+  if (entry.startsAt && entry.endsAt) return t('sys.event.range', { from: formatMoment(entry.startsAt), to: formatMoment(entry.endsAt) });
+  if (entry.startsAt) return t('sys.event.from', { from: formatMoment(entry.startsAt) });
+  if (entry.endsAt) return t('sys.event.until', { to: formatMoment(entry.endsAt) });
+  return t('sys.event.always');
 }

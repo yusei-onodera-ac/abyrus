@@ -1,3 +1,4 @@
+// i18n-ignore-file: the developer's catalog page (catalog.html: what is in the game), not part of the game's UI.
 import Phaser from 'phaser';
 import { ALL_HEROES, createHeroInstance, HERO_ROSTER } from '../game/data/heroes';
 import { HERO_RELEASES } from '../game/data/heroRelease';

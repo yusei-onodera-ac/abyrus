@@ -3,6 +3,7 @@ import { Button, type ButtonVariant } from './Button';
 import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { createPanel } from './Panel';
 import { body, heading, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -51,7 +52,7 @@ export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: Tex
   const left = 360 - fieldW / 2;
   const right = 360 + fieldW / 2;
 
-  modal.container.add(body(scene, left + 4, top + 108, opts.label ?? 'デッキ名', { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+  modal.container.add(body(scene, left + 4, top + 108, opts.label ?? t('sys.dialog.deckName'), { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
   const count = body(scene, right - 4, top + 108, '', { fontSize: '20px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5);
   modal.container.add(count);
   if (opts.hint) modal.container.add(body(scene, 360, top + 238, opts.hint, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
@@ -69,7 +70,7 @@ export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: Tex
   field.type = 'text';
   field.value = opts.initial;
   field.maxLength = opts.maxLength;
-  field.placeholder = opts.placeholder ?? 'ここに入力';
+  field.placeholder = opts.placeholder ?? t('sys.dialog.typeHere');
   if (opts.inputMode) field.inputMode = opts.inputMode as HTMLInputElement['inputMode'];
   field.autocomplete = 'off';
   field.spellcheck = false;
@@ -105,7 +106,7 @@ export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: Tex
   window.setTimeout(focusField, 60);
 
   const buttonY = top + h - 56;
-  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, 'キャンセル', close, { variant: 'wood', fontSize: '24px' }));
+  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, t('common.cancel'), close, { variant: 'wood', fontSize: '24px' }));
   modal.container.add(new Button(scene, 360 + 140, buttonY, 230, 68, 'OK', submit, { variant: 'gold', fontSize: '30px' }));
   return { container: modal.container, close };
 }
@@ -135,7 +136,7 @@ export function openConfirm(scene: Phaser.Scene, scroll: ModalLock, opts: Confir
   modal.container.add(text);
   opts.extra?.build(modal.container, top + h - 112 - extraH / 2);
   const buttonY = top + h - 56;
-  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, 'キャンセル', () => modal.close(), { variant: 'wood', fontSize: '24px' }));
+  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, t('common.cancel'), () => modal.close(), { variant: 'wood', fontSize: '24px' }));
   modal.container.add(
     new Button(
       scene,
@@ -251,7 +252,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
   const submit = (): void => {
     const text = field.value.trim();
     if (!text) {
-      hint.setText('内容を入力してください');
+      hint.setText(t('sys.dialog.enterText'));
       field.focus();
       return;
     }
@@ -266,7 +267,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
   window.setTimeout(focusField, 60);
 
   const buttonY = top + h - 56;
-  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, 'キャンセル', close, { variant: 'wood', fontSize: '24px' }));
+  modal.container.add(new Button(scene, 360 - 140, buttonY, 230, 68, t('common.cancel'), close, { variant: 'wood', fontSize: '24px' }));
   modal.container.add(new Button(scene, 360 + 140, buttonY, 230, 68, opts.submitLabel, submit, { variant: 'gold', fontSize: '28px' }));
   return { container: modal.container, close };
 }

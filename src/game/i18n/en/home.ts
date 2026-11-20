@@ -5,7 +5,7 @@ export const home: Part<'home'> = {
   // HomeScene.ts
   'home.quest': 'Quest',
   'home.summon': 'Summon',
-  'home.collection': 'Collection',
+  'home.roster': 'Party',
   'home.loginBonus': 'Login Bonus',
   'home.dayReward': 'Day {dayOfMonth} reward',
   'home.idleRewards': 'Idle Rewards',

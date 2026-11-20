@@ -12,6 +12,7 @@ import { equipIcon, itemIcon, materialIcon } from './ItemIcons';
 import { createPanel } from './Panel';
 import { addGoodIcon, GOOD_LABEL } from './RewardIcon';
 import { body, caption, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 export const TILE_W = 112;
@@ -39,10 +40,38 @@ export interface RewardTile {
 
 /** EXP and 技素 have no illustration of their own: a brass-ringed disc with a kanji. */
 const BADGE: Record<'exp' | 'essence' | 'rank' | 'coin', { color: number; glyph: string; label: string }> = {
-  coin: { color: 0x8a5a1c, glyph: '盟', label: '同盟コイン' },
-  rank: { color: 0xc7701c, glyph: 'Lv', label: 'プレイヤー' },
-  exp: { color: 0x3a7fd6, glyph: '経', label: 'EXP' },
-  essence: { color: 0x3f9a5a, glyph: '技', label: '技素' },
+  coin: {
+    color: 0x8a5a1c,
+    get glyph() {
+      return t('sys.badge.allianceCoinGlyph');
+    },
+    get label() {
+      return t('sys.badge.allianceCoin');
+    },
+  },
+  rank: {
+    color: 0xc7701c,
+    glyph: 'Lv',
+    get label() {
+      return t('sys.badge.player');
+    },
+  },
+  exp: {
+    color: 0x3a7fd6,
+    get glyph() {
+      return t('sys.badge.expGlyph');
+    },
+    label: 'EXP',
+  },
+  essence: {
+    color: 0x3f9a5a,
+    get glyph() {
+      return t('sys.badge.essenceGlyph');
+    },
+    get label() {
+      return t('sys.good.skillEssence');
+    },
+  },
 };
 
 /** One tile per piece of equipment (its icon, name and rarity stars). */
@@ -108,7 +137,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
 /** A tile for a reward that has not been handed over yet (a calendar day, a pack's contents). */
 export function tileForReward(r: Reward): RewardTile {
   const amount = `+${r.amount.toLocaleString('ja-JP')}`;
-  if (r.type === 'equipment') return { kind: 'equipment', amount: `×${r.amount}`, equip: { glyph: DEFAULT_GLYPH.weapon, rarity: r.rarity, name: `装備★${r.rarity}` } };
+  if (r.type === 'equipment') return { kind: 'equipment', amount: `×${r.amount}`, equip: { glyph: DEFAULT_GLYPH.weapon, rarity: r.rarity, name: t('sys.reward.gearStars', { rarity: r.rarity }) } };
   if (r.type === 'item') return { kind: 'item', item: r.item, amount };
   if (r.type === 'skillEssence') return { kind: 'essence', amount };
   return { kind: r.type, amount };

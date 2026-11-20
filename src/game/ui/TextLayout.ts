@@ -1,8 +1,8 @@
 /** Characters that must not begin a line (closing brackets, punctuation,
  *  small kana, the long-vowel mark): they hang on the end of the previous line. */
-export const NO_LINE_START = new Set(Array.from('、。，．・：；？！）］｝〕〉》」』】ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶー々〜…)]}.,:;?!'));
+export const NO_LINE_START = new Set(Array.from('、。，．・：；？！）］｝〕〉》」』】ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶー々〜…)]}.,:;?!')); // i18n-ignore (line-breaking rules, not text)
 /** Characters that must not end a line (opening brackets): they move down with the next character. */
-export const NO_LINE_END = new Set(Array.from('（［｛〔〈《「『【([{'));
+export const NO_LINE_END = new Set(Array.from('（［｛〔〈《「『【([{')); // i18n-ignore (line-breaking rules, not text)
 
 export const NEWLINE = String.fromCharCode(10);
 

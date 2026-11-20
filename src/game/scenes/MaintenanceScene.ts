@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { RemoteMaintenance } from '../systems/RemoteMaintenance';
+import { RemoteMaintenance, maintenanceMessageText } from '../systems/RemoteMaintenance';
 import { Button } from '../ui/Button';
 import { wrappedText } from '../ui/CardParts';
 import { createDivider, createPanel } from '../ui/Panel';
@@ -38,7 +38,7 @@ export class MaintenanceScene extends Phaser.Scene {
     createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false });
     heading(this, 360, cy - h / 2 + 64, t('home.maintenance.underMaintenance'), { fontSize: '40px' }).setOrigin(0.5);
     createDivider(this, 360, cy - h / 2 + 112, inner, CHROME.brassDark);
-    wrappedText(this, left, cy - h / 2 + 140, data.message, inner, { fontSize: '25px', color: '#f5e6c8', lineSpacing: 10 });
+    wrappedText(this, left, cy - h / 2 + 140, maintenanceMessageText(data.message), inner, { fontSize: '25px', color: '#f5e6c8', lineSpacing: 10 });
     const status = this.add.text(360, cy + h / 2 - 150, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5);
 
     const recheck = async (): Promise<void> => {

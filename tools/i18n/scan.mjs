@@ -23,6 +23,8 @@ export const posix = (p) => p.split(path.sep).join('/');
 export function scanFile(file) {
   const text = readFileSync(file, 'utf8');
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  // `i18n-ignore-file` anywhere in a file: none of its Japanese is player-facing text (a developer tool page, a dev-only notice)
+  if (/i18n-ignore-file/.test(text)) return [];
   const lines = text.split(/\r?\n/);
   const hits = [];
   const add = (node, value) => {

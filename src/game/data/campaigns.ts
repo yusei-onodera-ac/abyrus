@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 /**
  * ブーストキャンペーン: for a week or so, one thing pays more (or costs less). They fill the weeks between the 期間限定イベント
  * (data/schedule.ts lists the year's) and can overlap an event. They need no screen of their own: the Event tab shows the ones
@@ -26,16 +28,27 @@ export interface CampaignDef {
   endsAt: string;
 }
 
+// (getters: the name is looked up each time it is read, so it follows the language)
 export const CAMPAIGN_KIND_NAME: Record<CampaignKind, string> = {
-  gold: 'ゴールド',
-  exp: '経験値',
-  drop: '素材ドロップ',
-  stamina: 'スタミナ消費',
-  idle: '放置報酬',
+  get gold() {
+    return t('sys.campaign.gold');
+  },
+  get exp() {
+    return t('sys.campaign.exp');
+  },
+  get drop() {
+    return t('sys.campaign.drop');
+  },
+  get stamina() {
+    return t('sys.campaign.stamina');
+  },
+  get idle() {
+    return t('sys.campaign.idle');
+  },
 };
 
 /** "ゴールド ×2", "スタミナ消費 半分". */
 export function describeCampaign(c: Pick<CampaignDef, 'kind' | 'mul'>): string {
-  if (c.kind === 'stamina') return `${CAMPAIGN_KIND_NAME[c.kind]} ${c.mul === 0.5 ? '半分' : `×${c.mul}`}`;
-  return `${CAMPAIGN_KIND_NAME[c.kind]} ×${c.mul}`;
+  if (c.kind === 'stamina' && c.mul === 0.5) return t('sys.campaign.half', { name: CAMPAIGN_KIND_NAME[c.kind] });
+  return t('sys.campaign.times', { name: CAMPAIGN_KIND_NAME[c.kind], mul: c.mul });
 }

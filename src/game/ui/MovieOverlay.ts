@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { MovieSystem } from '../systems/MovieSystem';
 import { body } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 /** Above the scene's popups (depth 200), so the next layer can be built underneath. */
@@ -31,7 +32,7 @@ export function playMovieOverlay(scene: Phaser.Scene, id: string, opts: MovieOve
     const cover = scene.add.rectangle(360, 640, 720, 1280, 0x000000, 1).setDepth(DEPTH).setInteractive();
     const video = scene.add.video(360, 640, key).setDepth(DEPTH + 1);
     video.setVolume(opts.volume);
-    const hint = body(scene, 360, 1232, 'タップでスキップ', { fontSize: '24px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setDepth(DEPTH + 2).setAlpha(0);
+    const hint = body(scene, 360, 1232, t('sys.movie.tapToSkip'), { fontSize: '24px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setDepth(DEPTH + 2).setAlpha(0);
     scene.tweens.add({ targets: hint, alpha: 0.75, delay: 1200, duration: 400 });
 
     let done = false;

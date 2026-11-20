@@ -15,7 +15,7 @@ import { ExpeditionSystem } from '../systems/ExpeditionSystem';
 import { VillageSystem } from '../systems/VillageSystem';
 import { MissionSystem } from '../systems/MissionSystem';
 import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
-import { getMissionGroup } from '../data/missions';
+import { missionGroupShort } from './MissionScene';
 import { homeLinesFor } from '../data/homeLines';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { wrapToWidth } from '../ui/CardParts';
@@ -250,7 +250,7 @@ export class HomeScene extends Phaser.Scene {
     const clusterX = BANNER.x + size / 2;
     const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), tl('home.quest'), size, () => this.scene.start('StageSelect'));
     const gacha = new IconNavButton(this, 400, 810, 'gacha', gachaIcon(this, 90), tl('home.summon'), size, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), tl('home.collection'), size, () => this.scene.start('Roster'));
+    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), tl('home.roster'), size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 
@@ -408,7 +408,7 @@ export class HomeScene extends Phaser.Scene {
     summary.forEach((g, i) => {
       const cx = columns[i];
       const ready = g.claimable > 0;
-      box.add(caption(this, cx, 43, getMissionGroup(g.group).short, { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(caption(this, cx, 43, missionGroupShort(g.group), { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       box.add(body(this, cx, 66, `${g.done}/${g.total}`, { fontSize: '25px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     });
 

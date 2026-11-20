@@ -21,6 +21,7 @@ import { loadEvents, type EventProgress } from './EventProgress';
 import { expToNextLevel } from './LevelCurve';
 import { MAX_PLAYER_LEVEL, staminaMaxFor } from '../data/playerLevel';
 import { MAX_SKILL_LEVEL, MAX_SKILL_SLOTS, isSkillSlotUnlocked, skillUpgradeCost } from '../data/skills';
+import { t as tl } from '../i18n';
 
 export interface PartyFormation {
   front: (string | null)[];
@@ -365,9 +366,9 @@ function normalizeDeck(raw: Partial<Deck> | undefined, fallbackName: string): De
  *  `party` into デッキ1, so an old save keeps its formation. */
 function restoreDecks(parsed: Partial<SaveData> & { party?: PartyFormation }, fallback: Deck[]): Deck[] {
   if (Array.isArray(parsed.decks) && parsed.decks.length > 0) {
-    return parsed.decks.slice(0, MAX_DECKS).map((deck, i) => normalizeDeck(deck, `デッキ${i + 1}`));
+    return parsed.decks.slice(0, MAX_DECKS).map((deck, i) => normalizeDeck(deck, tl('sys.deck.name', { i: i + 1 })));
   }
-  if (parsed.party) return [normalizeDeck(parsed.party as Partial<Deck>, 'デッキ1')];
+  if (parsed.party) return [normalizeDeck(parsed.party as Partial<Deck>, tl('sys.deck.first'))];
   return fallback;
 }
 
@@ -646,11 +647,11 @@ export const SaveSystem = {
       gems: 1500,
       skillEssence: 300,
       heroes,
-      decks: [{ name: 'デッキ1', front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] }],
+      decks: [{ name: tl('sys.deck.first'), front: [heroes[0].id, heroes[1].id, null], back: [heroes[2].id, null] }],
       activeDeck: 0,
       stageProgress: 0,
       updatedAt: Date.now(),
-      playerName: 'プレイヤー',
+      playerName: tl('sys.defaultPlayerName'),
       playerLevel: 1,
       playerExp: 0,
       tutorial: { opening: false, step: 0, done: false, village: { step: 0, done: false } },

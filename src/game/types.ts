@@ -1,15 +1,27 @@
 import type { BigNumber } from './systems/BigNumber';
+import { t } from './i18n';
 
 export type Rarity = 1 | 2 | 3 | 4 | 5 | 6;
 export type HeroClass = 'warrior' | 'mage' | 'archer' | 'tank' | 'healer';
 export type Row = 'front' | 'back';
 
+// (getters: the label is looked up each time it is read, so it follows the language - see docs/I18N.md)
 export const CLASS_LABELS: Record<HeroClass, string> = {
-  warrior: '戦士',
-  mage: '魔術師',
-  archer: '弓兵',
-  tank: '守護者',
-  healer: '術師',
+  get warrior() {
+    return t('sys.class.warrior');
+  },
+  get mage() {
+    return t('sys.class.mage');
+  },
+  get archer() {
+    return t('sys.class.archer');
+  },
+  get tank() {
+    return t('sys.class.tank');
+  },
+  get healer() {
+    return t('sys.class.healer');
+  },
 };
 
 export const RARITY_COLORS: Record<Rarity, number> = {
@@ -37,7 +49,17 @@ export const MAX_LEVEL = 100;
 /** Where a piece of equipment goes: each hero wears one of each. */
 export type EquipSlot = 'weapon' | 'armor' | 'accessory';
 export const EQUIP_SLOTS: EquipSlot[] = ['weapon', 'armor', 'accessory'];
-export const EQUIP_SLOT_LABELS: Record<EquipSlot, string> = { weapon: '武器', armor: '防具', accessory: '装飾' };
+export const EQUIP_SLOT_LABELS: Record<EquipSlot, string> = {
+  get weapon() {
+    return t('sys.slot.weapon');
+  },
+  get armor() {
+    return t('sys.slot.armor');
+  },
+  get accessory() {
+    return t('sys.slot.accessory');
+  },
+};
 
 /** One owned piece of equipment: which EQUIP_DEFS entry it is (data/equipment.ts)
  *  and how far it has been levelled. */
