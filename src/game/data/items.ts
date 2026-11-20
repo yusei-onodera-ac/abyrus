@@ -4,6 +4,8 @@
  * フェーズ素材 (phaseMaterials) と 技素 (skillEssence) は以前からセーブの専用
  * 項目として持っている。ここにあるのは、それ以外の素材。
  */
+import { tr } from '../i18n';
+
 export type ItemId = 'exp_s' | 'exp_m' | 'exp_l' | 'exp_xl' | 'equip_essence';
 
 export interface ItemDef {
@@ -18,12 +20,29 @@ export interface ItemDef {
   exp?: number;
 }
 
+/** The texts are read through tr() each time (see i18n/dataTexts.ts: the English is in i18n/data/en.ts), so they follow the language. */
+function localized(def: ItemDef): ItemDef {
+  const { name, short, description } = def;
+  return {
+    ...def,
+    get name() {
+      return tr('item', def.id, 'name', name);
+    },
+    get short() {
+      return tr('item', def.id, 'short', short);
+    },
+    get description() {
+      return tr('item', def.id, 'description', description);
+    },
+  };
+}
+
 export const ITEMS: Record<ItemId, ItemDef> = {
-  exp_s: { id: 'exp_s', name: '経験値素材（小）', short: '経験値(小)', description: 'キャラに使うと経験値+100。', color: '#7fb4ff', exp: 100 },
-  exp_m: { id: 'exp_m', name: '経験値素材（中）', short: '経験値(中)', description: 'キャラに使うと経験値+1,000。', color: '#ff9a8a', exp: 1000 },
-  exp_l: { id: 'exp_l', name: '経験値素材（大）', short: '経験値(大)', description: 'キャラに使うと経験値+10,000。', color: '#9fefff', exp: 10000 },
-  exp_xl: { id: 'exp_xl', name: '経験値素材（特大）', short: '経験値(特大)', description: 'キャラに使うと経験値+100,000。', color: '#c9a0ff', exp: 100000 },
-  equip_essence: { id: 'equip_essence', name: '装備強化素材', short: '強化素材', description: '装備のレベルアップに使う。装備を分解すると手に入る。', color: '#ffb36b' },
+  exp_s: localized({ id: 'exp_s', name: '経験値素材（小）', short: '経験値(小)', description: 'キャラに使うと経験値+100。', color: '#7fb4ff', exp: 100 }),
+  exp_m: localized({ id: 'exp_m', name: '経験値素材（中）', short: '経験値(中)', description: 'キャラに使うと経験値+1,000。', color: '#ff9a8a', exp: 1000 }),
+  exp_l: localized({ id: 'exp_l', name: '経験値素材（大）', short: '経験値(大)', description: 'キャラに使うと経験値+10,000。', color: '#9fefff', exp: 10000 }),
+  exp_xl: localized({ id: 'exp_xl', name: '経験値素材（特大）', short: '経験値(特大)', description: 'キャラに使うと経験値+100,000。', color: '#c9a0ff', exp: 100000 }),
+  equip_essence: localized({ id: 'equip_essence', name: '装備強化素材', short: '強化素材', description: '装備のレベルアップに使う。装備を分解すると手に入る。', color: '#ffb36b' }),
 };
 
 /** The four EXP materials, smallest first. */

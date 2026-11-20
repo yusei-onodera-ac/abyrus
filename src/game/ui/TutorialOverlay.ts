@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
-import { TUTORIAL_GUIDE_NAME, type TutorialRect, type TutorialStep } from '../data/tutorial';
+import { tutorialGuideName, type TutorialRect, type TutorialStep } from '../data/tutorial';
 import type { SaveData } from '../systems/SaveSystem';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { wrapToWidth } from './CardParts';
 import { createPanel } from './Panel';
 import { addPetFace } from './PetPortrait';
 import { body, caption, subheading, CHROME } from './theme';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 const DEPTH = 300;
@@ -166,14 +167,14 @@ export class TutorialOverlay {
     this.add(addPetFace(this.scene, left + 76, top + 96, 112, this.step.mood));
     const plate = this.add(createPanel(this.scene, left + 76, top + 168, 110, 38, { fillColor: CHROME.woodGrain, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 10, gradient: false }));
     void plate;
-    this.add(subheading(this.scene, left + 76, top + 168, TUTORIAL_GUIDE_NAME, { fontSize: '22px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
+    this.add(subheading(this.scene, left + 76, top + 168, tutorialGuideName(), { fontSize: '22px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
 
     this.bodyText = this.add(body(this.scene, left + TEXT_X_OFFSET, top + 26, '', { fontSize: `${TEXT_SIZE}px`, fontStyle: 'bold', color: '#fff0cc', stroke: INK, strokeThickness: 4, lineSpacing: 10 }));
     const tapStep = this.step.advance === 'tap';
     this.hint = this.add(
       tapStep
         ? caption(this.scene, left + PANEL_W - 34, top + h - 30, '▼', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5)
-        : caption(this.scene, left + TEXT_X_OFFSET, top + h - 28, '光っているところを押してね', { fontSize: '19px', color: '#ffd23f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
+        : caption(this.scene, left + TEXT_X_OFFSET, top + h - 28, tl('tutorial.overlay.tapGlow'), { fontSize: '19px', color: '#ffd23f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
     ) as Phaser.GameObjects.Text;
     this.hint.setVisible(false);
     this.scene.tweens.add({ targets: this.hint, y: this.hint.y + 5, duration: 480, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -205,17 +206,17 @@ export class TutorialOverlay {
       : [[100, 168], [360, 1236], [640, 1214], [360, 168]];
     const clash = (x: number, y: number, r: TutorialRect | undefined): boolean => !!r && x + 80 > r.x && x - 80 < r.x + r.w && y + 30 > r.y && y - 30 < r.y + r.h;
     const [x, y] = candidates.find(([cx, cy]) => !clash(cx, cy, this.hole) && !clash(cx, cy, this.bubbleRect)) ?? candidates[0];
-    const label = this.add(body(this.scene, x, y, 'スキップ', { fontSize: '22px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5)) as Phaser.GameObjects.Text;
+    const label = this.add(body(this.scene, x, y, tl('common.skip'), { fontSize: '22px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5)) as Phaser.GameObjects.Text;
     const hit = this.add(this.scene.add.zone(x, y, 150, 56));
     (hit as Phaser.GameObjects.Zone).setInteractive({ useHandCursor: true });
     hit.on('pointerup', () => {
       if (!this.skipArmed) {
         this.skipArmed = true;
-        label.setText('本当にスキップ？').setColor('#ff9a8a');
+        label.setText(tl('tutorial.overlay.reallySkip')).setColor('#ff9a8a');
         this.timers.push(
           this.scene.time.delayedCall(2800, () => {
             this.skipArmed = false;
-            if (label.active) label.setText('スキップ').setColor('#d8c49a');
+            if (label.active) label.setText(tl('common.skip')).setColor('#d8c49a');
           }),
         );
         return;

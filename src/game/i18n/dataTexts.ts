@@ -20,3 +20,9 @@ export function tr(table: string, id: string, field: string, ja: string): string
   }
   return ja;
 }
+
+/** `tr()` for a list of lines (a tutorial step's `lines`): the translation keeps them in one text, separated by line breaks. */
+export function trList(table: string, id: string, field: string, ja: readonly string[]): string[] {
+  const found = tr(table, id, field, '');
+  return found === '' ? [...ja] : found.split('\n');
+}
