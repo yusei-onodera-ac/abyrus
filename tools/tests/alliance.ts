@@ -8,6 +8,10 @@ import { IdleSystem } from '../../src/game/systems/IdleSystem';
 import { StageRewardSystem, type StageBonus } from '../../src/game/systems/StageRewardSystem';
 import { BattleSystem } from '../../src/game/systems/BattleSystem';
 import { createHeroInstance } from '../../src/game/data/heroes';
+import { enData } from '../../src/game/i18n/data/en';
+import { setLanguage } from '../../src/game/i18n';
+import { localizedBoss, RAID_BOSSES as ONLINE_BOSSES } from '../../src/game/alliance/onlineLogic';
+import { RAID_BOSSES } from '../../src/game/data/alliance';
 import { DONATIONS, perksForLevel, raidWarPoints, weekIdOf, weekStartOf, dayKeyOf, allianceExpToNext, raidDamageCap, allianceBattleBonus, allianceExpDropBonus, allianceIdleGoldBonus } from '../../src/game/data/alliance';
 import { DAILY_MISSIONS, WEEKLY_MISSIONS, getMissionDef, missionCap } from '../../src/game/data/allianceMissions';
 import { RESEARCH_LINES, RESEARCH_STEPS } from '../../src/game/data/allianceResearch';
@@ -1080,6 +1084,26 @@ function createGhost(): SaveData {
   const g = SaveSystem.createDefault();
   AllianceService.profile(g);
   return g;
+}
+
+// ---------------------------------------------------------------------------------------------- the raid boss's name follows the language
+{
+  const r = rig();
+  must(await r.b.create(r.me, { name: '言語の会', emblem: 0, description: '', joinPolicy: 'open', minPlayerLevel: 0 }), 'create');
+  const d = must(await r.b.load(r.me), 'load')!;
+  const boss = RAID_BOSSES.find((b) => b.id === d.raid.boss.id)!;
+  const jaName = boss.name;
+  const jaDescription = boss.description;
+  ok(!!boss && jaName.length > 0 && jaDescription.length > 0, 'the raid boss of the week is one of the table, with a name and a description');
+  enData.allianceBoss = { [boss.id]: { name: 'Test Stag' }, [ONLINE_BOSSES[0].id]: { name: 'Online Stag', description: 'An online description.' } };
+  setLanguage('en');
+  ok(boss.name === 'Test Stag' && boss.description === jaDescription, 'English: the boss name is read through tr() when asked for (the description has no translation yet: Japanese)');
+  ok(d.raid.boss.name === 'Test Stag', 'the boss of the alliance screen (Local), loaded before the language changed, shows the English name');
+  const online = localizedBoss(ONLINE_BOSSES[0]);
+  ok(online.name === 'Online Stag' && online.description === 'An online description.' && online.id === ONLINE_BOSSES[0].id && online.art === ONLINE_BOSSES[0].art, 'a boss from the server (Online) is shown in the language too, with the rest unchanged');
+  setLanguage('ja');
+  ok(boss.name === jaName && d.raid.boss.name === jaName && online.name === ONLINE_BOSSES[0].name, 'back to Japanese: the same objects follow (nothing was copied at load)');
+  delete enData.allianceBoss;
 }
 
 void createHeroInstance;

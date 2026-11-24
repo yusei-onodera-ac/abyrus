@@ -80,6 +80,7 @@ import {
   dayEndMs,
   dayKey,
   expToNext,
+  localizedBoss,
   missionBoardId,
   missionPeriodKey,
   perksForLevel,
@@ -944,7 +945,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
 
     // ボス。
     const totalPower = members.reduce((sum, m) => sum + m.power, 0);
-    const boss: RaidBossDef = raidSnap.exists() && raidSnap.data()?.boss ? (raidSnap.data()?.boss as RaidBossDef) : raidBossFor(now);
+    const boss: RaidBossDef = localizedBoss(raidSnap.exists() && raidSnap.data()?.boss ? (raidSnap.data()?.boss as RaidBossDef) : raidBossFor(now));
     const maxHp = raidSnap.exists() ? num(raidSnap.data()?.maxHp) : raidBossHp(totalPower, summary.level, perks.raidAttemptsPerDay);
     const hp = raidSnap.exists() ? num(raidSnap.data()?.hp) : maxHp;
     const ranking: RaidRankEntry[] = members
@@ -1348,7 +1349,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
       await this.session(me);
       const ticket = await this.callFn<RaidTicket>('beginRaid', {});
       this.invalidate();
-      return ticket;
+      return { ...ticket, boss: localizedBoss(ticket.boss) };
     });
   }
 

@@ -6,6 +6,7 @@ import type {
   RaidBossDef,
 } from '../alliance/AllianceBackend';
 import { LEAGUES } from '../alliance/AllianceBackend';
+import { tr } from '../i18n';
 import { REGIONS } from './regions';
 import { researchBonusOfSave } from './allianceResearch';
 import type { SaveData } from '../systems/SaveSystem';
@@ -121,14 +122,23 @@ const BOSS_TEXT = [
   '闇を走る大狼。速さに、ついていけるか。',
 ];
 
-/** 週ごとのボス (地方のボスを順に回す)。 */
-export const RAID_BOSSES: RaidBossDef[] = REGIONS.slice(0, RAID_BOSS_COUNT).map((r, i) => ({
-  id: `raid_${r.id}`,
-  name: r.bossName,
-  art: r.bossArt,
-  heroClass: r.bossClass,
-  description: BOSS_TEXT[i] ?? '',
-}));
+/** 週ごとのボス (地方のボスを順に回す)。名前と説明は、読むたびに (画面に出すときに) 引くので、言語を変えても、ついてくる:
+ *  名前は、地方の表の名前 (`REGIONS` の行が訳を持てば、その訳) を元に、`tr('allianceBoss', id, 'name', …)` の訳があればそれ。 */
+export const RAID_BOSSES: RaidBossDef[] = REGIONS.slice(0, RAID_BOSS_COUNT).map((r, i) => {
+  const id = `raid_${r.id}`;
+  const text = BOSS_TEXT[i] ?? '';
+  return {
+    id,
+    get name() {
+      return tr('allianceBoss', id, 'name', r.bossName);
+    },
+    art: r.bossArt,
+    heroClass: r.bossClass,
+    get description() {
+      return tr('allianceBoss', id, 'description', text);
+    },
+  };
+});
 
 /** 1回の挑戦で出るダメージは、auto で、総合力のおよそ4〜6.5倍 (戦闘を画面なしで動かして測った: 総合力が1,000から260万まで、
  *  ほぼ一定。auto を切って手で押さないと、2.8倍ほど)。ボスのHPは、これを元に決める。 */

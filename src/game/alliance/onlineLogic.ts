@@ -6,7 +6,7 @@
  * それまで、ここは docs/ALLIANCE_DESIGN.md の数字をそのまま写してある。
  */
 import type { AllianceReward, AlliancePerks, DonationKind, League, RaidBossDef } from './AllianceBackend';
-import { t as tl } from '../i18n';
+import { t as tl, tr } from '../i18n';
 
 // ---------------------------------------------------------------------------------------------- 時刻
 
@@ -172,6 +172,20 @@ export const RAID_BOSSES: RaidBossDef[] = [
   { id: 'necrodraco', name: '古骨の竜・ネクロドラコ', art: 'necrodraco', heroClass: 'mage', description: 'よみがえった、骨の竜。' }, // i18n-ignore
   { id: 'kurogane', name: '闇走りの大狼・クロガネ', art: 'wolf', heroClass: 'warrior', description: '夜を駆ける、黒鉄の狼。' }, // i18n-ignore
 ];
+
+/** サーバー (週のボスの文書・切符) が持つボスの定義を、いまの言語の名前・説明にする。日本語のままなのは、訳がないとき (`tr('allianceBoss', id, …)`)。
+ *  文書に入っている定義は、言語によらず、サーバーが書いた日本語。読むたびに (画面に出すときに) 引くので、読み込み済みの同盟でも、言語を変えると、ついてくる。 */
+export function localizedBoss(def: RaidBossDef): RaidBossDef {
+  return {
+    ...def,
+    get name() {
+      return tr('allianceBoss', def.id, 'name', def.name);
+    },
+    get description() {
+      return tr('allianceBoss', def.id, 'description', def.description);
+    },
+  };
+}
 
 export function raidBossFor(ms: number): RaidBossDef {
   const i = ((weekIndex(ms) % RAID_BOSSES.length) + RAID_BOSSES.length) % RAID_BOSSES.length;
