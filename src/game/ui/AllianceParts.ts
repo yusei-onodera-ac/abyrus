@@ -141,8 +141,8 @@ export function rewardLine(reward: AllianceReward): string {
 
 // ---------------------------------------------------------------------------------------------- 通知
 
-/** How many things in the 同盟 are waiting for the player (for a red dot): a reward to take, a request to answer (幹部以上),
- *  stamina sent to them, boss attempts left. 0 for no 同盟 or nothing waiting. */
+/** How many things in the 同盟 are waiting for the player (for a red dot): a reward to take (the boss, the 対抗戦, a 同盟ミッション), a
+ *  request to answer (幹部以上), stamina sent to them, boss attempts left. 0 for no 同盟 or nothing waiting. */
 export function allianceAttention(d: AllianceDetail | null | undefined): number {
   if (!d) return 0;
   let n = 0;
@@ -151,6 +151,7 @@ export function allianceAttention(d: AllianceDetail | null | undefined): number 
   if (d.requests.length > 0) n += 1;
   if (d.support.receivable > 0 && d.support.receiveLeft > 0) n += 1;
   if (d.raid.attemptsLeft > 0 && d.raid.defeatedAt === null) n += 1;
+  if (d.missions.claimable > 0) n += 1;
   return n;
 }
 

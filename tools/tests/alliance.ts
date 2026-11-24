@@ -8,7 +8,11 @@ import { IdleSystem } from '../../src/game/systems/IdleSystem';
 import { StageRewardSystem, type StageBonus } from '../../src/game/systems/StageRewardSystem';
 import { BattleSystem } from '../../src/game/systems/BattleSystem';
 import { createHeroInstance } from '../../src/game/data/heroes';
-import { DONATIONS, perksForLevel, raidWarPoints, weekIdOf, weekStartOf, dayKeyOf, allianceExpToNext, raidDamageCap } from '../../src/game/data/alliance';
+import { DONATIONS, perksForLevel, raidWarPoints, weekIdOf, weekStartOf, dayKeyOf, allianceExpToNext, raidDamageCap, allianceBattleBonus, allianceExpDropBonus, allianceIdleGoldBonus } from '../../src/game/data/alliance';
+import { DAILY_MISSIONS, WEEKLY_MISSIONS, getMissionDef, missionCap } from '../../src/game/data/allianceMissions';
+import { RESEARCH_LINES, RESEARCH_STEPS } from '../../src/game/data/allianceResearch';
+import { bump, checkClaim, cleanReport, goalTarget, markClaimed, newBoard, pickGoals, viewOfBoard, weekOrdinal } from '../../src/game/alliance/missionLogic';
+import { recordMission } from '../../src/game/systems/MissionProgress';
 import { BigNumber } from '../../src/game/systems/BigNumber';
 
 let failures = 0;
@@ -763,6 +767,319 @@ const must = <T>(r: { ok: boolean; value?: T; message?: string }, label: string)
   ok(left.ok, 'the player can leave');
   await AllianceService.refresh(save);
   ok(save.stamina[1] === 50 + 15 && save.alliance.level === 0 && save.alliance.helperHeroId === '', 'after leaving: the bonus is gone');
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟ミッション: the rules (pure)
+{
+  const day = (n: number): string => `2026-11-${String(n).padStart(2, '0')}`;
+  ok(goalTarget(DAILY_MISSIONS[0], 20) === 120 && goalTarget(DAILY_MISSIONS[0], 1) === 10, 'target = per member x members, never below the floor (6 x 20 = 120; a lone member: 10)');
+  ok(goalTarget(getMissionDef('d_donate')!, 17) === 30 && goalTarget(getMissionDef('d_idle')!, 20) === 14 && goalTarget(getMissionDef('d_idle')!, 1) === 2, 'targets are rounded up to a tidy number (25.5 -> 30; 14; floor 2)');
+  ok(goalTarget(getMissionDef('w_stage')!, 20) === 800 && goalTarget(getMissionDef('w_stamina')!, 25) === 12500, 'big targets round to tens and hundreds');
+  const g1 = pickGoals('daily', day(10), 20);
+  ok(g1.length === 3 && new Set(g1.map((g) => g.metric)).size === 3 && g1.every((g) => DAILY_MISSIONS.some((m) => m.id === g.id && m.metric === g.metric)), 'a day picks 3 goals, one per action, from the daily table');
+  ok(JSON.stringify(pickGoals('daily', day(10), 20)) === JSON.stringify(g1), 'the same day gives the same goals (every member sees the same ones)');
+  const seen = new Set<string>();
+  for (let n = 1; n <= 28; n++) for (const g of pickGoals('daily', day(n), 20)) seen.add(g.id);
+  ok(seen.size === DAILY_MISSIONS.length && new Set(Array.from({ length: 28 }, (_, n) => pickGoals('daily', day(n + 1), 20).map((g) => g.id).join())).size > 8, 'over a month every daily mission comes up, and the three change from day to day');
+  const weeks = Array.from({ length: 5 }, (_, i) => { const d = new Date(2026, 10, 9 + i * 7); return pickGoals('weekly', `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`, 20); });
+  ok(weeks.every((w) => w.length === 1) && new Set(weeks.map((w) => w[0].id)).size === WEEKLY_MISSIONS.length, 'a week has 1 big goal, and five weeks in a row take each of the five in turn');
+  ok(weekOrdinal('2026-11-23') === weekOrdinal('2026-11-9') + 2 && weekOrdinal('2026-12-7') === weekOrdinal('2026-11-30') + 1, 'weeks are counted whether or not months are padded');
+  ok(pickGoals('weekly', '2026-11-23', 20)[0].target >= WEEKLY_MISSIONS.find((m) => m.id === pickGoals('weekly', '2026-11-23', 20)[0].id)!.minTarget, 'a weekly goal is at least its floor');
+
+  const board = newBoard('daily', day(10), 20);
+  ok(board.members === 20 && board.goals.length === 3 && Object.keys(board.progress).length === 0, 'a new board: its goals are fixed, nothing done');
+  ok(JSON.stringify(cleanReport({ stage: 5.9, gacha: -3, donate: NaN, raid: 0, stamina: 1e9, bogus: 4 } as never)) === JSON.stringify({ stage: 5, stamina: 999 }), 'a report keeps whole numbers of 1 or more, up to 999, for the known actions only');
+  ok(bump(board, 'a', 'donate', 20) === 13 && bump(board, 'a', 'donate', 5) === 0 && board.progress.donate === 13 && board.by.a.donate === 13, 'one member can add at most 13 donations a day (the cap); the board counts only what was added');
+  ok(bump(board, 'b', 'donate', 4) === 4 && board.progress.donate === 17, 'another member adds on top');
+  const weekBoard = newBoard('weekly', '2026-11-09', 20);
+  ok(bump(weekBoard, 'a', 'donate', 999) === 91 && bump(weekBoard, 'a', 'raid', 99) === 35, 'the weekly cap is 7 x the daily one');
+  ok(missionCap('stage', 'daily') === 300 && missionCap('stage', 'weekly') === 2100, 'cap table: stage 300 a day, 2100 a week');
+
+  const b = newBoard('daily', day(10), 4);
+  const goal = b.goals[0];
+  const def = getMissionDef(goal.id)!;
+  ok(!checkClaim(b, 'me', goal.id).ok && (checkClaim(b, 'me', goal.id) as { reason: string }).reason === 'not_done', 'a goal that is not met cannot be claimed');
+  ok((checkClaim(b, 'me', 'nope') as { reason: string }).reason === 'no_such' && (checkClaim(null, 'me', goal.id) as { reason: string }).reason === 'no_such', 'an unknown mission / no board cannot be claimed');
+  b.progress[goal.metric] = goal.target;
+  const low = checkClaim(b, 'me', goal.id) as { ok: false; reason: string; need: number };
+  ok(!low.ok && low.reason === 'share_low' && low.need === def.minShare, 'met by the others but without your own share: refused, with how much is missing');
+  b.by.me = { [goal.metric]: def.minShare };
+  ok(checkClaim(b, 'me', goal.id).ok, 'met, with your minimum share: claimable');
+  markClaimed(b, 'me', goal.id);
+  ok((checkClaim(b, 'me', goal.id) as { reason: string }).reason === 'claimed' && b.claims.me.length === 1, 'claimed once, never twice');
+  markClaimed(b, 'me', goal.id);
+  ok(b.claims.me.length === 1, 'marking twice does not add twice');
+  const v = viewOfBoard(b, 'me', { me: 'わたし', x: 'ほか' }, 12345);
+  const mv = v.missions.find((m) => m.id === goal.id)!;
+  ok(v.scope === 'daily' && v.endsAt === 12345 && mv.claimed && !mv.claimable && mv.done && mv.mine === def.minShare && mv.myRank === 1, 'the view: done, claimed, my share and my rank');
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟ミッション: a created alliance (Local backend)
+{
+  const r = rig(5000, 20);
+  must(await r.b.create(r.me, { name: 'ミッション会', emblem: 0, description: '', joinPolicy: 'open', minPlayerLevel: 0 }), 'create');
+  const d0 = must(await r.b.load(r.me), 'load')!;
+  ok(d0.missions.daily.missions.length === 3 && d0.missions.weekly.missions.length === 1 && d0.missions.claimable === 0, 'a new alliance: 3 daily missions, 1 weekly, nothing to claim');
+  ok(d0.missions.daily.missions.every((m) => m.progress === 0 && m.mine === 0 && !m.done && m.reward.coins === 25), 'at first nothing is done; a daily mission pays 25 coins');
+  ok(d0.missions.weekly.missions[0].reward.coins === 100 && d0.missions.weekly.missions[0].reward.gems === 60 && (d0.missions.weekly.missions[0].reward.phaseMaterials ?? 0) === 1, 'the weekly one pays 100 coins, 60 gems, 1 phase material');
+  ok(d0.missions.daily.endsAt === new Date(2026, 10, 10, 4, 0).getTime() && d0.missions.weekly.endsAt === new Date(2026, 10, 16).getTime(), 'the day ends at the next 4:00, the week next Monday 0:00');
+  ok(!(await r.b.claimMission(r.me, d0.missions.daily.missions[0].id)).ok, 'a goal that is not met cannot be claimed');
+  const nope = await r.b.claimMission(r.me, 'nope');
+  ok(!nope.ok && nope.reason === 'not_found', 'an unknown mission is refused');
+
+  // report a lot of everything (the caps hold)
+  const everything = { stage: 999, gacha: 999, donate: 999, raid: 999, stamina: 999, idle: 999, enhance: 999, helper: 999 };
+  must(await r.b.reportMissions(r.me, everything), 'report');
+  const own = r.save.alliance.world!.own!;
+  ok(own.missions.daily!.by[r.me.uid].donate === 13 && own.missions.daily!.by[r.me.uid].stage === 300 && own.missions.weekly!.by[r.me.uid].donate === 91, 'reports are capped per member: 13 donations a day, 300 stages, 91 donations a week');
+  ok((await r.b.reportMissions(r.me, { stage: -5 as number, gacha: Number.NaN })).ok && r.save.alliance.world!.own!.missions.daily!.by[r.me.uid].gacha === 300, 'a nonsense report is simply ignored');
+  const d1 = must(await r.b.load(r.me), 'load')!;
+  const all = [...d1.missions.daily.missions, ...d1.missions.weekly.missions];
+  ok(all.every((m) => m.done) && all.filter((m) => m.claimable).length === all.length && d1.missions.claimable === 4, 'with everything reported, all 4 goals are met and claimable');
+  ok(all.every((m) => m.myRank === 1 && m.top.length === 1 && m.top[0].name === 'テスター'), 'I am first (and alone) in every contribution table');
+
+  // claim one: coins arrive, once
+  const first = d1.missions.daily.missions[0];
+  const coinsBefore = d1.coins;
+  const got = must(await r.b.claimMission(r.me, first.id), 'claim');
+  ok(got.coins === 25 && JSON.stringify(got) === JSON.stringify(first.reward), 'a claim returns the table\'s reward');
+  const d2 = must(await r.b.load(r.me), 'load')!;
+  ok(d2.coins === coinsBefore + 25 && d2.missions.claimable === 3 && d2.missions.daily.missions[0].claimed && !d2.missions.daily.missions[0].claimable, 'the coins were added; the mission shows as claimed');
+  const twice = await r.b.claimMission(r.me, first.id);
+  ok(!twice.ok && twice.reason === 'limit_reached', 'a second claim is refused');
+  const weekly = d2.missions.weekly.missions[0];
+  const w = must(await r.b.claimMission(r.me, weekly.id), 'claim weekly');
+  ok(w.coins === 100 && w.gems === 60, 'the weekly reward comes through too');
+
+  // a new day: new daily board, the week goes on
+  const dayKeyBefore = own.missions.daily!.key;
+  const weekKeyBefore = own.missions.weekly!.key;
+  await r.advance(DAY);
+  const own2 = r.save.alliance.world!.own!;
+  ok(own2.missions.daily!.key !== dayKeyBefore && own2.missions.weekly!.key === weekKeyBefore, 'the next day has a new daily board; the weekly one carries on');
+  const d3 = must(await r.b.load(r.me), 'load')!;
+  ok(d3.missions.daily.missions.every((m) => m.mine === 0 && !m.claimed) && d3.missions.weekly.missions[0].claimed && d3.missions.weekly.missions[0].mine > 0, 'my daily shares start over; the weekly claim and share stay');
+  await r.advance(7 * DAY);
+  ok(r.save.alliance.world!.own!.missions.weekly!.key !== weekKeyBefore, 'a week later there is a new weekly board');
+  const d4 = must(await r.b.load(r.me), 'load')!;
+  ok(d4.missions.weekly.missions[0].claimed === false && d4.missions.weekly.missions[0].mine === 0, 'and it can be claimed afresh');
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟ミッション: simulated members add up; old saves
+{
+  const r = rig(5000, 20);
+  const list = must(await r.b.search(r.me, { limit: 40 }), 'search');
+  const open = list.find((a) => a.joinPolicy === 'open' && a.memberCount < a.memberMax && a.minPlayerLevel <= 20 && a.memberCount >= 10)!;
+  must(await r.b.join(r.me, open.id), 'join');
+  const d = must(await r.b.load(r.me), 'load')!;
+  const sum = d.missions.daily.missions.reduce((s, m) => s + m.progress, 0);
+  ok(sum > 0 && d.missions.daily.missions.every((m) => m.mine === 0) && d.missions.daily.missions.every((m) => m.progress <= m.target * 1.5), 'joining mid-day: the others have already added to today\'s goals (and none is done yet by magic)');
+  ok(d.missions.daily.missions.some((m) => m.top.length > 0 && m.top[0].name !== 'テスター'), 'the table of contributions names the other members');
+  const before = d.missions.daily.missions.map((m) => m.progress);
+  await r.advance(8 * HOUR);
+  const after = must(await r.b.load(r.me), 'load')!;
+  ok(after.missions.daily.missions.some((m, i) => m.progress > before[i]) || after.missions.daily.missions[0].progress !== before[0], 'the simulated members keep adding as the day goes on (or the day turned over)');
+  // over the days, without me, the simulated members carry most of a goal but not all of it (looked at just before the day ends)
+  let sum2 = 0;
+  let count2 = 0;
+  let met = 0;
+  for (let n = 1; n <= 6; n++) {
+    r.clock.t = new Date(2026, 10, 9 + n, 3, 30).getTime();
+    const dd = must(await r.b.load(r.me), 'load')!;
+    for (const m of dd.missions.daily.missions) {
+      sum2 += Math.min(1.5, m.progress / m.target);
+      count2 += 1;
+      if (m.progress >= m.target) met += 1;
+    }
+  }
+  console.log(`      (the others alone reach ${(100 * sum2 / count2).toFixed(0)}% of a daily goal on average by 3:30; ${met} of ${count2} met)`);
+  ok(sum2 / count2 > 0.4 && sum2 / count2 < 1.0 && met < count2, 'on their own the others get most of the way but do not finish every goal');
+
+  // a save from before the missions: the new fields are filled in
+  const raw = JSON.parse(JSON.stringify(r.save.alliance));
+  delete raw.world.own.fund;
+  delete raw.world.own.research;
+  delete raw.world.own.missions;
+  delete raw.research;
+  delete raw.missionPending;
+  const fixed = restoreAlliance(raw);
+  ok(fixed.world!.own!.fund === 0 && fixed.world!.own!.research.battle === 0 && fixed.world!.own!.missions.daily === null && fixed.missionPending !== undefined && fixed.research.income === 0, 'an old save restores with no fund, no research, no boards');
+  const save2 = SaveSystem.createDefault();
+  save2.alliance = fixed;
+  const b2 = new LocalAllianceBackend(() => save2, { now: () => r.clock.t });
+  const again = must(await b2.load(r.me), 'load')!;
+  ok(again.missions.daily.missions.length === 3 && again.fund === 0, 'and it opens fine: the boards are laid out on the first load');
+  // a round trip keeps the boards
+  const copy = restoreAlliance(JSON.parse(JSON.stringify(r.save.alliance)));
+  const canon = (v: unknown): string => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).sort(([a], [b]) => a.localeCompare(b))) : x));
+  ok(canon(copy.world!.own!.missions) === canon(r.save.alliance.world!.own!.missions) && copy.world!.own!.fund === r.save.alliance.world!.own!.fund, 'a save round-trips the boards and the fund');
+  const junk = JSON.parse(JSON.stringify(r.save.alliance));
+  junk.world.own.missions.daily.goals = [{ id: 'x', metric: 'bogus', target: 'a' }];
+  junk.world.own.missions.weekly.by = { me: { stage: -4, gacha: 'z' } };
+  junk.world.own.research = { battle: 99, income: -2, growth: 'x' };
+  const cleaned = restoreAlliance(junk);
+  ok(cleaned.world!.own!.missions.daily === null && cleaned.world!.own!.missions.weekly!.by.me.stage === undefined && cleaned.world!.own!.research.battle === 5 && cleaned.world!.own!.research.income === 0 && cleaned.world!.own!.research.growth === 0, 'damaged boards are dropped, damaged counts and research levels repaired');
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟研究
+{
+  const r = rig(5000, 20);
+  must(await r.b.create(r.me, { name: '研究会', emblem: 0, description: '', joinPolicy: 'open', minPlayerLevel: 0 }), 'create');
+  const d0 = must(await r.b.load(r.me), 'load')!;
+  ok(d0.fund === 0 && d0.research.canResearch && d0.research.levels.battle === 0 && d0.research.levels.income === 0 && d0.research.levels.growth === 0, 'a new alliance: no fund, no research; the leader may research');
+  ok(RESEARCH_STEPS.length === 5 && RESEARCH_LINES.length === 3 && RESEARCH_STEPS.every((s, i) => i === 0 || (s.cost > RESEARCH_STEPS[i - 1].cost && s.needLevel >= RESEARCH_STEPS[i - 1].needLevel)), 'research: 3 lines of 5 steps, each dearer and no earlier than the one before');
+  ok(RESEARCH_LINES.every((l) => l.values.length === 5 && l.values.every((v, i) => i === 0 || v > l.values[i - 1]) && l.values[4] <= 0.1), 'each step adds more, and the last is a modest +10% at most (+5% for combat)');
+
+  // the fund comes from donations, as much as the EXP they give
+  must(await r.b.donate(r.me, 'gold'), 'd1');
+  must(await r.b.donate(r.me, 'materials'), 'd2');
+  must(await r.b.donate(r.me, 'gems'), 'd3');
+  const d1 = must(await r.b.load(r.me), 'load')!;
+  ok(d1.fund >= DONATIONS.gold.allianceExp + DONATIONS.materials.allianceExp + DONATIONS.gems.allianceExp, 'each donation adds its EXP to the fund (100 + 120 + 300 at least; the others\' donations too)');
+  const early = await r.b.researchUp(r.me, 'battle');
+  ok(!early.ok && early.reason === 'level_too_low', 'step 1 needs alliance Lv2 (the fund is not enough on its own)');
+  const own = r.save.alliance.world!.own!;
+  own.level = 2;
+  own.fund = RESEARCH_STEPS[0].cost - 1;
+  const poor = await r.b.researchUp(r.me, 'battle');
+  ok(!poor.ok && poor.reason === 'not_enough' && own.fund === RESEARCH_STEPS[0].cost - 1, 'one short of the price: refused, the fund is untouched');
+  own.fund = RESEARCH_STEPS[0].cost + 77;
+  const up = must(await r.b.researchUp(r.me, 'battle'), 'research');
+  ok(up.line === 'battle' && up.level === 1 && up.spent === RESEARCH_STEPS[0].cost && up.fundLeft === 77 && own.fund === 77, 'researched: the price came out of the fund');
+  ok(r.save.alliance.research.battle === 1 && must(await r.b.load(r.me), 'l')!.research.levels.battle === 1, 'the level shows in the detail and in the save');
+  ok(!(await r.b.researchUp(r.me, 'nope' as never)).ok, 'an unknown line is refused');
+  const lvl2 = await r.b.researchUp(r.me, 'battle');
+  ok(!lvl2.ok && lvl2.reason === 'level_too_low', 'step 2 needs Lv3');
+  // all the way up
+  own.level = 10;
+  own.fund = 10_000_000;
+  for (const line of ['battle', 'income', 'growth'] as const) {
+    while ((own.research[line] ?? 0) < 5) must(await r.b.researchUp(r.me, line), `up ${line}`);
+  }
+  const spent = 10_000_000 - own.fund + 77 - RESEARCH_STEPS[0].cost - 77;
+  void spent;
+  ok(own.research.battle === 5 && own.research.income === 5 && own.research.growth === 5, 'every line reaches step 5');
+  const max = await r.b.researchUp(r.me, 'growth');
+  ok(!max.ok && max.reason === 'limit_reached', 'there is no step 6');
+  const total = RESEARCH_STEPS.reduce((s, x) => s + x.cost, 0);
+  ok(10_000_000 - own.fund === total * 3 - RESEARCH_STEPS[0].cost, 'everything cost the table\'s prices (the first step of combat was already bought)');
+
+  // the effects, through the hooks the game uses
+  const save = SaveSystem.createDefault();
+  save.alliance.allianceId = 'x';
+  save.alliance.level = 5;
+  const plain = IdleSystem.perHour(save).gold;
+  const noAlliance = SaveSystem.createDefault();
+  const plainNone = IdleSystem.perHour(noAlliance).gold;
+  save.alliance.research = { battle: 5, income: 5, growth: 5 };
+  ok(Math.abs(IdleSystem.perHour(save).gold.div(plain).toNumber() - (1.1 + 0.08) / 1.08) < 1e-9, 'income research step 5: idle gold +10% on top of the Lv5 perk (+8%): x1.18 / 1.08');
+  ok(allianceIdleGoldBonus(save) === 0.08 + 0.1 && allianceExpDropBonus(save) === 0.06 + 0.1 && allianceBattleBonus(save) === 0.05, 'the bonuses add to the level\'s perks: gold +18%, exp materials +16%, combat +5%');
+  const bonus: StageBonus = { firstClear: false, gems: 0, phaseMaterials: 0, items: [{ item: 'exp_m', amount: 100 }, { item: 'equip_essence', amount: 100 }], materials: {} };
+  StageRewardSystem.grant(save, bonus);
+  ok(bonus.items[0].amount === 116 && bonus.items[1].amount === 100, 'growth research raises the exp materials (100 -> 116 with the Lv5 perk), nothing else');
+  const hero = createHeroInstance('mizuki', 'h1', 30, 0);
+  const base = BattleSystem.createPlayerUnit(hero, 'front', 0);
+  const boosted = BattleSystem.createPlayerUnit(hero, 'front', 0, 1 + allianceBattleBonus(save));
+  ok(Math.abs(boosted.maxHp.div(base.maxHp).toNumber() - 1.05) < 1e-9 && Math.abs(boosted.atk.div(base.atk).toNumber() - 1.05) < 1e-9 && boosted.def === base.def && boosted.spd === base.spd, 'combat research x1.05 on attack and HP, nothing else');
+  save.alliance.allianceId = null;
+  ok(allianceBattleBonus(save) === 0 && IdleSystem.perHour(save).gold.div(plainNone).toNumber() === 1 && allianceExpDropBonus(save) === 0, 'outside an alliance the research does nothing');
+
+  // a member cannot research
+  const m = rig(5000, 20);
+  const found = must(await m.b.search(m.me, { limit: 40 }), 's');
+  const open = found.find((a) => a.joinPolicy === 'open' && a.memberCount < a.memberMax && a.minPlayerLevel <= 20)!;
+  must(await m.b.join(m.me, open.id), 'join');
+  const md = must(await m.b.load(m.me), 'l')!;
+  ok(md.me.role === 'member' && !md.research.canResearch, 'a plain member sees the research but cannot advance it');
+  m.save.alliance.world!.own!.fund = 10_000_000;
+  m.save.alliance.world!.own!.level = 10;
+  const denied = await m.b.researchUp(m.me, 'income');
+  ok(!denied.ok && denied.reason === 'no_permission' && m.save.alliance.world!.own!.fund === 10_000_000, 'a member is refused, and nothing is spent');
+  m.save.alliance.world!.own!.members.find((x) => x.uid === m.me.uid)!.role = 'officer';
+  ok((await m.b.researchUp(m.me, 'income')).ok, 'an officer can');
+
+  // the simulated members' donations fill the fund too
+  const s2 = rig(5000, 20);
+  must(await s2.b.create(s2.me, { name: '資金会', emblem: 0, description: '', joinPolicy: 'open', minPlayerLevel: 0 }), 'c');
+  for (let i = 0; i < 72; i++) await s2.advance(HOUR);
+  ok(must(await s2.b.load(s2.me), 'l')!.fund > 0, 'in a few days the other members\' donations have put something in the fund');
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟ミッション・研究: the service
+{
+  const noAlliance = SaveSystem.createDefault();
+  recordMission(noAlliance, 'quest_clear', 3);
+  ok(Object.keys(noAlliance.alliance.missionPending).length === 0, 'outside an alliance nothing is queued for the missions');
+
+  const save = SaveSystem.createDefault();
+  save.playerLevel = 30;
+  save.playerName = 'ミッション係';
+  save.gems = 5000;
+  AllianceService.profile(save);
+  const created = await AllianceService.create(save, { name: 'サービス会', emblem: 1, description: '', joinPolicy: 'open', minPlayerLevel: 0 });
+  ok(created.ok, 'created through the service');
+  recordMission(save, 'quest_clear', 4);
+  recordMission(save, 'gacha_pull', 10);
+  recordMission(save, 'hero_enhance', 1);
+  recordMission(save, 'equip_enhance', 2);
+  recordMission(save, 'stamina', 36);
+  recordMission(save, 'idle_claim', 1);
+  recordMission(save, 'expedition', 2);
+  const p = save.alliance.missionPending;
+  ok(p.stage === 4 && p.gacha === 10 && p.enhance === 3 && p.stamina === 36 && p.idle === 1 && Object.keys(p).length === 5, 'what the player does is queued per action (hero and gear enhancements together; other missions are not counted)');
+  // donations and boss attempts and helper uses are queued by the service itself
+  ok((await AllianceService.donate(save, 'gold')).ok && save.alliance.missionPending.donate === 1, 'a donation queues one');
+  const ticket = await AllianceService.beginRaid(save);
+  if (ticket.ok) await AllianceService.finishRaid(save, ticket.value, 1000);
+  ok(save.alliance.missionPending.raid === 1, 'a boss attempt queues one');
+  await AllianceService.flushPending(save);
+  ok(Object.keys(save.alliance.missionPending).length === 0, 'flushing sends everything and clears the queue');
+  const own = save.alliance.world!.own!;
+  const mine = own.missions.daily!.by[save.social.playerId];
+  ok(mine.stage === 4 && mine.gacha === 10 && mine.enhance === 3 && mine.donate === 1 && mine.raid === 1 && own.missions.weekly!.by[save.social.playerId].stage === 4, 'the board has them, on the daily and the weekly boards both');
+
+  // big report -> claim through the service, with the reward applied to the save
+  save.alliance.missionPending = { stage: 999, gacha: 999, donate: 999, raid: 999, stamina: 999, idle: 999, enhance: 999, helper: 999 };
+  await AllianceService.flushPending(save);
+  type Loaded = { ok: true; value: AllianceDetail | null };
+  const det = ((await AllianceService.refresh(save)) as Loaded).value!;
+  ok(det.missions.claimable === 4 && !!det.missions.daily.missions.find((m) => m.claimable), 'after the big report, the 4 goals can be claimed');
+  const target = det.missions.weekly.missions[0];
+  const gems0 = save.gems;
+  const phase0 = save.phaseMaterials;
+  const taken = await AllianceService.claimMission(save, target.id);
+  ok(taken.ok && save.gems === gems0 + 60 && save.phaseMaterials === phase0 + 1, 'claiming through the service puts the gems and the phase material into the save');
+  const daily = det.missions.daily.missions.find((m) => m.reward.items) ?? det.missions.daily.missions[0];
+  const itemId = Object.keys(daily.reward.items ?? {})[0] as keyof typeof save.items | undefined;
+  const item0 = itemId ? (save.items[itemId] ?? 0) : 0;
+  const gems1 = save.gems;
+  const taken2 = await AllianceService.claimMission(save, daily.id);
+  ok(taken2.ok && (!itemId || (save.items[itemId] ?? 0) === item0 + (daily.reward.items?.[itemId] ?? 0)) && save.gems === gems1 + (daily.reward.gems ?? 0), 'a daily one pays its items / gems into the save');
+  ok(!(await AllianceService.claimMission(save, daily.id)).ok, 'and only once');
+  ok(!(await AllianceService.claimMission(createGhost(), 'd_stage')).ok, 'outside an alliance: refused');
+
+  // research through the service
+  const world = save.alliance.world!;
+  world.own!.level = 3;
+  world.own!.fund = RESEARCH_STEPS[0].cost + RESEARCH_STEPS[1].cost;
+  await AllianceService.refresh(save);
+  const plain = IdleSystem.perHour(save).gold;
+  const ru = await AllianceService.researchUp(save, 'income');
+  ok(ru.ok && save.alliance.research.income === 1 && Math.abs(IdleSystem.perHour(save).gold.div(plain).toNumber() - (1 + (perksForLevel(3).idleGoldBonus + 0.02)) / (1 + perksForLevel(3).idleGoldBonus)) < 1e-9, 'researching income through the service: +2% idle gold, at once');
+  const ru2 = await AllianceService.researchUp(save, 'growth');
+  ok(ru2.ok && save.alliance.research.growth === 1, 'a second line');
+  const refreshed = ((await AllianceService.refresh(save)) as Loaded).value!;
+  ok(refreshed.research.levels.income === 1 && refreshed.research.levels.growth === 1 && refreshed.fund === RESEARCH_STEPS[1].cost - RESEARCH_STEPS[0].cost, 'refresh shows the same levels, and the fund is spent (two first steps)');
+  const left = await AllianceService.backend().leave(AllianceService.profile(save));
+  ok(left.ok, 'leaving');
+  await AllianceService.refresh(save);
+  ok(save.alliance.research.income === 0 && save.alliance.research.growth === 0 && Object.keys(save.alliance.missionPending).length === 0 && allianceIdleGoldBonus(save) === 0, 'after leaving: no research, nothing queued, no bonus');
+}
+
+function createGhost(): SaveData {
+  const g = SaveSystem.createDefault();
+  AllianceService.profile(g);
+  return g;
 }
 
 void createHeroInstance;

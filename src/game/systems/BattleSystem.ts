@@ -63,8 +63,11 @@ export const ULT_MAX = 100;
 export const BASE_COOLDOWN = 1200;
 
 export const BattleSystem = {
-  createPlayerUnit(hero: HeroData, row: Row, slot: number): UnitInstance {
+  /** `statMul`: what multiplies this unit's attack and HP (1 = nothing; the 同盟研究's 戦闘 gives 1.01 ... 1.05: data/allianceResearch.ts). */
+  createPlayerUnit(hero: HeroData, row: Row, slot: number, statMul = 1): UnitInstance {
     const stats = ProgressionSystem.computeHeroStats(hero);
+    const maxHp = statMul === 1 ? stats.maxHp : stats.maxHp.mul(statMul);
+    const atk = statMul === 1 ? stats.atk : stats.atk.mul(statMul);
     return {
       id: hero.id,
       name: hero.name,
@@ -75,9 +78,9 @@ export const BattleSystem = {
       rarity: hero.rarity,
       seed: hero.seed,
       heroId: hero.heroId,
-      maxHp: stats.maxHp,
-      hp: stats.maxHp,
-      atk: stats.atk,
+      maxHp,
+      hp: maxHp,
+      atk,
       def: stats.def,
       spd: stats.spd,
       critRate: stats.critRate,

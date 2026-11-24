@@ -1,4 +1,5 @@
 import type { MissionKey } from '../data/missions';
+import { MISSION_METRIC_OF_KEY, addAllianceMissionPending } from '../data/allianceMissions';
 import { recordEvent } from './EventProgress';
 import type { SaveData } from './SaveSystem';
 
@@ -93,6 +94,9 @@ export function recordMission(save: SaveData, key: MissionKey, amount = 1, now =
   m.daily.counts[key] = (m.daily.counts[key] ?? 0) + amount;
   m.weekly.counts[key] = (m.weekly.counts[key] ?? 0) + amount;
   m.totals[key] = (m.totals[key] ?? 0) + amount;
+  // The 同盟ミッション count it too, for a player in an alliance (kept in the save until the next 同盟 call sends it).
+  const allianceMetric = MISSION_METRIC_OF_KEY[key];
+  if (allianceMetric) addAllianceMissionPending(save, allianceMetric, amount);
   // The 期間限定イベント that are on count it too (their missions: data/limitedEvents.ts).
   recordEvent(save, key, amount, now);
 }

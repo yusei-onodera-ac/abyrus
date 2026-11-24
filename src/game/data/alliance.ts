@@ -7,6 +7,7 @@ import type {
 } from '../alliance/AllianceBackend';
 import { LEAGUES } from '../alliance/AllianceBackend';
 import { REGIONS } from './regions';
+import { researchBonusOfSave } from './allianceResearch';
 import type { SaveData } from '../systems/SaveSystem';
 
 /**
@@ -65,13 +66,17 @@ export function perksOfSave(save: Pick<SaveData, 'alliance'>): AlliancePerks {
   const level = allianceLevelOf(save);
   return level > 0 ? perksForLevel(level) : NO_PERKS;
 }
-/** 放置ゴールドの増え (0.08 = +8%)。 */
+/** 放置ゴールドの増え (0.08 = +8%)。同盟Lv の恩恵に、同盟研究 (収入) が足される。 */
 export function allianceIdleGoldBonus(save: Pick<SaveData, 'alliance'>): number {
-  return perksOfSave(save).idleGoldBonus;
+  return perksOfSave(save).idleGoldBonus + researchBonusOfSave(save, 'idleGold');
 }
-/** 経験値素材ドロップの増え。 */
+/** 経験値素材ドロップの増え。同盟Lv の恩恵に、同盟研究 (成長) が足される。 */
 export function allianceExpDropBonus(save: Pick<SaveData, 'alliance'>): number {
-  return perksOfSave(save).expDropBonus;
+  return perksOfSave(save).expDropBonus + researchBonusOfSave(save, 'expDrop');
+}
+/** 戦闘で、味方全員の攻撃力とHPにかかる増え (0.03 = +3%)。同盟研究 (戦闘)。無限モードには、かけない。 */
+export function allianceBattleBonus(save: Pick<SaveData, 'alliance'>): number {
+  return researchBonusOfSave(save, 'battle');
 }
 /** スタミナ上限の増え。 */
 export function allianceStaminaBonus(save: Pick<SaveData, 'alliance'>): number {

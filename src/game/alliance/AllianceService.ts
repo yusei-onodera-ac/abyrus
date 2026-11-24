@@ -8,9 +8,12 @@ import type {
   DonationKind,
   DonationResult,
   HelperHero,
+  MissionMetric,
   PlayerProfile,
   RaidOutcome,
   RaidTicket,
+  ResearchLine,
+  ResearchResult,
   Result,
 } from './AllianceBackend';
 import { fail, ok } from './AllianceBackend';
@@ -26,6 +29,8 @@ import {
   weekIdOf,
   type ShopItem,
 } from '../data/alliance';
+import { MISSION_REPORT_MAX, addAllianceMissionPending } from '../data/allianceMissions';
+import { emptyResearchLevels } from '../data/allianceResearch';
 import { heroSeedFromId } from '../data/heroes';
 import { isItemId } from '../data/items';
 import { staminaMaxFor } from '../data/playerLevel';
@@ -56,6 +61,8 @@ let lastDetail: AllianceDetail | null | undefined;
 
 let local: LocalAllianceBackend | undefined;
 let online: Promise<AllianceBackend | null> | undefined;
+/** 同盟ミッションの行動を送っている最中 (同じ数を2回送らないため)。 */
+let flushingMissions: Promise<void> | undefined;
 
 function remember(save: SaveData): SaveData {
   if (currentSave !== save) {
@@ -213,6 +220,8 @@ export const AllianceService = {
     // Online では、入っている同盟を、ここでセーブに写す (Local は、Backend が書いている)。
     save.alliance.allianceId = detail ? detail.summary.id : null;
     save.alliance.level = detail ? detail.summary.level : 0;
+    save.alliance.research = detail ? { ...detail.research.levels } : emptyResearchLevels();
+    if (!detail) save.alliance.missionPending = {};
     // 助っ人に登録したキャラのLv・フェーズなどが変わっていたら、登録し直す。
     if (detail && save.alliance.helperHeroId) {
       const snapshot = AllianceService.helperSnapshot(save, save.alliance.helperHeroId);
@@ -235,15 +244,44 @@ export const AllianceService = {
     return ok(detail);
   },
 
-  /** 同盟ポイントに換えていなかった、メインステージの初クリアを送る。 */
+  /** 同盟ポイントに換えていなかった、メインステージの初クリアと、同盟ミッションに足していなかった行動を、送る。 */
   async flushPending(save: SaveData): Promise<void> {
-    if (!hasAlliance(save) || save.alliance.pendingStagePoints <= 0) return;
-    const count = save.alliance.pendingStagePoints;
-    const r = await (await pick()).addWarPoints(AllianceService.profile(save), 'stages', count * WAR_STAGE_POINTS);
-    if (r.ok) {
-      save.alliance.pendingStagePoints = Math.max(0, save.alliance.pendingStagePoints - count);
-      SaveSystem.save(save);
+    if (!hasAlliance(save)) return;
+    if (save.alliance.pendingStagePoints > 0) {
+      const count = save.alliance.pendingStagePoints;
+      const r = await (await pick()).addWarPoints(AllianceService.profile(save), 'stages', count * WAR_STAGE_POINTS);
+      if (r.ok) {
+        save.alliance.pendingStagePoints = Math.max(0, save.alliance.pendingStagePoints - count);
+        SaveSystem.save(save);
+      }
     }
+    await AllianceService.flushMissions(save);
+  },
+
+  /** 同盟ミッションに足していなかった行動 (ステージ・ガチャ・寄付 ...) を送る。送れた分だけ、セーブから引く。同時に2回は送らない。 */
+  async flushMissions(save: SaveData): Promise<void> {
+    if (!hasAlliance(save)) return;
+    if (flushingMissions) return flushingMissions;
+    const sent: Partial<Record<MissionMetric, number>> = {};
+    for (const [metric, n] of Object.entries(save.alliance.missionPending) as [MissionMetric, number][]) if (n >= 1) sent[metric] = Math.min(MISSION_REPORT_MAX, Math.floor(n));
+    if (Object.keys(sent).length === 0) return;
+    flushingMissions = (async () => {
+      try {
+        const r = await (await pick()).reportMissions(AllianceService.profile(save), sent);
+        // (a report the server will never take - refused, or malformed - is dropped, so that it is not sent again and again)
+        if (r.ok || r.reason === 'no_permission' || r.reason === 'bad_input') {
+          for (const [metric, n] of Object.entries(sent) as [MissionMetric, number][]) {
+            const left = (save.alliance.missionPending[metric] ?? 0) - n;
+            if (left >= 1) save.alliance.missionPending[metric] = left;
+            else delete save.alliance.missionPending[metric];
+          }
+          SaveSystem.save(save);
+        }
+      } finally {
+        flushingMissions = undefined;
+      }
+    })();
+    return flushingMissions;
   },
 
   /** メインステージを、初めてクリアした (SaveSystem.clearStage が、数だけ先に記録している)。対抗戦のポイントを、すぐ送る。 */
@@ -295,6 +333,7 @@ export const AllianceService = {
     else {
       if (result.value.levelUp) save.alliance.level = result.value.levelUp;
       syncStaminaMax(save);
+      addAllianceMissionPending(save, 'donate', 1);
     }
     SaveSystem.save(save);
     return result;
@@ -310,6 +349,7 @@ export const AllianceService = {
   async finishRaid(save: SaveData, ticket: RaidTicket, damage: number): Promise<Result<RaidOutcome>> {
     remember(save);
     const result = await (await pick()).finishRaid(AllianceService.profile(save), ticket, damage);
+    if (result.ok) addAllianceMissionPending(save, 'raid', 1);
     SaveSystem.save(save);
     return result;
   },
@@ -322,6 +362,29 @@ export const AllianceService = {
     const result = which === 'raid' ? await backend.claimRaidReward(me) : await backend.claimWarReward(me);
     if (!result.ok) return result;
     applyReward(save, result.value);
+    SaveSystem.save(save);
+    return result;
+  },
+
+  /** 達成した同盟ミッションの報酬を受け取って、セーブに足す。返す報酬は、`showRewardModal` に出す (同盟コインは、Backend が足し済み)。 */
+  async claimMission(save: SaveData, missionId: string): Promise<Result<AllianceReward>> {
+    remember(save);
+    if (!hasAlliance(save)) return fail('not_in_alliance', t('alliance.error.notInAlliance'));
+    const result = await (await pick()).claimMission(AllianceService.profile(save), missionId);
+    if (!result.ok) return result;
+    applyReward(save, result.value);
+    SaveSystem.save(save);
+    return result;
+  },
+
+  /** 同盟の資金で、研究を1段進める (同盟長・副長だけ)。効果は、すぐセーブに写る。 */
+  async researchUp(save: SaveData, line: ResearchLine): Promise<Result<ResearchResult>> {
+    remember(save);
+    if (!hasAlliance(save)) return fail('not_in_alliance', t('alliance.error.notInAlliance'));
+    const result = await (await pick()).researchUp(AllianceService.profile(save), line);
+    if (!result.ok) return result;
+    save.alliance.research = { ...save.alliance.research, [line]: result.value.level };
+    lastDetail = undefined;
     SaveSystem.save(save);
     return result;
   },
@@ -409,6 +472,7 @@ export const AllianceService = {
   async borrowHelper(save: SaveData, ownerUid: string): Promise<Result<HelperHero>> {
     remember(save);
     const result = await (await pick()).borrowHelper(AllianceService.profile(save), ownerUid);
+    if (result.ok) addAllianceMissionPending(save, 'helper', 1);
     SaveSystem.save(save);
     return result;
   },

@@ -5,6 +5,7 @@ import type { NavTab } from '../ui/BottomNavBar';
 import { Button } from '../ui/Button';
 import { buildUnreadDot, wrappedText } from '../ui/CardParts';
 import { buildBar, buildEmblem, fullDigits, policyChip, timeLeft } from '../ui/AllianceParts';
+import { RESEARCH_LINES, researchBlock } from '../data/allianceResearch';
 import { openConfirm, openTextPrompt } from '../ui/Dialogs';
 import { openModal } from '../ui/Modal';
 import { createPanel } from '../ui/Panel';
@@ -39,7 +40,7 @@ export class AllianceHomeScene extends AllianceScene {
 
   protected cards(detail: AllianceDetail | null): InboxCard[] {
     if (!detail) return [this.hintCard(t('alliance.error.notInAlliance'))];
-    return [this.headerCard(detail), this.raidCard(detail), this.warCard(detail), this.helperCard(detail), this.menuCard(detail)];
+    return [this.headerCard(detail), this.raidCard(detail), this.missionCard(detail), this.researchCard(detail), this.warCard(detail), this.helperCard(detail), this.menuCard(detail)];
   }
 
   // --- 同盟の顔 ---------------------------------------------------------------------
@@ -95,6 +96,42 @@ export class AllianceHomeScene extends AllianceScene {
     const button = new Button(this, CARD_WIDTH - PAD - 90, 150, 170, 62, r.claimable ? t('alliance.home.raidReward') : t('alliance.home.raidChallenge'), () => this.scene.start('AllianceRaid'), { variant: 'gold', fontSize: '26px', guard });
     card.container.add(button);
     if (hot) card.container.add(buildUnreadDot(this, CARD_WIDTH - PAD - 10, 124, 9));
+    return card;
+  }
+
+  // --- 同盟ミッション ----------------------------------------------------------------
+
+  private missionCard(d: AllianceDetail): InboxCard {
+    const guard = () => this.scroll.isTap();
+    const m = d.missions;
+    const claimable = m.claimable;
+    const done = m.daily.missions.filter((x) => x.done).length;
+    const week = m.weekly.missions[0];
+    const card = this.shell(150, claimable > 0);
+    card.container.add(body(this, PAD + 6, 28, t('alliance.home.missionTitle'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    card.container.add(body(this, PAD + 6, 72, t('alliance.home.missionToday', { done, total: m.daily.missions.length }), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    const sub = claimable > 0 ? t('alliance.home.missionClaimable', { claimable }) : week ? t('alliance.home.missionWeekly', { value: Math.min(100, Math.floor((week.progress / Math.max(1, week.target)) * 100)), timeLeft: timeLeft(m.weekly.endsAt, d.now) }) : '';
+    const subLine = this.line(card, PAD + 6, 116, sub, claimable > 0 ? '#9fe39f' : '#cdbb94', 18);
+    if (subLine.width > 400) subLine.setScale(400 / subLine.width);
+    card.container.add(new Button(this, CARD_WIDTH - PAD - 90, 80, 170, 62, t('alliance.home.missionButton'), () => this.scene.start('AllianceMission'), { variant: 'wood', fontSize: '24px', guard }));
+    if (claimable > 0) card.container.add(buildUnreadDot(this, CARD_WIDTH - PAD - 10, 52, 9));
+    return card;
+  }
+
+  // --- 同盟研究 ----------------------------------------------------------------------
+
+  private researchCard(d: AllianceDetail): InboxCard {
+    const guard = () => this.scroll.isTap();
+    const r = d.research;
+    // a dot for the leader / officers when a step can be taken now
+    const ready = r.canResearch && RESEARCH_LINES.some((l) => researchBlock(r.levels[l.id] ?? 0, d.summary.level, d.fund) === null);
+    const card = this.shell(150, ready);
+    card.container.add(body(this, PAD + 6, 28, t('alliance.home.researchTitle'), { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    card.container.add(body(this, PAD + 6, 72, t('alliance.home.researchFund', { fullDigits: fullDigits(d.fund) }), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    const levels = this.line(card, PAD + 6, 116, ready ? t('alliance.home.researchReady') : t('alliance.home.researchLevels', { battle: r.levels.battle, income: r.levels.income, growth: r.levels.growth }), ready ? '#9fe39f' : '#cdbb94', 18);
+    if (levels.width > 400) levels.setScale(400 / levels.width);
+    card.container.add(new Button(this, CARD_WIDTH - PAD - 90, 80, 170, 62, t('alliance.home.researchButton'), () => this.scene.start('AllianceResearch'), { variant: 'wood', fontSize: '24px', guard }));
+    if (ready) card.container.add(buildUnreadDot(this, CARD_WIDTH - PAD - 10, 52, 9));
     return card;
   }
 

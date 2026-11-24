@@ -44,6 +44,8 @@ import { AllianceRaidScene } from './game/scenes/AllianceRaidScene';
 import { AllianceRaidBattleScene } from './game/scenes/AllianceRaidBattleScene';
 import { AllianceWarScene } from './game/scenes/AllianceWarScene';
 import { AllianceHelperScene } from './game/scenes/AllianceHelperScene';
+import { AllianceMissionScene } from './game/scenes/AllianceMissionScene';
+import { AllianceResearchScene } from './game/scenes/AllianceResearchScene';
 import { ShopScene } from './game/scenes/ShopScene';
 import { SettingsScene } from './game/scenes/SettingsScene';
 import { showDevNotice } from './devNotice';
@@ -108,6 +110,8 @@ const config: Phaser.Types.Core.GameConfig = {
     AllianceRaidBattleScene,
     AllianceWarScene,
     AllianceHelperScene,
+    AllianceMissionScene,
+    AllianceResearchScene,
     ShopScene,
     SettingsScene,
   ],

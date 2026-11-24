@@ -3,6 +3,7 @@
 // 1. ゲーム側 (src/game/alliance/onlineLogic.ts) と、サーバー側 (functions/src/constants.ts) が、同じ答えを返すか。
 // 2. Firestore ルール (firestore.rules) に書き写した数字 (EXP表・1日の上限・ポイントの上限) が、onlineLogic.ts と合っているか。
 // 3. 日付・週・ポイントなどの、基本の計算が、正しいか。
+// 4. 同盟ミッション・同盟研究の表 (src/game/data/allianceMissions.ts, allianceResearch.ts) と、ルールに写した数字 (行動ごとの上限・研究の値段) が、合っているか。
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +22,9 @@ async function load(file) {
 
 const game = await load('src/game/alliance/onlineLogic.ts');
 const server = await load('functions/src/constants.ts');
+const backend = await load('src/game/alliance/AllianceBackend.ts');
+const missions = await load('src/game/data/allianceMissions.ts');
+const research = await load('src/game/data/allianceResearch.ts');
 const rules = fs.readFileSync(path.join(ROOT, 'firestore.rules'), 'utf8');
 
 let failed = 0;
@@ -84,7 +88,36 @@ check(
 check(/request\.time \+ duration\.value\(5, 'h'\)/.test(rules) && /duration\.value\(24, 'h'\)/.test(rules) && game.REJOIN_COOLDOWN_MS === 24 * 3_600_000, 'firestore.rules: dayKey shift (5 h) and the 24 h rejoin wait equal onlineLogic');
 check(/lendId\.split\('_'\)\[1\] == dayKey\(\)/.test(rules) && /n <= 3/.test(rules) && game.SUPPORT.lendRewardPerDay === 3, 'firestore.rules: lend counter limit (3) equals SUPPORT.lendRewardPerDay');
 
+// ---- 4. 同盟ミッション・同盟研究
+const list = (text) => [...text.matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+const costs = /function researchCost\(step\) \{\s*return \[([\d,\s]+)\]\[step\];/.exec(rules);
+const needs = /function researchNeedLevel\(step\) \{\s*return \[([\d,\s]+)\]\[step\];/.exec(rules);
+const nums = (m) => m?.[1].split(',').map((x) => Number(x.trim()));
+check(same(nums(costs), research.RESEARCH_STEPS.map((x) => x.cost)), 'firestore.rules: researchCost equals RESEARCH_STEPS[].cost');
+check(same(nums(needs), research.RESEARCH_STEPS.map((x) => x.needLevel)), 'firestore.rules: researchNeedLevel equals RESEARCH_STEPS[].needLevel');
+check(/before < 5/.test(rules) && research.RESEARCH_MAX_LEVEL === 5 && research.RESEARCH_STEPS.length === 5, 'firestore.rules: 5 research steps');
+check(same(list(/n\.research\.keys\(\)\.hasOnly\(\[([^\]]*)\]\)/.exec(rules)?.[1] ?? ''), backend.RESEARCH_LINE_IDS) && same(research.RESEARCH_LINES.map((l) => l.id), backend.RESEARCH_LINE_IDS), 'firestore.rules: the research lines equal RESEARCH_LINE_IDS');
+check(
+  research.RESEARCH_STEPS.every((x, i, a) => i === 0 || (x.cost > a[i - 1].cost && x.needLevel >= a[i - 1].needLevel)) && research.RESEARCH_STEPS.at(-1).needLevel <= game.MAX_ALLIANCE_LEVEL,
+  'research steps get dearer, and the last one can be reached (needLevel <= the top alliance level)',
+);
+check(/n\.get\('fund', 0\) - o\.get\('fund', 0\) <= 300/.test(rules) && Math.max(...Object.values(game.DONATION).map((d) => d.allianceExp)) <= 300, 'firestore.rules: the fund grows by at most 300 per donation (the biggest donation gives 300)');
+const caps = Object.fromEntries([...rules.matchAll(/missionStep\(a, b, p, q, '([a-z]+)', (\d+) \* m\)/g)].map((m) => [m[1], Number(m[2])]));
+check(same(caps, missions.MISSION_DAILY_CAP) && same(Object.keys(caps).sort(), [...backend.MISSION_METRICS].sort()), 'firestore.rules: the daily caps of the mission actions equal MISSION_DAILY_CAP (all 8 actions)');
+check(/o\.kind == 'weekly' \? 7 : 1/.test(rules) && /d\.kind == 'weekly' \? 7 : 1/.test(rules) && missions.MISSION_WEEKLY_CAP_FACTOR === 7, 'firestore.rules: the weekly cap is 7 x the daily one');
+check(same(list(/return a\.keys\(\)\.hasOnly\(\[([^\]]*)\]\)/.exec(rules)?.[1] ?? ''), backend.MISSION_METRICS) && same(list(/goals\[i\]\.metric in \[([^\]]*)\]/.exec(rules)?.[1] ?? ''), backend.MISSION_METRICS), 'firestore.rules: the mission actions equal MISSION_METRICS');
+check(/d\.goals\.size\(\) <= \(d\.kind == 'daily' \? 3 : 1\)/.test(rules) && missions.DAILY_GOAL_COUNT === 3, 'firestore.rules: 3 daily goals, 1 weekly');
+check(/'d' \+ dayKey\(\) : 'w' \+ weekKey\(\)/.test(rules) && /request\.time \+ duration\.value\(9, 'h'\)/.test(rules) && /t\.dayOfWeek\(\) - 1/.test(rules), 'firestore.rules: board ids are d + dayKey / w + Monday of the JST week (as onlineLogic.missionBoardId)');
+check(missions.ALL_MISSIONS.every((m) => (m.reward.coins ?? 0) <= game.WRITE_MAX_COINS), 'every mission pays at most 100 coins (one write of the own coins of a member is capped at 100)');
+check(
+  missions.ALL_MISSIONS.every((m) => m.minShare <= missions.missionCap(m.metric, m.scope) && m.minTarget >= 1 && m.perMember > 0) && missions.ALL_MISSIONS.every((m) => new Set(missions.ALL_MISSIONS.filter((x) => x.id === m.id)).size === 1),
+  'every mission can be claimed within the caps (minShare <= cap), ids are unique',
+);
+
 // ---- 3. 基本の計算
+check(game.mondayKey(JST(2026, 11, 24, 12)) === '2026-11-23' && game.mondayKey(JST(2026, 11, 29, 23, 59, 59)) === '2026-11-23' && game.mondayKey(JST(2026, 11, 30, 0, 0, 0)) === '2026-11-30' && game.mondayKey(JST(2026, 1, 5, 9)) === '2026-1-5', 'mondayKey: the Monday of the JST week, months and days not padded');
+check(game.missionBoardId('daily', JST(2026, 11, 24, 3, 59)) === 'd2026-11-23' && game.missionBoardId('daily', JST(2026, 11, 24, 4, 0)) === 'd2026-11-24' && game.missionBoardId('weekly', JST(2026, 11, 24, 12)) === 'w2026-11-23', 'missionBoardId: d + the 4:00-day, w + the Monday');
+check(game.dayEndMs(JST(2026, 11, 24, 12)) === JST(2026, 11, 25, 4) && game.dayEndMs(JST(2026, 11, 24, 3, 59)) === JST(2026, 11, 24, 4) && game.dayEndMs(JST(2026, 11, 24, 4, 0)) === JST(2026, 11, 25, 4), 'dayEndMs: the next 4:00 JST');
 check(game.dayKey(JST(2026, 11, 11, 3, 59, 59)) === '2026-11-10' && game.dayKey(JST(2026, 11, 11, 4, 0, 0)) === '2026-11-11', 'dayKey flips at 4:00 JST');
 check(game.dayKey(JST(2026, 1, 5, 12)) === '2026-1-5', 'dayKey does not pad months and days (as the rules do)');
 check(game.weekStartMs(JST(2026, 11, 11, 12)) === JST(2026, 11, 9) && game.weekEndMs(JST(2026, 11, 11, 12)) === JST(2026, 11, 16) - 1, 'the week runs Monday 0:00 to Sunday 23:59:59 JST');

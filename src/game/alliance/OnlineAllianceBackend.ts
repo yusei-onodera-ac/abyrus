@@ -23,8 +23,10 @@ import { sanitizeText } from '../systems/ChatSystem';
 import {
   DESCRIPTION_MAX,
   EMBLEM_COUNT,
+  MISSION_METRICS,
   NAME_MAX,
   NAME_MIN,
+  RESEARCH_LINE_IDS,
   fail,
   ok,
   type AllianceBackend,
@@ -45,12 +47,18 @@ import {
   type HelperHero,
   type JoinPolicy,
   type League,
+  type MissionBoard,
+  type MissionGoal,
+  type MissionMetric,
+  type MissionScope,
   type PlayerProfile,
   type RaidBossDef,
   type RaidOutcome,
   type RaidRankEntry,
   type RaidTicket,
   type RaidView,
+  type ResearchLine,
+  type ResearchResult,
   type Result,
   type SearchQuery,
   type SupportState,
@@ -58,6 +66,9 @@ import {
   type WarRankEntry,
   type WarView,
 } from './AllianceBackend';
+import { getMissionDef } from '../data/allianceMissions';
+import { cleanResearchLevels, nextResearchStep, researchBlock, researchView } from '../data/allianceResearch';
+import { applyReport, checkClaim, cleanReport, markClaimed, newBoard, viewOfBoard } from './missionLogic';
 import {
   DONATION,
   MAX_PENDING_REQUESTS_OUT,
@@ -66,8 +77,11 @@ import {
   WAR,
   WAR_REWARD_TIERS,
   addAllianceExp,
+  dayEndMs,
   dayKey,
   expToNext,
+  missionBoardId,
+  missionPeriodKey,
   perksForLevel,
   raidBossFor,
   raidBossHp,
@@ -206,6 +220,29 @@ function summaryFrom(id: string, d: DocumentData): AllianceSummary {
     power: num(d.power),
     league: (['bronze', 'silver', 'gold', 'platinum', 'diamond'].includes(d.league) ? d.league : 'bronze') as League,
   };
+}
+
+/** 同盟ミッションの掲示板の文書 (`alliances/{id}/missionTotals/{d2026-11-24 | w2026-11-23}`) を、掲示板にする。 */
+function boardFromDoc(scope: MissionScope, key: string, d: DocumentData): MissionBoard {
+  const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+  const counts = (v: unknown): Partial<Record<MissionMetric, number>> => {
+    const out: Partial<Record<MissionMetric, number>> = {};
+    if (isMap(v)) for (const metric of MISSION_METRICS) if (typeof v[metric] === 'number' && Number.isFinite(v[metric] as number)) out[metric] = v[metric] as number;
+    return out;
+  };
+  const goals: MissionGoal[] = [];
+  if (Array.isArray(d.goals)) {
+    for (const g of d.goals) if (isMap(g) && typeof g.id === 'string' && MISSION_METRICS.includes(g.metric as MissionMetric) && typeof g.target === 'number') goals.push({ id: g.id, metric: g.metric as MissionMetric, target: g.target });
+  }
+  const by: MissionBoard['by'] = {};
+  if (isMap(d.by)) for (const [k, v] of Object.entries(d.by)) by[k] = counts(v);
+  const claims: MissionBoard['claims'] = {};
+  if (isMap(d.claims)) for (const [k, v] of Object.entries(d.claims)) if (Array.isArray(v)) claims[k] = v.filter((x): x is string => typeof x === 'string');
+  return { scope, key, members: Math.max(1, num(d.members, 1)), goals, progress: counts(d.progress), by, claims };
+}
+
+function docFromBoard(board: MissionBoard): DocumentData {
+  return { kind: board.scope, members: board.members, goals: board.goals.map((g) => ({ id: g.id, metric: g.metric, target: g.target })), progress: board.progress, by: board.by, claims: board.claims };
 }
 
 interface DirectoryEntry {
@@ -849,7 +886,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
     const allianceRef = fs.doc(db, 'alliances', allianceId);
     const memberRef = fs.doc(db, 'alliances', allianceId, 'members', s.authUid);
 
-    const [allianceSnap, memberSnaps, raidSnap, damageSnaps, dailySnap, entrySnap, inboxSnap, claimSnap] = await Promise.all([
+    const [allianceSnap, memberSnaps, raidSnap, damageSnaps, dailySnap, entrySnap, inboxSnap, claimSnap, dayBoardSnap, weekBoardSnap] = await Promise.all([
       fs.getDoc(allianceRef),
       fs.getDocs(fs.collection(db, 'alliances', allianceId, 'members')),
       fs.getDoc(fs.doc(db, 'alliances', allianceId, 'raid', week)),
@@ -858,6 +895,8 @@ export class OnlineAllianceBackend implements AllianceBackend {
       fs.getDoc(fs.doc(db, 'seasons', week, 'entries', allianceId)),
       fs.getDocs(fs.collection(db, 'alliances', allianceId, 'members', s.authUid, 'inbox')),
       fs.getDoc(fs.doc(db, 'alliances', allianceId, 'raid', week, 'claims', s.authUid)),
+      fs.getDoc(fs.doc(db, 'alliances', allianceId, 'missionTotals', missionBoardId('daily', now))),
+      fs.getDoc(fs.doc(db, 'alliances', allianceId, 'missionTotals', missionBoardId('weekly', now))),
     ]);
     if (!allianceSnap.exists()) stop('not_found', tl('alliance.error.allianceNotFound'));
     const a = allianceSnap.data() ?? {};
@@ -949,6 +988,15 @@ export class OnlineAllianceBackend implements AllianceBackend {
       requests.sort((x, y) => x.at - y.at);
     }
 
+    // 同盟ミッション: まだ誰も足していない期間は、進み 0 の掲示板 (目標だけ) を見せる。
+    const names: Record<string, string> = {};
+    for (const d of memberSnaps.docs) names[d.id] = str(d.data().name);
+    const boardOf = (scope: MissionScope, snap: { exists(): boolean; data(): DocumentData | undefined }): MissionBoard =>
+      snap.exists() ? boardFromDoc(scope, missionPeriodKey(scope, now), snap.data() ?? {}) : newBoard(scope, missionPeriodKey(scope, now), summary.memberCount);
+    const dailyView = viewOfBoard(boardOf('daily', dayBoardSnap), s.authUid, names, dayEndMs(now));
+    const weeklyView = viewOfBoard(boardOf('weekly', weekBoardSnap), s.authUid, names, weekEndMs(now) + 1);
+    const missions = { daily: dailyView, weekly: weeklyView, claimable: [...dailyView.missions, ...weeklyView.missions].filter((m) => m.claimable).length };
+
     const expNext = expToNext(summary.level);
     return {
       summary,
@@ -964,6 +1012,9 @@ export class OnlineAllianceBackend implements AllianceBackend {
       raid,
       war,
       support,
+      fund: num(a.fund),
+      research: researchView(cleanResearchLevels(a.research), ROLE_RANK[meMember.role] >= ROLE_RANK.officer),
+      missions,
       now,
     };
   }
@@ -1149,6 +1200,7 @@ export class OnlineAllianceBackend implements AllianceBackend {
           level: grown.level,
           memberMax: perksForLevel(grown.level).memberMax,
           weekPoints: num(a.weekPoints) + rule.contribution,
+          fund: num(a.fund) + rule.allianceExp,
           updatedAt: fs.serverTimestamp(),
         });
         const m = member.data() ?? {};
@@ -1190,6 +1242,102 @@ export class OnlineAllianceBackend implements AllianceBackend {
       });
       this.invalidate();
       return balance;
+    });
+  }
+
+  // ------------------------------------------------------------------ 研究・ミッション
+
+  async researchUp(me: PlayerProfile, line: ResearchLine): Promise<Result<ResearchResult>> {
+    return this.run(async () => {
+      if (!RESEARCH_LINE_IDS.includes(line)) return stop('bad_input', tl('alliance.error.badResearch'));
+      const s = await this.session(me);
+      const { fs, db } = await this.sdk();
+      const allianceId = await this.requireAlliance(s);
+      const allianceRef = fs.doc(db, 'alliances', allianceId);
+      const memberRef = fs.doc(db, 'alliances', allianceId, 'members', s.authUid);
+      const result = await fs.runTransaction(db, async (t) => {
+        const [alliance, member] = await Promise.all([t.get(allianceRef), t.get(memberRef)]);
+        if (!alliance.exists() || !member.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
+        if (member.data().role !== 'leader' && member.data().role !== 'officer') return stop('no_permission', tl('alliance.error.researchPermission'));
+        const a = alliance.data() ?? {};
+        const level = cleanResearchLevels(a.research)[line];
+        const fund = num(a.fund);
+        const block = researchBlock(level, num(a.level, 1), fund);
+        const step = nextResearchStep(level);
+        if (block === 'max' || !step) return stop('limit_reached', tl('alliance.error.researchMax'));
+        if (block === 'level') return stop('level_too_low', tl('alliance.error.researchLevel', { needLevel: step.needLevel }));
+        if (block === 'fund') return stop('not_enough', tl('alliance.error.researchFund'));
+        t.update(allianceRef, { fund: fund - step.cost, [`research.${line}`]: level + 1, updatedAt: fs.serverTimestamp() });
+        return { line, level: level + 1, spent: step.cost, fundLeft: fund - step.cost };
+      });
+      this.invalidate();
+      return result;
+    });
+  }
+
+  async reportMissions(me: PlayerProfile, counts: Partial<Record<MissionMetric, number>>): Promise<Result<true>> {
+    return this.run(async () => {
+      const clean = cleanReport(counts);
+      if (Object.keys(clean).length === 0) return true as const;
+      const s = await this.session(me);
+      const { fs, db } = await this.sdk();
+      const allianceId = await this.requireAlliance(s);
+      const now = this.now();
+      const allianceRef = fs.doc(db, 'alliances', allianceId);
+      const boards = (['daily', 'weekly'] as const).map((scope) => ({ scope, key: missionPeriodKey(scope, now), ref: fs.doc(db, 'alliances', allianceId, 'missionTotals', missionBoardId(scope, now)) }));
+      await fs.runTransaction(db, async (t) => {
+        const [alliance, ...snaps] = await Promise.all([t.get(allianceRef), ...boards.map((b) => t.get(b.ref))]);
+        if (!alliance.exists()) return stop('not_in_alliance', tl('alliance.error.notInAlliance'));
+        const members = num(alliance.data()?.memberCount, 1);
+        boards.forEach((b, i) => {
+          const snap = snaps[i];
+          if (!snap.exists()) {
+            // The first one to report in a period lays the board out (its goals are fixed from here on).
+            const board = newBoard(b.scope, b.key, members);
+            applyReport(board, s.authUid, clean);
+            t.set(b.ref, { ...docFromBoard(board), updatedAt: fs.serverTimestamp() });
+            return;
+          }
+          const board = boardFromDoc(b.scope, b.key, snap.data() ?? {});
+          if (applyReport(board, s.authUid, clean) === 0) return;
+          t.update(b.ref, { progress: board.progress, [`by.${s.authUid}`]: board.by[s.authUid] ?? {}, updatedAt: fs.serverTimestamp() });
+        });
+      });
+      this.invalidate();
+      return true as const;
+    });
+  }
+
+  async claimMission(me: PlayerProfile, missionId: string): Promise<Result<AllianceReward>> {
+    return this.run(async () => {
+      const def = getMissionDef(missionId);
+      if (!def) return stop('not_found', tl('alliance.error.noSuchMission'));
+      const s = await this.session(me);
+      const { fs, db } = await this.sdk();
+      const allianceId = await this.requireAlliance(s);
+      const now = this.now();
+      const boardId = missionBoardId(def.scope, now);
+      const boardRef = fs.doc(db, 'alliances', allianceId, 'missionTotals', boardId);
+      const memberRef = fs.doc(db, 'alliances', allianceId, 'members', s.authUid);
+      const reward: AllianceReward = { ...def.reward, ...(def.reward.items ? { items: { ...def.reward.items } } : {}) };
+      await fs.runTransaction(db, async (t) => {
+        const [snap, member] = await Promise.all([t.get(boardRef), t.get(memberRef)]);
+        if (!snap.exists() || !member.exists()) return stop('not_found', tl('alliance.error.noSuchMission'));
+        const board = boardFromDoc(def.scope, missionPeriodKey(def.scope, now), snap.data() ?? {});
+        const check = checkClaim(board, s.authUid, missionId);
+        if (!check.ok) {
+          if (check.reason === 'no_such') return stop('not_found', tl('alliance.error.noSuchMission'));
+          if (check.reason === 'not_done') return stop('limit_reached', tl('alliance.error.missionNotDone'));
+          if (check.reason === 'share_low') return stop('limit_reached', tl('alliance.error.missionShareLow', { need: check.need ?? 1 }));
+          return stop('limit_reached', tl('alliance.error.missionClaimed'));
+        }
+        markClaimed(board, s.authUid, missionId);
+        t.update(boardRef, { [`claims.${s.authUid}`]: board.claims[s.authUid], updatedAt: fs.serverTimestamp() });
+        if (reward.coins) t.update(memberRef, { coins: num(member.data().coins) + reward.coins });
+        return true;
+      });
+      this.invalidate();
+      return reward;
     });
   }
 

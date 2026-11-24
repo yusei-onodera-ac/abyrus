@@ -8,9 +8,15 @@ import type {
   HelperHero,
   JoinPolicy,
   League,
+  MissionBoard,
+  MissionGoal,
+  MissionMetric,
+  MissionScope,
+  ResearchLine,
 } from './AllianceBackend';
-import { EMBLEM_COUNT, LEAGUES } from './AllianceBackend';
+import { EMBLEM_COUNT, LEAGUES, MISSION_METRICS } from './AllianceBackend';
 import { ALLIANCE_MAX_LEVEL, CHAT_KEEP } from '../data/alliance';
+import { cleanResearchLevels, emptyResearchLevels } from '../data/allianceResearch';
 import { isAllianceConfigured } from '../systems/firebaseConfig';
 
 /**
@@ -129,6 +135,12 @@ export interface OwnAlliance {
   me: MeCounters;
   ticket: RaidTicketState | null;
   friendInvites: FriendInviteState[];
+  /** 同盟の資金 (寄付で貯まる)。同盟研究に使う。 */
+  fund: number;
+  /** 同盟研究: 系統ごとの段。 */
+  research: Record<ResearchLine, number>;
+  /** 同盟ミッションの掲示板 (今日 / 今週)。期間が変わると、作り直される。 */
+  missions: { daily: MissionBoard | null; weekly: MissionBoard | null };
 }
 
 export interface PendingRequest {
@@ -168,11 +180,15 @@ export interface AlliancePlayerState {
   shop: { week: string; bought: Record<string, number> };
   /** 助っ人に登録したキャラ (自分のキャラの id)。Backend 側の写しとは別に、画面が見るために持つ。 */
   helperHeroId: string;
+  /** 入っている同盟の研究 (系統ごとの段。効果の計算に使う。入っていなければ全部 0)。 */
+  research: Record<ResearchLine, number>;
+  /** まだ同盟ミッションに送っていない、自分の行動の数 (行動ごと)。 */
+  missionPending: Partial<Record<MissionMetric, number>>;
   world: LocalWorld | null;
 }
 
 export function defaultAlliancePlayerState(): AlliancePlayerState {
-  return { version: 1, allianceId: null, level: 0, leftAt: 0, pendingStagePoints: 0, shop: { week: '', bought: {} }, helperHeroId: '', world: null };
+  return { version: 1, allianceId: null, level: 0, leftAt: 0, pendingStagePoints: 0, shop: { week: '', bought: {} }, helperHeroId: '', research: emptyResearchLevels(), missionPending: {}, world: null };
 }
 
 export function emptyDonated(): Record<DonationKind, number> {
@@ -336,7 +352,33 @@ function cleanOwn(v: unknown): OwnAlliance | null {
     friendInvites: Array.isArray(v.friendInvites)
       ? v.friendInvites.filter((f): f is Record<string, unknown> => isObj(f) && typeof f.uid === 'string').slice(0, 20).map((f) => ({ uid: f.uid as string, name: str(f.name, '', 20), level: int(f.level, 1, 1, 100), decideAt: num(f.decideAt, 0, 0), accept: f.accept === true }))
       : [],
+    // (a save from before the 同盟ミッション / 同盟研究 has neither: they start empty)
+    fund: num(v.fund, 0, 0),
+    research: cleanResearchLevels(v.research),
+    missions: { daily: isObj(v.missions) ? cleanBoard(v.missions.daily, 'daily') : null, weekly: isObj(v.missions) ? cleanBoard(v.missions.weekly, 'weekly') : null },
   };
+}
+
+const MISSION_SCOPES: MissionScope[] = ['daily', 'weekly'];
+
+function cleanMetricCounts(v: unknown): Partial<Record<MissionMetric, number>> {
+  const out: Partial<Record<MissionMetric, number>> = {};
+  if (isObj(v)) for (const metric of MISSION_METRICS) if (typeof v[metric] === 'number' && Number.isFinite(v[metric] as number) && (v[metric] as number) > 0) out[metric] = Math.floor(v[metric] as number);
+  return out;
+}
+
+function cleanBoard(v: unknown, scope: MissionScope): MissionBoard | null {
+  if (!isObj(v) || typeof v.key !== 'string' || !v.key || !Array.isArray(v.goals)) return null;
+  const goals: MissionGoal[] = [];
+  for (const g of v.goals.slice(0, 4)) {
+    if (isObj(g) && typeof g.id === 'string' && MISSION_METRICS.includes(g.metric as MissionMetric)) goals.push({ id: g.id.slice(0, 20), metric: g.metric as MissionMetric, target: int(g.target, 1, 1, 1e7) });
+  }
+  if (goals.length === 0) return null;
+  const by: MissionBoard['by'] = {};
+  if (isObj(v.by)) for (const [k, counts] of Object.entries(v.by).slice(0, 60)) by[k] = cleanMetricCounts(counts);
+  const claims: MissionBoard['claims'] = {};
+  if (isObj(v.claims)) for (const [k, ids] of Object.entries(v.claims).slice(0, 60)) if (Array.isArray(ids)) claims[k] = ids.filter((x): x is string => typeof x === 'string').slice(0, 4);
+  return { scope: MISSION_SCOPES.includes(scope) ? scope : 'daily', key: v.key.slice(0, 12), members: int(v.members, 1, 1, 60), goals, progress: cleanMetricCounts(v.progress), by, claims };
 }
 
 function cleanWorld(v: unknown): LocalWorld | null {
@@ -384,6 +426,8 @@ export function restoreAlliance(raw: unknown): AlliancePlayerState {
     pendingStagePoints: int(raw.pendingStagePoints, 0, 0, 9999),
     shop: { week: str(shop.week, '', 12), bought },
     helperHeroId: str(raw.helperHeroId, '', 40),
+    research: allianceId ? cleanResearchLevels(own ? own.research : raw.research) : emptyResearchLevels(),
+    missionPending: allianceId ? cleanMetricCounts(raw.missionPending) : {},
     world,
   };
 }

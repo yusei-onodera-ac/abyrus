@@ -13,11 +13,16 @@ import type {
   HelperHero,
   JoinPolicy,
   League,
+  MissionBoard,
+  MissionMetric,
+  MissionScope,
   PlayerProfile,
   RaidOutcome,
   RaidRankEntry,
   RaidTicket,
   RaidView,
+  ResearchLine,
+  ResearchResult,
   Result,
   SearchQuery,
   SupportState,
@@ -25,7 +30,7 @@ import type {
   WarRankEntry,
   WarView,
 } from './AllianceBackend';
-import { DESCRIPTION_MAX, DONATION_LABEL, EMBLEM_COUNT, LEAGUES, NAME_MAX, NAME_MIN, fail, ok } from './AllianceBackend';
+import { DESCRIPTION_MAX, DONATION_LABEL, EMBLEM_COUNT, LEAGUES, MISSION_METRICS, NAME_MAX, NAME_MIN, RESEARCH_LINE_IDS, fail, ok } from './AllianceBackend';
 import {
   emptyDonated,
   emptyMeCounters,
@@ -84,7 +89,10 @@ import {
   weekNumberOf,
   weekStartOf,
 } from '../data/alliance';
+import { MISSION_SIM_PER_DAY } from '../data/allianceMissions';
+import { emptyResearchLevels, nextResearchStep, researchBlock, researchView } from '../data/allianceResearch';
 import { HERO_ROSTER } from '../data/heroes';
+import { applyReport, bump, checkClaim, markClaimed, newBoard, viewOfBoard } from './missionLogic';
 import { sanitizeText, stripForbidden } from '../systems/ChatSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { t as tl } from '../i18n';
@@ -98,6 +106,9 @@ const SIM_DIRECTORY_SIZE = 40;
 const MAX_REQUESTS = 5;
 const MAX_APPLICANTS = 10;
 const CREATED_RECRUIT_TARGET = 12;
+const DAY = 24 * HOUR;
+/** 時間帯ごとの活発さの、1日の合計 (疑似メンバーの1日の数を、1時間ぶんに割るのに使う)。 */
+const HOUR_WEIGHT_SUM = HOUR_WEIGHT.reduce((a, b) => a + b, 0);
 
 export interface LocalOptions {
   /** 時計 (試験で差し替える)。 */
@@ -211,11 +222,14 @@ export class LocalAllianceBackend implements AllianceBackend {
         m.power = Math.max(0, me.power);
         m.lastActiveAt = Math.max(m.lastActiveAt, now);
       }
+      this.ensureBoards(world, own, now, true);
       save.alliance.allianceId = own.id;
       save.alliance.level = own.level;
+      save.alliance.research = { ...own.research };
     } else {
       save.alliance.allianceId = null;
       save.alliance.level = 0;
+      save.alliance.research = emptyResearchLevels();
     }
     world.lastSeenAt = Math.max(world.lastSeenAt, now);
     return { world, own, now };
@@ -303,10 +317,18 @@ export class LocalAllianceBackend implements AllianceBackend {
     const perks = perksForLevel(own.level);
     const players = own.members.filter((m) => m.uid !== me.uid);
     const mineMember = own.members.find((m) => m.uid === me.uid);
+    this.ensureBoards(world, own, t - 1, false);
 
     for (const m of players) {
       if (!m.simulated) continue;
       const r = rngOf(world.seed, 'act', hourIndex, m.uid);
+      // 同盟ミッション: ふつうの遊び (ステージ・ガチャ・強化 ...)。寄付と共闘ボスは、下の、本当の寄付・挑戦が数える。
+      for (const metric of MISSION_METRICS) {
+        if (metric === 'donate' || metric === 'raid') continue;
+        const expected = (MISSION_SIM_PER_DAY[metric] * m.act * w) / HOUR_WEIGHT_SUM;
+        const n = Math.floor(expected + rngOf(world.seed, 'mact', hourIndex, m.uid, metric)());
+        if (n > 0) this.bumpBoards(own, m.uid, metric, n);
+      }
       // ボスに挑む (挑戦回数の半分ほど。回数が増えるほど、挑む数も増える)
       if (!own.raid.defeatedAt && t <= own.raid.endsAt && m.used < perks.raidAttemptsPerDay && r() < m.act * 0.16 * (perks.raidAttemptsPerDay / 3) * w) {
         // (a hit is about the same as a real one - 3.5 to 6.5 times the member's power; on their own they take the boss
@@ -314,6 +336,7 @@ export class LocalAllianceBackend implements AllianceBackend {
         const dmg = Math.min(m.power * (3.5 + r() * 3), raidDamageCap(m.power));
         m.used += 1;
         this.applyDamage(own, m, dmg, t);
+        this.bumpBoards(own, m.uid, 'raid', 1);
       }
       // 寄付
       for (const kind of DONATION_KINDS) {
@@ -460,6 +483,60 @@ export class LocalAllianceBackend implements AllianceBackend {
     own.war.helpers = Math.round(per * 0.05);
   }
 
+  // ------------------------------------------------------------------ 同盟ミッション
+
+  /** 期間 (1日 / 1週間) が変わっていたら、新しい掲示板を作る。`seed`: 疑似メンバーが、期間の途中までに足した分を、先に入れる
+   *  (時計を進めている最中 (step) は、疑似メンバーが自分で足すので、入れない)。 */
+  private ensureBoards(world: LocalWorld | undefined, own: OwnAlliance, at: number, seed: boolean): void {
+    const keys: [MissionScope, string][] = [
+      ['daily', dayKeyOf(at)],
+      ['weekly', weekIdOf(at)],
+    ];
+    for (const [scope, key] of keys) {
+      const current = own.missions[scope];
+      if (current && current.key === key) continue;
+      const board = newBoard(scope, key, own.members.length);
+      own.missions[scope] = board;
+      if (seed && world) this.seedBoard(world, own, board, at);
+    }
+  }
+
+  /** 期間の途中から見え始めた掲示板に、疑似メンバーのこれまでの分を入れる。 */
+  private seedBoard(world: LocalWorld, own: OwnAlliance, board: MissionBoard, at: number): void {
+    const start = board.scope === 'weekly' ? weekStartOf(at) : (() => {
+      const d = new Date(at - 4 * HOUR);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 4, 0, 0, 0).getTime();
+    })();
+    const frac = Math.min(1, Math.max(0, (at - start) / (board.scope === 'weekly' ? WEEK_MS : DAY)));
+    if (frac <= 0) return;
+    for (const m of own.members) {
+      if (!m.simulated) continue;
+      for (const metric of MISSION_METRICS) {
+        const r = rngOf(world.seed, 'mseed', board.key, m.uid, metric);
+        const expected = MISSION_SIM_PER_DAY[metric] * m.act * (board.scope === 'weekly' ? 7 : 1) * frac * (0.6 + 0.8 * r());
+        const n = Math.floor(expected + r());
+        if (n > 0) bump(board, m.uid, metric, n);
+      }
+    }
+  }
+
+  /** 1人の行動を、今日の掲示板と今週の掲示板の、両方に足す。 */
+  private bumpBoards(own: OwnAlliance, uid: string, metric: MissionMetric, n: number): void {
+    for (const board of [own.missions.daily, own.missions.weekly]) if (board) bump(board, uid, metric, n);
+  }
+
+  private missionsView(own: OwnAlliance, me: PlayerProfile, now: number): AllianceDetail['missions'] {
+    const names: Record<string, string> = {};
+    for (const m of own.members) names[m.uid] = m.name;
+    const dayStart = ((): number => {
+      const d = new Date(now - 4 * HOUR);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 4, 0, 0, 0).getTime();
+    })();
+    const daily = viewOfBoard(own.missions.daily ?? newBoard('daily', dayKeyOf(now), own.members.length), me.uid, names, dayStart + DAY);
+    const weekly = viewOfBoard(own.missions.weekly ?? newBoard('weekly', weekIdOf(now), own.members.length), me.uid, names, weekStartOf(now) + WEEK_MS);
+    return { daily, weekly, claimable: [...daily.missions, ...weekly.missions].filter((m) => m.claimable).length };
+  }
+
   /** 対抗戦の相手 (自分以外の、同じリーグの19同盟): シーズンごとに固定。 */
   private leagueOthers(world: LocalWorld, own: OwnAlliance, seasonId: string, league: League): SimDef[] {
     const r = rngOf(world.seed, 'league', seasonId, league);
@@ -567,6 +644,9 @@ export class LocalAllianceBackend implements AllianceBackend {
       me: emptyMeCounters(dayKeyOf(now)),
       ticket: null,
       friendInvites: [],
+      fund: 0,
+      research: emptyResearchLevels(),
+      missions: { daily: null, weekly: null },
     };
     return own;
   }
@@ -667,6 +747,8 @@ export class LocalAllianceBackend implements AllianceBackend {
     m.weekContribution += rule.contribution;
     m.lastActiveAt = Math.max(m.lastActiveAt, t);
     own.war.donation += rule.contribution;
+    own.fund += rule.allianceExp;
+    if (!announce) this.bumpBoards(own, m.uid, 'donate', 1);
     const levelUp = this.addAllianceExp(own, rule.allianceExp, t);
     if (announce) this.say(own, tl('alliance.say.donated', { name: m.name, label: tl(DONATION_LABEL[kind]) }), t);
     return { levelUp };
@@ -1046,6 +1128,9 @@ export class LocalAllianceBackend implements AllianceBackend {
       raid: this.raidView(own, mine, me, now),
       war: this.warView(world, own, now),
       support: this.supportState(own),
+      fund: own.fund,
+      research: researchView(own.research, mine.role !== 'member'),
+      missions: this.missionsView(own, me, now),
       now,
     };
     this.persist();
@@ -1139,6 +1224,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     mine.weekContribution += rule.contribution;
     own.coins += rule.contribution;
     own.war.donation += rule.contribution;
+    own.fund += rule.allianceExp;
     const levelUp = this.addAllianceExp(own, rule.allianceExp, now);
     this.save().alliance.level = own.level;
     this.persist();
@@ -1245,6 +1331,56 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!past || past.claimed || !past.participated) return fail('limit_reached', tl('alliance.error.nothingToClaim'));
     past.claimed = true;
     const reward = warRewardFor(past.rank, past.league);
+    own.coins += reward.coins ?? 0;
+    this.persist();
+    return ok(reward);
+  }
+
+  // ------------------------------------------------------------------ AllianceBackend: 研究・ミッション
+
+  async researchUp(me: PlayerProfile, line: ResearchLine): Promise<Result<ResearchResult>> {
+    const got = this.requireOwn(me);
+    if (!got.ok) return got;
+    const { own, mine } = got.value;
+    if (!RESEARCH_LINE_IDS.includes(line)) return fail('bad_input', tl('alliance.error.badResearch'));
+    if (mine.role === 'member') return fail('no_permission', tl('alliance.error.researchPermission'));
+    const level = own.research[line] ?? 0;
+    const block = researchBlock(level, own.level, own.fund);
+    const step = nextResearchStep(level);
+    if (block === 'max' || !step) return fail('limit_reached', tl('alliance.error.researchMax'));
+    if (block === 'level') return fail('level_too_low', tl('alliance.error.researchLevel', { needLevel: step.needLevel }));
+    if (block === 'fund') return fail('not_enough', tl('alliance.error.researchFund'));
+    own.fund -= step.cost;
+    own.research[line] = level + 1;
+    this.save().alliance.research = { ...own.research };
+    this.persist();
+    return ok({ line, level: level + 1, spent: step.cost, fundLeft: own.fund });
+  }
+
+  async reportMissions(me: PlayerProfile, counts: Partial<Record<MissionMetric, number>>): Promise<Result<true>> {
+    const got = this.requireOwn(me);
+    if (!got.ok) return got;
+    const { own } = got.value;
+    for (const board of [own.missions.daily, own.missions.weekly]) if (board) applyReport(board, me.uid, counts);
+    this.persist();
+    return ok(true);
+  }
+
+  async claimMission(me: PlayerProfile, missionId: string): Promise<Result<AllianceReward>> {
+    const got = this.requireOwn(me);
+    if (!got.ok) return got;
+    const { own } = got.value;
+    const board = [own.missions.daily, own.missions.weekly].find((b) => b?.goals.some((g) => g.id === missionId)) ?? null;
+    const check = checkClaim(board, me.uid, missionId);
+    if (!check.ok || !board) {
+      if (check.ok) return fail('not_found', tl('alliance.error.noSuchMission'));
+      if (check.reason === 'no_such') return fail('not_found', tl('alliance.error.noSuchMission'));
+      if (check.reason === 'not_done') return fail('limit_reached', tl('alliance.error.missionNotDone'));
+      if (check.reason === 'share_low') return fail('limit_reached', tl('alliance.error.missionShareLow', { need: check.need ?? 1 }));
+      return fail('limit_reached', tl('alliance.error.missionClaimed'));
+    }
+    markClaimed(board, me.uid, missionId);
+    const reward: AllianceReward = { ...check.def.reward, ...(check.def.reward.items ? { items: { ...check.def.reward.items } } : {}) };
     own.coins += reward.coins ?? 0;
     this.persist();
     return ok(reward);
