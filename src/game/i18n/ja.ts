@@ -14,6 +14,7 @@ import { social } from './ja/social';
 import { alliance } from './ja/alliance';
 import { tutorial } from './ja/tutorial';
 import { sys } from './ja/sys';
+import { transfer } from './ja/transfer';
 
 export const ja = {
   ...common,
@@ -30,4 +31,5 @@ export const ja = {
   ...alliance,
   ...tutorial,
   ...sys,
+  ...transfer,
 } as const;

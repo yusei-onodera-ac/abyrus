@@ -1,8 +1,14 @@
 import Phaser from 'phaser';
 import { tutorialGuideName, type TutorialRect, type TutorialStep } from '../data/tutorial';
+import { TRANSFER_TEXT } from '../data/transferText';
+import { stripForbidden } from '../systems/ChatSystem';
 import type { SaveData } from '../systems/SaveSystem';
+import { PLAYER_NAME_MAX, cleanPlayerName } from '../systems/SettingsSystem';
+import { isTransferAvailable } from '../systems/TransferStore';
 import { VoiceSystem } from '../systems/VoiceSystem';
+import { Button } from './Button';
 import { wrapToWidth } from './CardParts';
+import { addDomField, focusField } from './DomField';
 import { createPanel } from './Panel';
 import { addPetFace } from './PetPortrait';
 import { body, caption, subheading, CHROME } from './theme';
@@ -22,12 +28,17 @@ export interface TutorialHandlers {
   /** The step is done: the player tapped to go on, or pressed the highlighted spot. */
   onAdvance: () => void;
   onSkip: () => void;
+  /** The 名前 step: the player gave this name (already cleaned, never empty). */
+  onName: (name: string) => void;
+  /** The 名前 step: the player chose データを引き継ぐ instead (whoever handles this destroys the overlay). */
+  onTransfer: () => void;
 }
 
 /** One チュートリアル step on screen: the screen dimmed (with the target lit and, for a
  *  'target' step, left open so pressing it works), the pet's speech bubble with the
  *  text typed out, her voice, and a スキップ button. Everything sits at depth 300, above
- *  the popups of the scene it is on. */
+ *  the popups of the scene it is on. The 名前 step (advance 'name') is its own layout: her bubble at the top and,
+ *  under it, a card to type the name in with 決定, and データを引き継ぐ for someone who has played before; no スキップ. */
 export class TutorialOverlay {
   private readonly objects: Phaser.GameObjects.GameObject[] = [];
   private readonly timers: Phaser.Time.TimerEvent[] = [];
@@ -41,6 +52,8 @@ export class TutorialOverlay {
   /** Where the speech bubble is (set when it is built): the スキップ button keeps clear of it and of the lit spot. */
   private bubbleRect: TutorialRect = { x: 0, y: 0, w: 0, h: 0 };
   private pointerListener?: (pointer: Phaser.Input.Pointer) => void;
+  /** The 名前 step's text field (a DOM element over the canvas: destroyed with the overlay). */
+  private nameDom?: Phaser.GameObjects.DOMElement;
 
   private readonly scene: Phaser.Scene;
   private readonly step: TutorialStep;
@@ -50,6 +63,11 @@ export class TutorialOverlay {
     this.scene = scene;
     this.step = step;
     this.handlers = handlers;
+    if (step.advance === 'name') {
+      this.buildNameStep();
+      VoiceSystem.play(save, step.id);
+      return;
+    }
     this.hole = step.target ? { x: step.target.x - HOLE_PAD, y: step.target.y - HOLE_PAD, w: step.target.w + HOLE_PAD * 2, h: step.target.h + HOLE_PAD * 2 } : undefined;
     this.buildDim();
     if (this.hole) this.buildRing(this.hole);
@@ -62,6 +80,7 @@ export class TutorialOverlay {
     if (this.done) return;
     this.done = true;
     VoiceSystem.stop();
+    this.nameDom?.destroy();
     for (const t of this.timers) t.remove();
     if (this.pointerListener) this.scene.input.off(Phaser.Input.Events.POINTER_DOWN, this.pointerListener);
     for (const o of this.objects) if (o.active) o.destroy();
@@ -146,6 +165,7 @@ export class TutorialOverlay {
 
   /** The bubble goes on the half of the screen the lit spot is not in. */
   private bubbleAtTop(): boolean {
+    if (this.step.advance === 'name') return true;
     const t = this.step.target;
     return !!t && t.y + t.h / 2 > 640;
   }
@@ -172,7 +192,9 @@ export class TutorialOverlay {
     this.bodyText = this.add(body(this.scene, left + TEXT_X_OFFSET, top + 26, '', { fontSize: `${TEXT_SIZE}px`, fontStyle: 'bold', color: '#fff0cc', stroke: INK, strokeThickness: 4, lineSpacing: 10 }));
     const tapStep = this.step.advance === 'tap';
     this.hint = this.add(
-      tapStep
+      this.step.advance === 'name'
+        ? caption(this.scene, left + PANEL_W - 34, top + h - 30, '', { fontSize: '26px' })
+        : tapStep
         ? caption(this.scene, left + PANEL_W - 34, top + h - 30, '▼', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(0.5)
         : caption(this.scene, left + TEXT_X_OFFSET, top + h - 28, tl('tutorial.overlay.tapGlow'), { fontSize: '19px', color: '#ffd23f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
     ) as Phaser.GameObjects.Text;
@@ -193,6 +215,96 @@ export class TutorialOverlay {
     this.shown = Math.min(this.fullText.length, count);
     this.bodyText.setText(this.fullText.slice(0, this.shown));
     if (this.shown >= this.fullText.length) this.hint.setVisible(true);
+  }
+
+  // --- the 名前 step -------------------------------------------------------------------
+
+  private buildNameStep(): void {
+    const T = TRANSFER_TEXT.nameStep;
+    // Nothing here goes on by tapping: the dark layer only keeps the screen underneath from being pressed.
+    this.rect(0, 0, 720, 1280)?.setInteractive();
+    this.buildBubble();
+
+    const cardW = PANEL_W;
+    const cardH = 462;
+    const top = this.bubbleRect.y + this.bubbleRect.h + 24;
+    const left = 360 - cardW / 2;
+    const innerW = cardW - 56;
+    this.add(createPanel(this.scene, 360, top + cardH / 2, cardW, cardH, { fillColor: CHROME.woodFill, fillAlpha: 0.98, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 4, gradient: false }));
+    this.add(this.scene.add.zone(360, top + cardH / 2, cardW, cardH).setInteractive());
+
+    this.add(body(this.scene, left + 28, top + 40, T.label, { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    const count = this.add(body(this.scene, left + cardW - 28, top + 40, '', { fontSize: '21px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+
+    const { dom, field } = addDomField(this.scene, 360, top + 108, innerW, 72, { maxLength: PLAYER_NAME_MAX * 2, placeholder: T.placeholder, fontSize: 34 });
+    this.nameDom = dom;
+    const hint = this.add(
+      body(this.scene, 360, top + 176, T.hint(PLAYER_NAME_MAX), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: innerW } }).setOrigin(0.5, 0),
+    );
+    const say = (text: string, error: boolean): void => {
+      hint.setText(text);
+      hint.setColor(error ? '#ff9a8a' : '#d8c49a');
+    };
+
+    const refresh = (): void => {
+      count.setText(`${Array.from(field.value).length} / ${PLAYER_NAME_MAX}`);
+    };
+    refresh();
+    field.addEventListener('input', (event) => {
+      // Emoji and the like are taken out as it is typed (not in the middle of an IME conversion, which would break it).
+      if (!(event as InputEvent).isComposing) {
+        const cleaned = stripForbidden(field.value);
+        if (cleaned !== field.value) {
+          field.value = cleaned;
+          say(T.stripped, true);
+        } else if (cleaned.trim()) {
+          say(T.hint(PLAYER_NAME_MAX), false);
+        }
+      }
+      refresh();
+    });
+
+    const submit = (): void => {
+      if (this.done) return;
+      const name = cleanPlayerName(field.value);
+      if (!name) {
+        say(T.empty, true);
+        field.focus();
+        return;
+      }
+      this.handlers.onName(name);
+    };
+    field.addEventListener('keydown', (event) => {
+      // Enter while composing Japanese confirms the conversion, not the name.
+      if (event.key === 'Enter' && !event.isComposing) submit();
+    });
+    this.add(new Button(this.scene, 360, top + 262, 340, 80, T.submit, submit, { variant: 'gold', fontSize: '34px' }));
+
+    const line = this.add(this.scene.add.graphics()) as Phaser.GameObjects.Graphics;
+    line.lineStyle(2, CHROME.brassDark, 0.7);
+    line.lineBetween(left + 40, top + 328, left + cardW - 40, top + 328);
+    this.add(body(this.scene, 360, top + 356, T.restoreCaption, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: innerW } }).setOrigin(0.5, 0.5));
+    this.add(
+      new Button(
+        this.scene,
+        360,
+        top + 410,
+        470,
+        68,
+        T.restore,
+        () => {
+          if (this.done) return;
+          // Without a server to ask there is nothing to carry over: said here, since a toast would sit under this layer.
+          if (!isTransferAvailable()) {
+            say(TRANSFER_TEXT.settings.unavailable, true);
+            return;
+          }
+          this.handlers.onTransfer();
+        },
+        { variant: 'wood', fontSize: '26px' },
+      ),
+    );
+    focusField(field);
   }
 
   // --- skip ----------------------------------------------------------------------------

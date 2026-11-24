@@ -15,6 +15,7 @@ import { social } from './en/social';
 import { alliance } from './en/alliance';
 import { tutorial } from './en/tutorial';
 import { sys } from './en/sys';
+import { transfer } from './en/transfer';
 
 export const en: Messages = {
   ...common,
@@ -31,4 +32,5 @@ export const en: Messages = {
   ...alliance,
   ...tutorial,
   ...sys,
+  ...transfer,
 };

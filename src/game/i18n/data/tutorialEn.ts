@@ -2,6 +2,7 @@
  *  Japanese. The button names in quotes are the English names the screens use. */
 export const tutorialEn: Record<string, Record<string, string>> = {
   guide: { name: 'Luri' },
+  name_entry: { lines: "Hey, Commander. First, tell me your name!\nIf you have saved data from before, tap \"Transfer Data\"." },
   home_welcome: { lines: "Hey there, Commander! I'm Luri.\nFrom here on, I'll teach you how to fight in this world. Stay with me, okay?" },
   home_bar: { lines: "The bar at the top shows what you're carrying: Gold, Gems and Stamina.\nStamina drops when you go on a quest, and it refills as time passes." },
   home_quest: { lines: 'First up: Quest! Tap the glowing button and head out.' },
