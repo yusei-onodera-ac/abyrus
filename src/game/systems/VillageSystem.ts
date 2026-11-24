@@ -55,6 +55,21 @@ import {
 } from './VillageIncome';
 import { MAIN_STAGE_COUNT } from './ProgressionSystem';
 import { VillageQuests } from './VillageQuests';
+import { t } from '../i18n';
+
+/** Why an action was refused, as a code a screen can pick a short label from (the text itself is in the player's language). */
+export type RefusalCode = 'builders' | 'gold' | 'materials' | 'castle' | 'max' | 'busy' | 'broken' | 'other';
+export interface Refusal {
+  code: RefusalCode;
+  /** The 城 level it asks for (code 'castle'). */
+  need?: number;
+}
+const REFUSALS = new Map<string, Refusal>();
+/** Gives back the message of a refusal and remembers its code (see VillageSystem.reasonOf). */
+function refuse(code: RefusalCode, text: string, need?: number): string {
+  REFUSALS.set(text, need === undefined ? { code } : { code, need });
+  return text;
+}
 
 const HOUR_MS = 3600 * 1000;
 
@@ -169,9 +184,9 @@ function pay(save: SaveData, level: BuildingLevel): boolean {
 
 /** Why `level` cannot be paid for now, or null when it can: ゴールド first, then the 素材 that are short. */
 function shortOf(save: SaveData, level: BuildingLevel): string | null {
-  if (!SaveSystem.getGold(save).gte(VillageSystem.cost(save, level))) return 'ゴールドが足りません';
+  if (!SaveSystem.getGold(save).gte(VillageSystem.cost(save, level))) return refuse('gold', t('village.sys.noGold'));
   const missing = SaveSystem.missingMaterials(save, VillageSystem.materialCost(level));
-  return missing.length > 0 ? `${missing.map(materialName).join('・')}が足りません` : null;
+  return missing.length > 0 ? refuse('materials', t('village.sys.notEnough', { names: missing.map(materialName).join(t('village.listSeparator')) })) : null;
 }
 
 /** A free single tile for a 行商人 / 宝箱, or null (after a number of tries) when the map is too crowded. */
@@ -399,15 +414,20 @@ export const VillageSystem = {
     return index < 0 ? null : index + 1;
   },
 
+  /** What kind of refusal a message from one of the check... functions is, so a screen can show a short label in any language. */
+  reasonOf(reason: string): Refusal {
+    return REFUSALS.get(reason) ?? { code: 'other' };
+  },
+
   /** Why another `kind` cannot be started now, wherever it would go (the 建築 menu asks this), or null when it can. */
   checkStart(save: SaveData, kind: BuildingKind, now = Date.now()): string | null {
     const def = getBuilding(kind);
-    if (!def.buildable) return 'これは建てられません';
+    if (!def.buildable) return t('village.sys.notBuildable');
     if (VillageSystem.count(save, kind) >= VillageSystem.maxCount(save, kind, now)) {
       const need = VillageSystem.castleNeededForNext(save, kind);
-      return need ? `城をLv${need}にすると、もう1つ建てられます` : 'これ以上は建てられません';
+      return need ? refuse('castle', t('village.sys.needCastleForMore', { need }), need) : refuse('max', t('village.sys.noMoreBuildable'));
     }
-    if (!def.decor && busyBuilders(save, now) >= builderCount(save, now)) return '建築員が全員、作業中です';
+    if (!def.decor && busyBuilders(save, now) >= builderCount(save, now)) return refuse('builders', t('village.sys.buildersBusy'));
     return shortOf(save, def.levels[0]);
   },
 
@@ -415,7 +435,7 @@ export const VillageSystem = {
   checkBuild(save: SaveData, kind: BuildingKind, x: number, y: number, now = Date.now()): string | null {
     const reason = VillageSystem.checkStart(save, kind, now);
     if (reason) return reason;
-    return fits(save, getBuilding(kind), x, y, undefined, now) ? null : 'ここには置けません';
+    return fits(save, getBuilding(kind), x, y, undefined, now) ? null : t('village.cantPlaceHere');
   },
 
   /** Starts building `kind` at (x, y): the ゴールド and 素材 are paid and the work begins. Returns the building, or
@@ -440,13 +460,13 @@ export const VillageSystem = {
   /** Why `b` cannot be strengthened now, or null when it can. */
   checkUpgrade(save: SaveData, b: PlacedBuilding, now = Date.now()): string | null {
     const def = getBuilding(b.kind);
-    if (b.damaged) return '壊れています。先に修理しましょう';
-    if (isWorking(b, now)) return '作業中です';
+    if (b.damaged) return refuse('broken', t('village.sys.repairFirst'));
+    if (isWorking(b, now)) return refuse('busy', t('village.sys.inProgress'));
     const level = effectiveLevel(b, now);
     const next = def.levels[level];
-    if (!next) return 'これ以上は強くできません';
-    if (b.kind !== 'castle' && castleLevel(save, now) < next.needCastle) return `城をLv${next.needCastle}にすると、強くできます`;
-    if (busyBuilders(save, now) >= builderCount(save, now)) return '建築員が全員、作業中です';
+    if (!next) return refuse('max', t('village.sys.noFurtherUpgrade'));
+    if (b.kind !== 'castle' && castleLevel(save, now) < next.needCastle) return refuse('castle', t('village.needCastleToUpgrade', { needCastle: next.needCastle }), next.needCastle);
+    if (busyBuilders(save, now) >= builderCount(save, now)) return refuse('builders', t('village.sys.buildersBusy'));
     return shortOf(save, next);
   },
 
@@ -477,10 +497,10 @@ export const VillageSystem = {
   /** Why `b` cannot be moved at all now (wherever to), or null when it can. */
   checkMoveStart(save: SaveData, b: PlacedBuilding, now = Date.now()): string | null {
     const def = getBuilding(b.kind);
-    if (!def.movable) return `${def.name}は動かせません`;
-    if (b.damaged) return '壊れています。先に修理しましょう';
-    if (isWorking(b, now) || effectiveLevel(b, now) <= 0) return '作業中です';
-    if (!def.decor && busyBuilders(save, now) >= builderCount(save, now)) return '建築員が全員、作業中です';
+    if (!def.movable) return t('village.sys.cantMoveKind', { name: def.name });
+    if (b.damaged) return refuse('broken', t('village.sys.repairFirst'));
+    if (isWorking(b, now) || effectiveLevel(b, now) <= 0) return refuse('busy', t('village.sys.inProgress'));
+    if (!def.decor && busyBuilders(save, now) >= builderCount(save, now)) return refuse('builders', t('village.sys.buildersBusy'));
     return null;
   },
 
@@ -488,8 +508,8 @@ export const VillageSystem = {
   checkMove(save: SaveData, b: PlacedBuilding, x: number, y: number, now = Date.now()): string | null {
     const reason = VillageSystem.checkMoveStart(save, b, now);
     if (reason) return reason;
-    if (x === b.x && y === b.y) return '今と同じ場所です';
-    return fits(save, getBuilding(b.kind), x, y, b.id, now) ? null : 'ここには置けません';
+    if (x === b.x && y === b.y) return t('village.sys.sameSpot');
+    return fits(save, getBuilding(b.kind), x, y, b.id, now) ? null : t('village.cantPlaceHere');
   },
 
   /** Starts moving `b` so its top-left tile ends up at (x, y): it is taken down where it stands, then put up
@@ -530,8 +550,8 @@ export const VillageSystem = {
   /** Why the land cannot be 拡張 now, or null when it can: already as big as it gets, the 城 not high enough, or short of ゴールド / 素材. */
   checkExpand(save: SaveData, now = Date.now()): string | null {
     const step = VillageSystem.nextExpansion(save);
-    if (!step) return '村はこれ以上、広げられません';
-    if (castleLevel(save, now) < step.needCastle) return `城をLv${step.needCastle}にすると、村を広げられます`;
+    if (!step) return t('village.sys.fullyExpanded');
+    if (castleLevel(save, now) < step.needCastle) return t('village.sys.needCastleToExpand', { needCastle: step.needCastle });
     return shortOf(save, VillageSystem.expansionLevel(step));
   },
 
@@ -566,9 +586,9 @@ export const VillageSystem = {
   /** Why `b` cannot be removed now, or null when it can. */
   checkRemove(save: SaveData, b: PlacedBuilding, now = Date.now()): string | null {
     const def = getBuilding(b.kind);
-    if (def.removable === false) return `${def.name}は撤去できません`;
-    if (isWorking(b, now) || effectiveLevel(b, now) <= 0) return '作業が終わってから撤去できます';
-    return save.village.buildings.includes(b) ? null : 'もう村にありません';
+    if (def.removable === false) return t('village.sys.cantRemoveKind', { name: def.name });
+    if (isWorking(b, now) || effectiveLevel(b, now) <= 0) return t('village.sys.removeAfterWork');
+    return save.village.buildings.includes(b) ? null : t('village.sys.alreadyGone');
   },
 
   /** Takes `b` away at once: its place is free and the 素材 it gives back go to the village. Returns what was given
@@ -651,9 +671,9 @@ export const VillageSystem = {
 
   /** Why `b` cannot be repaired now, or null when it can. */
   checkRepair(save: SaveData, b: PlacedBuilding, now = Date.now()): string | null {
-    if (!b.damaged) return '壊れていません';
+    if (!b.damaged) return t('village.sys.notDamaged');
     const missing = SaveSystem.missingMaterials(save, VillageSystem.repairCost(b, now));
-    return missing.length > 0 ? `${missing.map(materialName).join('・')}が足りません` : null;
+    return missing.length > 0 ? refuse('materials', t('village.sys.notEnough', { names: missing.map(materialName).join(t('village.listSeparator')) })) : null;
   },
 
   /** Mends `b`: the 素材 are paid and it works again at once. False (nothing changed) when `checkRepair` says no. */
@@ -676,8 +696,8 @@ export const VillageSystem = {
 
   /** Why the work on `b` cannot be finished at once, or null when it can. */
   checkFinish(save: SaveData, b: PlacedBuilding, now = Date.now()): string | null {
-    if (!VillageSystem.work(b, now)) return '作業中ではありません';
-    return save.gems >= VillageSystem.finishCost(b, now) ? null : '魔晶石が足りません';
+    if (!VillageSystem.work(b, now)) return t('village.sys.noWorkToFinish');
+    return save.gems >= VillageSystem.finishCost(b, now) ? null : t('village.sys.noGems');
   },
 
   /** Pays 魔晶石 and finishes the work on `b` now (building, strengthening, or the rest of a move). False (nothing
@@ -699,8 +719,8 @@ export const VillageSystem = {
   /** Why another builder cannot be bought now, or null when it can. */
   checkBuyBuilder(save: SaveData): string | null {
     const cost = VillageSystem.nextBuilderGems(save);
-    if (cost === null) return 'これ以上は増やせません';
-    return save.gems >= cost ? null : '魔晶石が足りません';
+    if (cost === null) return t('village.noMoreToAdd');
+    return save.gems >= cost ? null : t('village.sys.noGems');
   },
 
   /** Buys one more builder with 魔晶石. False (nothing changed) when `checkBuyBuilder` says no. */

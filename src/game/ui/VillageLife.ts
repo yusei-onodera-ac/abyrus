@@ -7,6 +7,7 @@ import { showToast } from './Toast';
 import { isoPoint, type Pt } from './VillageArt';
 import { PEOPLE, VillageWalkers, peopleTexture } from './VillagePeople';
 import { ParticlePool, SOFT, STAR, ensureLifeTextures } from './VillageParticles';
+import { t as tl } from '../i18n';
 
 /**
  * 村の生活感: everything in the village that moves by itself. Chimney smoke, flags, the fountain's spray, trees in the
@@ -753,7 +754,7 @@ export class VillageLife {
     }
     for (const b of this.builders.values()) {
       if (Math.abs(wx - b.x) < 30 && wy < b.y + 8 && wy > b.y - 76) {
-        showToast(this.scene, 'トンカン、トンカン！もうすぐ完成だ！', '#ffe9b8');
+        showToast(this.scene, tl('village.life.hammering'), '#ffe9b8');
         b.jolt = 2.2;
         return;
       }

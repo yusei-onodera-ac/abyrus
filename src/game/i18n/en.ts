@@ -16,6 +16,7 @@ import { alliance } from './en/alliance';
 import { tutorial } from './en/tutorial';
 import { sys } from './en/sys';
 import { transfer } from './en/transfer';
+import { village } from './en/village';
 
 export const en: Messages = {
   ...common,
@@ -33,4 +34,5 @@ export const en: Messages = {
   ...tutorial,
   ...sys,
   ...transfer,
+  ...village,
 };

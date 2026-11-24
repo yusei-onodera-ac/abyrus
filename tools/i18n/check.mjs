@@ -121,7 +121,9 @@ const dataGroupOf = (base) => Object.entries(DATA_GROUPS).find(([, names]) => na
 const VILLAGE_FILE = /(^|\/)Village[A-Za-z]*\.ts$/;
 function areaOf(rel) {
   if (rel.startsWith('src/game/data/')) return { kind: 'data', area: dataGroupOf(path.basename(rel, '.ts')) };
-  if (VILLAGE_FILE.test(rel)) return { kind: 'chrome', area: 'village (VillageScene etc.: another branch, later)' };
+  // the villagers' chatter lives next to their walking code, but it is data (read through tr('villager', ...))
+  if (rel === 'src/game/ui/VillagePeople.ts') return { kind: 'data', area: 'village data' };
+  if (VILLAGE_FILE.test(rel)) return { kind: 'chrome', area: 'village (VillageScene etc.)' };
   if (rel.startsWith('src/game/scenes/')) return { kind: 'chrome', area: 'scenes (screens)' };
   if (rel.startsWith('src/game/ui/')) return { kind: 'chrome', area: 'ui (shared widgets)' };
   if (rel.startsWith('src/game/alliance/')) return { kind: 'chrome', area: 'alliance backends (seed names, messages)' };

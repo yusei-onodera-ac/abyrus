@@ -134,7 +134,7 @@ export function addTileIcon(scene: Phaser.Scene, container: Phaser.GameObjects.C
     g.lineStyle(2.5, CHROME.brassBright, 0.95);
     g.strokePoints(corners, true);
     container.add(g);
-    return '新しい土地';
+    return t('village.rewardNewLand');
   }
   if (tile.kind === 'item' && tile.item) {
     container.add(scene.add.image(x, y, itemIcon(scene, tile.item, size)));

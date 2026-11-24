@@ -27,6 +27,7 @@ import { VillageLife } from '../ui/VillageLife';
 import { VillageFx, villageThumb } from '../ui/VillageFx';
 import { openVillageGoals } from '../ui/VillageGoalsModal';
 import { VillageGoals } from '../systems/VillageGoals';
+import { t as tl, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -130,7 +131,7 @@ interface Lift {
 }
 
 /** What the picture over a building says while it is worked on. */
-const WORK_LABEL: Record<WorkKind, string> = { build: '建築中', upgrade: '強化中', demolish: '解体中', rebuild: '再建築中' };
+const WORK_LABEL: Record<WorkKind, PlainKey> = { build: 'village.work.build', upgrade: 'village.work.upgrade', demolish: 'village.work.demolish', rebuild: 'village.work.rebuild' };
 
 /** A press on the ghost (the building being placed or moved): dragged, it follows the finger. */
 interface Drag {
@@ -612,7 +613,7 @@ export class VillageScene extends Phaser.Scene {
     // (towards the bottom corner, where the two strips are nearest the middle of the screen)
     const east = this.pos((cols + next.cols) / 2, rows * 0.8);
     const west = this.pos(cols * 0.8, (rows + next.rows) / 2);
-    this.extraLayer.add([this.plate(east.x, east.y, '未開拓', 26), this.plate(west.x, west.y, '未開拓', 26)]);
+    this.extraLayer.add([this.plate(east.x, east.y, tl('village.label.uncharted'), 26), this.plate(west.x, west.y, tl('village.label.uncharted'), 26)]);
   }
 
   /** The grid shown while placing, over the map as big as it is now. */
@@ -741,7 +742,7 @@ export class VillageScene extends Phaser.Scene {
     });
     const hit = this.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
     hit.on('pointerup', () => {
-      if (!this.blocked()) showToast(this, '素材は、ダンジョン・ステージ・放置報酬で手に入ります', '#ffe9b8');
+      if (!this.blocked()) showToast(this, tl('village.hud.materialsHint'), '#ffe9b8');
     });
     box.add(hit);
     enter(this, box, { dx: 30, dy: 0, duration: 320, delay: 180 });
@@ -750,8 +751,8 @@ export class VillageScene extends Phaser.Scene {
 
   private refreshHeader(): void {
     const now = Date.now();
-    this.headerTop.setText(`村Lv${castleLevel(this.save, now)}　建築員 ${busyBuilders(this.save, now)}/${builderCount(this.save, now)}`);
-    this.headerGold.setText(`売上 +${IdleSystem.perHour(this.save, now).gold.toString()}/時`);
+    this.headerTop.setText(tl('village.hud.levelBuilders', { castleLevel: castleLevel(this.save, now), busyBuilders: busyBuilders(this.save, now), builderCount: builderCount(this.save, now) }));
+    this.headerGold.setText(tl('village.hud.sales', { gold: IdleSystem.perHour(this.save, now).gold.toString() }));
     this.refreshMaterials();
     this.refreshRaidBanner();
     this.refreshGoalsDot();
@@ -773,7 +774,7 @@ export class VillageScene extends Phaser.Scene {
     disc.lineStyle(3, CHROME.brassBright, 1);
     disc.strokeCircle(0, 0, r);
     box.add(disc);
-    box.add(caption(this, 0, 1, '目標', { fontSize: '19px', fontStyle: 'bold', color: '#fff4dc', stroke: '#4a2406', strokeThickness: 4 }).setOrigin(0.5));
+    box.add(caption(this, 0, 1, tl('village.hud.goals'), { fontSize: '19px', fontStyle: 'bold', color: '#fff4dc', stroke: '#4a2406', strokeThickness: 4 }).setOrigin(0.5));
     this.goalsDot = this.add.graphics();
     box.add(this.goalsDot);
     const hit = this.add.zone(0, 0, r * 2, r * 2).setInteractive({ useHandCursor: true });
@@ -947,17 +948,17 @@ export class VillageScene extends Phaser.Scene {
   private renderRoadBar(): void {
     const level = getBuilding('road').levels[0];
     this.panelDock(176);
-    this.dock.add(heading(this, 18, 28, '道づくり', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    this.dock.add(heading(this, 18, 28, tl('village.road.title'), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     this.roadCount = caption(this, DOCK.w - 18, 28, '', { fontSize: '20px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5);
     this.dock.add(this.roadCount);
-    const hint = this.roadTool === 'draw' ? '指でなぞると、道が敷けます' : this.roadTool === 'erase' ? 'なぞった道を消します' : '地図を動かして、見回せます';
+    const hint = this.roadTool === 'draw' ? tl('village.road.hintDraw') : this.roadTool === 'erase' ? tl('village.road.hintErase') : tl('village.road.hintPan');
     this.dock.add(caption(this, 18, 60, hint, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    this.dock.add(caption(this, 18, 90, `1マス　ゴールド ${VillageSystem.cost(this.save, level).toString()}　${this.bundleText(VillageSystem.materialCost(level))}`, { fontSize: '17px', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const tools: [RoadTool, string][] = [['draw', '敷く'], ['erase', '消す'], ['pan', '動かす']];
+    this.dock.add(caption(this, 18, 90, tl('village.road.cost', { cost: VillageSystem.cost(this.save, level).toString(), bundleText: this.bundleText(VillageSystem.materialCost(level)) }), { fontSize: '17px', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const tools: [RoadTool, string][] = [['draw', tl('village.road.draw')], ['erase', tl('village.road.erase')], ['pan', tl('village.road.pan')]];
     tools.forEach(([tool, label], i) => {
       this.dock.add(new Button(this, 62 + i * 110, 138, 104, 62, label, () => this.setRoadTool(tool), { variant: this.roadTool === tool ? 'gold' : 'wood', fontSize: '24px' }));
     });
-    this.dock.add(new Button(this, DOCK.w - 72, 138, 124, 62, '終わり', () => this.endRoadMode(), { variant: 'wood', fontSize: '26px' }));
+    this.dock.add(new Button(this, DOCK.w - 72, 138, 124, 62, tl('village.road.done'), () => this.endRoadMode(), { variant: 'wood', fontSize: '26px' }));
     this.refreshRoadCount();
   }
 
@@ -1016,7 +1017,7 @@ export class VillageScene extends Phaser.Scene {
     this.refreshHeader();
     this.refreshMaterials();
     this.resourceBar.update(this.save);
-    showToast(this, stroke.laid > 0 ? `道を${stroke.laid}マス敷きました` : `道を${stroke.erased}マス消しました`, '#ffe9b8');
+    showToast(this, stroke.laid > 0 ? tl('village.road.laid', { laid: stroke.laid }) : tl('village.road.erased', { erased: stroke.erased }), '#ffe9b8');
   }
 
   /** While a building is being taken down, the place it is going to is marked, and kept for it. */
@@ -1031,17 +1032,17 @@ export class VillageScene extends Phaser.Scene {
     g.lineStyle(3, 0xffe27a, 0.9);
     g.strokePoints(pts, true);
     this.markers.add(g);
-    this.markers.add(this.plate((pts[0].x + pts[2].x) / 2, (pts[0].y + pts[2].y) / 2, `${def.name}の移転先`, 16));
+    this.markers.add(this.plate((pts[0].x + pts[2].x) / 2, (pts[0].y + pts[2].y) / 2, tl('village.label.moveTarget', { name: def.name }), 16));
   }
 
   /** What a building is called in its label: its level, or what is being done to it that stops it working. */
   private titleOf(b: PlacedBuilding, now: number): string {
     const def = getBuilding(b.kind);
     const level = effectiveLevel(b, now);
-    if (level === 0) return `${def.name}（建築中）`;
-    if (b.damaged) return `${def.name}（損壊）`;
-    if (isMoving(b, now)) return `${def.name}（移転中）`;
-    return def.decor ? def.name : `${def.name}　Lv${level}`;
+    if (level === 0) return tl('village.label.building', { name: def.name });
+    if (b.damaged) return tl('village.label.damagedName', { name: def.name });
+    if (isMoving(b, now)) return tl('village.label.movingName', { name: def.name });
+    return def.decor ? def.name : tl('village.label.nameLevel', { name: def.name, level });
   }
 
   private buildView(b: PlacedBuilding): Phaser.GameObjects.Container {
@@ -1076,7 +1077,7 @@ export class VillageScene extends Phaser.Scene {
       shade.fillStyle(0x4a4a4a, 0.75);
       for (const [dx, dy, r] of [[-10, 6, 13], [8, -8, 16], [-2, -24, 12]] as [number, number, number][]) shade.fillCircle(art.bounds.centerX + dx, art.bounds.y + 18 + dy, r);
       view.add(shade);
-      view.add(this.plate(centre.x, centre.y - 6, '損壊', 17));
+      view.add(this.plate(centre.x, centre.y - 6, tl('village.label.damaged'), 17));
     }
 
     if (work) {
@@ -1088,7 +1089,7 @@ export class VillageScene extends Phaser.Scene {
       }
       const bar = this.add.graphics();
       const text = caption(this, centre.x, centre.y - 6, '', { fontSize: '19px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
-      const label = caption(this, centre.x, centre.y - 28, WORK_LABEL[work.kind], { fontSize: '16px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+      const label = caption(this, centre.x, centre.y - 28, tl(WORK_LABEL[work.kind]), { fontSize: '16px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
       view.add([bar, label, text]);
       const ticking: Ticking = { id: b.id, text, bar, cx: centre.x, cy: centre.y };
       this.ticking.push(ticking);
@@ -1132,7 +1133,7 @@ export class VillageScene extends Phaser.Scene {
 
   /** The bubble over a 採集施設: which material it gathers and how much an hour. */
   private produceBubble(b: PlacedBuilding, material: 'wood' | 'iron' | 'stone', bounds: Phaser.Geom.Rectangle, now: number): Phaser.GameObjects.Container {
-    const label = caption(this, 0, 0, `+${levelValue(b, now).toLocaleString('ja-JP')}/時`, { fontSize: '17px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+    const label = caption(this, 0, 0, tl('village.label.perHour', { levelValue: levelValue(b, now).toLocaleString('ja-JP') }), { fontSize: '17px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     const w = label.width + 48;
     const bg = this.add.graphics();
     bg.fillStyle(0xeaf6ff, 0.95);
@@ -1280,7 +1281,7 @@ export class VillageScene extends Phaser.Scene {
         this.flushRefresh();
         const view = this.views.get(b.id);
         if (view) popIn(this, view, { duration: 220 });
-        showToast(this, `${def.name}を移しました`, '#ffe9b8');
+        showToast(this, tl('village.toast.moved', { name: def.name }), '#ffe9b8');
         return;
       }
     }
@@ -1289,7 +1290,7 @@ export class VillageScene extends Phaser.Scene {
     this.tweens.killTweensOf(lift.view);
     this.tweens.add({ targets: lift.view, x: o.x, y: o.y, alpha: 1, duration: 160, ease: 'Back.easeOut' });
     if (!lift.moved) this.select(lift.id);
-    else showToast(this, 'ここには置けません', '#ffb0a0');
+    else showToast(this, tl('village.cantPlaceHere'), '#ffb0a0');
     if (this.refreshQueued) this.flushRefresh();
   }
 
@@ -1488,12 +1489,12 @@ export class VillageScene extends Phaser.Scene {
    *  the toast (a new toast replaces the one on screen). */
   private announce(done: SettleResult): void {
     this.celebrate(done);
-    const names = (list: PlacedBuilding[]): string => list.map((b) => getBuilding(b.kind).name).join('・');
+    const names = (list: PlacedBuilding[]): string => list.map((b) => getBuilding(b.kind).name).join(tl('village.listSeparator'));
     const notes: { text: string; color: string }[] = [];
-    if (done.finished.length > 0) notes.push({ text: `${names(done.finished)}が完成しました`, color: '#9fe39f' });
-    if (done.rebuilt.length > 0) notes.push({ text: `${names(done.rebuilt)}の移転が終わりました`, color: '#9fe39f' });
-    if (done.spawned.length > 0) notes.push({ text: `${done.spawned.map((w) => WANDERERS[w.kind].name).join('・')}が来ました`, color: '#ffe9b8' });
-    if (done.raidArrived && this.save.village.raid.pending) notes.push({ text: '襲撃！ 獣の群れが近づいています', color: '#ff9a8a' });
+    if (done.finished.length > 0) notes.push({ text: tl('village.toast.completed', { names: names(done.finished) }), color: '#9fe39f' });
+    if (done.rebuilt.length > 0) notes.push({ text: tl('village.toast.finishedMoving', { names: names(done.rebuilt) }), color: '#9fe39f' });
+    if (done.spawned.length > 0) notes.push({ text: tl('village.toast.wandererCame', { names: done.spawned.map((w) => WANDERERS[w.kind].name).join(tl('village.listSeparator')) }), color: '#ffe9b8' });
+    if (done.raidArrived && this.save.village.raid.pending) notes.push({ text: tl('village.raid.incoming'), color: '#ff9a8a' });
     notes.forEach((note, i) => {
       if (i === 0) showToast(this, note.text, note.color);
       else this.time.delayedCall(1500 * i, () => showToast(this, note.text, note.color));
@@ -1647,15 +1648,25 @@ export class VillageScene extends Phaser.Scene {
 
   /** Why an action cannot be taken, cut down to what fits under a round button. */
   private shortReason(reason: string): string {
-    if (reason.includes('建築員')) return '建築員なし';
-    if (reason.includes('ゴールド')) return '資金不足';
-    if (reason.includes('足りません')) return '素材不足';
-    const castle = reason.match(/城をLv(\d+)/);
-    if (castle) return `城Lv${castle[1]}で`;
-    if (reason.includes('これ以上') || reason.includes('上限')) return '最大';
-    if (reason.includes('作業中')) return '作業中';
-    if (reason.includes('壊れて')) return '修理が先';
-    return reason.length > 6 ? `${reason.slice(0, 5)}…` : reason;
+    const why = VillageSystem.reasonOf(reason);
+    switch (why.code) {
+      case 'builders':
+        return tl('village.short.noBuilder');
+      case 'gold':
+        return tl('village.short.needGold');
+      case 'materials':
+        return tl('village.short.needMaterials');
+      case 'castle':
+        return tl('village.short.castle', { castle: why.need ?? 0 });
+      case 'max':
+        return tl('village.short.max');
+      case 'busy':
+        return tl('village.short.busy');
+      case 'broken':
+        return tl('village.short.repairFirst');
+      default:
+        return reason.length > 12 ? `${reason.slice(0, 11)}…` : reason;
+    }
   }
 
   /** The buttons that hang round the selected building: what can be done to it now. */
@@ -1665,20 +1676,20 @@ export class VillageScene extends Phaser.Scene {
     const level = effectiveLevel(b, now);
     const work = VillageSystem.work(b, now);
     const actions: RoundSpec[] = [];
-    const info: RoundSpec = { glyph: 'info', label: '情報', tone: 'wood', enabled: true, onTap: () => this.openInfo(b) };
+    const info: RoundSpec = { glyph: 'info', label: tl('village.float.info'), tone: 'wood', enabled: true, onTap: () => this.openInfo(b) };
 
     if (work) {
       // Being built / strengthened / moved: it can be hurried with 魔晶石 (and nothing else is done to it meanwhile).
       const gems = VillageSystem.finishCost(b, now);
       const reason = VillageSystem.checkFinish(this.save, b, now);
-      actions.push({ glyph: 'bolt', label: 'すぐ完成', tone: 'gold', sub: `魔晶石 ${gems}`, subColor: reason ? '#ff9a8a' : '#c8f0ff', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.askFinish(b)) });
+      actions.push({ glyph: 'bolt', label: tl('village.float.finishNow'), tone: 'gold', sub: tl('village.float.gems', { gems }), subColor: reason ? '#ff9a8a' : '#c8f0ff', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.askFinish(b)) });
       actions.push(info);
       return actions;
     }
 
     if (b.damaged) {
       const reason = VillageSystem.checkRepair(this.save, b, now);
-      actions.push({ glyph: 'wrench', label: '修理', tone: 'gold', sub: reason ? this.shortReason(reason) : '素材のみ', subColor: reason ? '#ff9a8a' : '#cdbb94', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.askRepair(b)) });
+      actions.push({ glyph: 'wrench', label: tl('village.float.repair'), tone: 'gold', sub: reason ? this.shortReason(reason) : tl('village.float.materialsOnly'), subColor: reason ? '#ff9a8a' : '#cdbb94', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.askRepair(b)) });
     } else if (!def.decor) {
       const next = def.levels[level];
       if (next) {
@@ -1687,7 +1698,7 @@ export class VillageScene extends Phaser.Scene {
         const affordable = SaveSystem.getGold(this.save).gte(cost);
         actions.push({
           glyph: 'up',
-          label: `強化 Lv${level + 1}`,
+          label: tl('village.float.upgrade', { level: level + 1 }),
           tone: 'gold',
           sub: reason ? this.shortReason(reason) : cost.toString(),
           subColor: reason ? '#ff9a8a' : affordable ? '#ffe79a' : '#ff9a8a',
@@ -1695,16 +1706,16 @@ export class VillageScene extends Phaser.Scene {
           onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.askUpgrade(b)),
         });
       } else {
-        actions.push({ glyph: 'up', label: '最大Lv', tone: 'wood', enabled: false, onTap: () => showToast(this, 'このレベルが上限です', '#ffe9b8') });
+        actions.push({ glyph: 'up', label: tl('village.float.maxLevel'), tone: 'wood', enabled: false, onTap: () => showToast(this, tl('village.maxLevelReached'), '#ffe9b8') });
       }
     }
 
     if (def.movable) {
       const reason = VillageSystem.checkMoveStart(this.save, b, now);
-      actions.push({ glyph: 'move', label: '移動', tone: 'wood', sub: def.decor ? 'すぐ・無料' : reason ? this.shortReason(reason) : undefined, subColor: reason ? '#ff9a8a' : '#9fe39f', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.startMoving(b)) });
+      actions.push({ glyph: 'move', label: tl('village.float.move'), tone: 'wood', sub: def.decor ? tl('village.float.free') : reason ? this.shortReason(reason) : undefined, subColor: reason ? '#ff9a8a' : '#9fe39f', enabled: !reason, onTap: () => (reason ? showToast(this, reason, '#ffb0a0') : this.startMoving(b)) });
     }
     if (level > 0 && def.removable !== false) {
-      actions.push({ glyph: 'trash', label: '撤去', tone: 'red', enabled: true, onTap: () => this.askRemove(b) });
+      actions.push({ glyph: 'trash', label: tl('village.float.remove'), tone: 'red', enabled: true, onTap: () => this.askRemove(b) });
     }
     actions.push(info);
     return actions;
@@ -1721,14 +1732,14 @@ export class VillageScene extends Phaser.Scene {
       const ghost = this.ghost;
       key = `place:${ghost.kind}:${ghost.movingId ?? ''}`;
       specs = [
-        { glyph: 'cross', label: 'やめる', tone: 'red', enabled: true, radius: 36, onTap: () => this.cancelPlacing() },
+        { glyph: 'cross', label: tl('village.float.cancel'), tone: 'red', enabled: true, radius: 36, onTap: () => this.cancelPlacing() },
         {
           glyph: 'check',
-          label: ghost.movingId ? 'ここに移す' : getBuilding(ghost.kind).decor ? 'ここに置く' : 'ここに建てる',
+          label: ghost.movingId ? tl('village.float.moveHere') : getBuilding(ghost.kind).decor ? tl('village.float.placeHere') : tl('village.float.buildHere'),
           tone: 'green',
           enabled: true,
           radius: 36,
-          onTap: () => (this.ghost?.valid ? this.confirmPlacing() : showToast(this, this.placeMessage?.text || 'ここには置けません', '#ffb0a0')),
+          onTap: () => (this.ghost?.valid ? this.confirmPlacing() : showToast(this, this.placeMessage?.text || tl('village.cantPlaceHere'), '#ffb0a0')),
         },
       ];
       anchor = () => {
@@ -1830,18 +1841,18 @@ export class VillageScene extends Phaser.Scene {
     content.add(caption(this, left, top + 168, this.statText(b, level, now), { fontSize: '20px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 68, useAdvancedWrap: true } }).setOrigin(0, 0));
     let y = top + 236;
     if (next) {
-      content.add(heading(this, left, y, `Lv${level + 1} にすると`, { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      content.add(heading(this, left, y, tl('village.info.atLevel', { level: level + 1 }), { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       const gain = this.gainText(b, level, now);
       if (gain) content.add(caption(this, left, y + 40, gain, { fontSize: '19px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       this.costLines(content, left, y + 84, y + 122, next, 26, 21);
       if (b.kind !== 'castle' && castleLevel(this.save, now) < next.needCastle) {
-        content.add(caption(this, left, y + 160, `城をLv${next.needCastle}にすると、強くできます`, { fontSize: '17px', fontStyle: 'bold', color: '#ffb07a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        content.add(caption(this, left, y + 160, tl('village.needCastleToUpgrade', { needCastle: next.needCastle }), { fontSize: '17px', fontStyle: 'bold', color: '#ffb07a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       }
     } else if (!def.decor) {
-      content.add(caption(this, left, y, 'このレベルが上限です', { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      content.add(caption(this, left, y, tl('village.maxLevelReached'), { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     }
     content.add(
-      new Button(this, 360, top + h - 44, 200, 54, '閉じる', () => {
+      new Button(this, 360, top + h - 44, 200, 54, tl('common.close'), () => {
         modal.close();
         this.modal = undefined;
       }, { variant: 'wood', fontSize: '24px' }),
@@ -1856,30 +1867,30 @@ export class VillageScene extends Phaser.Scene {
     const closeW = 104;
     this.dock.add(heading(this, 18, 26, this.titleOf(b, now), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     if (work) {
-      const head = work.kind === 'build' ? '完成まで' : work.kind === 'upgrade' ? '強化完了まで' : work.kind === 'demolish' ? '解体まで' : '再建築まで';
+      const head = work.kind === 'build' ? tl('village.dock.doneIn') : work.kind === 'upgrade' ? tl('village.dock.upgradeDoneIn') : work.kind === 'demolish' ? tl('village.dock.takenDownIn') : tl('village.dock.rebuiltIn');
       const left = caption(this, 18, 66, '', { fontSize: '19px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
       this.dock.add(left);
       const update = () => {
         const current = VillageSystem.work(b, Date.now());
-        left.setText(`${head} あと ${current ? StaminaSystem.formatDuration(current.left) : ''}`);
+        left.setText(tl('village.dock.timeLeft', { head, value: current ? StaminaSystem.formatDuration(current.left) : '' }));
       };
       update();
       this.dockTick = update;
     } else {
       this.dock.add(caption(this, 18, 66, this.statText(b, level, now), { fontSize: '16px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: DOCK.w - 36 - closeW - 10, useAdvancedWrap: true } }).setOrigin(0, 0.5));
     }
-    this.dock.add(new Button(this, DOCK.w - 14 - closeW / 2, COMPACT.h / 2, closeW, 52, '閉じる', () => this.select(undefined), { variant: 'wood', fontSize: '22px' }));
+    this.dock.add(new Button(this, DOCK.w - 14 - closeW / 2, COMPACT.h / 2, closeW, 52, tl('common.close'), () => this.select(undefined), { variant: 'wood', fontSize: '22px' }));
   }
 
   /** Nothing selected: 建築 big in the bottom-left corner, 受け取る (with what has piled up) in the bottom-right. */
   private renderCorners(): void {
     this.dock.setPosition(0, 0);
-    this.dock.add(new Button(this, 104, 1218, 200, 112, '建築', () => this.openBuildMenu(), { variant: 'gold', fontSize: '40px' }));
+    this.dock.add(new Button(this, 104, 1218, 200, 112, tl('village.build.title'), () => this.openBuildMenu(), { variant: 'gold', fontSize: '40px' }));
 
-    const claim = new Button(this, 720 - 104, 1218, 200, 112, '受け取る', () => this.claim(), { variant: 'wood', fontSize: '30px' });
+    const claim = new Button(this, 720 - 104, 1218, 200, 112, tl('common.claim'), () => this.claim(), { variant: 'wood', fontSize: '30px' });
     this.dock.add(claim);
     // 依頼 between the two, with a red dot when a chore's pay is waiting.
-    this.dock.add(new Button(this, 360, 1226, 150, 88, '依頼', () => this.openQuests(), { variant: 'wood', fontSize: '28px' }));
+    this.dock.add(new Button(this, 360, 1226, 150, 88, tl('village.dock.requests'), () => this.openQuests(), { variant: 'wood', fontSize: '28px' }));
     if (VillageQuests.claimable(this.save).length > 0) {
       const dot = this.add.graphics();
       dot.fillStyle(0xe03a2a, 1);
@@ -1889,7 +1900,7 @@ export class VillageScene extends Phaser.Scene {
       this.dock.add(dot);
     }
     // 城へ: a small round button above 受け取る that slides the map back to the 城.
-    const home = this.roundButton({ glyph: 'castle', label: '城へ', tone: 'wood', enabled: true, radius: 28, onTap: () => this.recenter() });
+    const home = this.roundButton({ glyph: 'castle', label: tl('village.dock.toCastle'), tone: 'wood', enabled: true, radius: 28, onTap: () => this.recenter() });
     home.setPosition(720 - 14 - 40, 1060);
     this.dock.add(home);
     this.dock.add(this.buildExpandButton());
@@ -1920,7 +1931,7 @@ export class VillageScene extends Phaser.Scene {
     arrow.fillRect(-7, -26, 14, 22);
     arrow.lineStyle(3, 0x1c130a, 1);
     arrow.strokePoints([new Phaser.Math.Vector2(0, 18), new Phaser.Math.Vector2(-17, -6), new Phaser.Math.Vector2(-7, -6), new Phaser.Math.Vector2(-7, -26), new Phaser.Math.Vector2(7, -26), new Phaser.Math.Vector2(7, -6), new Phaser.Math.Vector2(17, -6)], true);
-    const pill = this.plate(0, 0, 'タップして建物を建てよう', 20);
+    const pill = this.plate(0, 0, tl('village.dock.firstBuildGuide'), 20);
     pill.setPosition(190, -38);
     const guide = this.add.container(104, 1136, [arrow, pill]);
     this.dock.add(guide);
@@ -1933,7 +1944,7 @@ export class VillageScene extends Phaser.Scene {
     SaveSystem.save(this.save);
     this.resourceBar.update(this.save);
     this.refreshMaterials();
-    this.modal = showRewardModal(this, noLock, { title: '放置報酬を受け取りました', tiles: tilesForVillageClaim(result.preview, result.equipment) });
+    this.modal = showRewardModal(this, noLock, { title: tl('home.idleRewardsClaimed'), tiles: tilesForVillageClaim(result.preview, result.equipment) });
     this.renderDock();
   }
 
@@ -1959,17 +1970,17 @@ export class VillageScene extends Phaser.Scene {
     parent.add(addGoodIcon(this, 'gold', x + size / 2, yGold, size));
     const costText = body(this, x + size + 6, yGold, cost.toString(), { fontSize: `${fontSize}px`, fontStyle: 'bold', color: affordable ? '#ffe79a' : '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     parent.add(costText);
-    parent.add(caption(this, costText.x + costText.width + 14, yGold, level.seconds > 0 ? `所要 ${formatSpan(level.seconds)}` : 'すぐ完成', { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    parent.add(caption(this, costText.x + costText.width + 14, yGold, level.seconds > 0 ? tl('village.takes', { formatSpan: formatSpan(level.seconds) }) : tl('village.instant'), { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     this.materialChips(parent, x, yMaterials, VillageSystem.materialCost(level), size, fontSize - 1);
   }
 
   /** The cost of reaching `level` as lines of text, for a question that asks before it is paid. */
   private costText(level: BuildingLevel): string {
-    const lines = [`ゴールド　${VillageSystem.cost(this.save, level).toString()}`];
+    const lines = [tl('village.costGold', { cost: VillageSystem.cost(this.save, level).toString() })];
     const bundle = VillageSystem.materialCost(level);
     const materials = VILLAGE_MATERIALS.filter(({ id }) => (bundle[id] ?? 0) > 0).map(({ id, name }) => `${name} ${(bundle[id] ?? 0).toLocaleString('ja-JP')}`);
-    if (materials.length > 0) lines.push(materials.join('　'));
-    lines.push(level.seconds > 0 ? `所要時間　${formatSpan(level.seconds)}` : 'すぐに完成します');
+    if (materials.length > 0) lines.push(materials.join(tl('village.materialSeparator')));
+    lines.push(level.seconds > 0 ? tl('village.costTime', { formatSpan: formatSpan(level.seconds) }) : tl('village.completesInstantly'));
     return lines.join('\n');
   }
 
@@ -1977,7 +1988,7 @@ export class VillageScene extends Phaser.Scene {
   private bundleText(bundle: MaterialBundle): string {
     return VILLAGE_MATERIALS.filter(({ id }) => (bundle[id] ?? 0) > 0)
       .map(({ id, name }) => `${name} ${(bundle[id] ?? 0).toLocaleString('ja-JP')}`)
-      .join('　');
+      .join(tl('village.materialSeparator'));
   }
 
   /** What strengthening `b` would change, as a short line for the right of the 素材 row ('' when nothing shows). */
@@ -1985,29 +1996,29 @@ export class VillageScene extends Phaser.Scene {
     const def = getBuilding(b.kind);
     const next = def.levels[level];
     if (!next) return '';
-    if (def.produces) return `+${levelValue(b, now)} → +${next.value}/時`;
-    if (def.defense) return `防衛 ${levelValue(b, now)} → ${next.value}`;
+    if (def.produces) return tl('village.gain.produce', { levelValue: levelValue(b, now), value: next.value });
+    if (def.defense) return tl('village.gain.defense', { levelValue: levelValue(b, now), value: next.value });
     const gain = VillageSystem.incomeAfter(this.save, b, now);
-    return gain.after > gain.now + 1e-9 ? `売上 ×${gain.now.toFixed(2)} → ×${gain.after.toFixed(2)}` : '';
+    return gain.after > gain.now + 1e-9 ? tl('village.gain.sales', { now: gain.now.toFixed(2), after: gain.after.toFixed(2) }) : '';
   }
 
   /** The one line saying what a building does for the village. */
   private statText(b: PlacedBuilding, level: number, now: number): string {
     const phase = movePhase(b, now);
     const def = getBuilding(b.kind);
-    if (phase === 'demolish') return '解体中。終わると、新しい場所で再建築します';
-    if (phase === 'rebuild') return '再建築中。終わると、また働きます';
-    if (b.damaged) return '壊れています。直すまで働きません';
-    if (def.decor) return '見た目だけの飾りです（効果はありません）';
-    if (level === 0) return 'できあがると、村が少し豊かになります';
-    if (def.produces) return `${materialName(def.produces)} +${levelValue(b, now)}/時（放置報酬に足されます）`;
-    if (def.defense) return `防衛 ${levelValue(b, now)}　村全体 ${VillageSystem.defense(this.save, now)}／襲撃 ${VillageSystem.raidPower(this.save)}`;
+    if (phase === 'demolish') return tl('village.stat.demolishing');
+    if (phase === 'rebuild') return tl('village.stat.rebuilding');
+    if (b.damaged) return tl('village.stat.damaged');
+    if (def.decor) return tl('village.stat.decor');
+    if (level === 0) return tl('village.stat.underConstruction');
+    if (def.produces) return tl('village.stat.produce', { materialName: materialName(def.produces), levelValue: levelValue(b, now) });
+    if (def.defense) return tl('village.stat.defense', { levelValue: levelValue(b, now), defense: VillageSystem.defense(this.save, now), raidPower: VillageSystem.raidPower(this.save) });
     if (b.kind === 'shop' || b.kind === 'market') {
       const perHour = IdleSystem.baseGoldPerHour(this.save).mul(levelValue(b, now) * (1 + houseBonus(this.save, now)));
-      return `売上 +${perHour.toString()}/時`;
+      return tl('village.stat.sales', { perHour: perHour.toString() });
     }
-    if (b.kind === 'house') return `村じゅうの店の売上 +${Math.round(levelValue(b, now) * 1000) / 10}%`;
-    return `建築員 ${builderCount(this.save, now)}人　建てられる数と最大レベルが増える`;
+    if (b.kind === 'house') return tl('village.stat.house', { levelValue: Math.round(levelValue(b, now) * 1000) / 10 });
+    return tl('village.stat.castle', { builderCount: builderCount(this.save, now) });
   }
 
   private select(id: string | undefined): void {
@@ -2027,11 +2038,11 @@ export class VillageScene extends Phaser.Scene {
     }
     const def = getBuilding(b.kind);
     const back = this.bundleText(VillageSystem.removeRefund(b, now));
-    const name = def.decor ? def.name : `${def.name}（Lv${effectiveLevel(b, now)}）`;
+    const name = def.decor ? def.name : tl('village.remove.nameLevel', { name: def.name, effectiveLevel: effectiveLevel(b, now) });
     this.modal = openConfirm(this, noLock, {
-      title: '撤去の確認',
-      message: `${name}を撤去しますか？\n\n戻る素材　${back || 'なし'}\n（ゴールドは戻りません）${def.decor ? '' : '\nこの建物の働きもなくなります。'}\n\n元には戻せません。`,
-      confirmLabel: '撤去する',
+      title: tl('village.remove.title'),
+      message: tl('village.remove.message', { name, back: back || tl('village.none'), note: def.decor ? '' : tl('village.remove.workStops') }),
+      confirmLabel: tl('village.remove.confirm'),
       onConfirm: () => this.doRemove(b),
     });
   }
@@ -2041,7 +2052,7 @@ export class VillageScene extends Phaser.Scene {
     const name = getBuilding(b.kind).name;
     const refund = VillageSystem.remove(this.save, b, now);
     if (!refund) {
-      showToast(this, VillageSystem.checkRemove(this.save, b, now) ?? '撤去できません', '#ffb0a0');
+      showToast(this, VillageSystem.checkRemove(this.save, b, now) ?? tl('village.remove.cantRemove'), '#ffb0a0');
       return;
     }
     SaveSystem.save(this.save);
@@ -2049,8 +2060,8 @@ export class VillageScene extends Phaser.Scene {
     this.refreshMaterials();
     this.flushRefresh();
     const tiles = VILLAGE_MATERIALS.filter(({ id }) => (refund[id] ?? 0) > 0).map(({ id }): RewardTile => ({ kind: 'material', material: id, amount: `+${(refund[id] ?? 0).toLocaleString('ja-JP')}` }));
-    if (tiles.length > 0) this.modal = showRewardModal(this, noLock, { title: `${name}を撤去しました`, tiles });
-    else showToast(this, `${name}を撤去しました`, '#ffe9b8');
+    if (tiles.length > 0) this.modal = showRewardModal(this, noLock, { title: tl('village.remove.doneTitle', { name }), tiles });
+    else showToast(this, tl('village.remove.doneToast', { name }), '#ffe9b8');
   }
 
   /** 強化: asks first, with what it will cost and give. */
@@ -2068,9 +2079,9 @@ export class VillageScene extends Phaser.Scene {
     const gain = VillageGoals.upgradeGain(this.save, b, now);
     const preview = { height: 214 + gain.length * 30, rows: gain.length };
     this.modal = openConfirm(this, noLock, {
-      title: '強化の確認',
-      message: `${def.name}を Lv${level + 1} に強化しますか？\n\n${this.costText(def.levels[level])}\n\n終わるまで建築員を1人使います。`,
-      confirmLabel: '強化する',
+      title: tl('village.upgrade.title'),
+      message: tl('village.upgrade.message', { name: def.name, level: level + 1, costText: this.costText(def.levels[level]) }),
+      confirmLabel: tl('village.upgrade.confirm'),
       confirmVariant: 'gold',
       extra: {
         height: preview.height,
@@ -2101,11 +2112,11 @@ export class VillageScene extends Phaser.Scene {
   private upgrade(b: PlacedBuilding): void {
     const now = Date.now();
     if (!VillageSystem.upgrade(this.save, b, now)) {
-      showToast(this, VillageSystem.checkUpgrade(this.save, b, now) ?? '強くできません', '#ffb0a0');
+      showToast(this, VillageSystem.checkUpgrade(this.save, b, now) ?? tl('village.upgrade.cantUpgrade'), '#ffb0a0');
       return;
     }
     SaveSystem.save(this.save);
-    showToast(this, `${getBuilding(b.kind).name}の強化を始めました`, '#ffe9b8');
+    showToast(this, tl('village.upgrade.started', { name: getBuilding(b.kind).name }), '#ffe9b8');
     this.flushRefresh();
   }
 
@@ -2113,13 +2124,13 @@ export class VillageScene extends Phaser.Scene {
 
   /** The one-line role of a building in the 建築 menu, and the colour of its chip. */
   private roleOf(def: (typeof BUILDINGS)[number]): { text: string; color: number } {
-    if (def.road) return { text: '道', color: 0x8a6a3a };
-    if (def.decor) return { text: '見た目', color: 0x8a5aa8 };
-    if (def.produces) return { text: `素材+ ${materialName(def.produces)}`, color: 0x4f8a3f };
-    if (def.defense) return { text: '防衛', color: 0xb0482e };
-    if (def.kind === 'house') return { text: '売上アップ', color: 0x3a6fb0 };
-    if (def.kind === 'shop' || def.kind === 'market') return { text: '売上+', color: 0xb8841f };
-    return { text: '村の中心', color: 0x6a5a3a };
+    if (def.road) return { text: tl('village.role.road'), color: 0x8a6a3a };
+    if (def.decor) return { text: tl('village.role.decor'), color: 0x8a5aa8 };
+    if (def.produces) return { text: tl('village.role.gathers', { materialName: materialName(def.produces) }), color: 0x4f8a3f };
+    if (def.defense) return { text: tl('village.role.defense'), color: 0xb0482e };
+    if (def.kind === 'house') return { text: tl('village.role.salesBoost'), color: 0x3a6fb0 };
+    if (def.kind === 'shop' || def.kind === 'market') return { text: tl('village.role.sales'), color: 0xb8841f };
+    return { text: tl('village.role.hub'), color: 0x6a5a3a };
   }
 
   private openBuildMenu(): void {
@@ -2148,13 +2159,13 @@ export class VillageScene extends Phaser.Scene {
     const left0 = 360 - w / 2 + 24;
     content.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 5, gradient: false }));
     content.add(this.add.zone(360, cy, w, h).setInteractive());
-    content.add(heading(this, 360, top + 48, '建築', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    content.add(heading(this, 360, top + 48, tl('village.build.title'), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     const now = Date.now();
-    content.add(caption(this, left0 + 4, top + 96, `建築員 ${busyBuilders(this.save, now)}/${builderCount(this.save, now)}`, { fontSize: '18px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(caption(this, left0 + 4, top + 96, tl('village.build.builders', { busyBuilders: busyBuilders(this.save, now), builderCount: builderCount(this.save, now) }), { fontSize: '18px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const gems = VillageSystem.nextBuilderGems(this.save);
     if (gems !== null) {
       const enough = this.save.gems >= gems;
-      const buy = new Button(this, 360 + w / 2 - 24 - 118, top + 96, 236, 40, `建築員を増やす　魔晶石 ${gems}`, () => this.askBuyBuilder(modal, content), { variant: enough ? 'gold' : 'wood', fontSize: '16px' });
+      const buy = new Button(this, 360 + w / 2 - 24 - 118, top + 96, 236, 40, tl('village.build.addBuilder', { gems }), () => this.askBuyBuilder(modal, content), { variant: enough ? 'gold' : 'wood', fontSize: '16px' });
       buy.setEnabled(enough);
       content.add(buy);
     }
@@ -2209,7 +2220,7 @@ export class VillageScene extends Phaser.Scene {
       chip.lineStyle(2, 0x1c130a, 0.9);
       chip.strokeRoundedRect(-chipW / 2, -13, chipW, 26, 13);
       content.add(this.add.container(nameText.x + nameText.width + 14 + chipW / 2, y + 27, [chip, roleLabel]));
-      content.add(caption(this, left + 142, y + 56, `${have}/${max}　${def.w}×${def.h}マス`, { fontSize: '16px', fontStyle: 'bold', color: locked ? '#ff9a8a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      content.add(caption(this, left + 142, y + 56, tl('village.build.countSize', { have, max, w: def.w, h: def.h }), { fontSize: '16px', fontStyle: 'bold', color: locked ? '#ff9a8a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       content.add(caption(this, left + 142, y + 72, def.description, { fontSize: '14px', color: '#d8c49a', stroke: INK, strokeThickness: 2, wordWrap: { width: 300, useAdvancedWrap: true } }).setOrigin(0, 0));
 
       this.costLines(content, left + 142, y + 122, y + 150, def.levels[0], 22, 17);
@@ -2224,8 +2235,9 @@ export class VillageScene extends Phaser.Scene {
 
       const reason = VillageSystem.checkStart(this.save, def.kind, now);
       const need = VillageSystem.castleNeededForNext(this.save, def.kind);
-      const short = reason?.includes('建築員') ? '建築員が不足' : reason?.includes('ゴールド') ? '資金不足' : '素材が不足';
-      const text = locked ? (need ? `城Lv${need}で解放` : '上限です') : reason ? short : '選ぶ';
+      const why = reason ? VillageSystem.reasonOf(reason).code : undefined;
+      const short = why === 'builders' ? tl('village.build.needBuilder') : why === 'gold' ? tl('village.short.needGold') : tl('village.build.needMaterials');
+      const text = locked ? (need ? tl('village.build.castleLevel', { need }) : tl('village.build.maxed')) : reason ? short : tl('village.build.select');
       const pick = new Button(this, left + w - 36 - 70, y + 56, 140, 56, text, () => {
         modal.close();
         this.modal = undefined;
@@ -2239,11 +2251,11 @@ export class VillageScene extends Phaser.Scene {
     const castle = castleLevel(this.save, now);
     const unlocks = kinds.filter((d) => (d.maxCount[castle] ?? 0) > (d.maxCount[castle - 1] ?? 0)).map((d) => d.name);
     if (unlocks.length > 0) {
-      content.add(caption(this, 360, top + h - 92, `次に解放　城Lv${castle + 1}で　${unlocks.join('・')}が増えます`, { fontSize: '17px', fontStyle: 'bold', color: '#9fd8ff', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      content.add(caption(this, 360, top + h - 92, tl('village.build.nextUnlock', { castle: castle + 1, names: unlocks.join(tl('village.listSeparator')) }), { fontSize: '17px', fontStyle: 'bold', color: '#9fd8ff', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
     }
 
     content.add(
-      new Button(this, 360, top + h - 42, 200, 52, '閉じる', () => {
+      new Button(this, 360, top + h - 42, 200, 52, tl('common.close'), () => {
         modal.close();
         this.modal = undefined;
       }, { variant: 'wood', fontSize: '24px' }),
@@ -2261,7 +2273,7 @@ export class VillageScene extends Phaser.Scene {
     const mid = this.gridAt({ x: 360, y: 560 });
     const spot = VillageSystem.findSpot(this.save, kind, Math.round(mid.gx - def.w / 2), Math.round(mid.gy - def.h / 2));
     if (!spot) {
-      showToast(this, '村に空き地がありません', '#ffb0a0');
+      showToast(this, tl('village.build.noSpace'), '#ffb0a0');
       return;
     }
     this.selectedId = undefined;
@@ -2317,14 +2329,14 @@ export class VillageScene extends Phaser.Scene {
     const moving = ghost.movingId ? VillageSystem.get(this.save, ghost.movingId) : undefined;
     const home = !!moving && ghost.x === moving.x && ghost.y === moving.y;
     let reason: string | null = null;
-    if (ghost.movingId) reason = moving ? VillageSystem.checkMove(this.save, moving, ghost.x, ghost.y) : '移せません';
-    else if (!VillageSystem.canPlace(this.save, ghost.kind, ghost.x, ghost.y)) reason = 'ここには置けません';
+    if (ghost.movingId) reason = moving ? VillageSystem.checkMove(this.save, moving, ghost.x, ghost.y) : tl('village.cantMove');
+    else if (!VillageSystem.canPlace(this.save, ghost.kind, ghost.x, ghost.y)) reason = tl('village.cantPlaceHere');
     ghost.valid = reason === null;
     this.paintFootprint(ghost.kind, ghost.x, ghost.y, ghost.valid || home);
     this.confirmButton?.setEnabled(ghost.valid);
     this.floatConfirm?.setAlpha(ghost.valid ? 1 : 0.5);
-    const hint = ghost.movingId ? 'ドラッグか、地面のタップで場所を決めて、✓で移します' : 'ドラッグか、地面のタップで場所を決めて、✓で確定します';
-    const text = ghost.valid ? hint : home ? '移す場所を選んでください' : (reason ?? '');
+    const hint = ghost.movingId ? tl('village.place.hintMove') : tl('village.place.hintConfirm');
+    const text = ghost.valid ? hint : home ? tl('village.place.chooseSpot') : (reason ?? '');
     this.placeMessage?.setText(text).setColor(ghost.valid || home ? '#9fe39f' : '#ff9a8a');
     this.positionFloat();
   }
@@ -2333,16 +2345,16 @@ export class VillageScene extends Phaser.Scene {
     const def = getBuilding(ghost.kind);
     const w = DOCK.w;
     const moving = ghost.movingId ? VillageSystem.get(this.save, ghost.movingId) : undefined;
-    this.dock.add(heading(this, 18, ROW.title, moving ? `${def.name}を移す` : def.decor ? `${def.name}を置く` : `${def.name}を建てる`, { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    this.dock.add(heading(this, 18, ROW.title, moving ? tl('village.place.moveTitle', { name: def.name }) : def.decor ? tl('village.place.placeTitle', { name: def.name }) : tl('village.place.buildTitle', { name: def.name }), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     this.placeMessage = caption(this, 18, ROW.line, '', { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 36, useAdvancedWrap: true } }).setOrigin(0, 0.5);
     this.dock.add(this.placeMessage);
     if (moving && def.decor) {
-      this.dock.add(body(this, 18, ROW.cost, 'すぐに移せます', { fontSize: '20px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      this.dock.add(caption(this, 18, ROW.materials, '費用も建築員もいりません', { fontSize: '15px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      this.dock.add(body(this, 18, ROW.cost, tl('village.place.movesInstantly'), { fontSize: '20px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      this.dock.add(caption(this, 18, ROW.materials, tl('village.place.noCost'), { fontSize: '15px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     } else if (moving) {
       const times = VillageSystem.moveTimes(moving);
-      this.dock.add(body(this, 18, ROW.cost, `解体 ${formatSpanExact(times.demolish)}　→　再建築 ${formatSpanExact(times.rebuild)}`, { fontSize: '20px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      this.dock.add(caption(this, 18, ROW.materials, 'レベルそのまま・費用なし。終わるまで売上などは止まります', { fontSize: '15px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      this.dock.add(body(this, 18, ROW.cost, tl('village.place.moveTimes', { formatSpanExact: formatSpanExact(times.demolish), formatSpanExact2: formatSpanExact(times.rebuild) }), { fontSize: '20px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      this.dock.add(caption(this, 18, ROW.materials, tl('village.place.moveNote'), { fontSize: '15px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     } else {
       this.costLines(this.dock, 18, ROW.cost, ROW.materials, def.levels[0]);
     }
@@ -2351,7 +2363,7 @@ export class VillageScene extends Phaser.Scene {
     if (!moving) {
       const on = this.repeat;
       this.dock.add(
-        new Button(this, w - 14 - 78, ROW.title, 156, 40, on ? '連続配置 ON' : '連続配置 OFF', () => {
+        new Button(this, w - 14 - 78, ROW.title, 156, 40, on ? tl('village.place.repeatOn') : tl('village.place.repeatOff'), () => {
           this.repeat = !this.repeat;
           // Redrawn after this tap has finished: the button being replaced is still handling it.
           this.time.delayedCall(0, () => this.renderDock());
@@ -2391,16 +2403,16 @@ export class VillageScene extends Phaser.Scene {
 
     if (ghost.movingId) {
       const moving = VillageSystem.get(this.save, ghost.movingId);
-      const reason = moving ? VillageSystem.checkMove(this.save, moving, x, y, now) : '移せません';
+      const reason = moving ? VillageSystem.checkMove(this.save, moving, x, y, now) : tl('village.cantMove');
       if (!moving || reason) {
-        showToast(this, reason ?? '移せません', '#ffb0a0');
+        showToast(this, reason ?? tl('village.cantMove'), '#ffb0a0');
         return;
       }
       if (def.decor) {
         this.modal = openConfirm(this, noLock, {
-          title: '移動の確認',
-          message: `${def.name}を、ここに移しますか？\n\nすぐに移せます。費用も建築員もいりません。`,
-          confirmLabel: '移す',
+          title: tl('village.move.title'),
+          message: tl('village.move.messageDecor', { name: def.name }),
+          confirmLabel: tl('village.move.confirm'),
           confirmVariant: 'gold',
           onConfirm: () => this.doMove(moving.id, x, y),
         });
@@ -2408,11 +2420,9 @@ export class VillageScene extends Phaser.Scene {
       }
       const times = VillageSystem.moveTimes(moving, now);
       this.modal = openConfirm(this, noLock, {
-        title: '移動の確認',
-        message:
-          `${def.name}を、ここに移しますか？\n\n解体　${formatSpanExact(times.demolish)}\n再建築　${formatSpanExact(times.rebuild)}\n合計　${formatSpanExact(times.demolish + times.rebuild)}\n\n` +
-          'レベルはそのまま、費用はかかりません。\n終わるまで建築員を1人使い、\nこの建物の効果は止まります。',
-        confirmLabel: '移す',
+        title: tl('village.move.title'),
+        message: tl('village.move.message', { name: def.name, demolish: formatSpanExact(times.demolish), rebuild: formatSpanExact(times.rebuild), total: formatSpanExact(times.demolish + times.rebuild) }),
+        confirmLabel: tl('village.move.confirm'),
         confirmVariant: 'gold',
         onConfirm: () => this.doMove(moving.id, x, y),
       });
@@ -2425,9 +2435,9 @@ export class VillageScene extends Phaser.Scene {
       return;
     }
     this.modal = openConfirm(this, noLock, {
-      title: def.decor ? '設置の確認' : '建築の確認',
-      message: `${def.name}を、ここに${def.decor ? '置' : '建て'}ますか？\n\n${this.costText(def.levels[0])}\n\n${def.decor ? '建築員はいりません。' : '終わるまで建築員を1人使います。'}`,
-      confirmLabel: def.decor ? '置く' : '建てる',
+      title: def.decor ? tl('village.place.confirmTitle') : tl('village.build.confirmTitle'),
+      message: tl(def.decor ? 'village.place.message' : 'village.build.message', { name: def.name, costText: this.costText(def.levels[0]) }),
+      confirmLabel: def.decor ? tl('village.place.confirm') : tl('village.build.confirm'),
       confirmVariant: 'gold',
       onConfirm: () => this.doBuild(ghost.kind, x, y),
     });
@@ -2437,7 +2447,7 @@ export class VillageScene extends Phaser.Scene {
     const now = Date.now();
     const building = VillageSystem.build(this.save, kind, x, y, now);
     if (!building) {
-      showToast(this, VillageSystem.checkBuild(this.save, kind, x, y, now) ?? '建てられません', '#ffb0a0');
+      showToast(this, VillageSystem.checkBuild(this.save, kind, x, y, now) ?? tl('village.build.cantBuild'), '#ffb0a0');
       return;
     }
     SaveSystem.save(this.save);
@@ -2456,18 +2466,18 @@ export class VillageScene extends Phaser.Scene {
         this.flushRefresh();
         const placed = this.views.get(building.id);
         if (placed) popIn(this, placed, { duration: 240 });
-        showToast(this, built.decor ? `${built.name}を置きました（連続配置）` : `${built.name}の建築を始めました（連続配置）`, '#ffe9b8');
+        showToast(this, built.decor ? tl('village.place.placedRepeat', { name: built.name }) : tl('village.build.startedRepeat', { name: built.name }), '#ffe9b8');
         this.placeGhost();
         return;
       }
-      showToast(this, stop ?? '置ける場所がありません', '#ffe9b8');
+      showToast(this, stop ?? tl('village.place.noRoom'), '#ffe9b8');
     }
     this.endPlacing();
     this.selectedId = building.id;
     this.flushRefresh();
     const view = this.views.get(building.id);
     if (view) popIn(this, view, { duration: 260 });
-    showToast(this, built.decor ? `${built.name}を置きました` : `${built.name}の建築を始めました`, '#ffe9b8');
+    showToast(this, built.decor ? tl('village.place.placed', { name: built.name }) : tl('village.build.started', { name: built.name }), '#ffe9b8');
   }
 
   // ------------------------------------- repair, hurry, builders (each asks first)
@@ -2481,17 +2491,17 @@ export class VillageScene extends Phaser.Scene {
       return;
     }
     this.modal = openConfirm(this, noLock, {
-      title: '修理の確認',
-      message: `${getBuilding(b.kind).name}を直しますか？\n\n素材　${this.bundleText(VillageSystem.repairCost(b, now))}\n\nすぐに直ります。建築員はいりません。`,
-      confirmLabel: '直す',
+      title: tl('village.repair.title'),
+      message: tl('village.repair.message', { name: getBuilding(b.kind).name, bundleText: this.bundleText(VillageSystem.repairCost(b, now)) }),
+      confirmLabel: tl('village.repair.confirm'),
       confirmVariant: 'gold',
       onConfirm: () => {
         if (!VillageSystem.repair(this.save, b)) {
-          showToast(this, VillageSystem.checkRepair(this.save, b) ?? '直せません', '#ffb0a0');
+          showToast(this, VillageSystem.checkRepair(this.save, b) ?? tl('village.repair.cantRepair'), '#ffb0a0');
           return;
         }
         SaveSystem.save(this.save);
-        showToast(this, `${getBuilding(b.kind).name}を直しました`, '#9fe39f');
+        showToast(this, tl('village.repair.done', { name: getBuilding(b.kind).name }), '#9fe39f');
         this.flushRefresh();
       },
     });
@@ -2508,17 +2518,17 @@ export class VillageScene extends Phaser.Scene {
     const cost = VillageSystem.finishCost(b, now);
     const work = VillageSystem.work(b, now);
     this.modal = openConfirm(this, noLock, {
-      title: 'すぐ完成の確認',
-      message: `${getBuilding(b.kind).name}の作業を、今すぐ終わらせますか？\n（あと ${formatSpanExact(work?.totalLeft ?? 0)}）\n\n魔晶石 ${cost} を使います。\n（今 ${this.save.gems.toLocaleString('ja-JP')} → ${(this.save.gems - cost).toLocaleString('ja-JP')}）`,
-      confirmLabel: '完成させる',
+      title: tl('village.finish.title'),
+      message: tl('village.finish.message', { name: getBuilding(b.kind).name, formatSpanExact: formatSpanExact(work?.totalLeft ?? 0), cost, gems: this.save.gems.toLocaleString('ja-JP'), gems2: (this.save.gems - cost).toLocaleString('ja-JP') }),
+      confirmLabel: tl('village.finish.confirm'),
       confirmVariant: 'gold',
       onConfirm: () => {
         if (!VillageSystem.finishNow(this.save, b)) {
-          showToast(this, VillageSystem.checkFinish(this.save, b) ?? '終わらせられません', '#ffb0a0');
+          showToast(this, VillageSystem.checkFinish(this.save, b) ?? tl('village.finish.cantFinish'), '#ffb0a0');
           return;
         }
         SaveSystem.save(this.save);
-        showToast(this, `${getBuilding(b.kind).name}が完成しました`, '#9fe39f');
+        showToast(this, tl('village.finish.done', { name: getBuilding(b.kind).name }), '#9fe39f');
         this.flushRefresh();
       },
     });
@@ -2528,24 +2538,24 @@ export class VillageScene extends Phaser.Scene {
     const cost = VillageSystem.nextBuilderGems(this.save);
     const reason = VillageSystem.checkBuyBuilder(this.save);
     if (reason || cost === null) {
-      showToast(this, reason ?? 'これ以上は増やせません', '#ffb0a0');
+      showToast(this, reason ?? tl('village.noMoreToAdd'), '#ffb0a0');
       return;
     }
     this.modal = openConfirm(this, noLock, {
-      title: '建築員の追加',
-      message: `建築員を1人増やしますか？\n（今 ${builderCount(this.save)}人 → ${builderCount(this.save) + 1}人）\n\n魔晶石 ${cost} を使います。\n（今 ${this.save.gems.toLocaleString('ja-JP')} → ${(this.save.gems - cost).toLocaleString('ja-JP')}）`,
-      confirmLabel: '増やす',
+      title: tl('village.builder.title'),
+      message: tl('village.builder.message', { builderCount: builderCount(this.save), builderCount2: builderCount(this.save) + 1, cost, gems: this.save.gems.toLocaleString('ja-JP'), gems2: (this.save.gems - cost).toLocaleString('ja-JP') }),
+      confirmLabel: tl('village.builder.confirm'),
       confirmVariant: 'gold',
       onConfirm: () => {
         this.modal = menu;
         if (!VillageSystem.buyBuilder(this.save)) {
-          showToast(this, VillageSystem.checkBuyBuilder(this.save) ?? '増やせません', '#ffb0a0');
+          showToast(this, VillageSystem.checkBuyBuilder(this.save) ?? tl('village.builder.cantAdd'), '#ffb0a0');
           return;
         }
         SaveSystem.save(this.save);
         this.resourceBar.update(this.save);
         this.refreshHeader();
-        showToast(this, '建築員が1人増えました', '#9fe39f');
+        showToast(this, tl('village.builder.added'), '#9fe39f');
         this.drawBuildMenu(menu, content);
       },
     });
@@ -2558,12 +2568,12 @@ export class VillageScene extends Phaser.Scene {
   private buildExpandButton(): Phaser.GameObjects.Container {
     const next = VillageSystem.nextExpansion(this.save);
     const reason = VillageSystem.checkExpand(this.save);
-    const sub = !next ? `最大 ${this.size.cols}×${this.size.rows}` : castleLevel(this.save) < next.needCastle ? `城Lv${next.needCastle}で解放` : `${next.cols}×${next.rows}へ`;
+    const sub = !next ? tl('village.expand.max', { cols: this.size.cols, rows: this.size.rows }) : castleLevel(this.save) < next.needCastle ? tl('village.expand.castle', { needCastle: next.needCastle }) : tl('village.expand.to', { cols: next.cols, rows: next.rows });
     const w = 156;
     const x = 720 - 14 - w / 2;
     const y = 962;
     const box = this.add.container(x, y);
-    const button = new Button(this, 0, 0, w, 72, '拡張', () => this.openExpand(), { variant: 'wood', fontSize: '28px', subLabel: sub });
+    const button = new Button(this, 0, 0, w, 72, tl('village.expand.button'), () => this.openExpand(), { variant: 'wood', fontSize: '28px', subLabel: sub });
     // Not yet possible: dimmed, but still pressable (the popup says why).
     if (reason) button.setAlpha(0.78);
     box.add(button);
@@ -2625,13 +2635,13 @@ export class VillageScene extends Phaser.Scene {
     };
     content.add(createPanel(this, 360, 640, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 5, gradient: false }));
     content.add(this.add.zone(360, 640, w, h).setInteractive());
-    content.add(heading(this, 360, top + 46, '村の拡張', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    content.add(heading(this, 360, top + 46, tl('village.expand.title'), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
 
     if (!next) {
       this.landPicture(content, 360, top + 100, { cols: VILLAGE_BASE_COLS, rows: VILLAGE_BASE_ROWS }, size, 300);
-      content.add(heading(this, 360, top + 290, `${size.cols}×${size.rows}マス`, { fontSize: '36px', color: '#ffe79a', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-      content.add(caption(this, 360, top + 340, '村はこれ以上、広げられません。\nいちばん広い村になりました。', { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5));
-      content.add(new Button(this, 360, top + h - 52, 220, 60, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
+      content.add(heading(this, 360, top + 290, tl('village.expand.tiles', { cols: size.cols, rows: size.rows }), { fontSize: '36px', color: '#ffe79a', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+      content.add(caption(this, 360, top + 340, tl('village.expand.full'), { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5));
+      content.add(new Button(this, 360, top + h - 52, 220, 60, tl('common.close'), close, { variant: 'wood', fontSize: '24px' }));
       return;
     }
 
@@ -2639,7 +2649,7 @@ export class VillageScene extends Phaser.Scene {
     this.landPicture(content, left + 150, top + 104, size, next, 300);
     // Beside the picture: now, and after.
     const right = left + 330;
-    content.add(caption(this, right, top + 112, '今の広さ', { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(caption(this, right, top + 112, tl('village.expand.currentSize'), { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     content.add(body(this, right, top + 146, `${size.cols}×${size.rows}`, { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const arrow = this.add.graphics();
     arrow.fillStyle(0xffd23f, 1);
@@ -2647,7 +2657,7 @@ export class VillageScene extends Phaser.Scene {
     arrow.fillTriangle(right + 14, top + 196, right, top + 176, right + 28, top + 176);
     arrow.strokeTriangle(right + 14, top + 196, right, top + 176, right + 28, top + 176);
     content.add(arrow);
-    content.add(caption(this, right, top + 224, '広げると', { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(caption(this, right, top + 224, tl('village.expand.after'), { fontSize: '19px', fontStyle: 'bold', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     content.add(body(this, right, top + 262, `${next.cols}×${next.rows}`, { fontSize: '40px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     // Under the picture: what the two colours are.
     const chip = (x: number, y: number, color: number, text: string, textColor: string): void => {
@@ -2659,19 +2669,19 @@ export class VillageScene extends Phaser.Scene {
       content.add(g);
       content.add(caption(this, x + 32, y, text, { fontSize: '19px', fontStyle: 'bold', color: textColor, stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     };
-    chip(left, top + 302, 0x3f8731, '今の村', '#d8c49a');
-    chip(left + 190, top + 302, 0x6bb751, `新しい土地 +${added.toLocaleString('ja-JP')}マス`, '#9fe39f');
+    chip(left, top + 302, 0x3f8731, tl('village.expand.currentVillage'), '#d8c49a');
+    chip(left + 190, top + 302, 0x6bb751, tl('village.expand.newLand', { added: added.toLocaleString('ja-JP') }), '#9fe39f');
 
     // What it takes.
-    content.add(heading(this, left, top + 356, '必要なもの', { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    content.add(heading(this, left, top + 356, tl('village.expand.requirements'), { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     this.costLines(content, left, top + 402, top + 442, VillageSystem.expansionLevel(next), 28, 22);
     const castleNeeded = castleLevel(this.save, now) < next.needCastle;
-    content.add(caption(this, left, top + 488, `城Lv${next.needCastle}以上　${castleNeeded ? `（今 Lv${castleLevel(this.save, now)}）` : '（満たしています）'}`, { fontSize: '20px', fontStyle: 'bold', color: castleNeeded ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    content.add(caption(this, left, top + 488, tl('village.expand.castleRequired', { needCastle: next.needCastle, state: castleNeeded ? tl('village.expand.nowLevel', { castleLevel: castleLevel(this.save, now) }) : tl('village.expand.met') }), { fontSize: '20px', fontStyle: 'bold', color: castleNeeded ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     if (reason) content.add(caption(this, left, top + 534, reason, { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    else content.add(caption(this, left, top + 534, 'すぐに広がります。建築員はいりません。', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    else content.add(caption(this, left, top + 534, tl('village.expand.instant'), { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
-    content.add(new Button(this, 360 - 140, top + h - 50, 230, 64, '閉じる', close, { variant: 'wood', fontSize: '24px' }));
-    const go = new Button(this, 360 + 140, top + h - 50, 230, 64, '拡張する', () => this.doExpand(modal), { variant: 'gold', fontSize: '28px' });
+    content.add(new Button(this, 360 - 140, top + h - 50, 230, 64, tl('common.close'), close, { variant: 'wood', fontSize: '24px' }));
+    const go = new Button(this, 360 + 140, top + h - 50, 230, 64, tl('village.expand.confirm'), () => this.doExpand(modal), { variant: 'gold', fontSize: '28px' });
     go.setEnabled(!reason);
     content.add(go);
   }
@@ -2681,7 +2691,7 @@ export class VillageScene extends Phaser.Scene {
     const now = Date.now();
     const result = VillageSystem.expand(this.save, now);
     if (!result) {
-      showToast(this, VillageSystem.checkExpand(this.save, now) ?? '広げられません', '#ffb0a0');
+      showToast(this, VillageSystem.checkExpand(this.save, now) ?? tl('village.expand.cantExpand'), '#ffb0a0');
       return;
     }
     SaveSystem.save(this.save);
@@ -2699,9 +2709,9 @@ export class VillageScene extends Phaser.Scene {
     // Slide to the new land, then say what it came to.
     this.glideTo(result.to.cols - 3, result.to.rows - 3, () => {
       this.modal = showRewardModal(this, noLock, {
-        title: '村を広げました',
-        tiles: [{ kind: 'land', amount: `+${result.tiles.toLocaleString('ja-JP')}マス` }],
-        note: `村の広さ　${result.from.cols}×${result.from.rows} → ${result.to.cols}×${result.to.rows}`,
+        title: tl('village.expand.doneTitle'),
+        tiles: [{ kind: 'land', amount: tl('village.expand.gainTiles', { tiles: result.tiles.toLocaleString('ja-JP') }) }],
+        note: tl('village.expand.sizeNote', { cols: result.from.cols, rows: result.from.rows, cols2: result.to.cols, rows2: result.to.rows }),
         onClose: () => {
           this.modal = undefined;
           this.renderDock();
@@ -2733,8 +2743,8 @@ export class VillageScene extends Phaser.Scene {
     const left = 360 - w / 2 + 24;
     content.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 18, rarity: 5, gradient: false }));
     content.add(this.add.zone(360, cy, w, h).setInteractive());
-    content.add(heading(this, 360, top + 48, '村の依頼', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    content.add(caption(this, 360, top + 92, '毎日、午前0時に新しくなります。報酬は素材です。', { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    content.add(heading(this, 360, top + 48, tl('village.quest.title'), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    content.add(caption(this, 360, top + 92, tl('village.quest.note'), { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
 
     VILLAGE_QUESTS.forEach((quest, i) => {
       const y = top + 118 + i * rowH;
@@ -2744,14 +2754,14 @@ export class VillageScene extends Phaser.Scene {
       content.add(body(this, left + 10, y + 24, quest.text, { fontSize: '21px', fontStyle: 'bold', color: claimed ? '#a89a78' : '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       content.add(caption(this, left + 10, y + 62, `${VillageQuests.count(this.save, quest, now)}/${quest.target}`, { fontSize: '19px', fontStyle: 'bold', color: done ? '#9fe39f' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       this.materialChips(content, left + 80, y + 62, VillageQuests.reward(this.save, quest), 24, 18, false);
-      const text = claimed ? '受け取り済み' : done ? '受け取る' : '未達成';
+      const text = claimed ? tl('common.claimed') : done ? tl('common.claim') : tl('village.incomplete');
       const button = new Button(this, left + w - 36 - 66, y + 46, 132, 56, text, () => this.claimQuest(quest.id, modal, content), { variant: done && !claimed ? 'gold' : 'wood', fontSize: done && !claimed ? '24px' : '17px' });
       button.setEnabled(done && !claimed);
       content.add(button);
     });
 
     content.add(
-      new Button(this, 360, top + h - 42, 200, 52, '閉じる', () => {
+      new Button(this, 360, top + h - 42, 200, 52, tl('common.close'), () => {
         modal.close();
         this.modal = undefined;
         this.renderDock();
@@ -2764,7 +2774,7 @@ export class VillageScene extends Phaser.Scene {
     if (!reward) return;
     SaveSystem.save(this.save);
     this.refreshMaterials();
-    showToast(this, `素材を受け取りました　${this.bundleText(reward)}`, '#ffe9b8');
+    showToast(this, tl('village.quest.gotMaterials', { bundleText: this.bundleText(reward) }), '#ffe9b8');
     // Redrawn after this tap finishes: it would otherwise destroy the button mid-click.
     this.time.delayedCall(0, () => this.drawQuests(modal, content));
   }
@@ -2788,7 +2798,7 @@ export class VillageScene extends Phaser.Scene {
     if (live && this.raidText) {
       const defense = VillageSystem.defense(this.save, now);
       const holds = defense >= live.power;
-      this.raidText.setText(`防衛 ${defense} / 敵 ${live.power}　あと ${StaminaSystem.formatDuration(VillageSystem.raidSecondsLeft(this.save, now))}${holds ? '　壁で防げます' : ''}`);
+      this.raidText.setText(tl(holds ? 'village.raid.statusHolds' : 'village.raid.status', { defense, power: live.power, time: StaminaSystem.formatDuration(VillageSystem.raidSecondsLeft(this.save, now)) }));
       this.raidText.setColor(holds ? '#9fe39f' : '#ffe0c8');
     }
   }
@@ -2798,10 +2808,10 @@ export class VillageScene extends Phaser.Scene {
     const h = 78;
     const box = this.add.container(360, 246).setDepth(12);
     box.add(createPanel(this, 0, 0, w, h, { fillColor: 0x3a1410, fillAlpha: 0.95, borderColor: 0xd0583a, glowColor: 0xff8a60, radius: 14, gradient: false }));
-    box.add(heading(this, -w / 2 + 18, -17, '襲撃！ 獣の群れが近づいています', { fontSize: '22px', color: '#ffb09a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    box.add(heading(this, -w / 2 + 18, -17, tl('village.raid.incoming'), { fontSize: '22px', color: '#ffb09a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     this.raidText = caption(this, -w / 2 + 18, 15, '', { fontSize: '17px', fontStyle: 'bold', color: '#ffe0c8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     box.add(this.raidText);
-    box.add(new Button(this, w / 2 - 92, 0, 164, 56, '迎え撃つ', () => this.askRaid(), { variant: 'gold', fontSize: '26px' }));
+    box.add(new Button(this, w / 2 - 92, 0, 164, 56, tl('village.raid.fightBack'), () => this.askRaid(), { variant: 'gold', fontSize: '26px' }));
     this.raidBanner = box;
   }
 
@@ -2811,20 +2821,20 @@ export class VillageScene extends Phaser.Scene {
     const battle = VillageSystem.raidBattle(this.save);
     const reward = VillageSystem.raidReward(this.save);
     if (!battle || !reward || VillageSystem.raidSecondsLeft(this.save) <= 0) {
-      showToast(this, '襲撃は去っていきました', '#ffb0a0');
+      showToast(this, tl('village.raid.gone'), '#ffb0a0');
       this.flushRefresh();
       return;
     }
     const party = SaveSystem.getPartyHeroes(this.save);
     if (party.front.length + party.back.length === 0) {
-      this.modal = openConfirm(this, noLock, { title: '編成が空です', message: 'パーティが空のため出撃できません。\n名鑑で編成しますか？', confirmLabel: '名鑑へ', confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
+      this.modal = openConfirm(this, noLock, { title: tl('village.raid.emptyTitle'), message: tl('village.raid.emptyMessage'), confirmLabel: tl('village.raid.toParty'), confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
       return;
     }
     const stage = ProgressionSystem.getRaidStage(battle.stageIndex, battle.seed);
     this.modal = openConfirm(this, noLock, {
-      title: '襲撃を迎え撃つ',
-      message: `獣の群れ（${stage.enemies.length}体）と戦います。\n\n勝つと\n${this.bundleText(reward.materials)}\nゴールド ${reward.gold.toString()}\n\nスタミナは使いません。\n負けても、時間内ならやり直せます。`,
-      confirmLabel: '出撃',
+      title: tl('village.raid.confirmTitle'),
+      message: tl('village.raid.confirmMessage', { count: stage.enemies.length, bundleText: this.bundleText(reward.materials), gold: reward.gold.toString() }),
+      confirmLabel: tl('village.raid.fight'),
       confirmVariant: 'gold',
       onConfirm: () => {
         SaveSystem.save(this.save);
@@ -2841,9 +2851,9 @@ export class VillageScene extends Phaser.Scene {
     SaveSystem.save(this.save);
     const message =
       report.outcome === 'repelled'
-        ? '襲撃がありましたが、柵と門が追い返しました。\n被害はありません。'
-        : `襲撃で、${report.damaged.join('・')}が壊されました。\n建物を選んで、素材で直しましょう。\n（柵と門を強くすると、防げます）`;
-    this.modal = openConfirm(this, noLock, { title: '襲撃の報告', message, confirmLabel: '確認', confirmVariant: 'gold', onConfirm: () => {} });
+        ? tl('village.raid.repelled')
+        : tl('village.raid.damaged', { names: report.damaged.join(tl('village.listSeparator')) });
+    this.modal = openConfirm(this, noLock, { title: tl('village.raid.reportTitle'), message, confirmLabel: tl('common.confirm'), confirmVariant: 'gold', onConfirm: () => {} });
     this.flushRefresh();
   }
 
@@ -2872,7 +2882,7 @@ export class VillageScene extends Phaser.Scene {
   private collectWanderer(id: string): void {
     const got = VillageSystem.collect(this.save, id);
     if (!got) {
-      showToast(this, 'もう行ってしまいました', '#ffb0a0');
+      showToast(this, tl('village.wanderer.gone'), '#ffb0a0');
       this.flushRefresh();
       return;
     }
@@ -2881,7 +2891,7 @@ export class VillageScene extends Phaser.Scene {
     this.refreshMaterials();
     const tiles: RewardTile[] = VILLAGE_MATERIALS.filter(({ id: m }) => (got.wanderer.materials[m] ?? 0) > 0).map(({ id: m }): RewardTile => ({ kind: 'material', material: m, amount: `+${(got.wanderer.materials[m] ?? 0).toLocaleString('ja-JP')}` }));
     if (!got.gold.isZero()) tiles.unshift({ kind: 'gold', amount: `+${got.gold.toString()}` });
-    this.modal = showRewardModal(this, noLock, { title: `${WANDERERS[got.wanderer.kind].name}を開けました`, tiles });
+    this.modal = showRewardModal(this, noLock, { title: tl('village.wanderer.opened', { name: WANDERERS[got.wanderer.kind].name }), tiles });
     this.flushRefresh();
   }
 
@@ -2890,7 +2900,7 @@ export class VillageScene extends Phaser.Scene {
     if (!b) return;
     const now = Date.now();
     if (!VillageSystem.startMove(this.save, b, x, y, now)) {
-      showToast(this, VillageSystem.checkMove(this.save, b, x, y, now) ?? '移せません', '#ffb0a0');
+      showToast(this, VillageSystem.checkMove(this.save, b, x, y, now) ?? tl('village.cantMove'), '#ffb0a0');
       return;
     }
     SaveSystem.save(this.save);
@@ -2898,6 +2908,6 @@ export class VillageScene extends Phaser.Scene {
     this.selectedId = b.id;
     this.flushRefresh();
     const def = getBuilding(b.kind);
-    showToast(this, def.decor ? `${def.name}を移しました` : `${def.name}の移転を始めました（解体 → 再建築）`, '#ffe9b8');
+    showToast(this, def.decor ? tl('village.toast.moved', { name: def.name }) : tl('village.move.started', { name: def.name }), '#ffe9b8');
   }
 }
