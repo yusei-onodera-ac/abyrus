@@ -81,7 +81,7 @@ export class AllianceResearchScene extends AllianceScene {
       pips.strokeRoundedRect(px, 92, PIP, PIP, 6);
     }
     card.container.add(pips);
-    this.fit(body(this, x + RESEARCH_MAX_LEVEL * (PIP + PIP_GAP) + 10, 106, t('alliance.research.now', { value: pct(researchValue(line.id, level)) }), { fontSize: '21px', fontStyle: 'bold', color: level > 0 ? '#9fe39f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5), 230);
+    card.container.add(this.fit(body(this, x + RESEARCH_MAX_LEVEL * (PIP + PIP_GAP) + 10, 106, t('alliance.research.now', { value: pct(researchValue(line.id, level)) }), { fontSize: '21px', fontStyle: 'bold', color: level > 0 ? '#9fe39f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5), 230));
 
     if (step) {
       this.fit(this.line(card, x, 146, t('alliance.research.next', { value: pct(researchValue(line.id, level + 1)), cost: fullDigits(step.cost) }), '#f5e6c8', 19), TEXT_W);

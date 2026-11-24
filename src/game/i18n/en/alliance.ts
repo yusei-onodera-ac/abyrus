@@ -542,7 +542,7 @@ export const alliance: Part<'alliance'> = {
   'alliance.research.maxed': 'Fully researched',
   'alliance.research.lockedLevel': 'Level too low',
   'alliance.research.lockedFund': 'Fund too low',
-  'alliance.research.noRight': 'Leaders only',
+  'alliance.research.noRight': 'Leader/Officer',
   'alliance.research.confirmTitle': 'Research',
   'alliance.research.confirmMessage': 'Advance "{name}" to Lv.{level}.\nThis uses {cost} of the alliance Fund.',
   'alliance.research.done': '"{name}" is now Lv.{level} ({value})',
