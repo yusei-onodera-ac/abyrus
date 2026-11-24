@@ -47,3 +47,22 @@ export function scanFile(file) {
   visit(sf);
   return hits;
 }
+
+/** [{ line, text }] for every `t(...)` / `tl(...)` / `tr(...)` / `trList(...)` call that runs when the module loads or when a class is
+ *  built (not inside any function): it would keep the language of that moment for good (docs/I18N.md, "してはいけないこと"). */
+export function scanStaleCalls(file) {
+  const text = readFileSync(file, 'utf8');
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const found = [];
+  const NAMES = new Set(['t', 'tl', 'tr', 'trList']);
+  const visit = (node, inFunction) => {
+    const fn = inFunction || ts.isFunctionLike(node) || ts.isClassStaticBlockDeclaration(node);
+    if (!inFunction && ts.isCallExpression(node) && ts.isIdentifier(node.expression) && NAMES.has(node.expression.text) && !fn) {
+      const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+      found.push({ line: line + 1, text: node.getText(sf).slice(0, 80) });
+    }
+    ts.forEachChild(node, (c) => visit(c, fn));
+  };
+  visit(sf, false);
+  return found;
+}

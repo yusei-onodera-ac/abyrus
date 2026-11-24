@@ -2,7 +2,7 @@
 //
 //   1. The translation tables agree: every language has exactly the Japanese table's keys (a language marked `partial` in
 //      languages.ts may lack some: reported, not failed), the same {placeholders}, keys start with their file's namespace,
-//      and no key is defined twice.  A failure here exits 1.
+//      and no key is defined twice; no t()/tr() call runs at load time (module level, class field).  A failure here exits 1.
 //   2. The Japanese still hard-coded in src/ outside the tables (listed per file, so later phases can burn the list down).
 //      Only a report: exit 0.   --list shows every line,  --strict makes a remaining one fail,  --survey prints the
 //      table used in docs/I18N.md.
@@ -10,7 +10,7 @@ import { rolldown } from 'rolldown';
 import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { posix, scanFile, walk } from './scan.mjs';
+import { posix, scanFile, scanStaleCalls, walk } from './scan.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = new Set(process.argv.slice(2));
@@ -91,6 +91,13 @@ for (const lang of LANGUAGES) {
       else seen.set(id, `${ns}.ts`);
     }
   }
+}
+
+// t() / tr() that runs when a module loads or a class is built would keep the language of that moment for good
+for (const file of walk(path.join(root, 'src'))) {
+  const rel = posix(path.relative(root, file));
+  if (rel.startsWith('src/game/i18n/')) continue;
+  for (const hit of scanStaleCalls(file)) problems.push(`${rel}:${hit.line}: ${hit.text} runs at load time (module level / class field): it must run where the text is drawn`);
 }
 
 // ---------------------------------------------------------------- 2. hard-coded Japanese
