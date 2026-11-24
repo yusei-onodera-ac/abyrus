@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { BigNumber } from '../systems/BigNumber';
-import { isItemId } from '../data/items';
+import { ITEMS, isItemId } from '../data/items';
 import { ALLIANCE_ROLE_LABEL, EMBLEM_COUNT, JOIN_POLICY_LABEL, type AllianceDetail, type AllianceReward, type AllianceRole, type JoinPolicy } from '../alliance/AllianceBackend';
 import { buildChip } from './CardParts';
 import type { RewardTile } from './RewardTiles';
@@ -135,7 +135,7 @@ export function rewardLine(reward: AllianceReward): string {
   if (reward.phaseMaterials) parts.push(t('alliance.parts.linePhaseMaterial', { phaseMaterials: reward.phaseMaterials }));
   if (reward.coins) parts.push(t('alliance.parts.lineCoins', { coins: reward.coins.toLocaleString('ja-JP') }));
   if (reward.goldHours) parts.push(t('alliance.parts.lineGold', { goldHours: reward.goldHours }));
-  for (const [id, amount] of Object.entries(reward.items ?? {})) if (amount > 0) parts.push(`${id} ×${amount}`);
+  for (const [id, amount] of Object.entries(reward.items ?? {})) if (amount > 0) parts.push(`${isItemId(id) ? ITEMS[id].short : id} ×${amount}`);
   return parts.join(t('alliance.parts.separator')) || t('alliance.parts.none');
 }
 
