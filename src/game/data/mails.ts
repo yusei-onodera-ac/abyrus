@@ -1,3 +1,5 @@
+import { localized } from '../i18n';
+
 export interface MailCampaign {
   id: string;
   title: string;
@@ -13,7 +15,7 @@ export interface MailCampaign {
  * the player reaches the home screen after its sentAt time. This is the thing
  * to edit to send a mail; no code elsewhere needs to change.
  */
-export const MAIL_CAMPAIGNS: MailCampaign[] = [
+const MAIL_ROWS: MailCampaign[] = [
   {
     id: 'welcome-mail',
     title: 'ABYRUSからのご挨拶',
@@ -27,3 +29,6 @@ export const MAIL_CAMPAIGNS: MailCampaign[] = [
     body: '編成画面では、デッキを最大5つまで作成できます。\n「お任せ編成」を使うと、所持キャラから強い順に自動で並べます。\n\n使用中のデッキが、クエストと無限モードで出撃します。',
   },
 ];
+
+/** The texts are read through tr() (English: i18n/data/missionsEn.ts) when a mail is delivered to a save, which keeps them from then on. */
+export const MAIL_CAMPAIGNS: MailCampaign[] = MAIL_ROWS.map((row) => localized('mail', row.id, row, ['title', 'body']));

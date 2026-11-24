@@ -1,10 +1,18 @@
 import type { DataTexts } from '../dataTexts';
 import { tutorialEn } from './tutorialEn';
+import { villageEn } from './villageEn';
+import { missionsEn } from './missionsEn';
+import { shopEn } from './shopEn';
+import { worldEn } from './worldEn';
 
 /** English text of the game's data (heroes, skills, enemies, stages, story, items ...): see docs/I18N.md. Anything not listed here
  *  is shown in Japanese by `tr()`. Shape: `{ <table>: { <id>: { <field>: 'text' } } }`. Phase 1 has the materials (data/items.ts);
  *  the rest is phase 2 (split this into one file per table when it grows). */
 export const enData: DataTexts = {
+  ...villageEn,
+  ...missionsEn,
+  ...shopEn,
+  ...worldEn,
   tutorial: tutorialEn,
   item: {
     exp_s: { name: 'EXP Material (S)', short: 'EXP (S)', description: 'Gives a hero +100 EXP.' },

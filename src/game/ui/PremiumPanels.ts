@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { IDLE_BASE_CAP_HOURS } from '../data/idle';
-import { PREMIUM, PREMIUM_JOIN_PACK } from '../data/premium';
+import { PREMIUM, PREMIUM_JOIN_PACK, premiumName } from '../data/premium';
 import { PaymentSystem } from '../systems/PaymentSystem';
 import { PremiumSystem } from '../systems/PremiumSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
@@ -162,13 +162,13 @@ export function askBuyPremium(
   hooks.setModal(
     openConfirm(scene, lock, {
       title: PremiumSystem.isActive(save) ? t('shop.premium.renewPass') : t('shop.premium.buyPass'),
-      message: t(gateway.isTest ? 'shop.premium.confirmMessageTest' : 'shop.premium.confirmMessage', { name: PREMIUM.name, yen: PREMIUM.yen.toLocaleString('ja-JP') }),
+      message: t(gateway.isTest ? 'shop.premium.confirmMessageTest' : 'shop.premium.confirmMessage', { name: premiumName(), yen: PREMIUM.yen.toLocaleString('ja-JP') }),
       confirmLabel: t('shop.buy'),
       confirmVariant: 'gold',
       onConfirm: () => {
         void (async () => {
           hooks.setBusy(true);
-          const result = await PaymentSystem.getGateway().purchase({ productId: PREMIUM.productId, name: PREMIUM.name, yen: PREMIUM.yen });
+          const result = await PaymentSystem.getGateway().purchase({ productId: PREMIUM.productId, name: premiumName(), yen: PREMIUM.yen });
           hooks.setBusy(false);
           if (!scene.scene.isActive()) return;
           if (result.status === 'paid') {

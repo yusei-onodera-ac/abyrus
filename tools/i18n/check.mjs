@@ -152,7 +152,7 @@ function report() {
   console.log('Hard-coded Japanese string literals still in src/ (outside the translation tables):');
   for (const kind of ['chrome', 'data']) {
     const rows = [...byArea].filter(([k]) => k.startsWith(`${kind}\t`)).sort((a, b) => b[1].literals - a[1].literals);
-    console.log(`\n  ${kind === 'chrome' ? '(a) UI chrome: labels, buttons, dialogs, toasts, system messages (phase 1)' : '(b) game data text: names, descriptions, skills, lines, story ... (later phases, via tr())'}`);
+    console.log(`\n  ${kind === 'chrome' ? '(a) UI chrome: labels, buttons, dialogs, toasts, system messages (phase 1)' : '(b) game data text: names, descriptions, skills, lines, story ... (Japanese source rows, read through tr(); which tables already have English: docs/I18N.md section 8)'}`);
     for (const [k, v] of rows) console.log(`    ${String(v.literals).padStart(5)}  ${k.split('\t')[1]}  (${v.files} files)`);
     console.log(`    ${String(sum(perFile.filter((f) => f.kind === kind))).padStart(5)}  total`);
   }

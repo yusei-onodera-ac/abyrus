@@ -1,4 +1,5 @@
 import { EQUIP_SLOTS, type CombatStats, type EquipSlot, type EquipmentItem, type HeroGear, type Rarity } from '../types';
+import { localized, t } from '../i18n';
 
 /**
  * 装備の一覧と数値。装備を足す/調整するときはここだけ編集する。数字は仮のバランス。
@@ -12,12 +13,21 @@ export type EquipRarity = Exclude<Rarity, 6>;
 
 export type EquipStat = 'atkPct' | 'hpPct' | 'defFlat' | 'critRate' | 'spdFlat';
 
+// (getters: the label is looked up each time it is read, so it follows the language)
 export const EQUIP_STAT_LABEL: Record<EquipStat, string> = {
-  atkPct: '攻撃力',
+  get atkPct() {
+    return t('hero.stat.atk');
+  },
   hpPct: 'HP',
-  defFlat: '防御力',
-  critRate: '会心率',
-  spdFlat: '素早さ',
+  get defFlat() {
+    return t('hero.stat.def');
+  },
+  get critRate() {
+    return t('hero.stat.critRate');
+  },
+  get spdFlat() {
+    return t('hero.stat.spd');
+  },
 };
 
 /** What a piece looks like (ui/ItemIcons.ts draws one shape for each). Looks only, no effect on stats. */
@@ -82,7 +92,8 @@ const GROUPS: [EquipSlot, EquipRarity, Row[]][] = [
 ];
 
 export const EQUIP_DEFS: EquipDef[] = GROUPS.flatMap(([slot, rarity, rows]) =>
-  rows.map(([name, stat, glyph], n): EquipDef => ({ id: `${slot}-${rarity}-${n}`, name, slot, rarity, stat, glyph })),
+  // (the names are read through tr() each time: English in i18n/data/worldEn.ts)
+  rows.map(([name, stat, glyph], n): EquipDef => localized('equip', `${slot}-${rarity}-${n}`, { id: `${slot}-${rarity}-${n}`, name, slot, rarity, stat, glyph }, ['name'])),
 );
 
 const BY_ID = new Map(EQUIP_DEFS.map((d) => [d.id, d]));

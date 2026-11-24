@@ -1,4 +1,5 @@
 import type { Reward } from './rewards';
+import { localized } from '../i18n';
 
 /**
  * ミッション: three lists of things to do, each with a reward. Edit this file to change the
@@ -107,13 +108,16 @@ const TOTAL: MissionDef[] = [
   { id: 't_village150', title: '村の建物を合計150回、建てる・強くする', key: 'village_build', target: 150, reward: { type: 'phaseMaterials', amount: 5 } },
 ];
 
+/** The titles are read through tr() each time (English: i18n/data/missionsEn.ts), so they follow the language. */
+const withTitles = (list: MissionDef[]): MissionDef[] => list.map((m) => localized('mission', m.id, m, ['title']));
+
 export const MISSION_GROUPS: MissionGroupDef[] = [
   {
     id: 'daily',
     name: 'デイリーミッション',
     short: 'デイリー',
     resetNote: '毎日0時にリセット',
-    missions: DAILY,
+    missions: withTitles(DAILY),
     bonus: [
       { type: 'gems', amount: 50 },
       { type: 'item', item: 'exp_l', amount: 1 },
@@ -124,7 +128,7 @@ export const MISSION_GROUPS: MissionGroupDef[] = [
     name: 'ウィークリーミッション',
     short: 'ウィークリー',
     resetNote: '毎週月曜0時にリセット',
-    missions: WEEKLY,
+    missions: withTitles(WEEKLY),
     bonus: [
       { type: 'gems', amount: 200 },
       { type: 'item', item: 'exp_l', amount: 3 },
@@ -136,7 +140,7 @@ export const MISSION_GROUPS: MissionGroupDef[] = [
     name: '実績',
     short: '実績',
     resetNote: 'リセットされません（それぞれ1回だけ）',
-    missions: TOTAL,
+    missions: withTitles(TOTAL),
   },
 ];
 

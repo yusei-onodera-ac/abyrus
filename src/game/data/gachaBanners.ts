@@ -1,5 +1,7 @@
 import type { Rarity } from '../types';
 import { SCHEDULED_GACHAS } from './schedule';
+import { localized, t } from '../i18n';
+import { formatDateTime } from '../ui/format';
 
 export interface GachaBannerEntry {
   id: string;
@@ -51,7 +53,7 @@ export interface GachaBannerEntry {
  * Every gacha currently rolls the same pool at the same rates and cost (see
  * GachaSystem) - an entry changes what's shown, not what's rolled.
  */
-export const GACHA_BANNERS: GachaBannerEntry[] = [
+const GACHA_BANNER_ROWS: GachaBannerEntry[] = [
   {
     id: 'special',
     title: '特設ガチャ',
@@ -107,6 +109,10 @@ export const GACHA_BANNERS: GachaBannerEntry[] = [
   ...SCHEDULED_GACHAS,
 ];
 
+/** Title and description are read through tr() each time (English: i18n/data/shopEn.ts for the permanent four; the limited ones are
+ *  data/schedule.ts's, with the events). */
+export const GACHA_BANNERS: GachaBannerEntry[] = GACHA_BANNER_ROWS.map((row) => localized('gachaBanner', row.id, row, ['title', 'description']));
+
 /** Promo strip beside the フレンドガチャ button, under public/assets/gacha/.
  *  About 4.6:1 (e.g. 1290x280). */
 export const FRIEND_GACHA_IMAGE = 'friend_gacha.jpg';
@@ -126,6 +132,5 @@ export function getActiveGachaBanners(now = Date.now()): GachaBannerEntry[] {
 
 /** "11/7 11:59まで" - month/day unpadded, minutes padded. */
 export function formatGachaEnd(endsAt: string): string {
-  const d = new Date(endsAt);
-  return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}まで`;
+  return t('mission.event.until', { formatDateTime: formatDateTime(new Date(endsAt).getTime()) });
 }

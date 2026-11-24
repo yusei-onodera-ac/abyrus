@@ -11,6 +11,7 @@
  */
 
 import type { ItemId } from './items';
+import { localized } from '../i18n';
 
 /** Where the shop opens: the top bar's + buttons ask for the part of the shop
  *  that sells what they show. */
@@ -60,7 +61,7 @@ export interface ShopProduct {
   category?: 'stamina' | 'material';
 }
 
-export const PACKS: ShopProduct[] = [
+const PACK_ROWS: ShopProduct[] = [
   {
     id: 'pack-starter',
     name: '初心者パック',
@@ -126,7 +127,7 @@ export const PACKS: ShopProduct[] = [
   },
 ];
 
-export const GEM_PRODUCTS: ShopProduct[] = [
+const GEM_ROWS: ShopProduct[] = [
   { id: 'gems-50', name: '魔晶石', price: { currency: 'yen', amount: 160 }, goods: [{ type: 'gems', amount: 50 }] },
   { id: 'gems-160', name: '魔晶石', price: { currency: 'yen', amount: 480 }, goods: [{ type: 'gems', amount: 160 }], bonus: 10 },
   { id: 'gems-330', name: '魔晶石', price: { currency: 'yen', amount: 980 }, goods: [{ type: 'gems', amount: 330 }], bonus: 30 },
@@ -135,14 +136,14 @@ export const GEM_PRODUCTS: ShopProduct[] = [
   { id: 'gems-3800', name: '魔晶石', price: { currency: 'yen', amount: 9800 }, goods: [{ type: 'gems', amount: 3800 }], bonus: 600 },
 ];
 
-export const GOLD_PRODUCTS: ShopProduct[] = [
+const GOLD_ROWS: ShopProduct[] = [
   { id: 'gold-1000', name: 'ゴールド', price: { currency: 'gems', amount: 10 }, goods: [{ type: 'gold', amount: 1000 }] },
   { id: 'gold-6000', name: 'ゴールド', price: { currency: 'gems', amount: 50 }, goods: [{ type: 'gold', amount: 6000 }], bonus: 1000 },
   { id: 'gold-14000', name: 'ゴールド', price: { currency: 'gems', amount: 100 }, goods: [{ type: 'gold', amount: 14000 }], bonus: 4000 },
   { id: 'gold-80000', name: 'ゴールド', price: { currency: 'gems', amount: 500 }, goods: [{ type: 'gold', amount: 80000 }], bonus: 30000, badge: 'おすすめ' },
 ];
 
-export const ITEM_PRODUCTS: ShopProduct[] = [
+const ITEM_ROWS: ShopProduct[] = [
   {
     id: 'item-stamina-s',
     name: 'スタミナ回復薬（小）',
@@ -248,3 +249,10 @@ export const ITEM_PRODUCTS: ShopProduct[] = [
     category: 'material',
   },
 ];
+
+/** Name, description and badge are read through tr() each time (English: i18n/data/shopEn.ts). The operator's own products (systems/RemoteShopConfig.ts) are plain objects: their text is left as written. */
+const localizedProducts = (rows: ShopProduct[]): ShopProduct[] => rows.map((p) => localized('shop', p.id, p, ['name', 'description', 'badge']));
+export const PACKS: ShopProduct[] = localizedProducts(PACK_ROWS);
+export const GEM_PRODUCTS: ShopProduct[] = localizedProducts(GEM_ROWS);
+export const GOLD_PRODUCTS: ShopProduct[] = localizedProducts(GOLD_ROWS);
+export const ITEM_PRODUCTS: ShopProduct[] = localizedProducts(ITEM_ROWS);

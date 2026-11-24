@@ -130,7 +130,7 @@ export const hero: Part<'hero'> = {
   'hero.equipment.dismantleLocked': 'Locked',
   'hero.equipment.equipped': 'Equipped',
   'hero.equipment.dismantle': 'Dismantle',
-  'hero.equipment.upgradeMaterial': 'Gear Upgrade Material',
+  'hero.equipment.upgradeMaterial': 'Upgrade Material',
   'hero.equipment.dismantleLow': 'Dismantle All ★1–2',
   'hero.equipment.dismantleLowSub': '{count, plural, one {# item} other {# items}} → Material +{gain}',
   'hero.equipment.dismantleNone': 'Nothing to dismantle',

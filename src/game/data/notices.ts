@@ -1,6 +1,7 @@
 import { SCHEDULED_EVENTS, SCHEDULED_GACHAS } from './schedule';
 import { formatDate, formatDateTime } from '../ui/format';
 import { remoteNotices } from '../systems/RemoteNotices';
+import { localized } from '../i18n';
 
 export interface NoticeEntry {
   id: string;
@@ -23,7 +24,7 @@ export interface NoticeEntry {
  * an entry at the top. No code elsewhere needs to change. A notice shows a
  * red NEW tag until the player has opened it.
  */
-export const NOTICES: NoticeEntry[] = [
+const NOTICE_ROWS: NoticeEntry[] = [
   {
     id: 'new-gacha',
     category: 'イベント',
@@ -46,6 +47,9 @@ export const NOTICES: NoticeEntry[] = [
       'お知らせ・プレゼント・メールは、ホーム画面右上のボタンからいつでも確認できます。',
   },
 ];
+
+/** Title and text are read through tr() each time (English: i18n/data/missionsEn.ts). `category` stays the Japanese key the notice board maps to its label. */
+export const NOTICES: NoticeEntry[] = NOTICE_ROWS.map((row) => localized('notice', row.id, row, ['title', 'body']));
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long the notice of an event or a gacha stays on the board after it starts. */

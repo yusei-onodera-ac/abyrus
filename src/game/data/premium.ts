@@ -1,4 +1,5 @@
 import type { Reward } from './rewards';
+import { tr } from '../i18n';
 
 /**
  * プレミアムパス (月額). 値段・期間・特典はここだけで決まる。数字は仮のバランス。
@@ -21,6 +22,9 @@ export const PREMIUM = {
   /** How many hours of 放置報酬 can pile up while the pass is active (the base is in data/idle.ts). */
   idleCapHours: 24,
 };
+
+/** The pass's name as the player reads it (English: i18n/data/shopEn.ts). PREMIUM.name stays the Japanese the data holds. */
+export const premiumName = (): string => tr('premium', 'pass', 'name', PREMIUM.name);
 
 /** 加入特典の限定パック: worth about ¥300, handed over every time the pass is bought or renewed. */
 export const PREMIUM_JOIN_PACK: Reward[] = [

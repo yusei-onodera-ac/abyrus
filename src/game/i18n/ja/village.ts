@@ -261,4 +261,11 @@ export const village = {
   'village.goals.gainMaterial': '{material}　+{was} → +{value}/時',
   'village.goals.tierProgress': '{claimed}/{total} 達成{rest}',
   'village.goals.summary': '達成 {claimed} / {total}{rest}',
+  // villageGoals.ts: what a Castle level unlocks (unlocksAt)
+  'village.unlock.builders': '建築員　{before}人 → {builders}人',
+  'village.unlock.canBuild': '{name}が建てられるようになる',
+  'village.unlock.canPlace': '{name}が置けるようになる',
+  'village.unlock.mostBuildings': 'ほとんどの建物',
+  'village.unlock.maxLevel': '{names}の最大レベル　Lv{was} → Lv{now}',
+  'village.unlock.count': '{name}の数　{was} → {now}',
 } as const;

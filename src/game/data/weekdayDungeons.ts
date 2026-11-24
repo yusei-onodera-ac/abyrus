@@ -1,5 +1,6 @@
 import type { ItemId } from './items';
 import type { VillageMaterial } from './village';
+import { localized } from '../i18n';
 
 /**
  * 曜日ダンジョン: a dungeon that is open every day, and that pays a different 素材 on each day of
@@ -9,7 +10,7 @@ import type { VillageMaterial } from './village';
  */
 
 /** 日 first, the order `Date.getDay()` counts in. */
-export const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+export const WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土']; // i18n-ignore (the ja day names: what is drawn comes from quest.weekday.*)
 
 export interface WeekdayTier {
   id: string;
@@ -29,7 +30,7 @@ export interface WeekdayTier {
   note?: string;
 }
 
-export const WEEKDAY_TIERS: WeekdayTier[] = [
+const WEEKDAY_TIER_ROWS: WeekdayTier[] = [
   { id: 'easy', name: '初級', needStage: 0, stamina: 10, likeStage: 8 },
   { id: 'normal', name: '中級', needStage: 30, stamina: 14, likeStage: 40 },
   { id: 'hard', name: '上級', needStage: 60, stamina: 18, likeStage: 75 },
@@ -41,6 +42,9 @@ export const WEEKDAY_TIERS: WeekdayTier[] = [
   // and EXP grow with the difficulty.
   { id: 'expert', name: '超級', needStage: 100, stamina: 30, likeStage: 145, difficulty: 58, expLevel: 99, note: '★5・Lv100の編成で、やっと倒せる強さ' },
 ];
+
+/** Names and notes are read through tr() each time (English: i18n/data/worldEn.ts), so they follow the language. */
+export const WEEKDAY_TIERS: WeekdayTier[] = WEEKDAY_TIER_ROWS.map((row) => localized('weekdayTier', row.id, row, ['name', 'note']));
 
 export interface WeekdayDungeon {
   /** 0 = 日曜 ... 6 = 土曜 (the index in WEEKDAY_DUNGEONS). */
@@ -60,7 +64,7 @@ export interface WeekdayDungeon {
   materials: { material: VillageMaterial; amounts: number[] }[];
 }
 
-export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
+const WEEKDAY_DUNGEON_ROWS: WeekdayDungeon[] = [
   {
     day: 0,
     name: '安息の祭壇',
@@ -166,6 +170,9 @@ export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = [
     ],
   },
 ];
+
+/** (English by day number: i18n/data/worldEn.ts) */
+export const WEEKDAY_DUNGEONS: WeekdayDungeon[] = WEEKDAY_DUNGEON_ROWS.map((row) => localized('weekdayDungeon', String(row.day), row, ['name', 'theme']));
 
 export function getWeekdayDungeon(day: number): WeekdayDungeon {
   return WEEKDAY_DUNGEONS[((Math.floor(day) % 7) + 7) % 7];

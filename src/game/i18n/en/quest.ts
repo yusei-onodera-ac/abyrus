@@ -183,4 +183,6 @@ export const quest: Part<'quest'> = {
   'quest.stageName.extraFloor': '{name} (Special) Floor {stageInRegion}',
   'quest.stageName.weekday': '{dayName} {name} {name2}',
   'quest.stageName.raid': 'Raid! Beast Pack of {name}',
+  // regions.ts: an enemy is named by an adjective and an animal (written together in Japanese, with a space in English)
+  'quest.feral.name': '{prefix} {animal}',
 };

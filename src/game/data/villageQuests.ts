@@ -1,4 +1,5 @@
 import type { MaterialBundle } from './village';
+import { localized } from '../i18n';
 
 /**
  * 村の依頼: chores the village sets each day (they start over at local midnight). Doing one pays 素材 (木材・鉄・石),
@@ -20,7 +21,7 @@ export interface VillageQuestDef {
   reward: MaterialBundle;
 }
 
-export const VILLAGE_QUESTS: VillageQuestDef[] = [
+const VILLAGE_QUEST_ROWS: VillageQuestDef[] = [
   { id: 'q_build1', key: 'build', text: '建築か強化を1回する', target: 1, reward: { wood: 30, stone: 40 } },
   { id: 'q_build3', key: 'build', text: '建築か強化を3回する', target: 3, reward: { wood: 60, stone: 90, iron: 12 } },
   { id: 'q_claim', key: 'claim', text: '放置報酬を受け取る', target: 1, reward: { stone: 50, iron: 10 } },
@@ -28,6 +29,9 @@ export const VILLAGE_QUESTS: VillageQuestDef[] = [
   { id: 'q_raid', key: 'raid', text: '襲撃を1回、迎え撃つ', target: 1, reward: { wood: 60, stone: 100, iron: 35 } },
   { id: 'q_repair', key: 'repair', text: '壊れた建物を1つ直す', target: 1, reward: { wood: 30, stone: 30, iron: 8 } },
 ];
+
+/** The text is read through tr() each time (English: i18n/data/villageEn.ts), so it follows the language. */
+export const VILLAGE_QUESTS: VillageQuestDef[] = VILLAGE_QUEST_ROWS.map((row) => localized('villageQuest', row.id, row, ['text']));
 
 /** By region reached (迷いの森 ... 黄昏の都): what a chore pays is multiplied by this. */
 export const QUEST_REGION_MULTIPLIER = [1, 1.6, 2.6, 4, 6];

@@ -14,6 +14,8 @@
  * the land itself can be 拡張 (VILLAGE_EXPANSIONS below): up to six times, each paid for at once, adding ground at the far edges.
  */
 
+import { localized } from '../i18n';
+
 /**
  * The map a new village has (拡張 0 回): tiles across and down (drawn as a diamond of 2:1 tiles, see ui/VillageArt.ts). A building
  * covers `w` x `h` of them. This is also the size the plot's pictures (ui/VillageArt.ts) and the water tiles (data/villageWalk.ts)
@@ -26,12 +28,13 @@ export type BuildingKind = 'castle' | 'shop' | 'market' | 'house' | 'lumber' | '
 
 /** The tabs of the 建築 menu: 商い (what pays gold), 採集 (what gathers 素材), 防衛 (what keeps the 襲撃 out), 装飾 (looks only). */
 export type BuildTab = 'trade' | 'gather' | 'defend' | 'decor';
-export const BUILD_TABS: { id: BuildTab; name: string }[] = [
+const BUILD_TAB_ROWS: { id: BuildTab; name: string }[] = [
   { id: 'trade', name: '商い' },
   { id: 'gather', name: '採集' },
   { id: 'defend', name: '防衛' },
   { id: 'decor', name: '装飾' },
 ];
+export const BUILD_TABS = BUILD_TAB_ROWS.map((row) => localized('buildTab', row.id, row, ['name']));
 
 /**
  * 村の素材: only the village uses them, so only the village shows them (the resource bar and the bag do not).
@@ -41,11 +44,12 @@ export const BUILD_TABS: { id: BuildTab; name: string }[] = [
 export type VillageMaterial = 'wood' | 'iron' | 'stone';
 
 /** 木材 / 鉄 / 石 in the order the village lists them, with how each is named and coloured. */
-export const VILLAGE_MATERIALS: { id: VillageMaterial; name: string; color: string }[] = [
+const VILLAGE_MATERIAL_ROWS: { id: VillageMaterial; name: string; color: string }[] = [
   { id: 'wood', name: '木材', color: '#e0b070' },
   { id: 'iron', name: '鉄', color: '#b8c4d4' },
   { id: 'stone', name: '石', color: '#cfc8bc' },
 ];
+export const VILLAGE_MATERIALS = VILLAGE_MATERIAL_ROWS.map((row) => localized('villageMaterial', row.id, row, ['name']));
 
 /** An amount of some of the materials (the ones left out are 0). */
 export type MaterialBundle = Partial<Record<VillageMaterial, number>>;
@@ -178,7 +182,8 @@ export const WANDERER_SPAWN_HOURS = 3;
 export const WANDERER_MAX = 3;
 /** ...and stays this long before it leaves. */
 export const WANDERER_LIFE_HOURS = 12;
-export const WANDERERS: Record<WandererKind, { name: string; chance: number; goldHours: number; materials: Record<VillageMaterial, number>[] }> = {
+type WandererDef = { name: string; chance: number; goldHours: number; materials: Record<VillageMaterial, number>[] };
+const WANDERER_ROWS: Record<WandererKind, WandererDef> = {
   chest: {
     name: '宝箱',
     chance: 0.6,
@@ -203,6 +208,11 @@ export const WANDERERS: Record<WandererKind, { name: string; chance: number; gol
       { wood: 100, iron: 36, stone: 115 },
     ],
   },
+};
+
+export const WANDERERS: Record<WandererKind, WandererDef> = {
+  chest: localized('wanderer', 'chest', WANDERER_ROWS.chest, ['name']),
+  merchant: localized('wanderer', 'merchant', WANDERER_ROWS.merchant, ['name']),
 };
 
 // ---- Hurrying with 魔晶石.
@@ -261,7 +271,7 @@ export interface BuildingDef {
   art?: { scale?: number; dy?: number };
 }
 
-export const BUILDINGS: BuildingDef[] = [
+const BUILDING_ROWS: BuildingDef[] = [
   {
     kind: 'castle',
     name: '城',
@@ -503,6 +513,9 @@ export const BUILDINGS: BuildingDef[] = [
     levels: [{ costHours: 0.02, materials: { stone: 1 }, seconds: 0, needCastle: 1, value: 0 }],
   },
 ];
+
+/** The names and descriptions are read through tr() each time (English: i18n/data/villageEn.ts), so they follow the language. */
+export const BUILDINGS: BuildingDef[] = BUILDING_ROWS.map((row) => localized('building', row.kind, row, ['name', 'description']));
 
 /** How many buildings can be under construction or being strengthened at once, by 城 level (index 0 = 城 Lv1). */
 export const VILLAGE_BUILDERS = [2, 2, 2, 3, 3, 4];

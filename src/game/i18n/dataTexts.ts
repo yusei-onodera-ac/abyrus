@@ -26,3 +26,21 @@ export function trList(table: string, id: string, field: string, ja: readonly st
   const found = tr(table, id, field, '');
   return found === '' ? [...ja] : found.split('\n');
 }
+
+type StringKeys<T> = { [K in keyof T]-?: NonNullable<T[K]> extends string ? K : never }[keyof T] & string;
+
+/** A copy of a data row whose text fields are read through tr() each time they are used, so they follow the language and no
+ *  call site has to change (the way data/items.ts does by hand):
+ *
+ *    const BUILDINGS = ROWS.map((row) => localized('building', row.kind, row, ['name', 'description']));
+ *
+ *  `ja` is whatever the row holds (always Japanese); the English is in data/*.ts under `{ table: { id: { field: '...' } } }`. */
+export function localized<T extends object>(table: string, id: string, row: T, fields: readonly StringKeys<T>[]): T {
+  const out = { ...row };
+  for (const field of fields) {
+    const ja = row[field] as unknown;
+    if (typeof ja !== 'string') continue; // (an optional field the row does not have)
+    Object.defineProperty(out, field, { enumerable: true, configurable: true, get: () => tr(table, id, field, ja) });
+  }
+  return out;
+}
