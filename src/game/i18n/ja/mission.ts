@@ -76,6 +76,7 @@ export const mission = {
   'mission.group.dailyShort': 'デイリー',
   'mission.group.weeklyShort': 'ウィークリー',
   'mission.group.totalShort': '実績',
+  'mission.group.totalHome': '実績',
   'mission.group.dailyName': 'デイリーミッション',
   'mission.group.weeklyName': 'ウィークリーミッション',
   'mission.group.totalName': '実績',

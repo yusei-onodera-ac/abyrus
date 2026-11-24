@@ -78,6 +78,8 @@ export const mission: Part<'mission'> = {
   'mission.group.dailyShort': 'Daily',
   'mission.group.weeklyShort': 'Weekly',
   'mission.group.totalShort': 'Achievements',
+  // (Home's mission box has room for about 8 letters)
+  'mission.group.totalHome': 'Records',
   'mission.group.dailyName': 'Daily Missions',
   'mission.group.weeklyName': 'Weekly Missions',
   'mission.group.totalName': 'Achievements',

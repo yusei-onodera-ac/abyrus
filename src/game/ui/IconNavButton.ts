@@ -67,15 +67,17 @@ export class IconNavButton extends Phaser.GameObjects.Container {
     } else if (!art.labelMatches) {
       // The Japanese art shown in another language: a plate over its lettering, with the name in the language, until that
       // language's own art is supplied (see IconAssets.ts).
-      const plateW = size * 0.58;
-      const plateH = size * 0.21;
+      // (the lettering in the art sits a little above the middle of the badge)
+      const plateW = size * 0.6;
+      const plateH = size * 0.25;
+      const plateY = -size * 0.023;
       const plate = scene.add.graphics();
-      plate.fillStyle(0x1b1838, 0.97);
-      plate.fillRoundedRect(-plateW / 2, -size * 0.133 - plateH / 2, plateW, plateH, 16);
+      plate.fillStyle(0x1b1838, 1);
+      plate.fillRoundedRect(-plateW / 2, plateY - plateH / 2, plateW, plateH, 16);
       plate.lineStyle(2, 0xc9a052, 0.55);
-      plate.strokeRoundedRect(-plateW / 2, -size * 0.133 - plateH / 2, plateW, plateH, 16);
+      plate.strokeRoundedRect(-plateW / 2, plateY - plateH / 2, plateW, plateH, 16);
       const text = scene.add
-        .text(0, -size * 0.133, label, { fontFamily: 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif', fontSize: '40px', fontStyle: 'bold', color: '#f6dca0', stroke: '#2a1a08', strokeThickness: 5 })
+        .text(0, plateY, label, { fontFamily: 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif', fontSize: '40px', fontStyle: 'bold', color: '#f6dca0', stroke: '#2a1a08', strokeThickness: 5 })
         .setOrigin(0.5);
       if (text.width > plateW - 20) text.setScale((plateW - 20) / text.width);
       this.add([plate, text]);

@@ -408,7 +408,7 @@ export class HomeScene extends Phaser.Scene {
     summary.forEach((g, i) => {
       const cx = columns[i];
       const ready = g.claimable > 0;
-      box.add(caption(this, cx, 43, missionGroupShort(g.group), { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(caption(this, cx, 43, g.group === 'total' ? tl('mission.group.totalHome') : missionGroupShort(g.group), { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       box.add(body(this, cx, 66, `${g.done}/${g.total}`, { fontSize: '25px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     });
 
