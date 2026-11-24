@@ -45,7 +45,7 @@ export const villageEn: DataTexts = {
     flowers: { name: 'Flower Bed', description: 'Flowers in every color. Looks only.' },
     fountain: { name: 'Fountain', description: 'A fountain to decorate the village square. Looks only.' },
     statue: { name: 'Statue', description: "A statue that gives shape to the village's pride. Looks only." },
-    road: { name: 'Road', description: 'Roads that link your buildings. Drag a finger to lay them. As the Castle grows, dirt roads turn into cobblestone, then marble.' },
+    road: { name: 'Road', description: 'Roads linking your buildings. Drag to lay them. They improve as the Castle grows.' },
   },
   wanderer: {
     chest: { name: 'Treasure Chest' },

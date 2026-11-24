@@ -81,15 +81,15 @@ export const worldEn: DataTexts = {
     hard: { name: 'Advanced' },
     expert: { name: 'Master', note: 'Barely beatable with a ★5, Lv.100 party' },
   },
-  // by day: 0 = Sunday ... 6 = Saturday
+  // by day: 0 = Sunday ... 6 = Saturday (the theme is also a row of the weekly list, so it stays short)
   weekdayDungeon: {
-    '0': { name: 'Altar of Repose', theme: 'On Sundays, you get a little of every material' },
-    '1': { name: 'Cave of Experience', theme: 'On Mondays, you get plenty of EXP Material' },
-    '2': { name: 'Forge Tunnels', theme: 'On Tuesdays, you get plenty of Gear Upgrade Material' },
-    '3': { name: 'Skill Library', theme: 'On Wednesdays, you get plenty of Skill Essence' },
-    '4': { name: 'Sanctum of Ranks', theme: 'On Thursdays, you get Phase Material' },
-    '5': { name: 'Golden Treasury', theme: 'On Fridays, Gold is multiplied by 8' },
-    '6': { name: 'Training Arena', theme: 'On Saturdays, you get EXP Material and Gear Upgrade Material' },
+    '0': { name: 'Altar of Repose', theme: 'A little of every material' },
+    '1': { name: 'Cave of Experience', theme: 'Lots of EXP Material' },
+    '2': { name: 'Forge Tunnels', theme: 'Lots of Gear Upgrade Material' },
+    '3': { name: 'Skill Library', theme: 'Lots of Skill Essence' },
+    '4': { name: 'Sanctum of Ranks', theme: 'Phase Material' },
+    '5': { name: 'Golden Treasury', theme: 'Gold ×8' },
+    '6': { name: 'Training Arena', theme: 'EXP and Gear Upgrade Material' },
   },
   expedition: {
     'forest-patrol': { name: 'Forest Patrol', description: 'Make a round of the Lost Forest and see how things stand.' },
