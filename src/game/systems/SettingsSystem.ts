@@ -1,3 +1,4 @@
+import { stripForbidden } from './ChatSystem';
 import type { SaveData } from './SaveSystem';
 import pkg from '../../../package.json';
 
@@ -60,10 +61,10 @@ function clampVolume(value: unknown): number {
   return Math.min(VOLUME_STEPS, Math.max(0, n));
 }
 
-/** A name that fits the plank: control characters dropped, runs of spaces
- *  collapsed, trimmed, cut to PLAYER_NAME_MAX. '' if nothing usable is left. */
+/** A name that fits the plank: emoji and control characters dropped (as in chat: ChatSystem.stripForbidden), runs of
+ *  spaces collapsed, trimmed, cut to PLAYER_NAME_MAX. '' if nothing usable is left. */
 export function cleanPlayerName(raw: string): string {
-  const text = raw.replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  const text = stripForbidden(raw).replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
   return Array.from(text).slice(0, PLAYER_NAME_MAX).join('').trim();
 }
 

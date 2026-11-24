@@ -1,4 +1,4 @@
-// ABYRUS の Firestore ルール: 無限モードのランキング + 同盟（アライアンス） + 管理画面 (abyrus-admin) の管理者・ショップ・プレミアム。
+// ABYRUS の Firestore ルール: 無限モードのランキング + 同盟（アライアンス） + データ引き継ぎ + 管理画面 (abyrus-admin) の管理者・ショップ・プレミアム。
 // Firebase プロジェクト abyrus-game は、ゲームと管理画面で共用。ルールは1プロジェクトに1つだけ公開できるので、両方の分を、このファイルに入れてある。
 // 公開する前に、必ず admins/{自分の認証uid} を、Firebase コンソールで作っておくこと (作る前に公開すると、管理画面に入れなくなる)。
 // 同盟の設計と、各ルールが何を守るかは、docs/ALLIANCE_SERVER.md に書いてある。
@@ -386,6 +386,43 @@ service cloud.firestore {
         && request.resource.data.authUid == uid()
         && getAfter(userPath(uid())).data.playerId == playerId;
       allow update, delete: if false;
+    }
+
+    // ====================================================================== データ引き継ぎ
+
+    // transfers/{引き継ぎコード}: パスワードで暗号化した、セーブ1つ。サーバーにあるのは暗号文だけで、パスワードは端末の外に出ない
+    // (暗号化は、端末の中: src/game/systems/TransferCrypto.ts)。ドキュメントID = 引き継ぎコード (紛らわしい文字を除いた32文字から、
+    // 乱数で20文字: 100ビット)。コードを知っている人が、1件だけ読める (一覧は、できない)。
+    // 作れるのは、サインインした人 (匿名でよい) が、自分の uid を ownerUid にして、決まった形で作るときだけ。暗号文は 600,000 バイトまで
+    // (base64 で 800,000 文字まで。Firestore のドキュメントの上限 1MiB より、ずっと小さい)。書きかえ・消すのは、持ち主だけ。
+    // 回数・長さ・上限は、TransferCrypto.ts と同じ数字。変えるときは、両方を。
+    function validTransfer(d) {
+      return d.keys().hasOnly(['version', 'kdf', 'iterations', 'salt', 'iv', 'compression', 'ciphertext', 'size', 'ownerUid', 'savedAt'])
+        && d.keys().hasAll(['version', 'kdf', 'iterations', 'salt', 'iv', 'compression', 'ciphertext', 'size', 'ownerUid', 'savedAt'])
+        && d.version == 1
+        && d.kdf == 'PBKDF2-SHA256'
+        && d.iterations is int && d.iterations >= 100000 && d.iterations <= 2000000
+        && d.salt is string && d.salt.size() == 24
+        && d.iv is string && d.iv.size() == 16
+        && d.compression in ['gzip', 'none']
+        && d.size is int && d.size > 16 && d.size <= 600000
+        && d.ciphertext is string && d.ciphertext.size() == math.ceil(d.size / 3.0) * 4
+        && d.ownerUid is string
+        && d.savedAt == request.time;
+    }
+
+    match /transfers/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('[A-HJ-NP-Z2-9]{20}')
+        && request.resource.data.ownerUid == uid()
+        && validTransfer(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerUid == uid()
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && validTransfer(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerUid == uid();
     }
 
     // ====================================================================== 同盟

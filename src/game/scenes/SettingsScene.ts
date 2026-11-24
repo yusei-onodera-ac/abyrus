@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { LEGAL_DOCUMENTS, type LegalDocument } from '../data/legal';
+import { TRANSFER_TEXT } from '../data/transferText';
 import { SaveSystem } from '../systems/SaveSystem';
 import {
   APP_VERSION,
@@ -20,10 +21,12 @@ import {
 } from '../systems/SettingsSystem';
 import { formatPlayerId } from '../systems/SocialSystem';
 import { SoundSystem } from '../systems/SoundSystem';
+import { TransferSystem, formatWhen } from '../systems/TransferSystem';
 import { Button } from '../ui/Button';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
 import { openConfirm, openMessageForm, openTextPrompt } from '../ui/Dialogs';
 import { openDocument } from '../ui/DocumentViewer';
+import { openIssueFlow, openIssued, openRestoreFlow } from '../ui/TransferDialogs';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { copyText } from '../ui/share';
 import { body, caption, CHROME } from '../ui/theme';
@@ -71,7 +74,7 @@ export class SettingsScene extends InboxScene {
         value: settings.email ? maskEmail(settings.email) : '未登録',
         muted: !settings.email,
         chip: settings.email ? '未確認' : undefined,
-        note: 'データの引き継ぎやお知らせに使います。確認メールは、通信機能の追加後に届きます。',
+        note: 'お知らせに使います。確認メールは、通信機能の追加後に届きます。',
         buttons: settings.email
           ? [
               { label: '変更', variant: 'wood', onTap: () => this.askEmail(settings.email) },
@@ -97,6 +100,9 @@ export class SettingsScene extends InboxScene {
         guard,
       }),
     );
+
+    cards.push(this.sectionCard(TRANSFER_TEXT.settings.section));
+    cards.push(...this.transferCards(guard));
 
     cards.push(this.sectionCard('ホーム画面'));
     cards.push(
@@ -197,6 +203,42 @@ export class SettingsScene extends InboxScene {
     });
     container.addAt(buildCardPanel(this, CARD_WIDTH, height), 0);
     return { container, height };
+  }
+
+  /** データ引き継ぎ: 引き継ぎコードの発行 (発行ずみなら、その日時とコードを見る入口)、と、データを引き継ぐ。 */
+  private transferCards(guard: () => boolean): InboxCard[] {
+    const T = TRANSFER_TEXT.settings;
+    const issued = TransferSystem.lastIssued();
+    const cards: InboxCard[] = [
+      this.valueCard({
+        label: T.issueLabel,
+        value: '',
+        note: T.issueNote,
+        buttons: [{ label: issued ? T.reissueButton : T.issueButton, variant: 'gold', onTap: () => this.issueTransfer() }],
+        guard,
+      }),
+    ];
+    if (issued) {
+      cards.push(
+        this.valueCard({
+          label: T.issuedLabel,
+          value: T.issued(formatWhen(issued.issuedAt)),
+          note: T.issuedNote,
+          buttons: [{ label: T.showCodeButton, variant: 'wood', onTap: () => openIssued(this, this.scroll, issued.code, issued.issuedAt, null) }],
+          guard,
+        }),
+      );
+    }
+    cards.push(
+      this.valueCard({
+        label: T.restoreLabel,
+        value: '',
+        note: T.restoreNote,
+        buttons: [{ label: T.restoreButton, variant: 'wood', onTap: () => this.restoreTransfer() }],
+        guard,
+      }),
+    );
+    return cards;
   }
 
   /** プレイヤーID: shown big, copyable, never editable. */
@@ -350,6 +392,24 @@ export class SettingsScene extends InboxScene {
     if (this.scene.isActive()) showToast(this, ok ? 'プレイヤーIDをコピーしました' : 'コピーできませんでした', ok ? '#f0ecff' : '#ff8a8a');
   }
 
+  private issueTransfer(): void {
+    this.modal?.close();
+    openIssueFlow(this, this.scroll, this.save, () => this.queueRender());
+  }
+
+  /** The saved game from another device replaces this one (asked first, since this one has been played). Home reopens with it. */
+  private restoreTransfer(): void {
+    this.modal?.close();
+    openRestoreFlow(this, this.scroll, {
+      local: this.save,
+      finishTutorial: false,
+      onDone: (restored) => {
+        this.game.registry.set('save', restored);
+        this.scene.start('Home');
+      },
+    });
+  }
+
   private askName(): void {
     this.modal?.close();
     this.modal = openTextPrompt(this, this.scroll, {
@@ -380,7 +440,7 @@ export class SettingsScene extends InboxScene {
       maxLength: 100,
       placeholder: 'example@mail.com',
       inputMode: 'email',
-      hint: '入力したアドレスにお知らせや引き継ぎ情報を送ります。',
+      hint: '入力したアドレスにお知らせを送ります。',
       onSubmit: (text) => {
         const email = text.trim();
         if (!isValidEmail(email)) {

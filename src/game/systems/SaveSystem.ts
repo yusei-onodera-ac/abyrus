@@ -249,8 +249,10 @@ export interface SaveData {
    *  owned: SaveSystem.getHomeHero repairs it when it is empty or the hero is gone. */
   homeHeroId: string;
   /** The first-launch story and チュートリアル: `opening` once the opening story has been
-   *  seen, `step` the next tutorial step (data/tutorial.ts), `done` when finished or skipped. */
-  tutorial: { opening: boolean; step: number; done: boolean; village: { step: number; done: boolean } };
+   *  seen, `step` the next tutorial step (data/tutorial.ts), `done` when finished or skipped.
+   *  `rev` says which list `step` counts in (TUTORIAL_REV): a save from before the first step became
+   *  the 名前 step has none, and is moved on by one when it is loaded (see SaveSystem.restoreFrom). */
+  tutorial: { opening: boolean; step: number; done: boolean; village: { step: number; done: boolean }; rev: number };
   /** EXP towards the next プレイヤーレベル (see data/playerLevel.ts). */
   playerExp: number;
   /** [current, max]. Starting a stage spends it and it recovers over time -
@@ -349,6 +351,12 @@ export interface HeroPullOutcome {
 }
 
 const STORAGE_KEY = 'abyrus_save_v1';
+
+/** The shape of a save this build writes (`SaveData.version`). A save with a higher number comes from a newer build. */
+export const SAVE_VERSION = 1;
+
+/** Which tutorial list `tutorial.step` counts in: 1 = the list that starts with the 名前 step (data/tutorial.ts). */
+export const TUTORIAL_REV = 1;
 
 export { expToNextLevel };
 
@@ -649,7 +657,7 @@ export const SaveSystem = {
       createHeroInstance('lumi', 'starter-3'),
     ];
     return {
-      version: 1,
+      version: SAVE_VERSION,
       gold: BigNumber.from(500).toJSON(),
       gems: 1500,
       skillEssence: 300,
@@ -661,7 +669,7 @@ export const SaveSystem = {
       playerName: 'プレイヤー',
       playerLevel: 1,
       playerExp: 0,
-      tutorial: { opening: false, step: 0, done: false, village: { step: 0, done: false } },
+      tutorial: { opening: false, step: 0, done: false, village: { step: 0, done: false }, rev: TUTORIAL_REV },
       homeHeroId: '',
       gachaPity: {},
       missions: emptyMissions(),
@@ -704,67 +712,86 @@ export const SaveSystem = {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return this.createDefault();
-      const parsed = JSON.parse(raw) as Partial<SaveData> & { party?: PartyFormation };
-      if (!parsed.version) return this.createDefault();
-      // Spread over a fresh default so a save written before a field (like
-      // playerName) existed still gets a sane value instead of undefined.
-      const merged = { ...this.createDefault(), ...parsed } as SaveData & { party?: PartyFormation; unread?: unknown };
-      merged.decks = restoreDecks(parsed, merged.decks);
-      merged.social = restoreSocial(parsed.social, merged.social);
-      // (before the stamina maximum below, which a 同盟 adds to)
-      merged.alliance = restoreAlliance(parsed.alliance);
-      merged.chat = Array.isArray(parsed.chat?.messages) ? { messages: parsed.chat.messages } : merged.chat;
-      merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
-      merged.settings = SettingsSystem.restore(parsed.settings);
-      merged.reports = SettingsSystem.restoreReports(parsed.reports);
-      if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
-      merged.playerLevel = Number.isInteger(parsed.playerLevel) ? Math.max(1, Math.min(MAX_PLAYER_LEVEL, parsed.playerLevel!)) : 1;
-      // A save from before the tutorial existed belongs to someone already playing: nothing to teach.
-      const t = parsed.tutorial;
-      // The 村のチュートリアル (data/tutorial.ts) is its own track: a village that has been built up already needs none.
-      const villageTaught = (parsed.village?.buildings?.length ?? 0) > 2;
-      const v = t?.village;
-      const village = v && Number.isInteger(v.step) && typeof v.done === 'boolean' ? { step: Math.max(0, v.step), done: v.done } : { step: 0, done: villageTaught };
-      merged.tutorial =
-        t && typeof t.opening === 'boolean' && Number.isInteger(t.step) && typeof t.done === 'boolean'
-          ? { opening: t.opening, step: Math.max(0, t.step), done: t.done, village }
-          : { opening: true, step: 0, done: true, village };
-      merged.missions = loadMissions(parsed.missions);
-      merged.gachaPity = {};
-      for (const [id, n] of Object.entries(parsed.gachaPity ?? {})) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) merged.gachaPity[id] = Math.floor(n);
-      merged.homeHeroId = typeof parsed.homeHeroId === 'string' ? parsed.homeHeroId : '';
-      merged.playerExp = typeof parsed.playerExp === 'number' && parsed.playerExp >= 0 ? Math.floor(parsed.playerExp) : 0;
-      // The stamina maximum follows the level (a save from before levels still holds 50).
-      // (A 同盟's bonus is on top of that: it goes with the alliance, so the maximum is the level's plus it, exactly.)
-      const staminaMax = staminaMaxFor(merged.playerLevel) + allianceStaminaBonus(merged);
-      merged.stamina = [Math.min(merged.stamina[0], Math.max(merged.stamina[1], staminaMax)), Math.max(merged.stamina[1], staminaMax)];
-      merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
-      // A hero saved before phase / skills existed lacks those fields.
-      merged.heroes = merged.heroes.map((hero) => ({
-        ...hero,
-        phase: hero.phase ?? 1,
-        skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1),
-        // A save from before the level cap may hold a level above it.
-        level: Math.min(hero.level, MAX_LEVEL),
-        exp: hero.level >= MAX_LEVEL ? 0 : hero.exp,
-      }));
-      merged.decks = merged.decks.map((deck) => dropRepeatedCharacters(deck, merged.heroes));
-      restoreInventory(merged, parsed);
-      delete merged.party;
-      // Replaced by values derived from the real inbox (InboxSystem.getUnread).
-      delete merged.unread;
-      return merged;
+      return this.restoreFrom(JSON.parse(raw));
     } catch {
       return this.createDefault();
     }
   },
 
+  /** Turns what a stored save holds (already JSON-parsed) into a well-formed SaveData: every field is checked, filled in or
+   *  repaired, and an older save is brought up to date. What `load` does with the browser's copy, and what a save received
+   *  by データ引き継ぎ goes through too (systems/TransferSystem.ts). Anything that is not a save at all gives a new one;
+   *  it may also throw on a save that is broken beyond repair (`load` catches that). */
+  restoreFrom(source: unknown): SaveData {
+    const parsed = source as Partial<SaveData> & { party?: PartyFormation };
+    if (!parsed || typeof parsed !== 'object' || !parsed.version) return this.createDefault();
+    // Spread over a fresh default so a save written before a field (like
+    // playerName) existed still gets a sane value instead of undefined.
+    const merged = { ...this.createDefault(), ...parsed } as SaveData & { party?: PartyFormation; unread?: unknown };
+    merged.decks = restoreDecks(parsed, merged.decks);
+    merged.social = restoreSocial(parsed.social, merged.social);
+    // (before the stamina maximum below, which a 同盟 adds to)
+    merged.alliance = restoreAlliance(parsed.alliance);
+    merged.chat = Array.isArray(parsed.chat?.messages) ? { messages: parsed.chat.messages } : merged.chat;
+    merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
+    merged.settings = SettingsSystem.restore(parsed.settings);
+    merged.reports = SettingsSystem.restoreReports(parsed.reports);
+    if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();
+    merged.playerLevel = Number.isInteger(parsed.playerLevel) ? Math.max(1, Math.min(MAX_PLAYER_LEVEL, parsed.playerLevel!)) : 1;
+    // A save from before the tutorial existed belongs to someone already playing: nothing to teach.
+    const t = parsed.tutorial;
+    // The 村のチュートリアル (data/tutorial.ts) is its own track: a village that has been built up already needs none.
+    const villageTaught = (parsed.village?.buildings?.length ?? 0) > 2;
+    const v = t?.village;
+    const village = v && Number.isInteger(v.step) && typeof v.done === 'boolean' ? { step: Math.max(0, v.step), done: v.done } : { step: 0, done: villageTaught };
+    merged.tutorial =
+      t && typeof t.opening === 'boolean' && Number.isInteger(t.step) && typeof t.done === 'boolean'
+        ? { opening: t.opening, step: Math.max(0, t.step), done: t.done, village, rev: TUTORIAL_REV }
+        : { opening: true, step: 0, done: true, village, rev: TUTORIAL_REV };
+    // The tutorial's list gained a first step (the player's name). A save from before that counted its steps without it, so a
+    // tutorial that was under way moves on by one (it stays on the same step), and one that had not started begins just after
+    // the name step: only a brand-new save is asked for a name.
+    if (t && t.rev !== TUTORIAL_REV && !merged.tutorial.done) merged.tutorial.step += 1;
+    merged.missions = loadMissions(parsed.missions);
+    merged.gachaPity = {};
+    for (const [id, n] of Object.entries(parsed.gachaPity ?? {})) if (typeof n === 'number' && Number.isFinite(n) && n >= 0) merged.gachaPity[id] = Math.floor(n);
+    merged.homeHeroId = typeof parsed.homeHeroId === 'string' ? parsed.homeHeroId : '';
+    merged.playerExp = typeof parsed.playerExp === 'number' && parsed.playerExp >= 0 ? Math.floor(parsed.playerExp) : 0;
+    // The stamina maximum follows the level (a save from before levels still holds 50).
+    // (A 同盟's bonus is on top of that: it goes with the alliance, so the maximum is the level's plus it, exactly.)
+    const staminaMax = staminaMaxFor(merged.playerLevel) + allianceStaminaBonus(merged);
+    merged.stamina = [Math.min(merged.stamina[0], Math.max(merged.stamina[1], staminaMax)), Math.max(merged.stamina[1], staminaMax)];
+    merged.activeDeck = Number.isInteger(parsed.activeDeck) && parsed.activeDeck! >= 0 && parsed.activeDeck! < merged.decks.length ? parsed.activeDeck! : 0;
+    // A hero saved before phase / skills existed lacks those fields.
+    merged.heroes = merged.heroes.map((hero) => ({
+      ...hero,
+      phase: hero.phase ?? 1,
+      skillLevels: hero.skillLevels ?? Array(MAX_SKILL_SLOTS).fill(1),
+      // A save from before the level cap may hold a level above it.
+      level: Math.min(hero.level, MAX_LEVEL),
+      exp: hero.level >= MAX_LEVEL ? 0 : hero.exp,
+    }));
+    merged.decks = merged.decks.map((deck) => dropRepeatedCharacters(deck, merged.heroes));
+    restoreInventory(merged, parsed);
+    delete merged.party;
+    // Replaced by values derived from the real inbox (InboxSystem.getUnread).
+    delete merged.unread;
+    return merged;
+  },
+
   save(data: SaveData): void {
     data.updatedAt = Date.now();
+    this.persist(data);
+  },
+
+  /** Writes `data` to the browser's storage as it is. False when the browser would not keep it (quota, private mode) -
+   *  `save` ignores that (progress just stays in-memory); a caller that must know (replacing a save) checks it. */
+  persist(data: SaveData): boolean {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      return true;
     } catch {
-      // Storage can fail (quota, private mode) - progress just stays in-memory.
+      return false;
     }
   },
 
