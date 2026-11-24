@@ -6,7 +6,7 @@ import { phaseFusionCopies, phaseMaterialCost } from '../data/phaseCost';
 import { EQUIP_SLOTS, MAX_LEVEL, MAX_PHASE, emptyGear, type EquipmentItem, type HeroData, type HeroGear, type Row } from '../types';
 import { getEquipDef } from '../data/equipment';
 import { EXPEDITION_SLOTS, getExpedition } from '../data/expeditions';
-import { EXTRA_BUILDER_GEMS, RAID_INTERVAL_HOURS, VILLAGE_COLS, VILLAGE_MATERIALS, VILLAGE_ROWS, VILLAGE_START, VILLAGE_START_MATERIALS, WANDERERS, getBuilding, isBuildingKind, type BuildingKind, type MaterialBundle, type VillageMaterial, type WandererKind } from '../data/village';
+import { EXTRA_BUILDER_GEMS, RAID_INTERVAL_HOURS, VILLAGE_MATERIALS, VILLAGE_START, VILLAGE_START_MATERIALS, WANDERERS, clampExpansions, getBuilding, isBuildingKind, villageSizeAt, type BuildingKind, type MaterialBundle, type VillageMaterial, type VillageSize, type WandererKind } from '../data/village';
 import { isItemId, type ItemId } from '../data/items';
 import { getSupplySlot } from '../data/supply';
 import type { InfiniteRunState } from './InfiniteModeSystem';
@@ -209,6 +209,9 @@ export interface VillageState {
   materials: Record<VillageMaterial, number>;
   /** Builders bought with 魔晶石, on top of what the 城 gives. */
   extraBuilders: number;
+  /** How many times the land has been 拡張 (data/village.ts VILLAGE_EXPANSIONS): 0 = the map every village started with. A save
+   *  from before 拡張 existed has none, which loads as 0. */
+  expansions: number;
   quests: VillageQuestState;
   wanderers: { lastSpawnAt: number; items: Wanderer[] };
   raid: VillageRaid;
@@ -449,6 +452,7 @@ function defaultVillage(now = Date.now()): VillageState {
     nextId: VILLAGE_START.length + 1,
     materials: { ...VILLAGE_START_MATERIALS },
     extraBuilders: 0,
+    expansions: 0,
     quests: { day: '', counts: {}, claimed: [] },
     wanderers: { lastSpawnAt: now, items: [] },
     raid: { nextAt: now + RAID_INTERVAL_HOURS * 3600 * 1000, pending: null, report: null, won: 0 },
@@ -460,8 +464,8 @@ function finiteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-/** The saved 行商人 / 宝箱: the ones that are malformed are dropped, positions are pulled onto the map. */
-function restoreWanderers(raw: Partial<VillageState['wanderers']> | undefined, now: number): VillageState['wanderers'] {
+/** The saved 行商人 / 宝箱: the ones that are malformed are dropped, positions are pulled onto the map (of size `size`). */
+function restoreWanderers(raw: Partial<VillageState['wanderers']> | undefined, now: number, size: VillageSize): VillageState['wanderers'] {
   const items: Wanderer[] = [];
   const seen = new Set<string>();
   for (const w of Array.isArray(raw?.items) ? (raw.items as Partial<Wanderer>[]) : []) {
@@ -476,8 +480,8 @@ function restoreWanderers(raw: Partial<VillageState['wanderers']> | undefined, n
     items.push({
       id: w.id,
       kind: w.kind,
-      x: Math.max(0, Math.min(VILLAGE_COLS - 1, Math.floor(w.x))),
-      y: Math.max(0, Math.min(VILLAGE_ROWS - 1, Math.floor(w.y))),
+      x: Math.max(0, Math.min(size.cols - 1, Math.floor(w.x))),
+      y: Math.max(0, Math.min(size.rows - 1, Math.floor(w.y))),
       expiresAt: w.expiresAt,
       materials,
       goldHours: finiteNumber(w.goldHours) ? Math.max(0, w.goldHours) : 0,
@@ -545,6 +549,9 @@ function restoreMaterials(raw: Partial<Record<VillageMaterial, number>> | undefi
  *  are left as they are (a layout can only get that way by editing the map's size); moving one sorts it out. */
 function restoreVillage(raw: Partial<VillageState> | undefined): VillageState {
   if (!raw || !Array.isArray(raw.buildings)) return defaultVillage();
+  // The map's size comes first: positions are pulled back onto the map as it is (a save from before 拡張 has none: the old size).
+  const expansions = finiteNumber(raw.expansions) ? clampExpansions(raw.expansions) : 0;
+  const size = villageSizeAt(expansions);
   const seen = new Set<string>();
   const buildings: PlacedBuilding[] = [];
   for (const item of raw.buildings as Partial<PlacedBuilding>[]) {
@@ -567,16 +574,16 @@ function restoreVillage(raw: Partial<VillageState> | undefined): VillageState {
             startedAt: m.startedAt,
             demolish: Math.max(0, Math.floor(m.demolish)),
             rebuild: Math.max(0, Math.floor(m.rebuild)),
-            toX: Math.max(0, Math.min(VILLAGE_COLS - def.w, Math.floor(m.toX))),
-            toY: Math.max(0, Math.min(VILLAGE_ROWS - def.h, Math.floor(m.toY))),
+            toX: Math.max(0, Math.min(size.cols - def.w, Math.floor(m.toX))),
+            toY: Math.max(0, Math.min(size.rows - def.h, Math.floor(m.toY))),
           }
         : undefined;
     seen.add(item.id);
     buildings.push({
       id: item.id,
       kind: item.kind,
-      x: Math.max(0, Math.min(VILLAGE_COLS - def.w, Math.floor(item.x as number))),
-      y: Math.max(0, Math.min(VILLAGE_ROWS - def.h, Math.floor(item.y as number))),
+      x: Math.max(0, Math.min(size.cols - def.w, Math.floor(item.x as number))),
+      y: Math.max(0, Math.min(size.rows - def.h, Math.floor(item.y as number))),
       level,
       ...(work ? { upgrade: work } : {}),
       ...(move ? { move } : {}),
@@ -593,8 +600,9 @@ function restoreVillage(raw: Partial<VillageState> | undefined): VillageState {
     nextId: Math.max(nextId, highest + 1, 1),
     materials: restoreMaterials(raw.materials),
     extraBuilders: extra,
+    expansions,
     quests: restoreQuests(raw.quests),
-    wanderers: restoreWanderers(raw.wanderers, now),
+    wanderers: restoreWanderers(raw.wanderers, now, size),
     raid: restoreRaid(raw.raid, now),
     milestones: restoreMilestones(raw.milestones),
   };

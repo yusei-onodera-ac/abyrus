@@ -1,4 +1,4 @@
-import { RAID_POWER, VILLAGE_BUILDERS, VILLAGE_MATERIALS, getBuilding, type VillageMaterial } from '../data/village';
+import { RAID_POWER, VILLAGE_BUILDERS, VILLAGE_MATERIALS, clampExpansions, getBuilding, villageSizeAt, type VillageMaterial, type VillageSize } from '../data/village';
 import { MAIN_STAGE_COUNT, STAGES_PER_REGION } from './ProgressionSystem';
 import type { PlacedBuilding, SaveData } from './SaveSystem';
 
@@ -54,6 +54,17 @@ export function castleLevel(save: SaveData, now = Date.now()): number {
   let level = 1;
   for (const b of save.village.buildings) if (b.kind === 'castle') level = Math.max(level, effectiveLevel(b, now));
   return level;
+}
+
+/** How many times the land has been 拡張 (0 for a save from before 拡張 existed). */
+export function expansionCount(save: SaveData): number {
+  return clampExpansions(save.village.expansions);
+}
+
+/** The map as it is now: tiles across and down. Everything that needs the edge of the map (placing, walking, the camera, where a
+ *  行商人 may stand) asks this, never the base size in data/village.ts. */
+export function villageSize(save: SaveData): VillageSize {
+  return villageSizeAt(save.village.expansions);
 }
 
 /** How many builders there are: what this 城 level gives, and the ones bought with 魔晶石. */
