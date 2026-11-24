@@ -6,6 +6,7 @@ import { SettingsSystem } from '../systems/SettingsSystem';
 import { BATTLE_CONTROL_POS, RoundControl } from './BattleControl';
 import { openConfirm } from './Dialogs';
 import { openOverFight } from './OverFight';
+import { t } from '../i18n';
 
 /** The 2倍速 button beside オート in a fight: プレミアムパス members switch the fight
  *  to double speed (kept in the settings); anyone else gets told what the pass offers. */
@@ -33,15 +34,15 @@ export class SpeedToggle extends Phaser.GameObjects.Container {
     this.removeAll(true);
     const member = PremiumSystem.isActive(this.save);
     const on = this.factor() > 1;
-    this.add(new RoundControl(this.scene, `${PREMIUM.battleSpeed}倍速`, !member ? 'パス限定' : on ? 'ON' : 'OFF', on, () => this.tap()));
+    this.add(new RoundControl(this.scene, t('battle.speed.label', { battleSpeed: PREMIUM.battleSpeed }), !member ? t('battle.speed.passOnly') : on ? 'ON' : 'OFF', on, () => this.tap()));
   }
 
   private tap(): void {
     if (!PremiumSystem.isActive(this.save)) {
       openConfirm(this.scene, { setEnabled: () => {} }, {
-        title: `${PREMIUM.battleSpeed}倍速はプレミアムパス限定です`,
-        message: `プレミアムパスに加入すると、\nクエストも無限モードも${PREMIUM.battleSpeed}倍の速さで進められます。`,
-        confirmLabel: 'パスを見る',
+        title: t('battle.speed.passOnlyTitle', { battleSpeed: PREMIUM.battleSpeed }),
+        message: t('battle.speed.passOnlyMessage', { battleSpeed: PREMIUM.battleSpeed }),
+        confirmLabel: t('battle.shared.viewPass'),
         confirmVariant: 'gold',
         // Laid over the fight, which waits underneath (going there for good would throw the fight away).
         onConfirm: () => openOverFight(this.scene, 'Premium'),

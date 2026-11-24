@@ -1,6 +1,7 @@
 import { stripForbidden } from './ChatSystem';
 import type { SaveData } from './SaveSystem';
 import pkg from '../../../package.json';
+import { defaultLanguageForNewSave, isLanguage, SOURCE_LANGUAGE, type Language, type PlainKey } from '../i18n';
 
 export const APP_VERSION: string = pkg.version;
 
@@ -28,6 +29,8 @@ export interface SettingsState {
   autoSkill: boolean;
   /** 2倍速 (プレミアムパス): run fights at double speed. Only has an effect while the pass is active. */
   speed2x: boolean;
+  /** The language the game is shown in (see i18n/). A new save starts with the device's; a save from before this existed is Japanese. */
+  language: Language;
 }
 
 export type ReportKind = 'inquiry' | 'bug';
@@ -45,13 +48,18 @@ export interface Report {
   sent: boolean;
 }
 
-export const INQUIRY_CATEGORIES = ['ゲームの内容', 'お支払い・購入', 'アカウント', 'ご意見・ご要望', 'その他'];
-export const BUG_CATEGORIES = ['表示がおかしい', '操作できない・固まる', '数値・報酬が違う', '落ちる・動かない', 'その他'];
+/** What a report stores as its category: Japanese text by design (it is what the operator reads, and what is already saved in
+ *  old reports). The player sees the *_LABELS below instead (same order): translate the label, never these. */
+export const INQUIRY_CATEGORIES = ['ゲームの内容', 'お支払い・購入', 'アカウント', 'ご意見・ご要望', 'その他']; // i18n-ignore (stored value)
+export const BUG_CATEGORIES = ['表示がおかしい', '操作できない・固まる', '数値・報酬が違う', '落ちる・動かない', 'その他']; // i18n-ignore (stored value)
 
-export const NOTIFICATION_LABEL: Record<NotificationKind, string> = {
-  news: 'お知らせ・イベント',
-  stamina: 'スタミナ回復',
-  social: 'フレンド・メッセージ',
+export const INQUIRY_CATEGORY_LABELS: PlainKey[] = ['settings.inquiry.game', 'settings.inquiry.payment', 'settings.account', 'settings.inquiry.feedback', 'settings.other'];
+export const BUG_CATEGORY_LABELS: PlainKey[] = ['settings.bug.display', 'settings.bug.freeze', 'settings.bug.values', 'settings.bug.crash', 'settings.other'];
+
+export const NOTIFICATION_LABEL: Record<NotificationKind, PlainKey> = {
+  news: 'settings.notify.news',
+  stamina: 'settings.notify.stamina',
+  social: 'settings.notify.social',
 };
 
 const VOLUME_DEFAULT = 7;
@@ -97,13 +105,15 @@ export const SettingsSystem = {
       notifications: { news: true, stamina: true, social: true },
       autoSkill: false,
       speed2x: false,
+      language: defaultLanguageForNewSave(),
     };
   },
 
   /** Keeps whatever a save holds that is well-formed, filling the rest with defaults. */
   restore(raw: Partial<SettingsState> | undefined): SettingsState {
     const fallback = this.createDefaultState();
-    if (!raw || typeof raw !== 'object') return fallback;
+    // (a save with no settings at all is an old one: its player has been playing in Japanese)
+    if (!raw || typeof raw !== 'object') return { ...fallback, language: SOURCE_LANGUAGE };
     return {
       email: typeof raw.email === 'string' && isValidEmail(raw.email) ? raw.email : '',
       twitter: typeof raw.twitter === 'string' && /^[A-Za-z0-9_]{1,15}$/.test(raw.twitter) ? raw.twitter : '',
@@ -115,6 +125,7 @@ export const SettingsSystem = {
       },
       autoSkill: raw.autoSkill === true,
       speed2x: raw.speed2x === true,
+      language: isLanguage(raw.language) ? raw.language : SOURCE_LANGUAGE,
     };
   },
 

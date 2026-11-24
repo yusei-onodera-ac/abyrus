@@ -6,6 +6,7 @@ import type { ModalLock } from './Modal';
 import { showRewardModal } from './RewardModal';
 import type { RewardTile } from './RewardTiles';
 import { body, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 export const SWEEP_ROW_HEIGHT = 128;
@@ -32,8 +33,8 @@ export function addSweepRow(scene: Phaser.Scene, container: Phaser.GameObjects.C
     bg.lineStyle(2, CHROME.brassDark, 1);
     bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     row.add(bg);
-    row.add(body(scene, -w / 2 + 20, -34, '掃討', { fontSize: '28px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    row.add(body(scene, -w / 2 + 104, -33, 'クリア済み: 戦わずに報酬だけ受け取る', { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    row.add(body(scene, -w / 2 + 20, -34, t('quest.sweep.title'), { fontSize: '28px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    row.add(body(scene, -w / 2 + 104, -33, t('quest.sweep.description'), { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const step = (delta: number): void => {
       count = Phaser.Math.Clamp(count + delta, 1, most);
@@ -41,15 +42,15 @@ export function addSweepRow(scene: Phaser.Scene, container: Phaser.GameObjects.C
       scene.time.delayedCall(0, draw);
     };
     const y2 = 24;
-    const minus = new Button(scene, -w / 2 + 52, y2, 64, 52, '－', () => step(-1), { variant: 'wood', fontSize: '28px' });
+    const minus = new Button(scene, -w / 2 + 52, y2, 64, 52, '－', () => step(-1), { variant: 'wood', fontSize: '28px' }); // i18n-ignore (a sign)
     minus.setEnabled(count > 1);
-    const plus = new Button(scene, -w / 2 + 224, y2, 64, 52, '＋', () => step(1), { variant: 'wood', fontSize: '28px' });
+    const plus = new Button(scene, -w / 2 + 224, y2, 64, 52, '＋', () => step(1), { variant: 'wood', fontSize: '28px' }); // i18n-ignore (a sign)
     plus.setEnabled(count < most);
-    const mostBtn = new Button(scene, -w / 2 + 300, y2, 70, 52, '最大', () => step(most - count), { variant: 'wood', fontSize: '20px' });
+    const mostBtn = new Button(scene, -w / 2 + 300, y2, 70, 52, t('quest.sweep.max'), () => step(most - count), { variant: 'wood', fontSize: '20px' });
     mostBtn.setEnabled(count < most);
     row.add([minus, plus, mostBtn]);
-    row.add(body(scene, -w / 2 + 138, y2, `${count}回`, { fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    row.add(new Button(scene, w / 2 - 82, y2, 150, 56, '掃討する', () => onSweep(count), { variant: 'gold', fontSize: '24px', subLabel: `スタミナ ${per * count}` }));
+    row.add(body(scene, -w / 2 + 138, y2, t('quest.sweep.count', { count }), { fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    row.add(new Button(scene, w / 2 - 82, y2, 150, 56, t('quest.sweep.run'), () => onSweep(count), { variant: 'gold', fontSize: '24px', subLabel: t('quest.sweep.stamina', { per: per * count }) }));
   };
   draw();
 }
@@ -64,10 +65,10 @@ export function showSweepResult(scene: Phaser.Scene, lock: ModalLock, result: Sw
     { kind: 'rank', amount: n(result.playerExp), tag: result.levelUp ? `Lv${result.levelUp.to}` : undefined },
   ];
   if (result.levelUp) tiles.push({ kind: 'gems', amount: n(result.levelUp.gems), tag: 'LvUP' });
-  if (result.eventTokens) tiles.push({ kind: 'token', token: result.eventTokens.token, amount: n(result.eventTokens.amount), tag: 'イベント' });
-  if (result.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: n(result.phaseMaterials), tag: 'ドロップ' });
-  for (const { item, amount } of result.items) tiles.push({ kind: 'item', item, amount: n(amount), tag: 'ドロップ' });
+  if (result.eventTokens) tiles.push({ kind: 'token', token: result.eventTokens.token, amount: n(result.eventTokens.amount), tag: t('quest.sweep.tagEvent') });
+  if (result.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: n(result.phaseMaterials), tag: t('quest.sweep.tagDrop') });
+  for (const { item, amount } of result.items) tiles.push({ kind: 'item', item, amount: n(amount), tag: t('quest.sweep.tagDrop') });
   const up = result.party.filter((p) => p.levelAfter > p.levelBefore);
-  const note = up.length > 0 ? `${up.length}体がレベルアップ！（最高 Lv${Math.max(...up.map((p) => p.levelAfter))}）` : undefined;
-  showRewardModal(scene, lock, { title: `掃討 ${result.count}回 完了`, tiles, note, onClose });
+  const note = up.length > 0 ? t('quest.sweep.levelUps', { count: up.length, value: Math.max(...up.map((p) => p.levelAfter)) }) : undefined;
+  showRewardModal(scene, lock, { title: t('quest.sweep.complete', { count: result.count }), tiles, note, onClose });
 }

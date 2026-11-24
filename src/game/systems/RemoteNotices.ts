@@ -52,7 +52,8 @@ export function parseAnnouncement(id: string, raw: unknown): RemoteNotice | null
   const at = Date.parse(`${date}T00:00:00+09:00`);
   if (!Number.isFinite(at) || new Date(at + 9 * 3600_000).getUTCDate() !== Number(m[3])) return null; // (2026-02-31 and the like)
   if (id.length < 1 || id.includes('/')) return null;
-  return { entry: { id: `remote-${id}`, category: 'お知らせ', title, body, date: `${m[1]}/${m[2]}/${m[3]}` }, at };
+  // (the tag is a data key: NoticeScene shows it in the player's language)
+  return { entry: { id: `remote-${id}`, category: 'お知らせ', title, body, date: `${m[1]}/${m[2]}/${m[3]}` }, at }; // i18n-ignore
 }
 
 let loaded: RemoteNotice[] = [];

@@ -4,6 +4,7 @@ import { ULT_MAX, type UnitInstance } from '../systems/BattleSystem';
 import type { HeroData } from '../types';
 import { HeroSlot } from './HeroSlot';
 import { CHROME, body } from './theme';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -153,7 +154,7 @@ export class PartyBar {
     const shade = scene.add.graphics();
     shade.fillStyle(0x000000, 0.62);
     shade.fillRoundedRect(-ICON / 2, -ICON / 2, ICON, ICON, 12);
-    const downText = body(scene, 0, 0, '戦闘不能', { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+    const downText = body(scene, 0, 0, tl('hero.party.down'), { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
     down.add([shade, downText]);
     container.add(down);
 
@@ -222,7 +223,7 @@ export class PartyBar {
     const hpColor = hp < 0.3 ? 0xe05353 : hp < 0.6 ? 0xe0c653 : 0x4caf50;
     drawBar(g, x, top + HP_Y, hp, hpColor);
     drawBar(g, x, top + GAUGE_Y, hasSkill ? gauge : 0, full ? 0xffe27a : hasSkill ? 0xe0a02a : 0x666666);
-    card.gaugeLabel.setText(!hasSkill ? '未解放' : full ? 'MAX' : 'SKILL');
+    card.gaugeLabel.setText(!hasSkill ? tl('hero.party.locked') : full ? 'MAX' : 'SKILL');
 
     card.down.setVisible(!unit.alive);
     this.drawPlate(card, full);

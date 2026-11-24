@@ -6,6 +6,7 @@ import { CARD_WIDTH, SCREEN_VIEW } from '../ui/ScreenFrame';
 import { body, caption, heading } from '../ui/theme';
 import { formatDate } from '../ui/format';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 14;
@@ -13,17 +14,17 @@ const ROW_H = 92;
 const CARD_GAP = 12;
 
 type Filter = 'all' | ScheduleKind;
-const FILTERS: { id: Filter; name: string }[] = [
-  { id: 'all', name: 'すべて' },
-  { id: 'event', name: 'イベント' },
-  { id: 'gacha', name: 'ガチャ' },
-  { id: 'campaign', name: 'キャンペーン' },
+const FILTERS: { id: Filter; name: PlainKey }[] = [
+  { id: 'all', name: 'mission.schedule.all' },
+  { id: 'event', name: 'mission.schedule.kindEvent' },
+  { id: 'gacha', name: 'mission.schedule.kindGacha' },
+  { id: 'campaign', name: 'mission.schedule.kindCampaign' },
 ];
 const KIND_FILL: Record<ScheduleKind, number> = { event: 0x8a5a1c, gacha: 0x6a3aa8, campaign: 0x2f7a3a };
-const STATUS_CHIP: Record<ScheduleStatus, { text: string; fill: number; color: string }> = {
-  live: { text: '開催中', fill: 0x2f7a3a, color: '#e6ffe0' },
-  upcoming: { text: '開催予定', fill: 0x3a4f7a, color: '#e0ecff' },
-  ended: { text: '終了', fill: 0x4a3a3a, color: '#d8c8c8' },
+const STATUS_CHIP: Record<ScheduleStatus, { text: PlainKey; fill: number; color: string }> = {
+  live: { text: 'mission.phase.live', fill: 0x2f7a3a, color: '#e6ffe0' },
+  upcoming: { text: 'mission.phase.upcoming', fill: 0x3a4f7a, color: '#e0ecff' },
+  ended: { text: 'mission.phase.ended', fill: 0x4a3a3a, color: '#d8c8c8' },
 };
 
 /**
@@ -31,8 +32,12 @@ const STATUS_CHIP: Record<ScheduleStatus, { text: string; fill: number; color: s
  * Reached from the Event tab. It opens scrolled to this month.
  */
 export class ScheduleScene extends InboxScene {
-  protected readonly screenTitle = '年間予定';
-  protected emptyText = '予定はありません';
+  protected get screenTitle(): string {
+    return t('mission.schedule.title');
+  }
+  protected get emptyText(): string {
+    return t('mission.schedule.empty');
+  }
   private filter: Filter = 'all';
   /** Where the list was last built the current month's card sits (the screen opens scrolled to it). */
   private focusY = 0;
@@ -89,7 +94,8 @@ export class ScheduleScene extends InboxScene {
     const w = (CARD_WIDTH - PAD * 2 - gap * (FILTERS.length - 1)) / FILTERS.length;
     FILTERS.forEach((f, i) => {
       const x = PAD + w / 2 + i * (w + gap);
-      container.add(new Button(this, x, height / 2, w, 68, f.name, () => this.pick(f.id), { variant: f.id === this.filter ? 'gold' : 'wood', fontSize: f.name.length > 4 ? '19px' : '23px', guard }));
+      const label = t(f.name);
+      container.add(new Button(this, x, height / 2, w, 68, label, () => this.pick(f.id), { variant: f.id === this.filter ? 'gold' : 'wood', fontSize: label.length > 4 ? '19px' : '23px', guard }));
     });
     return { container, height };
   }
@@ -105,7 +111,7 @@ export class ScheduleScene extends InboxScene {
     const height = 62;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(caption(this, PAD + 6, height / 2, '※予定は、変更になることがあります', { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, height / 2, t('mission.schedule.mayChange'), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     return { container, height };
   }
 
@@ -115,7 +121,7 @@ export class ScheduleScene extends InboxScene {
     container.add(buildCardPanel(this, CARD_WIDTH, height, isCurrent));
     container.add(heading(this, PAD + 6, 32, month.label, { fontSize: '28px', color: isCurrent ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     if (isCurrent) {
-      const chip = buildChip(this, 0, 32, '今月', { fill: 0xb8472a, color: '#fff0d0', fontSize: 18 });
+      const chip = buildChip(this, 0, 32, t('mission.schedule.thisMonth'), { fill: 0xb8472a, color: '#fff0d0', fontSize: 18 });
       chip.container.setX(CARD_WIDTH - PAD - chip.width);
       container.add(chip.container);
     }
@@ -136,7 +142,7 @@ export class ScheduleScene extends InboxScene {
     row.add(bg);
 
     const status2 = STATUS_CHIP[status];
-    const chip = buildChip(this, 0, 24, status2.text, { fill: status2.fill, color: status2.color, fontSize: 16 });
+    const chip = buildChip(this, 0, 24, t(status2.text), { fill: status2.fill, color: status2.color, fontSize: 16 });
     chip.container.setX(w - 10 - chip.width);
     row.add(chip.container);
     const title = body(this, 26, 24, item.title, { fontSize: '22px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
@@ -158,8 +164,8 @@ export class ScheduleScene extends InboxScene {
     const height = 84;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 30, `${formatDate(new Date(SCHEDULE_NEXT.at).getTime())}　${SCHEDULE_NEXT.title}`, { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 62, 'この先も、新しいイベントとガチャが続きます', { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 6, 30, t('mission.schedule.nextEntry', { formatDate: formatDate(new Date(SCHEDULE_NEXT.at).getTime()), title: SCHEDULE_NEXT.title }), { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 62, t('mission.schedule.moreComing'), { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     return { container, height };
   }
 }

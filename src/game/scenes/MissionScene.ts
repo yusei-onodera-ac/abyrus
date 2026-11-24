@@ -9,16 +9,29 @@ import { showRewardModal } from '../ui/RewardModal';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 14;
 const ROW_H = 112;
 
+// The group names live as Japanese in data/missions.ts (MISSION_GROUPS); what the player reads is made here, when it is drawn.
+const GROUP_SHORT: Record<MissionGroup, PlainKey> = { daily: 'mission.group.dailyShort', weekly: 'mission.group.weeklyShort', total: 'mission.group.totalShort' };
+const GROUP_NAME: Record<MissionGroup, PlainKey> = { daily: 'mission.group.dailyName', weekly: 'mission.group.weeklyName', total: 'mission.group.totalName' };
+const GROUP_RESET: Record<MissionGroup, PlainKey> = { daily: 'mission.group.dailyReset', weekly: 'mission.group.weeklyReset', total: 'mission.group.totalReset' };
+
+/** The short name of a mission group (デイリー / ウィークリー / 実績) in the player's language: the tab names here and on Home. */
+export function missionGroupShort(group: MissionGroup): string {
+  return t(GROUP_SHORT[group]);
+}
+
 /** ミッション: three tabs - デイリー (starts over every day), ウィークリー (every Monday) and
  *  実績 (never; each taken once) - each with its list, progress bars and 受け取る buttons, a
  *  まとめて受け取る for everything met, and (daily / weekly) the bonus for taking them all. */
 export class MissionScene extends InboxScene {
-  protected readonly screenTitle = 'ミッション';
+  protected get screenTitle(): string {
+    return t('mission.title');
+  }
   protected emptyText = '';
   private group: MissionGroup = 'daily';
 
@@ -56,7 +69,8 @@ export class MissionScene extends InboxScene {
     MISSION_GROUPS.forEach((g, i) => {
       const x = PAD + w / 2 + i * (w + gap);
       const selected = g.id === this.group;
-      container.add(new Button(this, x, height / 2, w, 68, g.short, () => this.pick(g.id), { variant: selected ? 'gold' : 'wood', fontSize: g.short.length > 5 ? '23px' : '28px', guard }));
+      const label = missionGroupShort(g.id);
+      container.add(new Button(this, x, height / 2, w, 68, label, () => this.pick(g.id), { variant: selected ? 'gold' : 'wood', fontSize: label.length > 5 ? '23px' : '28px', guard }));
       if (MissionSystem.groupHasReward(this.save, g.id)) {
         const dot = this.add.graphics();
         dot.fillStyle(0x1b1d29, 1);
@@ -78,16 +92,15 @@ export class MissionScene extends InboxScene {
 
   private headerCard(missions: MissionStatus[]): InboxCard {
     const guard = () => this.scroll.isTap();
-    const def = getMissionGroup(this.group);
     const met = missions.filter((m) => m.done).length;
     const ready = MissionSystem.claimable(this.save, this.group).length;
     const height = 132;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 34, def.name, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 74, `達成 ${met} / ${missions.length}`, { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 102, def.resetNote, { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, 'まとめて受け取る', () => this.claimAll(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? `${ready}件` : undefined, guard });
+    container.add(heading(this, PAD + 6, 34, t(GROUP_NAME[this.group]), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 74, t('mission.completedCount', { met, count: missions.length }), { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 102, t(GROUP_RESET[this.group]), { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, t('mission.claimAll'), () => this.claimAll(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? t('mission.readyCount', { ready }) : undefined, guard });
     all.setEnabled(ready > 0);
     container.add(all);
     return { container, height };
@@ -122,7 +135,7 @@ export class MissionScene extends InboxScene {
     rewardBox.setAlpha(m.claimed ? 0.4 : 1);
     container.add(rewardBox);
 
-    const label = m.claimed ? '受け取り済み' : m.done ? '受け取る' : '未達成';
+    const label = m.claimed ? t('common.claimed') : m.done ? t('common.claim') : t('mission.incomplete');
     const button = new Button(this, CARD_WIDTH - PAD - 90, ROW_H / 2, 180, 70, label, () => this.claim(m.def.id), { variant: m.done && !m.claimed ? 'gold' : 'wood', fontSize: '24px', guard });
     button.setEnabled(m.done && !m.claimed);
     container.add(button);
@@ -138,12 +151,12 @@ export class MissionScene extends InboxScene {
     const claimable = MissionSystem.bonusClaimable(this.save, this.group);
     const claimed = MissionSystem.bonusClaimed(this.save, this.group);
     container.add(buildCardPanel(this, CARD_WIDTH, height, claimable));
-    container.add(heading(this, PAD + 6, 32, '全部達成ボーナス', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 6, 32, t('mission.allClearBonus'), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     grid.container.setPosition(PAD, 58);
     container.add(grid.container);
     const allTaken = missions.every((m) => m.claimed);
-    const label = claimed ? '受け取り済み' : allTaken ? '受け取る' : '全部受け取ると解放';
-    const button = new Button(this, CARD_WIDTH - PAD - 92, height / 2, 184, 80, label, () => this.claimBonus(), { variant: claimable ? 'gold' : 'wood', fontSize: label.length > 6 ? '17px' : '24px', guard });
+    const label = claimed ? t('common.claimed') : allTaken ? t('common.claim') : t('mission.claimAllFirst');
+    const button = new Button(this, CARD_WIDTH - PAD - 92, height / 2, 184, 80, label, () => this.claimBonus(), { variant: claimable ? 'gold' : 'wood', fontSize: claimed || allTaken ? '24px' : '17px', guard });
     button.setEnabled(claimable);
     container.add(button);
     return { container, height };
@@ -151,17 +164,17 @@ export class MissionScene extends InboxScene {
 
   private claim(id: string): void {
     const granted = MissionSystem.claim(this.save, this.group, id);
-    if (granted) this.reward('ミッション達成！', [granted]);
+    if (granted) this.reward(t('mission.missionComplete'), [granted]);
   }
 
   private claimAll(): void {
     const granted = MissionSystem.claimAll(this.save, this.group);
-    if (granted.length > 0) this.reward('ミッション達成！', granted);
+    if (granted.length > 0) this.reward(t('mission.missionComplete'), granted);
   }
 
   private claimBonus(): void {
     const granted = MissionSystem.claimBonus(this.save, this.group);
-    if (granted.length > 0) this.reward('全部達成ボーナス！', granted);
+    if (granted.length > 0) this.reward(t('mission.allClearBonusClaimed'), granted);
   }
 
   private reward(title: string, granted: GrantedReward[]): void {

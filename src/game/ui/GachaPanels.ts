@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { formatGachaEnd, FRIEND_GACHA_IMAGE, type GachaBannerEntry } from '../data/gachaBanners';
+import { FRIEND_GACHA_IMAGE, type GachaBannerEntry } from '../data/gachaBanners';
+import { formatDateTime } from './format';
 import { costOf } from '../systems/GachaSystem';
 import { drawBanner } from './EventPanels';
 import { Button } from './Button';
@@ -7,6 +8,7 @@ import { buildChip } from './CardParts';
 import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
 import { body, caption, CHROME } from './theme';
+import { t } from '../i18n';
 
 export const GACHA_CARD_WIDTH = CARD_WIDTH;
 const PAD = 12;
@@ -56,10 +58,10 @@ export function buildFriendGachaRow(scene: Phaser.Scene, onTap: () => void, guar
     const scale = Math.min((stripW - 6) / frame.width, (h - 6) / frame.height);
     container.add(scene.add.image(stripW / 2, h / 2, FRIEND_KEY).setScale(scale));
   } else {
-    container.add(caption(scene, stripW / 2, h / 2, 'バナー準備中', { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0.5));
+    container.add(caption(scene, stripW / 2, h / 2, t('gacha.bannerSoon'), { fontSize: '16px', color: '#9a8a6a' }).setOrigin(0.5));
   }
 
-  const button = new Button(scene, stripW + gap + buttonW / 2, h / 2, buttonW, h, 'フレンドガチャ', onTap, { variant: 'wood', fontSize: '22px', guard });
+  const button = new Button(scene, stripW + gap + buttonW / 2, h / 2, buttonW, h, t('gacha.friendSummon'), onTap, { variant: 'wood', fontSize: '22px', guard });
   container.add(button);
   return { container, height: h };
 }
@@ -80,7 +82,7 @@ export function buildGachaBannerCard(
   // Header: title, then the end time in the same line.
   const headerH = 48;
   container.add(createPanel(scene, w / 2, y + headerH / 2, innerW, headerH, { fillColor: 0x150e07, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
-  const headerText = entry.endsAt ? `${entry.title}　${formatGachaEnd(entry.endsAt)}` : entry.title;
+  const headerText = entry.endsAt ? t('gacha.banner.titleEnds', { title: entry.title, end: formatDateTime(new Date(entry.endsAt).getTime()) }) : entry.title;
   container.add(
     body(scene, PAD + 16, y + headerH / 2, headerText, { fontSize: '23px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5),
   );
@@ -98,7 +100,7 @@ export function buildGachaBannerCard(
     container.add(drawBanner(scene, { title: entry.title, accent: entry.accent, emblem: entry.emblem }, PAD, y, innerW, bannerH));
   } else {
     container.add(createPanel(scene, w / 2, y + bannerH / 2, innerW, bannerH, { fillColor: 0x241810, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 8, gradient: false }));
-    container.add(caption(scene, w / 2, y + bannerH / 2 - 14, 'バナー準備中', { fontSize: '24px', color: '#9a8a6a' }).setOrigin(0.5));
+    container.add(caption(scene, w / 2, y + bannerH / 2 - 14, t('gacha.bannerSoon'), { fontSize: '24px', color: '#9a8a6a' }).setOrigin(0.5));
     container.add(caption(scene, w / 2, y + bannerH / 2 + 18, `public/assets/gacha/${entry.image}`, { fontSize: '14px', color: '#6e6048' }).setOrigin(0.5));
   }
   const outline = scene.add.graphics();
@@ -107,7 +109,7 @@ export function buildGachaBannerCard(
   container.add(outline);
   if (entry.pity && handlers.pityLeft !== undefined) {
     const left = handlers.pityLeft;
-    const chip = buildChip(scene, PAD + 12, y + bannerH - 26, entry.pity.pickup ? (left <= 1 ? '次の1回でピックアップが確定！' : `あと${left}回でピックアップ確定`) : left <= 1 ? `次の1回で★${entry.pity.minRarity}以上が確定！` : `あと${left}回で★${entry.pity.minRarity}以上が確定`, { fill: left <= 1 ? 0xb8472a : 0x1c130a, color: '#ffe9b8', fontSize: 20 });
+    const chip = buildChip(scene, PAD + 12, y + bannerH - 26, entry.pity.pickup ? (left <= 1 ? t('gacha.banner.pityRateUpNext') : t('gacha.banner.pityRateUpIn', { left })) : left <= 1 ? t('gacha.banner.pityNext', { minRarity: entry.pity.minRarity }) : t('gacha.banner.pityIn', { left, minRarity: entry.pity.minRarity }), { fill: left <= 1 ? 0xb8472a : 0x1c130a, color: '#ffe9b8', fontSize: 20 });
     container.add(chip.container);
   }
   y += bannerH + 10;
@@ -118,25 +120,25 @@ export function buildGachaBannerCard(
   const descW = innerW - detailW - 10;
   container.add(createPanel(scene, PAD + descW / 2, y + rowH / 2, descW, rowH, { fillColor: 0x150e07, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, borderWidth: 1.5, radius: 8, gradient: false }));
   container.add(body(scene, PAD + 16, y + rowH / 2, entry.description, { fontSize: '20px', color: '#f5e6c8' }).setOrigin(0, 0.5));
-  container.add(new Button(scene, PAD + descW + 10 + detailW / 2, y + rowH / 2, detailW, rowH, '詳細', handlers.onDetail, { variant: 'wood', fontSize: '22px', guard: handlers.guard }));
+  container.add(new Button(scene, PAD + descW + 10 + detailW / 2, y + rowH / 2, detailW, rowH, t('common.details'), handlers.onDetail, { variant: 'wood', fontSize: '22px', guard: handlers.guard }));
   y += rowH + 12;
 
   // Pull buttons.
   const ctaH = 82;
   const ctaW = (innerW - 14) / 2;
   container.add(
-    new Button(scene, PAD + ctaW / 2, y + ctaH / 2, ctaW, ctaH, 'シングルガチャ', handlers.onSingle, {
+    new Button(scene, PAD + ctaW / 2, y + ctaH / 2, ctaW, ctaH, t('gacha.banner.single'), handlers.onSingle, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${costOf(entry, 1)} 魔晶石`,
+      subLabel: t('gacha.banner.cost', { costOf: costOf(entry, 1) }),
       guard: handlers.guard,
     }),
   );
   container.add(
-    new Button(scene, PAD + ctaW + 14 + ctaW / 2, y + ctaH / 2, ctaW, ctaH, '10連ガチャ', handlers.onTen, {
+    new Button(scene, PAD + ctaW + 14 + ctaW / 2, y + ctaH / 2, ctaW, ctaH, t('gacha.banner.ten'), handlers.onTen, {
       variant: 'gold',
       fontSize: '25px',
-      subLabel: `${costOf(entry, 10)} 魔晶石`,
+      subLabel: t('gacha.banner.cost', { costOf: costOf(entry, 10) }),
       guard: handlers.guard,
     }),
   );

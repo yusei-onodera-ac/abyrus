@@ -9,6 +9,7 @@ import { createPanel } from './Panel';
 import { showRewardModal } from './RewardModal';
 import { buildRewardGrid, tileForReward, tilesForGranted } from './RewardTiles';
 import { body, caption, heading, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 const W = 640;
@@ -18,20 +19,20 @@ const noLock = { setEnabled: () => {} };
 
 /** "6:00〜14:00" */
 export function supplyHours(slot: SupplySlot): string {
-  return `${slot.startHour}:00〜${slot.endHour === 24 ? '24:00' : `${slot.endHour}:00`}`;
+  return t('home.supplyModal.n00', { startHour: slot.startHour, value: slot.endHour === 24 ? '24:00' : `${slot.endHour}:00` });
 }
 
 /** What the status button of a slot says. */
 function statusLabel(state: SupplyState, slot: SupplySlot, now: number): string {
   switch (state) {
     case 'open':
-      return '受け取る';
+      return t('common.claim');
     case 'claimed':
-      return '受け取り済み';
+      return t('common.claimed');
     case 'upcoming':
-      return `あと ${StaminaSystem.formatDuration(SupplySystem.secondsUntilOpen(slot, now))}`;
+      return t('home.supplyModal.in', { formatDuration: StaminaSystem.formatDuration(SupplySystem.secondsUntilOpen(slot, now)) });
     default:
-      return '受付終了';
+      return t('home.supplyModal.closed');
   }
 }
 
@@ -60,8 +61,8 @@ export function openSupplyModal(scene: Phaser.Scene, save: SaveData, onChange: (
     const top = 640 - h / 2;
     content.add(createPanel(scene, 360, 640, W, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 20, rarity: 5, gradient: false }));
     content.add(scene.add.zone(360, 640, W, h).setInteractive());
-    content.add(heading(scene, 360, top + 48, '朝夕の補給', { fontSize: '38px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
-    content.add(caption(scene, 360, top + 86, '朝と夕に1回ずつ。両方受け取るとボーナス！', { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    content.add(heading(scene, 360, top + 48, t('home.supplyModal.morningEveningSupplies'), { fontSize: '38px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
+    content.add(caption(scene, 360, top + 86, t('home.supplyModal.onceEachMorningAnd'), { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
 
     let y = top + 108;
     SUPPLY_SLOTS.forEach((slot, i) => {
@@ -88,15 +89,15 @@ export function openSupplyModal(scene: Phaser.Scene, save: SaveData, onChange: (
     const reachable = SupplySystem.bonusReachable(save, now);
     const left = 360 - CARD_W / 2;
     content.add(createPanel(scene, 360, y + bonusH / 2, CARD_W, bonusH, { fillColor: 0x2c1c10, fillAlpha: 1, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 12, gradient: false }));
-    content.add(heading(scene, left + 18, y + 30, '両方受け取るとボーナス', { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    const note = taken ? '本日分は受け取り済みです' : reachable ? '朝と夕の両方を受け取ると、もらえます' : '今日は受け取れなかった枠があるため、もらえません';
+    content.add(heading(scene, left + 18, y + 30, t('home.supplyModal.bonusForClaimingBoth'), { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    const note = taken ? t('home.supplyModal.alreadyClaimedToday') : reachable ? t('home.supplyModal.claimBothMorningAnd') : t('home.supplyModal.notAvailableYouMissed');
     content.add(body(scene, left + 18, y + 62, note, { fontSize: '17px', fontStyle: 'bold', color: taken ? '#9fe39f' : reachable ? '#cdbb94' : '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const bonusGrid = buildRewardGrid(scene, SUPPLY_BOTH_BONUS.map(tileForReward), CARD_W - 20);
     bonusGrid.container.setPosition(left + 10, y + 82);
     if (taken || !reachable) bonusGrid.container.setAlpha(0.5);
     content.add(bonusGrid.container);
 
-    content.add(new Button(scene, 360, top + h - 52, 220, 62, '閉じる', () => handle.close(), { variant: 'wood', fontSize: '26px' }));
+    content.add(new Button(scene, 360, top + h - 52, 220, 62, t('common.close'), () => handle.close(), { variant: 'wood', fontSize: '26px' }));
   };
 
   const claimSlot = (slot: SupplySlot): void => {
@@ -107,9 +108,9 @@ export function openSupplyModal(scene: Phaser.Scene, save: SaveData, onChange: (
     // Redrawn after this tap has finished: the button being replaced is still handling it.
     scene.time.delayedCall(0, draw);
     showRewardModal(scene, noLock, {
-      title: `${slot.name}を受け取りました`,
+      title: t('home.supplyModal.claimed', { name: slot.name }),
       tiles: tilesForGranted([...result.granted, ...result.bonus]),
-      note: result.bonus.length > 0 ? '両方受け取ったボーナスを含みます' : undefined,
+      note: result.bonus.length > 0 ? t('home.supplyModal.includesTheBothSlots') : undefined,
     });
   };
 

@@ -104,7 +104,8 @@ export function parseMail(id: string, raw: unknown, now = Date.now()): { mail: M
     const reward = rewardOf(raw.rewardType, raw.rewardAmount);
     // (a reward that is not valid — an `item`, a typo'd amount — means the mail is not sent either: better none than one that promises something it cannot give)
     if (!reward) return null;
-    return { mail, gift: { id: `${REMOTE_PREFIX}mail-${id}`, title, message: 'メールに添えたプレゼントです。', reward } };
+    // (the gift's message is saved with the gift, like the operator's own text: left as it is)
+    return { mail, gift: { id: `${REMOTE_PREFIX}mail-${id}`, title, message: 'メールに添えたプレゼントです。', reward } }; // i18n-ignore
   }
   return { mail };
 }

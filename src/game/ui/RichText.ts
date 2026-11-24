@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { EmojiId } from '../data/emoji';
 import { parseParts } from '../systems/ChatSystem';
 import { emojiTexture } from './EmojiIcons';
-import { breakLines, measureWidth, type LayoutToken } from './TextLayout';
+import { breakLines, tokenize, type LayoutToken } from './TextLayout';
 
 const FONT = 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif';
 
@@ -33,7 +33,7 @@ export function buildRichText(scene: Phaser.Scene, text: string, maxWidth: numbe
   const tokens: LayoutToken<EmojiId>[] = [];
   for (const part of parseParts(text)) {
     if (part.kind === 'emoji') tokens.push({ ch: null, width: emojiSize + 4, data: part.id });
-    else for (const ch of Array.from(part.text)) tokens.push({ ch, width: measureWidth(font, ch) });
+    else tokens.push(...tokenize<EmojiId>(part.text, font));
   }
 
   const container = scene.add.container(0, 0);
@@ -44,7 +44,9 @@ export function buildRichText(scene: Phaser.Scene, text: string, maxWidth: numbe
     const y = row * lineHeight + lineHeight / 2;
     let x = 0;
     let run = '';
-    const flush = (): void => {
+    const flush = (last = false): void => {
+      // (the spaces that end a wrapped English line are not drawn)
+      if (last) run = run.replace(/ +$/, '');
       if (!run) return;
       const label = scene.add.text(x, y, run, {
         fontFamily: FONT,
@@ -69,7 +71,7 @@ export function buildRichText(scene: Phaser.Scene, text: string, maxWidth: numbe
       container.add(icon);
       x += token.width;
     }
-    flush();
+    flush(true);
     widest = Math.max(widest, x);
   });
   return { container, width: Math.ceil(widest), height: Math.max(1, lines.length) * lineHeight };

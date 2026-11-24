@@ -17,6 +17,8 @@ const out = path.join(here, '.out');
 const stub = path.join(here, 'phaser_stub.mjs');
 // the game's clock starts on a fixed day in every test (see fixed_clock.mjs)
 const clock = pathToFileURL(path.join(here, 'fixed_clock.mjs')).href;
+// the device language is Japanese in every test (fixed_locale.mjs)
+const locale = pathToFileURL(path.join(here, 'fixed_locale.mjs')).href;
 const only = process.argv[2];
 
 mkdirSync(out, { recursive: true });
@@ -39,7 +41,7 @@ for (const name of names) {
   const file = path.join(out, `${name}.mjs`);
   await bundle.write({ file, format: 'esm' });
   await bundle.close();
-  const run = spawnSync(process.execPath, ['--import', clock, file], { encoding: 'utf8', timeout: 600_000 });
+  const run = spawnSync(process.execPath, ['--import', clock, '--import', locale, file], { encoding: 'utf8', timeout: 600_000 });
   const lines = (run.stdout ?? '').split('\n');
   const fails = lines.filter((l) => l.startsWith('FAIL')).length;
   const passes = lines.filter((l) => l.startsWith('PASS')).length;

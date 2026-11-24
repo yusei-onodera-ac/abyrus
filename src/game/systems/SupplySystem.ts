@@ -3,6 +3,7 @@ import { recordMission } from './MissionProgress';
 import { RewardSystem, type GrantedReward } from './RewardSystem';
 import type { SaveData } from './SaveSystem';
 import { periodKey } from './ShopSystem';
+import { t } from '../i18n';
 
 /**
  * 朝夕の補給 (data/supply.ts): a small reward at two times of the day, once each per day, and a bonus for taking both.
@@ -92,11 +93,11 @@ export const SupplySystem = {
       case 'open':
         return null;
       case 'claimed':
-        return '受け取り済みです';
+        return t('home.supply.alreadyClaimed');
       case 'upcoming':
-        return 'まだ受け取れる時間ではありません';
+        return t('home.supply.itIsnTTime');
       default:
-        return '受け取れる時間が過ぎました';
+        return t('home.supply.theClaimWindowHas');
     }
   },
 

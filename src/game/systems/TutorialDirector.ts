@@ -8,6 +8,7 @@ import { TutorialOverlay } from '../ui/TutorialOverlay';
 import { RewardSystem } from './RewardSystem';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import { TutorialSystem } from './TutorialSystem';
+import { t } from '../i18n';
 
 let overlay: TutorialOverlay | undefined;
 /** True from the moment a step is due until its overlay is gone: a fight waits for it. */
@@ -114,9 +115,9 @@ export const TutorialDirector = {
       SaveSystem.save(save);
       // Reopen the screen afterwards so the top bar shows what came with it.
       showRewardModal(scene, { setEnabled: () => undefined }, {
-        title: village ? '村のチュートリアル完了！' : 'チュートリアル完了！',
+        title: village ? t('tutorial.done.village') : t('tutorial.done.main'),
         tiles: tilesForGranted(granted),
-        note: village ? 'ルリより：村づくり、がんばってね！' : 'ルリより：おつかれさま！ これからもよろしくね。',
+        note: village ? t('tutorial.done.villageNote') : t('tutorial.done.mainNote'),
         onClose: () => scene.scene.restart(),
       });
       return;

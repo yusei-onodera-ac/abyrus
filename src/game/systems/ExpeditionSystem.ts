@@ -5,6 +5,7 @@ import type { HeroData } from '../types';
 import { recordMission } from './MissionProgress';
 import { RewardSystem, type GrantedReward } from './RewardSystem';
 import { SaveSystem, type ExpeditionRun, type SaveData } from './SaveSystem';
+import { t } from '../i18n';
 
 /** What sending a party would pay, over the base rewards. */
 export interface ExpeditionBonus {
@@ -70,15 +71,15 @@ export const ExpeditionSystem = {
 
   /** Why `heroIds` cannot be sent on `def` from `slot` right now, or null when they can. */
   check(save: SaveData, slot: number, def: ExpeditionDef, heroIds: string[]): string | null {
-    if (!Number.isInteger(slot) || slot < 0 || slot >= EXPEDITION_SLOTS) return '出発できる枠がありません';
-    if (save.expeditions.slots[slot]) return 'この枠は遠征中です';
-    if (!ExpeditionSystem.isUnlocked(save, def)) return `メインステージを${def.needStage}まで進めると行けます`;
-    if (heroIds.length !== def.partySize) return `${def.partySize}人で出発します`;
-    if (new Set(heroIds).size !== heroIds.length) return '同じキャラは選べません';
+    if (!Number.isInteger(slot) || slot < 0 || slot >= EXPEDITION_SLOTS) return t('quest.expeditionCheck.noSlot');
+    if (save.expeditions.slots[slot]) return t('quest.expeditionCheck.slotBusy');
+    if (!ExpeditionSystem.isUnlocked(save, def)) return t('quest.expeditionCheck.locked', { needStage: def.needStage });
+    if (heroIds.length !== def.partySize) return t('quest.expeditionCheck.partySize', { partySize: def.partySize });
+    if (new Set(heroIds).size !== heroIds.length) return t('quest.expeditionCheck.duplicate');
     const busy = ExpeditionSystem.busyHeroIds(save);
     for (const id of heroIds) {
-      if (!SaveSystem.getHero(save, id)) return 'キャラが見つかりません';
-      if (busy.has(id)) return '遠征中のキャラは選べません';
+      if (!SaveSystem.getHero(save, id)) return t('quest.expeditionCheck.heroMissing');
+      if (busy.has(id)) return t('quest.expeditionCheck.heroBusy');
     }
     return null;
   },

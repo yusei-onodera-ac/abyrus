@@ -13,6 +13,7 @@ import { createPanel } from '../ui/Panel';
 import { body, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t } from '../i18n';
 
 const PAD = 14;
 const SLOT = 108;
@@ -25,8 +26,12 @@ const URGENT_MS = 3 * 86_400_000;
  *  a 受取 button. A claimed or expired gift can then be deleted; 一括受取 and
  *  一括削除 sit in the pinned bar. */
 export class GiftScene extends InboxScene {
-  protected readonly screenTitle = 'プレゼントBOX';
-  protected readonly emptyText = 'プレゼントはありません';
+  protected get screenTitle(): string {
+    return t('social.gift.title');
+  }
+  protected get emptyText(): string {
+    return t('social.gift.empty');
+  }
   protected readonly toolbarHeight = 76;
 
   constructor() {
@@ -42,9 +47,9 @@ export class GiftScene extends InboxScene {
     const now = Date.now();
     const claimable = this.save.gifts.filter((g) => InboxSystem.canClaim(g, now)).length;
     const deletable = this.save.gifts.filter((g) => InboxSystem.canDeleteGift(g, now)).length;
-    this.layoutToolbar(toolbar, claimable > 0 ? `未受取 ${claimable}件` : '未受取なし', [
-      { label: '一括受取', variant: 'gold', enabled: claimable > 0, onTap: () => this.claimAll() },
-      { label: '一括削除', variant: 'danger', enabled: deletable > 0, onTap: () => this.confirmDeleteAll(deletable) },
+    this.layoutToolbar(toolbar, claimable > 0 ? t('social.gift.unclaimedCount', { claimable }) : t('social.gift.nothingToClaim'), [
+      { label: t('social.gift.claimAll'), variant: 'gold', enabled: claimable > 0, onTap: () => this.claimAll() },
+      { label: t('social.inbox.deleteAll'), variant: 'danger', enabled: deletable > 0, onTap: () => this.confirmDeleteAll(deletable) },
     ]);
   }
 
@@ -82,23 +87,23 @@ export class GiftScene extends InboxScene {
     let deadline: string;
     let deadlineColor = '#d8c49a';
     if (gift.claimed) {
-      deadline = '受取済み';
+      deadline = t('social.gift.claimedStatus');
       deadlineColor = '#9fd4a0';
     } else if (expired) {
-      deadline = '期限切れ';
+      deadline = t('social.gift.expired');
       deadlineColor = '#ff8a8a';
     } else {
-      deadline = `期限：${formatDateTime(gift.expiresAt)}まで（${formatRemaining(gift.expiresAt - now)}）`;
+      deadline = t('social.gift.deadline', { formatDateTime: formatDateTime(gift.expiresAt), formatRemaining: formatRemaining(gift.expiresAt - now) });
       if (gift.expiresAt - now < URGENT_MS) deadlineColor = '#ffb07a';
     }
     place(wrappedText(this, textX, y, deadline, textW, { fontSize: '17px', color: deadlineColor }), 0);
 
     // Buttons: 受取 on top, 削除 under it.
     const btnX = w - PAD - BUTTON_W / 2;
-    const claimLabel = gift.claimed ? '受取済' : expired ? '期限切れ' : '受取';
+    const claimLabel = gift.claimed ? t('social.gift.claimedShort') : expired ? t('social.gift.expired') : t('social.gift.claimButton');
     const claim = new Button(this, btnX, PAD + 28, BUTTON_W, 56, claimLabel, () => this.claim(gift.id), { variant: 'gold', fontSize: '25px', guard });
     claim.setEnabled(claimable);
-    const remove = new Button(this, btnX, PAD + 56 + 10 + 24, BUTTON_W, 48, '削除', () => this.remove(gift.id), { variant: 'danger', fontSize: '22px', guard });
+    const remove = new Button(this, btnX, PAD + 56 + 10 + 24, BUTTON_W, 48, t('common.delete'), () => this.remove(gift.id), { variant: 'danger', fontSize: '22px', guard });
     remove.setEnabled(InboxSystem.canDeleteGift(gift, now));
     container.add([claim, remove]);
 
@@ -113,7 +118,7 @@ export class GiftScene extends InboxScene {
     SaveSystem.save(this.save);
     this.refreshResources();
     this.modal?.close();
-    this.modal = showRewardModal(this, this.scroll, { title: 'プレゼントを受け取りました', tiles: [{ kind: reward.type, amount: `+${reward.amount.toLocaleString('ja-JP')}` }], onClose: () => this.queueRender() });
+    this.modal = showRewardModal(this, this.scroll, { title: t('social.gift.giftClaimed'), tiles: [{ kind: reward.type, amount: `+${reward.amount.toLocaleString('ja-JP')}` }], onClose: () => this.queueRender() });
   }
 
   private claimAll(): void {
@@ -125,26 +130,26 @@ export class GiftScene extends InboxScene {
     if (summary.gems > 0) tiles.push({ kind: 'gems', amount: `+${summary.gems.toLocaleString('ja-JP')}` });
     if (summary.gold > 0) tiles.push({ kind: 'gold', amount: `+${summary.gold.toLocaleString('ja-JP')}` });
     this.modal?.close();
-    this.modal = showRewardModal(this, this.scroll, { title: `${summary.count}件を受け取りました`, tiles, onClose: () => this.queueRender() });
+    this.modal = showRewardModal(this, this.scroll, { title: t('social.gift.claimedCount', { count: summary.count }), tiles, onClose: () => this.queueRender() });
   }
 
   private remove(id: string): void {
     if (!InboxSystem.deleteGift(this.save, id)) return;
     SaveSystem.save(this.save);
-    showToast(this, 'プレゼントを削除しました');
+    showToast(this, t('social.gift.giftDeleted'));
     this.queueRender();
   }
 
   private confirmDeleteAll(count: number): void {
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
-      title: '一括削除',
-      message: `受取済み・期限切れのプレゼント\n${count}件を削除しますか？\n（未受取のものは削除されません）`,
-      confirmLabel: '削除する',
+      title: t('social.inbox.deleteAll'),
+      message: t('social.gift.confirmDeleteAll', { count }),
+      confirmLabel: t('social.inbox.deleteConfirm'),
       onConfirm: () => {
         const removed = InboxSystem.deleteSettledGifts(this.save);
         SaveSystem.save(this.save);
-        showToast(this, `${removed}件削除しました`);
+        showToast(this, t('social.inbox.deletedCount', { removed }));
         this.queueRender();
       },
     });

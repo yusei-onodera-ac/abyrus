@@ -19,21 +19,22 @@ import { addSweepRow, showSweepResult, SWEEP_ROW_HEIGHT } from '../ui/SweepRow';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { formatDateTime } from '../ui/format';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 14;
 
 type Tab = 'play' | 'mission' | 'reward' | 'shop';
-const TAB_NAME: Record<Tab, string> = { play: '挑戦', mission: 'ミッション', reward: '累計報酬', shop: '交換所' };
+const TAB_LABELS: Record<Tab, PlainKey> = { play: 'mission.eventQuest.tabChallenge', mission: 'mission.title', reward: 'mission.eventQuest.tabRewards', shop: 'mission.eventQuest.exchange' };
 
 /** "3日4時間", "5時間12分", "8分". */
 function leftText(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 60000));
   const d = Math.floor(total / 1440);
   const h = Math.floor((total % 1440) / 60);
-  if (d > 0) return `${d}日${h}時間`;
-  if (h > 0) return `${h}時間${total % 60}分`;
-  return `${total}分`;
+  if (d > 0) return t('mission.eventQuest.daysHours', { d, h });
+  if (h > 0) return t('mission.eventQuest.hoursMinutes', { h, total: total % 60 });
+  return t('mission.eventQuest.minutes', { total });
 }
 
 /**
@@ -42,7 +43,9 @@ function leftText(ms: number): string {
  * for a few days more (a banner says so). The rules are in systems/EventSystem.ts.
  */
 export class EventQuestScene extends InboxScene {
-  protected readonly screenTitle = 'イベント';
+  protected get screenTitle(): string {
+    return t('mission.eventQuest.title');
+  }
   protected emptyText = '';
   private def!: LimitedEventDef;
   private tab: Tab = 'play';
@@ -143,13 +146,13 @@ export class EventQuestScene extends InboxScene {
     const end = new Date(def.endsAt).getTime();
     const closeAt = end + def.exchangeDays * 24 * 60 * 60 * 1000;
     const status = this.running
-      ? { text: `開催中　あと ${leftText(end - now)}`, fill: 0x2f7a3a, color: '#e6ffe0' }
-      : { text: `交換期間　あと ${leftText(closeAt - now)}`, fill: 0x8a5a1c, color: '#fff0d0' };
+      ? { text: t('mission.eventQuest.liveTimeLeft', { leftText: leftText(end - now) }), fill: 0x2f7a3a, color: '#e6ffe0' }
+      : { text: t('mission.eventQuest.exchangeTimeLeft', { leftText: leftText(closeAt - now) }), fill: 0x8a5a1c, color: '#fff0d0' };
     const chip = buildChip(this, PAD + 4, y + 18, status.text, { fill: status.fill, color: status.color, fontSize: 19 });
     chip.container.setX(PAD + 4);
     container.add(chip.container);
-    container.add(caption(this, PAD + 4, y + 50, `開催期間　${formatDateTime(new Date(def.startsAt).getTime())} 〜 ${formatDateTime(end)}`, { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    if (!this.running) container.add(caption(this, PAD + 4, y + 76, `交換所と報酬は ${formatDateTime(closeAt)} まで`, { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 4, y + 50, t('mission.eventQuest.period', { formatDateTime: formatDateTime(new Date(def.startsAt).getTime()), formatDateTime2: formatDateTime(end) }), { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    if (!this.running) container.add(caption(this, PAD + 4, y + 76, t('mission.eventQuest.exchangeUntil', { formatDateTime: formatDateTime(closeAt) }), { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     // What is in hand.
     const hold = this.add.container(CARD_WIDTH - PAD - 150, y + 30);
@@ -173,7 +176,8 @@ export class EventQuestScene extends InboxScene {
     const w = (CARD_WIDTH - PAD * 2 - gap * (tabs.length - 1)) / tabs.length;
     tabs.forEach((id, i) => {
       const x = PAD + w / 2 + i * (w + gap);
-      container.add(new Button(this, x, height / 2, w, 68, TAB_NAME[id], () => this.pick(id), { variant: id === this.tab ? 'gold' : 'wood', fontSize: TAB_NAME[id].length > 3 ? '22px' : '26px', guard }));
+      const label = t(TAB_LABELS[id]);
+      container.add(new Button(this, x, height / 2, w, 68, label, () => this.pick(id), { variant: id === this.tab ? 'gold' : 'wood', fontSize: label.length > 3 ? '22px' : '26px', guard }));
       const claimable = (id === 'mission' && EventSystem.missions(this.save, this.def).some((m) => m.done && !m.claimed)) || (id === 'reward' && EventSystem.milestones(this.save, this.def).some((m) => m.reached && !m.claimed));
       if (claimable) container.add(buildUnreadDot(this, x + w / 2 - 10, 16, 8));
     });
@@ -196,7 +200,7 @@ export class EventQuestScene extends InboxScene {
     const open = unlocked && this.running;
     const first = !EventSystem.isCleared(this.save, def.id, index);
     const tiles: RewardTile[] = [this.tokenTile(`+${EventSystem.tokensPerClear(def, index)}`)];
-    if (first && (def.firstClearGems[index] ?? 0) > 0) tiles.push({ kind: 'gems', amount: `+${def.firstClearGems[index]}`, tag: '初回' });
+    if (first && (def.firstClearGems[index] ?? 0) > 0) tiles.push({ kind: 'gems', amount: `+${def.firstClearGems[index]}`, tag: t('mission.eventQuest.firstClear') });
     const grid = buildRewardGrid(this, tiles, CARD_WIDTH - PAD * 2);
     const gridTop = 112;
     const height = gridTop + grid.height + 14 + 18 + 70 + 18;
@@ -205,17 +209,17 @@ export class EventQuestScene extends InboxScene {
 
     container.add(heading(this, PAD + 4, 34, tier.name, { fontSize: '30px', color: open ? '#ffe9b8' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const stamina = CampaignSystem.staminaCost(tier.stamina);
-    const cost = buildChip(this, 0, 34, `スタミナ ${stamina}${stamina < tier.stamina ? '（割引）' : ''}`, { fill: stamina < tier.stamina ? 0x2f7a3a : 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
+    const cost = buildChip(this, 0, 34, stamina < tier.stamina ? t('mission.eventQuest.staminaDiscounted', { stamina }) : t('mission.eventQuest.stamina', { stamina }), { fill: stamina < tier.stamina ? 0x2f7a3a : 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     cost.container.setX(CARD_WIDTH - PAD - cost.width);
     container.add(cost.container);
     const enemies = ProgressionSystem.getEventStage(def, index).enemies.length;
-    container.add(caption(this, PAD + 4, 76, `${enemies}体の敵　${tier.note ?? `クエスト${tier.likeStage + 1}層ほどの強さ`}`, { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 4, 76, t('mission.eventQuest.enemiesNote', { enemies, note: tier.note ?? t('mission.eventQuest.likeQuestFloor', { likeStage: tier.likeStage + 1 }) }), { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     grid.container.setPosition(PAD, gridTop);
     if (!open) grid.container.setAlpha(0.5);
     container.add(grid.container);
 
-    const label = !this.running ? 'イベントは終了しました' : unlocked ? '挑戦する' : `メインステージ${tier.needStage}まで進めると開放`;
+    const label = !this.running ? t('mission.eventQuest.eventEnded') : unlocked ? t('mission.eventQuest.challenge') : t('mission.eventQuest.unlockAtStage', { needStage: tier.needStage });
     const button = new Button(this, CARD_WIDTH / 2, gridTop + grid.height + 14 + 18 + 35, CARD_WIDTH - PAD * 2, 70, label, () => this.askToEnter(index), {
       variant: open ? 'gold' : 'wood',
       fontSize: open ? '30px' : '22px',
@@ -235,15 +239,15 @@ export class EventQuestScene extends InboxScene {
 
     const party = SaveSystem.getPartyHeroes(this.save);
     if (party.front.length + party.back.length === 0) {
-      this.openDialog({ title: '編成が空です', message: 'パーティが空のため出撃できません。\n名鑑で編成しますか？', confirmLabel: '名鑑へ', confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
+      this.openDialog({ title: t('mission.eventQuest.partyEmptyTitle'), message: t('mission.eventQuest.partyEmptyMessage'), confirmLabel: t('mission.eventQuest.toCollection'), confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
       return;
     }
     if (!StaminaSystem.canAfford(this.save, cost)) {
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));
       this.openDialog({
-        title: 'スタミナが足りません',
-        message: `${name}はスタミナ ${cost} 必要です。（現在 ${this.save.stamina[0]}）\n回復まで あと ${wait}\nショップでスタミナを回復しますか？`,
-        confirmLabel: 'ショップへ',
+        title: t('mission.eventQuest.notEnoughStaminaTitle'),
+        message: t('mission.eventQuest.notEnoughStaminaMessage', { name, cost, stamina: this.save.stamina[0], wait }),
+        confirmLabel: t('mission.eventQuest.toShop'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
       });
@@ -257,8 +261,8 @@ export class EventQuestScene extends InboxScene {
     const extraHeight = (helpers ? HELPER_ROW_HEIGHT : 0) + (sweep ? SWEEP_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
-      message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
-      confirmLabel: '出撃',
+      message: t('mission.eventQuest.deployMessage', { cost, have, have2: have - cost }),
+      confirmLabel: t('mission.eventQuest.deploy'),
       confirmVariant: 'gold',
       extra:
         extraHeight === 0
@@ -309,10 +313,10 @@ export class EventQuestScene extends InboxScene {
     const height = 120;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 34, 'イベントミッション', { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 74, `達成 ${states.filter((m) => m.done).length} / ${states.length}`, { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 98, this.running ? 'イベント中にしたことが、数えられます' : '期間は終わりました（受け取りだけ）', { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, 'まとめて受け取る', () => this.claimAllMissions(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? `${ready}件` : undefined, guard });
+    container.add(heading(this, PAD + 6, 34, t('mission.eventQuest.missionsHeading'), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 74, t('mission.eventQuest.completedCount', { count: states.filter((m) => m.done).length, count2: states.length }), { fontSize: '21px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 98, this.running ? t('mission.eventQuest.countsDuring') : t('mission.eventQuest.overClaimOnly'), { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, t('mission.claimAll'), () => this.claimAllMissions(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? t('mission.readyCount', { ready }) : undefined, guard });
     all.setEnabled(ready > 0);
     container.add(all);
     return { container, height };
@@ -343,7 +347,7 @@ export class EventQuestScene extends InboxScene {
     rewardBox.add(body(this, PAD + 62, 92, `+${m.def.tokens}`, { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     rewardBox.setAlpha(m.claimed ? 0.4 : 1);
     container.add(rewardBox);
-    const label = m.claimed ? '受け取り済み' : m.done ? '受け取る' : '未達成';
+    const label = m.claimed ? t('common.claimed') : m.done ? t('common.claim') : t('mission.incomplete');
     const button = new Button(this, CARD_WIDTH - PAD - 90, rowH / 2, 180, 70, label, () => this.claimMission(m.def.id), { variant: m.done && !m.claimed ? 'gold' : 'wood', fontSize: '24px', guard });
     button.setEnabled(m.done && !m.claimed);
     container.add(button);
@@ -352,12 +356,12 @@ export class EventQuestScene extends InboxScene {
 
   private claimMission(id: string): void {
     const tokens = EventSystem.claimMission(this.save, this.def, id);
-    if (tokens !== null) this.paid('ミッション達成！', [this.tokenTile(`+${tokens}`)]);
+    if (tokens !== null) this.paid(t('mission.missionComplete'), [this.tokenTile(`+${tokens}`)]);
   }
 
   private claimAllMissions(): void {
     const tokens = EventSystem.claimAllMissions(this.save, this.def);
-    if (tokens > 0) this.paid('ミッション達成！', [this.tokenTile(`+${tokens}`)]);
+    if (tokens > 0) this.paid(t('mission.missionComplete'), [this.tokenTile(`+${tokens}`)]);
   }
 
   // ---- 累計報酬
@@ -374,10 +378,10 @@ export class EventQuestScene extends InboxScene {
     const height = 120;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 34, '累計報酬', { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(body(this, PAD + 6, 76, `これまでに集めた数　${points.toLocaleString('ja-JP')}`, { fontSize: '23px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 100, `${this.def.token.name}を使っても、数は減りません`, { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, 'まとめて受け取る', () => this.claimAllMilestones(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? `${ready}件` : undefined, guard });
+    container.add(heading(this, PAD + 6, 34, t('mission.eventQuest.milestoneRewards'), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    container.add(body(this, PAD + 6, 76, t('mission.eventQuest.collectedSoFar', { points: points.toLocaleString('ja-JP') }), { fontSize: '23px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 100, t('mission.eventQuest.spendingDoesNotLower', { name: this.def.token.name }), { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const all = new Button(this, CARD_WIDTH - PAD - 100, height / 2, 200, 80, t('mission.claimAll'), () => this.claimAllMilestones(), { variant: 'gold', fontSize: '19px', subLabel: ready > 0 ? t('mission.readyCount', { ready }) : undefined, guard });
     all.setEnabled(ready > 0);
     container.add(all);
     return { container, height };
@@ -390,12 +394,12 @@ export class EventQuestScene extends InboxScene {
     const height = Math.max(150, 56 + grid.height + PAD);
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height, state.reached && !state.claimed));
-    container.add(body(this, PAD + 6, 28, `${state.milestone.points.toLocaleString('ja-JP')} 集める`, { fontSize: '24px', fontStyle: 'bold', color: state.claimed ? '#8a7a5a' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    if (!state.reached) container.add(caption(this, 250, 28, `あと ${(state.milestone.points - points).toLocaleString('ja-JP')}`, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(body(this, PAD + 6, 28, t('mission.eventQuest.collectPoints', { points: state.milestone.points.toLocaleString('ja-JP') }), { fontSize: '24px', fontStyle: 'bold', color: state.claimed ? '#8a7a5a' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    if (!state.reached) container.add(caption(this, 250, 28, t('mission.eventQuest.pointsToGo', { points: (state.milestone.points - points).toLocaleString('ja-JP') }), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     grid.container.setPosition(PAD, 56);
     grid.container.setAlpha(state.claimed ? 0.4 : 1);
     container.add(grid.container);
-    const label = state.claimed ? '受け取り済み' : state.reached ? '受け取る' : '未達成';
+    const label = state.claimed ? t('common.claimed') : state.reached ? t('common.claim') : t('mission.incomplete');
     const button = new Button(this, CARD_WIDTH - PAD - 90, height / 2, 180, 70, label, () => this.claimMilestone(state.index), { variant: state.reached && !state.claimed ? 'gold' : 'wood', fontSize: '24px', guard });
     button.setEnabled(state.reached && !state.claimed);
     container.add(button);
@@ -404,12 +408,12 @@ export class EventQuestScene extends InboxScene {
 
   private claimMilestone(index: number): void {
     const granted = EventSystem.claimMilestone(this.save, this.def, index);
-    if (granted) this.paid('累計報酬', tilesForGranted(granted));
+    if (granted) this.paid(t('mission.eventQuest.milestoneRewards'), tilesForGranted(granted));
   }
 
   private claimAllMilestones(): void {
     const granted = EventSystem.claimAllMilestones(this.save, this.def);
-    if (granted.length > 0) this.paid('累計報酬', tilesForGranted(granted));
+    if (granted.length > 0) this.paid(t('mission.eventQuest.milestoneRewards'), tilesForGranted(granted));
   }
 
   // ---- 交換所
@@ -422,8 +426,8 @@ export class EventQuestScene extends InboxScene {
     const height = 96;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 32, '交換所', { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, 68, `${this.def.token.name}は、イベントが終わって${this.def.exchangeDays}日たつと使えなくなります`, { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 6, 32, t('mission.eventQuest.exchange'), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, 68, t('mission.eventQuest.tokensExpire', { name: this.def.token.name, exchangeDays: this.def.exchangeDays }), { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     return { container, height };
   }
 
@@ -443,9 +447,9 @@ export class EventQuestScene extends InboxScene {
     addTileIcon(this, price, this.tokenTile(''), PAD + 98, 66, 30);
     price.add(body(this, PAD + 122, 66, item.cost.toLocaleString('ja-JP'), { fontSize: '24px', fontStyle: 'bold', color: block === 'tokens' ? '#ff8a8a' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     container.add(price);
-    container.add(caption(this, PAD + 84, 96, `残り ${item.limit - bought} / ${item.limit}`, { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const label = block === 'limit' ? '交換済み' : block === 'closed' ? '期間外' : block === 'tokens' ? `${this.def.token.name}不足` : '交換する';
-    const button = new Button(this, CARD_WIDTH - PAD - 90, rowH / 2, 180, 70, label, () => this.buy(item), { variant: block === 'ok' ? 'gold' : 'wood', fontSize: label.length > 5 ? '19px' : '24px', guard });
+    container.add(caption(this, PAD + 84, 96, t('mission.eventQuest.stockLeft', { limit: item.limit - bought, limit2: item.limit }), { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const label = block === 'limit' ? t('mission.eventQuest.exchangedOut') : block === 'closed' ? t('mission.eventQuest.closed') : block === 'tokens' ? t('mission.eventQuest.needTokens', { name: this.def.token.name }) : t('mission.eventQuest.exchangeButton');
+    const button = new Button(this, CARD_WIDTH - PAD - 90, rowH / 2, 180, 70, label, () => this.buy(item), { variant: block === 'ok' ? 'gold' : 'wood', fontSize: block === 'tokens' ? '19px' : '24px', guard });
     button.setEnabled(block === 'ok');
     container.add(button);
     return { container, height: rowH };
@@ -456,9 +460,9 @@ export class EventQuestScene extends InboxScene {
     // A dear item is asked about first; the cheap ones, which are bought over and over, are not.
     if (item.cost >= 1000) {
       this.openDialog({
-        title: '交換しますか？',
-        message: `${item.name}\n${item.cost.toLocaleString('ja-JP')} ${this.def.token.name}を使います。`,
-        confirmLabel: '交換する',
+        title: t('mission.eventQuest.exchangeTitle'),
+        message: t('mission.eventQuest.exchangeMessage', { name: item.name, cost: item.cost.toLocaleString('ja-JP'), name2: this.def.token.name }),
+        confirmLabel: t('mission.eventQuest.exchangeButton'),
         confirmVariant: 'gold',
         onConfirm: () => this.doBuy(item),
       });
@@ -469,7 +473,7 @@ export class EventQuestScene extends InboxScene {
 
   private doBuy(item: EventShopItem): void {
     const granted = EventSystem.buy(this.save, this.def, item.id);
-    if (granted) this.paid('交換しました', tilesForGranted(granted));
+    if (granted) this.paid(t('mission.eventQuest.exchangeComplete'), tilesForGranted(granted));
   }
 
   /** Saves, then shows what was handed over; the list is redrawn when the popup is closed. */

@@ -8,6 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "node tools/tests/run.mjs",
+    "i18n:check": "node tools/i18n/check.mjs",
     "schedule:doc": "node tools/schedule/export.mjs",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios"

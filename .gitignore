@@ -38,3 +38,4 @@ tools/audio/out/
 tools/tests/.out/
 tools/schedule/.out/
 tools/check/.out/
+tools/i18n/.out/

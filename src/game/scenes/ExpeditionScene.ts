@@ -14,6 +14,7 @@ import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { showToast } from '../ui/Toast';
 import { body, caption, heading } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 16;
@@ -49,7 +50,7 @@ export class ExpeditionScene extends InboxScene {
   }
 
   protected get screenTitle(): string {
-    return this.view === 'trips' ? '遠征先を選ぶ' : this.view === 'party' ? 'メンバーを選ぶ' : '遠征';
+    return this.view === 'trips' ? t('quest.expedition.titleTrips') : this.view === 'party' ? t('quest.expedition.titleParty') : t('quest.expedition.title');
   }
 
   /** Every `scene.start('Expedition', ...)` names its view: Phaser gives a scene started without data the data it
@@ -99,15 +100,15 @@ export class ExpeditionScene extends InboxScene {
     if (this.view === 'party' && this.def) {
       const bonus = ExpeditionSystem.bonus(this.save, this.def, this.picked);
       const ready = this.picked.length === this.def.partySize;
-      this.layoutToolbar(toolbar, `${this.picked.length}/${this.def.partySize}人　報酬 ×${bonus.multiplier}`, [
-        { label: '出発', variant: 'gold', enabled: ready, onTap: () => this.depart() },
+      this.layoutToolbar(toolbar, t('quest.expedition.partyInfo', { count: this.picked.length, partySize: this.def.partySize, multiplier: bonus.multiplier }), [
+        { label: t('quest.expedition.depart'), variant: 'gold', enabled: ready, onTap: () => this.depart() },
       ]);
     } else if (this.view === 'trips') {
-      this.layoutToolbar(toolbar, `枠${this.slot + 1} に出す遠征を選びます`, []);
+      this.layoutToolbar(toolbar, t('quest.expedition.chooseTripForSlot', { slot: this.slot + 1 }), []);
     } else {
       const running = ExpeditionSystem.runningCount(this.save);
       const back = ExpeditionSystem.readyCount(this.save);
-      this.layoutToolbar(toolbar, `遠征中 ${running}/${EXPEDITION_SLOTS}　帰還 ${back}`, []);
+      this.layoutToolbar(toolbar, t('quest.expedition.boardInfo', { running, EXPEDITION_SLOTS, back }), []);
     }
   }
 
@@ -124,7 +125,7 @@ export class ExpeditionScene extends InboxScene {
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
     container.add(
-      wrappedText(this, PAD + 4, 18, '送り出したキャラは、時間がたつと報酬を持ち帰ります。8〜12時間の遠征は、朝に出して夕方に受け取るのが目安です。得意な職業のキャラを送ると、報酬が増えます。', CARD_WIDTH - PAD * 2 - 8, {
+      wrappedText(this, PAD + 4, 18, t('quest.expedition.intro'), CARD_WIDTH - PAD * 2 - 8, {
         fontSize: '20px',
         color: '#d8c49a',
         lineSpacing: 6,
@@ -138,9 +139,9 @@ export class ExpeditionScene extends InboxScene {
     const height = 128;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 4, 38, `枠${slot + 1}　空き`, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 4, 86, 'キャラを遠征に出せます', { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(new Button(this, CARD_WIDTH - PAD - 120, height / 2, 220, 70, '遠征に出す', () => this.scene.start('Expedition', { view: 'trips', slot }), { variant: 'gold', fontSize: '26px', guard }));
+    container.add(heading(this, PAD + 4, 38, t('quest.expedition.slotEmpty', { slot: slot + 1 }), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 4, 86, t('quest.expedition.slotEmptyHint'), { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(new Button(this, CARD_WIDTH - PAD - 120, height / 2, 220, 70, t('quest.expedition.sendOut'), () => this.scene.start('Expedition', { view: 'trips', slot }), { variant: 'gold', fontSize: '26px', guard }));
     return { container, height };
   }
 
@@ -155,15 +156,15 @@ export class ExpeditionScene extends InboxScene {
     addPlacePicture(this, container, expeditionPictureKey(def.id), 6, 6, CARD_WIDTH - 12, 118, 0.5);
 
     container.add(heading(this, PAD + 4, 32, def.name, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    const chip = buildChip(this, 0, 32, `${def.hours}時間`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
+    const chip = buildChip(this, 0, 32, t('quest.expedition.hours', { hours: def.hours }), { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     chip.container.setX(CARD_WIDTH - PAD - chip.width);
     container.add(chip.container);
 
-    const names = run.heroIds.map((id) => SaveSystem.getHero(this.save, id)?.name ?? '？').join('・');
-    const members = caption(this, PAD + 4, 72, `メンバー　${names}`, { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+    const names = run.heroIds.map((id) => SaveSystem.getHero(this.save, id)?.name ?? t('quest.expedition.unknownHero')).join(t('quest.expedition.nameSeparator'));
+    const members = caption(this, PAD + 4, 72, t('quest.expedition.members', { names }), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     if (members.width > CARD_WIDTH - PAD * 2 - 130) members.setScale((CARD_WIDTH - PAD * 2 - 130) / members.width);
     container.add(members);
-    if (run.bonus > 1) container.add(caption(this, CARD_WIDTH - PAD, 72, `報酬 ×${run.bonus}`, { fontSize: '20px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    if (run.bonus > 1) container.add(caption(this, CARD_WIDTH - PAD, 72, t('quest.expedition.rewardBonus', { bonus: run.bonus }), { fontSize: '20px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
 
     const barX = PAD;
     const barW = CARD_WIDTH - PAD * 2;
@@ -175,7 +176,7 @@ export class ExpeditionScene extends InboxScene {
     const draw = (): void => {
       if (!timeText.active) return;
       const left = ExpeditionSystem.secondsLeft(run);
-      timeText.setText(left === 0 ? '帰還しました！' : `帰還まで ${StaminaSystem.formatDuration(left)}`);
+      timeText.setText(left === 0 ? t('quest.expedition.returned') : t('quest.expedition.returnsIn', { formatDuration: StaminaSystem.formatDuration(left) }));
       bar.clear();
       bar.fillStyle(0x0d0905, 1);
       bar.fillRoundedRect(barX, 100, barW, 16, 8);
@@ -187,7 +188,7 @@ export class ExpeditionScene extends InboxScene {
     draw();
     this.tickers.push(draw);
 
-    const claim = new Button(this, CARD_WIDTH - PAD - 120, 156, 220, 66, done ? '受け取る' : '遠征中', () => this.claim(slot), { variant: done ? 'gold' : 'wood', fontSize: '26px', guard });
+    const claim = new Button(this, CARD_WIDTH - PAD - 120, 156, 220, 66, done ? t('common.claim') : t('quest.expedition.away'), () => this.claim(slot), { variant: done ? 'gold' : 'wood', fontSize: '26px', guard });
     claim.setEnabled(done);
     container.add(claim);
     return { container, height };
@@ -200,9 +201,9 @@ export class ExpeditionScene extends InboxScene {
     this.refreshResources();
     this.modal?.close();
     this.modal = showRewardModal(this, this.scroll, {
-      title: `${result.def.name} から帰還`,
+      title: t('quest.expedition.backFrom', { name: result.def.name }),
       tiles: tilesForGranted(result.granted),
-      note: result.bonus > 1 ? `ボーナス ×${result.bonus}` : undefined,
+      note: result.bonus > 1 ? t('quest.expedition.bonus', { bonus: result.bonus }) : undefined,
       onClose: () => this.queueRender(),
     });
   }
@@ -226,15 +227,15 @@ export class ExpeditionScene extends InboxScene {
     addPlacePicture(this, container, expeditionPictureKey(def.id), 6, 6, CARD_WIDTH - 12, 124, open ? 0.5 : 0.72);
 
     container.add(heading(this, PAD + 4, 32, def.name, { fontSize: '28px', color: open ? '#ffe9b8' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    const hours = buildChip(this, 0, 32, `${def.hours}時間`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
+    const hours = buildChip(this, 0, 32, t('quest.expedition.hours', { hours: def.hours }), { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     hours.container.setX(CARD_WIDTH - PAD - hours.width);
     container.add(hours.container);
 
     container.add(caption(this, PAD + 4, 74, def.description, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    const people = buildChip(this, PAD + 4, 108, `${def.partySize}人`, { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 17 });
+    const people = buildChip(this, PAD + 4, 108, t('quest.expedition.partySize', { partySize: def.partySize }), { fill: 0x3a2b17, color: '#ffe9b8', fontSize: 17 });
     container.add(people.container);
     const bonusPct = Math.round(EXPEDITION_CLASS_BONUS * 100);
-    const favored = buildChip(this, PAD + 4 + people.width + 8, 108, `得意：${CLASS_LABELS[def.favored]}（1人ごとに報酬+${bonusPct}%）`, { fill: 0x2f5a30, color: '#dff7d8', fontSize: 17 });
+    const favored = buildChip(this, PAD + 4 + people.width + 8, 108, t('quest.expedition.favoredBonus', { CLASS_LABELS: CLASS_LABELS[def.favored], bonusPct }), { fill: 0x2f5a30, color: '#dff7d8', fontSize: 17 });
     container.add(favored.container);
 
     grid.container.setPosition(PAD, gridTop);
@@ -247,7 +248,7 @@ export class ExpeditionScene extends InboxScene {
       gridTop + grid.height + 18 + 35,
       CARD_WIDTH - PAD * 2,
       70,
-      open ? 'この遠征にする' : `メインステージ${def.needStage}まで進めると開放`,
+      open ? t('quest.expedition.chooseTrip') : t('quest.shared.unlocksAtStage', { needStage: def.needStage }),
       () => this.scene.start('Expedition', { view: 'party', slot: this.slot, defId: def.id }),
       { variant: open ? 'gold' : 'wood', fontSize: open ? '28px' : '22px', guard },
     );
@@ -282,8 +283,8 @@ export class ExpeditionScene extends InboxScene {
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
     container.add(heading(this, PAD + 4, 32, def.name, { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 4, 74, `${def.hours}時間　${def.partySize}人　得意：${CLASS_LABELS[def.favored]}`, { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    if (lacking) container.add(caption(this, PAD + 4, 116, `遠征に出せるキャラが足りません（あと${def.partySize - free}人）`, { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 4, 74, t('quest.expedition.summary', { hours: def.hours, partySize: def.partySize, CLASS_LABELS: CLASS_LABELS[def.favored] }), { fontSize: '21px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    if (lacking) container.add(caption(this, PAD + 4, 116, t('quest.expedition.notEnoughHeroes', { partySize: def.partySize - free }), { fontSize: '20px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     return { container, height };
   }
 
@@ -304,13 +305,13 @@ export class ExpeditionScene extends InboxScene {
     if (name.width > 250) name.setScale(250 / name.width);
     container.add(name);
     container.add(caption(this, PAD + 112, 62, '★'.repeat(hero.rarity), { fontSize: '20px', color: hex(color), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 112, 90, `${CLASS_LABELS[hero.heroClass]}　Lv.${hero.level}`, { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 112, 90, t('quest.expedition.classLevel', { CLASS_LABELS: CLASS_LABELS[hero.heroClass], level: hero.level }), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     if (hero.heroClass === def.favored) {
-      const chip = buildChip(this, PAD + 112 + name.displayWidth + 10, 30, '得意', { fill: 0x2f5a30, color: '#dff7d8', fontSize: 16 });
+      const chip = buildChip(this, PAD + 112 + name.displayWidth + 10, 30, t('quest.expedition.favored'), { fill: 0x2f5a30, color: '#dff7d8', fontSize: 16 });
       container.add(chip.container);
     }
 
-    const label = away ? '遠征中' : isPicked ? '外す' : '選ぶ';
+    const label = away ? t('quest.expedition.away') : isPicked ? t('quest.expedition.remove') : t('quest.expedition.select');
     const button = new Button(this, CARD_WIDTH - PAD - 80, HERO_ROW_H / 2, 150, 60, label, () => this.toggle(hero.id), { variant: isPicked ? 'wood' : 'gold', fontSize: '24px', guard });
     button.setEnabled(!away && (isPicked || !full));
     container.add(button);
@@ -328,7 +329,7 @@ export class ExpeditionScene extends InboxScene {
     const def = this.def;
     if (!def) return;
     if (!ExpeditionSystem.start(this.save, this.slot, def, this.picked)) {
-      showToast(this, ExpeditionSystem.check(this.save, this.slot, def, this.picked) ?? '出発できません', '#ff8a8a');
+      showToast(this, ExpeditionSystem.check(this.save, this.slot, def, this.picked) ?? t('quest.expedition.cantDepart'), '#ff8a8a');
       return;
     }
     SaveSystem.save(this.save);

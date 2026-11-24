@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { caption } from './theme';
-import { hasIconAsset, iconAssetKeys, type IconAssetName } from './IconAssets';
+import { resolveIconArt, type IconAssetName } from './IconAssets';
 
 /** Round icon + small label nav button, used for the home screen's icon
  *  cluster (quest / gacha / roster) instead of a stacked list of long
@@ -36,9 +36,9 @@ export class IconNavButton extends Phaser.GameObjects.Container {
   ) {
     super(scene, x, y);
 
-    const hasArt = hasIconAsset(scene, iconName);
-    if (hasArt) {
-      const { normal, pressed } = iconAssetKeys(iconName);
+    const art = resolveIconArt(scene, iconName);
+    if (art) {
+      const { normal, pressed } = art;
       // setDisplaySize(size, size) assumes a square source texture; the
       // supplied badge art isn't pixel-square, so forcing both axes to the
       // same value squashed it. Scale uniformly to fit within size x size
@@ -60,9 +60,27 @@ export class IconNavButton extends Phaser.GameObjects.Container {
     // Supplied icon art already has its label baked in (e.g. "クエスト"
     // lettering drawn into the diamond badge); only add a separate caption
     // for the procedural fallback, which is just a bare badge shape.
-    if (!hasArt) {
+    // (The Japanese art shown in another language has the wrong lettering: the caption says it in the language.)
+    if (!art) {
       const labelText = caption(scene, 0, size / 2 + 16, label, { fontSize: '13px', color: '#ffffff' }).setOrigin(0.5);
       this.add(labelText);
+    } else if (!art.labelMatches) {
+      // The Japanese art shown in another language: a plate over its lettering, with the name in the language, until that
+      // language's own art is supplied (see IconAssets.ts).
+      // (the lettering in the art sits a little above the middle of the badge)
+      const plateW = size * 0.6;
+      const plateH = size * 0.25;
+      const plateY = -size * 0.023;
+      const plate = scene.add.graphics();
+      plate.fillStyle(0x1b1838, 1);
+      plate.fillRoundedRect(-plateW / 2, plateY - plateH / 2, plateW, plateH, 16);
+      plate.lineStyle(2, 0xc9a052, 0.55);
+      plate.strokeRoundedRect(-plateW / 2, plateY - plateH / 2, plateW, plateH, 16);
+      const text = scene.add
+        .text(0, plateY, label, { fontFamily: 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif', fontSize: '40px', fontStyle: 'bold', color: '#f6dca0', stroke: '#2a1a08', strokeThickness: 5 })
+        .setOrigin(0.5);
+      if (text.width > plateW - 20) text.setScale((plateW - 20) / text.width);
+      this.add([plate, text]);
     }
 
     this.hitZone = scene.add.zone(0, 0, size, size).setOrigin(0.5);

@@ -3,6 +3,7 @@ import { PremiumSystem } from '../systems/PremiumSystem';
 import type { SaveData } from '../systems/SaveSystem';
 import { openConfirm } from './Dialogs';
 import { body, CHROME } from './theme';
+import { t } from '../i18n';
 
 const KEY = 'autoAdvance';
 const WINS_KEY = 'autoAdvanceWins';
@@ -61,8 +62,8 @@ export function addChainRow(scene: Phaser.Scene, container: Phaser.GameObjects.C
     bg.lineStyle(2, on ? CHROME.brassBright : CHROME.brassDark, 1);
     bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     row.add(bg);
-    row.add(body(scene, -w / 2 + 22, -17, '連戦', { fontSize: '28px', fontStyle: 'bold', color: on ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    row.add(body(scene, -w / 2 + 22, 20, '負けるまで、自動で次のステージへ', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    row.add(body(scene, -w / 2 + 22, -17, t('battle.autoAdvance.title'), { fontSize: '28px', fontStyle: 'bold', color: on ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    row.add(body(scene, -w / 2 + 22, 20, t('battle.autoAdvance.description'), { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const sx = w / 2 - 82;
     const sw = scene.add.graphics();
@@ -84,7 +85,7 @@ export function addChainRow(scene: Phaser.Scene, container: Phaser.GameObjects.C
       sw.lineStyle(2, CHROME.brass, 1);
       sw.strokeRoundedRect(sx - 56, -21, 112, 42, 21);
       row.add(sw);
-      row.add(body(scene, sx, 0, 'パス限定', { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      row.add(body(scene, sx, 0, t('battle.autoAdvance.passOnly'), { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
     }
 
     const zone = scene.add.zone(0, 0, w, h).setOrigin(0.5);
@@ -92,9 +93,9 @@ export function addChainRow(scene: Phaser.Scene, container: Phaser.GameObjects.C
     zone.on('pointerup', () => {
       if (!member) {
         openConfirm(scene, { setEnabled: () => {} }, {
-          title: '連戦はプレミアムパス限定です',
-          message: '勝つたびに自動で次のステージへ進み、\n負けるまで挑み続けます。',
-          confirmLabel: 'パスを見る',
+          title: t('battle.autoAdvance.passOnlyTitle'),
+          message: t('battle.autoAdvance.passOnlyMessage'),
+          confirmLabel: t('battle.shared.viewPass'),
           confirmVariant: 'gold',
           onConfirm: () => scene.scene.start('Premium'),
         });

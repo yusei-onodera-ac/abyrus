@@ -7,12 +7,13 @@ import { createPanel } from './Panel';
 import { addTileIcon, tileForReward } from './RewardTiles';
 import { CARD_WIDTH } from './ScreenFrame';
 import { body, caption, heading, CHROME } from './theme';
+import { t, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 14;
 const COLS = 7;
 const CELL_H = 112;
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+const WEEKDAYS: PlainKey[] = ['home.weekday.sun', 'home.weekday.mon', 'home.weekday.tue', 'home.weekday.wed', 'home.weekday.thu', 'home.weekday.fri', 'home.weekday.sat'];
 const WEEKDAY_COLOR = ['#ff9a8a', '#d8c49a', '#d8c49a', '#d8c49a', '#d8c49a', '#d8c49a', '#9fc4ff'];
 
 /** ログインボーナス is now handed over automatically (see HomeScene) and never
@@ -32,9 +33,9 @@ export function buildLoginBonusCalendarCard(scene: Phaser.Scene, save: SaveData)
 
   const container = scene.add.container(0, 0);
   container.add(buildCardPanel(scene, CARD_WIDTH, height));
-  container.add(heading(scene, CARD_WIDTH / 2, 38, `${date.getFullYear()}年${date.getMonth() + 1}月のログインボーナス`, { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+  container.add(heading(scene, CARD_WIDTH / 2, 38, t('home.loginBonusCalendar.loginBonus', { year: date.getFullYear(), month: date.getMonth() + 1 }), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
   WEEKDAYS.forEach((label, i) => {
-    container.add(caption(scene, PAD + cellW * i + cellW / 2, 76, label, { fontSize: '18px', fontStyle: 'bold', color: WEEKDAY_COLOR[i], stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+    container.add(caption(scene, PAD + cellW * i + cellW / 2, 76, t(label), { fontSize: '18px', fontStyle: 'bold', color: WEEKDAY_COLOR[i], stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
   });
 
   for (let day = 1; day <= days; day++) {

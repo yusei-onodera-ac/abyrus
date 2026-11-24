@@ -2,6 +2,7 @@ import { BigNumber } from './BigNumber';
 import { SaveSystem, type SaveData } from './SaveSystem';
 import type { Good, LimitPeriod, ShopProduct } from '../data/shop';
 import { isItemId } from '../data/items';
+import { t } from '../i18n';
 
 /** Why a product can't be bought right now. */
 export type BlockReason = 'not_started' | 'ended' | 'sold_out' | 'stamina_full';
@@ -25,14 +26,13 @@ export function periodKey(period: LimitPeriod, now: number): string {
   return dateKey(monday);
 }
 
-const PERIOD_LABEL: Record<LimitPeriod, string> = { once: '', day: '1日', week: '週', month: '月' };
 
 /** "1日1回まで" / "購入は1回のみ" - what the card says about the limit. */
 export function describeLimit(product: ShopProduct): string | null {
   const limit = product.limit;
   if (!limit) return null;
-  if (limit.period === 'once') return limit.count === 1 ? '購入は1回のみ' : `購入は${limit.count}回まで`;
-  return `${PERIOD_LABEL[limit.period]}${limit.count}回まで`;
+  if (limit.period === 'once') return limit.count === 1 ? t('shop.limit.once') : t('shop.limit.onceCount', { count: limit.count });
+  return t(limit.period === 'day' ? 'shop.limit.perDay' : limit.period === 'week' ? 'shop.limit.perWeek' : 'shop.limit.perMonth', { count: limit.count });
 }
 
 export const ShopSystem = {

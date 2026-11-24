@@ -15,7 +15,7 @@ import { ExpeditionSystem } from '../systems/ExpeditionSystem';
 import { VillageSystem } from '../systems/VillageSystem';
 import { MissionSystem } from '../systems/MissionSystem';
 import { stopAutoAdvance } from '../ui/AutoAdvanceToggle';
-import { getMissionGroup } from '../data/missions';
+import { missionGroupShort } from './MissionScene';
 import { homeLinesFor } from '../data/homeLines';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { wrapToWidth } from '../ui/CardParts';
@@ -36,6 +36,7 @@ import { BottomNavBar } from '../ui/BottomNavBar';
 import { buildBannerCarousel } from '../ui/BannerCarousel';
 import { getHomeBanners } from '../data/banners';
 import { RARITY_COLORS, type HeroData } from '../types';
+import { t as tl } from '../i18n';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
  *  hero layered over the background, with a round icon-cluster nav
@@ -247,9 +248,9 @@ export class HomeScene extends Phaser.Scene {
     // lines up with the banner's own left edge.
     const size = 300;
     const clusterX = BANNER.x + size / 2;
-    const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), 'クエスト', size, () => this.scene.start('StageSelect'));
-    const gacha = new IconNavButton(this, 400, 810, 'gacha', gachaIcon(this, 90), '召喚', size, () => this.scene.start('Gacha'));
-    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), '名鑑', size, () => this.scene.start('Roster'));
+    const quest = new IconNavButton(this, clusterX, 655, 'quest', questIcon(this, 90), tl('home.quest'), size, () => this.scene.start('StageSelect'));
+    const gacha = new IconNavButton(this, 400, 810, 'gacha', gachaIcon(this, 90), tl('home.summon'), size, () => this.scene.start('Gacha'));
+    const roster = new IconNavButton(this, clusterX, 970, 'roster', rosterIcon(this, 90), tl('home.roster'), size, () => this.scene.start('Roster'));
     enterStagger(this, [quest, gacha, roster], { dy: 24, duration: 320, delay: 150, stagger: 60 });
   }
 
@@ -316,7 +317,7 @@ export class HomeScene extends Phaser.Scene {
     if (!granted) return;
     SaveSystem.save(save);
     this.resourceBar.update(save);
-    showRewardModal(this, { setEnabled: () => {} }, { title: 'ログインボーナス', tiles: tilesForGranted([granted]), note: `${LoginBonusSystem.dayOfMonth()}日目の報酬です` });
+    showRewardModal(this, { setEnabled: () => {} }, { title: tl('home.loginBonus'), tiles: tilesForGranted([granted]), note: tl('home.dayReward', { dayOfMonth: LoginBonusSystem.dayOfMonth() }) });
   }
 
   /** 放置報酬, pinned just under the promo banner: how long has piled up (with a
@@ -334,13 +335,13 @@ export class HomeScene extends Phaser.Scene {
     const preview = IdleSystem.preview(save);
     const claimable = preview.hours >= 1 / 60;
     box.add(this.add.image(40, 46, hourglassIcon(this, 56)).setDisplaySize(56, 56));
-    box.add(caption(this, 80, 19, '放置報酬', { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(caption(this, 80, 19, tl('home.idleRewards'), { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     // How long has piled up: the numbers big, 時間 and 分 small.
     const total = Math.floor(preview.hours * 60);
     const numberColor = preview.full ? '#ffd23f' : '#ffffff';
     let tx = 80;
-    const parts: [string, boolean][] = [[String(Math.floor(total / 60)), true], ['時間', false], [String(total % 60).padStart(2, '0'), true], ['分', false]];
+    const parts: [string, boolean][] = [[String(Math.floor(total / 60)), true], [tl('home.units.hour'), false], [String(total % 60).padStart(2, '0'), true], [tl('home.units.minute'), false]];
     for (const [text, big] of parts) {
       const t = body(this, tx, big ? 55 : 60, text, big ? { fontSize: '32px', fontStyle: 'bold', color: numberColor, stroke: HOME_INK, strokeThickness: 5 } : { fontSize: '17px', fontStyle: 'bold', color: '#cfcbe8', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5);
       box.add(t);
@@ -372,7 +373,7 @@ export class HomeScene extends Phaser.Scene {
       box.add(gold);
       box.add(addGoodIcon(this, 'gold', gold.x - gold.width - 14, 19, 22));
     }
-    const claim = new Button(this, w - 62, 56, 98, 50, '受け取る', () => this.claimIdle(save, box), { variant: claimable ? 'gold' : 'wood', fontSize: '20px' });
+    const claim = new Button(this, w - 62, 56, 98, 50, tl('common.claim'), () => this.claimIdle(save, box), { variant: claimable ? 'gold' : 'wood', fontSize: '20px' });
     claim.setEnabled(claimable);
     box.add(claim);
 
@@ -401,13 +402,13 @@ export class HomeScene extends Phaser.Scene {
       dot.fillCircle(62, 18, 8);
       box.add(dot);
     }
-    box.add(caption(this, 84, 19, 'ミッション', { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(caption(this, 84, 19, tl('home.missions'), { fontSize: '17px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     // done / total of デイリー, ウィークリー and 実績: the label small, the numbers big (gold while one can be taken).
     const columns = [84, 158, 266];
     summary.forEach((g, i) => {
       const cx = columns[i];
       const ready = g.claimable > 0;
-      box.add(caption(this, cx, 43, getMissionGroup(g.group).short, { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      box.add(caption(this, cx, 43, g.group === 'total' ? tl('mission.group.totalHome') : missionGroupShort(g.group), { fontSize: '15px', color: '#b7b2da', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       box.add(body(this, cx, 66, `${g.done}/${g.total}`, { fontSize: '25px', fontStyle: 'bold', color: ready ? '#ffd23f' : '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     });
 
@@ -424,7 +425,7 @@ export class HomeScene extends Phaser.Scene {
     const result = IdleSystem.claim(save);
     SaveSystem.save(save);
     this.resourceBar.update(save);
-    showRewardModal(this, { setEnabled: () => {} }, { title: '放置報酬を受け取りました', tiles: tilesForIdleClaim(result.preview, result.equipment) });
+    showRewardModal(this, { setEnabled: () => {} }, { title: tl('home.idleRewardsClaimed'), tiles: tilesForIdleClaim(result.preview, result.equipment) });
     // Rebuilt after this tap has finished: the button being replaced is still handling it.
     this.time.delayedCall(0, () => {
       box.destroy();
@@ -446,14 +447,14 @@ export class HomeScene extends Phaser.Scene {
     const latest = ChatSystem.latestMessage(save);
     const textX = 26;
     const textW = w - textX - 18;
-    box.add(caption(this, textX, 24, 'メッセージ', { fontSize: '19px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    box.add(caption(this, textX, 24, tl('home.messages'), { fontSize: '19px', fontStyle: 'bold', color: HOME_TITLE, stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     if (latest) {
       box.add(caption(this, w - 18, 24, formatAgo(latest.sentAt), { fontSize: '17px', color: '#9a96c0', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(1, 0.5));
       box.add(this.fitted(body(this, textX, 62, latest.senderName, { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: HOME_INK, strokeThickness: 4 }).setOrigin(0, 0.5), textW));
       box.add(this.fitted(caption(this, textX, 98, plainPreview(latest.text), { fontSize: '22px', color: '#e6e3f4', stroke: HOME_INK, strokeThickness: 3 }).setOrigin(0, 0.5), textW));
     } else {
-      box.add(caption(this, textX, 76, 'まだメッセージがありません', { fontSize: '22px', color: '#9a96c0' }).setOrigin(0, 0.5));
+      box.add(caption(this, textX, 76, tl('home.noMessagesYet'), { fontSize: '22px', color: '#9a96c0' }).setOrigin(0, 0.5));
     }
 
     const hit = this.add.zone(w / 2, h / 2, w, h).setOrigin(0.5);

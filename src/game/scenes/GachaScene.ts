@@ -27,6 +27,7 @@ import { RARITY_COLORS } from '../types';
 import { BattleFx } from '../characters/BattleFx';
 import { rainbow } from '../ui/Rainbow';
 import { enter, enterStagger } from '../ui/Transitions';
+import { t } from '../i18n';
 
 const LIST_GAP = 14;
 
@@ -55,7 +56,7 @@ export class GachaScene extends Phaser.Scene {
     this.refreshResources();
     enter(this, this.resourceBar, { dy: -20, duration: 280 });
 
-    buildTitlePlate(this, 'ガチャ');
+    buildTitlePlate(this, t('gacha.title'));
     this.buildList();
     new BottomNavBar(this, 720, 1280, null);
     enter(this, new BackButton(this, () => this.scene.start('Home')), { dx: -40, dy: 0, duration: 300, delay: 250 });
@@ -76,7 +77,7 @@ export class GachaScene extends Phaser.Scene {
     const rows: Phaser.GameObjects.Container[] = [];
     let y = left;
 
-    const friend = buildFriendGachaRow(this, () => showToast(this, 'フレンドガチャ: 準備中です'), guard);
+    const friend = buildFriendGachaRow(this, () => showToast(this, t('gacha.toast.friendSoon')), guard);
     friend.container.setPosition(left, y);
     rows.push(friend.container);
     y += friend.height + LIST_GAP;
@@ -96,7 +97,7 @@ export class GachaScene extends Phaser.Scene {
     }
 
     if (banners.length === 0) {
-      this.scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 60, '開催中のガチャはありません', { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
+      this.scroll.content.add(caption(this, SCREEN_VIEW.w / 2, y + 60, t('gacha.noBanners'), { fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5));
       y += 120;
     }
 
@@ -123,7 +124,7 @@ export class GachaScene extends Phaser.Scene {
     if (this.pulling) return;
     const save = this.getSave();
     if (!SaveSystem.spendGems(save, costOf(entry, count))) {
-      showToast(this, '魔晶石が足りません', '#ff8a8a');
+      showToast(this, t('gacha.toast.notEnoughGems'), '#ff8a8a');
       return;
     }
     if (entry.kind === 'equipment') {
@@ -134,7 +135,7 @@ export class GachaScene extends Phaser.Scene {
       this.playPull(entry, count, Math.max(...items.map((i) => Number(i.defId.split('-')[1]))), () => {
         SoundSystem.play(this, items.some((i) => Number(i.defId.split('-')[1]) >= 4) ? 'reveal' : 'confirm');
         this.closeModal();
-        this.modal = showRewardModal(this, this.scroll, { title: entry.title, tiles: tilesForEquipment(items), note: '装備はバッグに入りました（装備画面で確認・強化できます）', onClose: () => this.scene.restart() });
+        this.modal = showRewardModal(this, this.scroll, { title: entry.title, tiles: tilesForEquipment(items), note: t('gacha.gearAddedNote'), onClose: () => this.scene.restart() });
       });
       return;
     }
@@ -227,8 +228,8 @@ export class GachaScene extends Phaser.Scene {
       });
     });
 
-    container.add(caption(this, 360, 1030, 'キャラをタップすると、詳細を見られます', { fontSize: '20px', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5));
-    const closeBtn = new Button(this, 360, 1100, 220, 64, '確認', () => this.closeModal(), { variant: 'gold', fontSize: '24px' });
+    container.add(caption(this, 360, 1030, t('gacha.tapHeroHint'), { fontSize: '20px', color: '#d8c49a', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5));
+    const closeBtn = new Button(this, 360, 1100, 220, 64, t('common.confirm'), () => this.closeModal(), { variant: 'gold', fontSize: '24px' });
     container.add(closeBtn);
     closeBtn.setScale(0);
     this.tweens.add({ targets: closeBtn, scale: 1, duration: 300, delay: 120 * outcomes.length + 120, ease: 'Back.easeOut' });

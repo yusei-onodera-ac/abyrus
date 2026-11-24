@@ -1,3 +1,4 @@
+// i18n-ignore-file: the notice of the development environment only (deploy/dev), never shown to players.
 /**
  * 開発版のお知らせ: on the dev environment (built with VITE_DEV_ENV=1, see deploy/dev/deploy.sh) the
  * first thing on screen says what this is - a development build, not the public service, with test

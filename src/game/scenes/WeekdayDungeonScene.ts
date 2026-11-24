@@ -1,5 +1,5 @@
-import { WEEKDAY_DUNGEONS, WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, type WeekdayTier } from '../data/weekdayDungeons';
-import { ProgressionSystem } from '../systems/ProgressionSystem';
+import { WEEKDAY_DUNGEONS, WEEKDAY_TIERS, getWeekdayDungeon, type WeekdayTier } from '../data/weekdayDungeons';
+import { ProgressionSystem, weekdayLong, weekdayShort } from '../systems/ProgressionSystem';
 import { SaveSystem } from '../systems/SaveSystem';
 import { StaminaSystem } from '../systems/StaminaSystem';
 import { CampaignSystem } from '../systems/CampaignSystem';
@@ -15,6 +15,7 @@ import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading } from '../ui/theme';
 import { addPlacePicture, weekdayPictureKey } from '../ui/PlacePicture';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 16;
@@ -22,7 +23,9 @@ const PAD = 16;
 /** 曜日ダンジョン: today's dungeon, in four tiers, each paying the day's 素材 (data/weekdayDungeons.ts); and
  *  below them what the rest of the week pays, so the player knows which day to come back for. */
 export class WeekdayDungeonScene extends InboxScene {
-  protected readonly screenTitle = '曜日ダンジョン';
+  protected get screenTitle(): string {
+    return t('quest.dailyDungeon');
+  }
   protected emptyText = '';
   private day = 0;
 
@@ -47,11 +50,11 @@ export class WeekdayDungeonScene extends InboxScene {
   /** あそびかた: the five things a player needs to know, in the order they meet them. */
   private howToCard(): InboxCard {
     const steps = [
-      '曜日ごとに、もらえる素材が変わります。何曜日に何がもらえるかは、下の「1週間の予定」で見られます',
-      '初級〜超級から選んで「挑戦する」を押し、「出撃」でスタミナを使って戦います',
-      '勝つと、それぞれのカードに出ている素材が、そのままもらえます',
-      '一度勝った難しさは「掃討」で、戦わずにまとめて受け取れます',
-      '上の難しさは、メインステージを進めると開放されます',
+      t('quest.weekdayDungeon.howTo1'),
+      t('quest.weekdayDungeon.howTo2'),
+      t('quest.weekdayDungeon.howTo3'),
+      t('quest.weekdayDungeon.howTo4'),
+      t('quest.weekdayDungeon.howTo5'),
     ];
     const textW = CARD_WIDTH - PAD * 2 - 44;
     const container = this.add.container(0, 0);
@@ -67,7 +70,7 @@ export class WeekdayDungeonScene extends InboxScene {
     });
     const height = y + 8;
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 4, 32, 'あそびかた', { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 4, 32, t('quest.weekdayDungeon.howToTitle'), { fontSize: '28px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     rows.forEach((row) => container.add(row));
     return { container, height };
   }
@@ -78,7 +81,8 @@ export class WeekdayDungeonScene extends InboxScene {
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height, true));
     addPlacePicture(this, container, weekdayPictureKey(this.day), 6, 6, CARD_WIDTH - 12, height - 12, 0.42);
-    container.add(caption(this, PAD + 4, 24, `今日は${WEEKDAY_NAMES[this.day]}曜日`, { fontSize: '20px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const dayName = weekdayLong(this.day);
+    container.add(caption(this, PAD + 4, 24, t('quest.weekdayDungeon.today', { dayName }), { fontSize: '20px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     container.add(heading(this, PAD + 4, 64, dungeon.name, { fontSize: '34px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     container.add(caption(this, PAD + 4, 108, dungeon.theme, { fontSize: '21px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     return { container, height };
@@ -101,12 +105,14 @@ export class WeekdayDungeonScene extends InboxScene {
 
     container.add(heading(this, PAD + 4, 34, tier.name, { fontSize: '30px', color: open ? '#ffe9b8' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const staminaNow = CampaignSystem.staminaCost(tier.stamina);
-    const cost = buildChip(this, 0, 34, `スタミナ ${staminaNow}${staminaNow < tier.stamina ? '（割引）' : ''}`, { fill: staminaNow < tier.stamina ? 0x2f7a3a : 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
+    const cost = buildChip(this, 0, 34, staminaNow < tier.stamina ? t('quest.weekdayDungeon.staminaDiscount', { staminaNow }) : t('quest.weekdayDungeon.stamina', { staminaNow }), { fill: staminaNow < tier.stamina ? 0x2f7a3a : 0x3a2b17, color: '#ffe9b8', fontSize: 18 });
     cost.container.setX(CARD_WIDTH - PAD - cost.width);
     container.add(cost.container);
-    container.add(caption(this, PAD + 4, 76, `${ProgressionSystem.getWeekdayStage(this.day, index).enemies.length}体の敵　${tier.note ?? `クエスト${tier.likeStage + 1}層ほどの強さ`}`, { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    const strength = tier.note ?? t('quest.weekdayDungeon.likeFloor', { likeStage: tier.likeStage + 1 });
+    const enemyCount = ProgressionSystem.getWeekdayStage(this.day, index).enemies.length;
+    container.add(caption(this, PAD + 4, 76, t('quest.weekdayDungeon.enemiesAndStrength', { enemyCount, strength }), { fontSize: '19px', fontStyle: tier.note ? 'bold' : 'normal', color: tier.note ? '#ff9a6a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
-    if (hasRewards) container.add(caption(this, PAD + 4, 116, 'クリアでもらえるもの', { fontSize: '19px', fontStyle: 'bold', color: open ? '#d8c49a' : '#8d7d5e', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    if (hasRewards) container.add(caption(this, PAD + 4, 116, t('quest.weekdayDungeon.clearRewards'), { fontSize: '19px', fontStyle: 'bold', color: open ? '#d8c49a' : '#8d7d5e', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     let y = gridTop;
     if (grid) {
       grid.container.setPosition(PAD, y);
@@ -115,11 +121,11 @@ export class WeekdayDungeonScene extends InboxScene {
       y += grid.height + 14;
     }
     if (dungeon.goldMul > 1) {
-      container.add(body(this, PAD + 4, y + 14, `ゴールド ×${dungeon.goldMul}`, { fontSize: '24px', fontStyle: 'bold', color: open ? '#ffe79a' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      container.add(body(this, PAD + 4, y + 14, t('quest.weekdayDungeon.goldBonus', { goldMul: dungeon.goldMul }), { fontSize: '24px', fontStyle: 'bold', color: open ? '#ffe79a' : '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       y += extraNote;
     }
 
-    const button = new Button(this, CARD_WIDTH / 2, y + 18 + 35, CARD_WIDTH - PAD * 2, 70, open ? '挑戦する' : `メインステージ${tier.needStage}まで進めると開放`, () => this.askToEnter(index), {
+    const button = new Button(this, CARD_WIDTH / 2, y + 18 + 35, CARD_WIDTH - PAD * 2, 70, open ? t('quest.weekdayDungeon.challenge') : t('quest.shared.unlocksAtStage', { needStage: tier.needStage }), () => this.askToEnter(index), {
       variant: open ? 'gold' : 'wood',
       fontSize: open ? '30px' : '22px',
       guard,
@@ -134,7 +140,7 @@ export class WeekdayDungeonScene extends InboxScene {
     const height = 70 + WEEKDAY_DUNGEONS.length * rowH + 14;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 4, 34, '1週間の予定', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 4, 34, t('quest.weekdayDungeon.weeklySchedule'), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     // 月 first, 日 last: the order a week is read in.
     const order = [1, 2, 3, 4, 5, 6, 0];
     order.forEach((day, row) => {
@@ -147,8 +153,10 @@ export class WeekdayDungeonScene extends InboxScene {
         mark.fillRoundedRect(PAD, y - rowH / 2 + 2, CARD_WIDTH - PAD * 2, rowH - 4, 8);
         container.add(mark);
       }
-      container.add(body(this, PAD + 14, y, `${WEEKDAY_NAMES[day]}`, { fontSize: '24px', fontStyle: 'bold', color: today ? '#ffd23f' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      container.add(caption(this, PAD + 62, y, dungeon.name, { fontSize: '21px', fontStyle: 'bold', color: today ? '#ffe9b8' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      const dayLabel = body(this, PAD + 14, y, weekdayShort(day), { fontSize: '24px', fontStyle: 'bold', color: today ? '#ffd23f' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+      container.add(dayLabel);
+      // A day name wider than the one Japanese character (Wed) pushes the dungeon's name along.
+      container.add(caption(this, Math.max(PAD + 62, PAD + 14 + dayLabel.width + 14), y, dungeon.name, { fontSize: '21px', fontStyle: 'bold', color: today ? '#ffe9b8' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       const theme = wrappedText(this, 0, 0, dungeon.theme.replace(/^.曜日は、/, ''), 330, { fontSize: '17px', color: '#cdbb94' });
       theme.setPosition(CARD_WIDTH - PAD - 8 - Math.min(theme.width, 330), y - theme.height / 2);
       container.add(theme);
@@ -165,15 +173,15 @@ export class WeekdayDungeonScene extends InboxScene {
 
     const party = SaveSystem.getPartyHeroes(this.save);
     if (party.front.length + party.back.length === 0) {
-      this.openDialog({ title: '編成が空です', message: 'パーティが空のため出撃できません。\n名鑑で編成しますか？', confirmLabel: '名鑑へ', confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
+      this.openDialog({ title: t('quest.shared.emptyParty'), message: t('quest.shared.emptyPartyMessage'), confirmLabel: t('quest.shared.toCollection'), confirmVariant: 'gold', onConfirm: () => this.scene.start('Roster') });
       return;
     }
     if (!StaminaSystem.canAfford(this.save, cost)) {
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));
       this.openDialog({
-        title: 'スタミナが足りません',
-        message: `${name}はスタミナ ${cost} 必要です。（現在 ${this.save.stamina[0]}）\n回復まで あと ${wait}\nショップでスタミナを回復しますか？`,
-        confirmLabel: 'ショップへ',
+        title: t('quest.shared.notEnoughStamina'),
+        message: t('quest.shared.notEnoughStaminaMessage', { name, cost, stamina: this.save.stamina[0], wait }),
+        confirmLabel: t('quest.shared.toShop'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
       });
@@ -189,8 +197,8 @@ export class WeekdayDungeonScene extends InboxScene {
     const extraHeight = (helpers ? HELPER_ROW_HEIGHT : 0) + (sweep ? SWEEP_ROW_HEIGHT : 0);
     this.openDialog({
       title: name,
-      message: `スタミナ ${cost} を消費して出撃します。\n（現在 ${have} → ${have - cost}）`,
-      confirmLabel: '出撃',
+      message: t('quest.shared.deployMessage', { cost, have, have2: have - cost }),
+      confirmLabel: t('quest.shared.deploy'),
       confirmVariant: 'gold',
       extra:
         extraHeight === 0

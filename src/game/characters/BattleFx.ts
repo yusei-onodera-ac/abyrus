@@ -255,7 +255,7 @@ export class BattleFx {
     this.ring(x, y, MAIN[palette], 14, 74, 320);
     if (kind === 'heal') this.ring(x, y, MAIN.green, 8, 46, 260, 3);
     const color = MAIN[palette];
-    if (kind === 'heal') this.risingGlyphs(x, y, '＋', color, 5, -78);
+    if (kind === 'heal') this.risingGlyphs(x, y, '＋', color, 5, -78); // i18n-ignore (a sign)
     else if (kind === 'buff') this.risingGlyphs(x, y, '▲', color, 3, -70);
     else if (kind === 'debuff') this.risingGlyphs(x, y - 50, '▼', color, 3, 60);
     else if (kind === 'stun') this.orbitStars(x, y - 52);

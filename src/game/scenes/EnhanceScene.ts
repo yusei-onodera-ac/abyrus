@@ -17,6 +17,7 @@ import { EXP_ITEMS, ITEMS, type ItemId } from '../data/items';
 import { phaseFusionCopies, phaseMaterialCost } from '../data/phaseCost';
 import { itemIcon } from '../ui/ItemIcons';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t } from '../i18n';
 
 interface EnhanceData {
   heroId: string;
@@ -33,7 +34,9 @@ const INK = '#1c130a';
  *  towards MAX_PHASE) and 合成 (+1 phase for a number of same-character copies that rises the same way).
  *  戻る goes back to that hero's detail. */
 export class EnhanceScene extends InboxScene {
-  protected readonly screenTitle = '強化';
+  protected get screenTitle(): string {
+    return t('hero.enhance.title');
+  }
   protected emptyText = '';
 
   private target!: EnhanceData;
@@ -90,7 +93,7 @@ export class EnhanceScene extends InboxScene {
     const needed = expToNextLevel(hero.level);
     const atMax = hero.level >= MAX_LEVEL;
     container.add(body(this, x, 104, `Lv.${hero.level}`, { fontSize: '34px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(caption(this, right, 110, atMax ? 'レベル最大' : `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '20px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    container.add(caption(this, right, 110, atMax ? t('hero.level.max') : t('hero.level.toNext', { value: Math.max(0, needed - hero.exp).toLocaleString('ja-JP') }), { fontSize: '20px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     const barW = right - x;
     const ratio = atMax ? 1 : Phaser.Math.Clamp(hero.exp / needed, 0, 1);
     const bar = this.add.graphics();
@@ -110,15 +113,15 @@ export class EnhanceScene extends InboxScene {
     const guard = () => this.scroll.isTap();
     const rowH = 96;
     const headH = 76;
-    const panel = buildInfoPanel(this, CARD_WIDTH, headH + EXP_ITEMS.length * rowH + 14, '経験値素材', 0x3a7fd6);
+    const panel = buildInfoPanel(this, CARD_WIDTH, headH + EXP_ITEMS.length * rowH + 14, t('hero.enhance.expMaterial'), 0x3a7fd6);
     const atMax = hero.level >= MAX_LEVEL;
     if (atMax) {
-      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 30, `レベルは最大（Lv.${MAX_LEVEL}）です。`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 30, t('hero.enhance.levelMaxed', { MAX_LEVEL }), { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     } else {
       const now = ProgressionSystem.computeHeroStats(hero);
       const next = EnhanceSystem.statsAfterLevels(hero, 1);
-      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 20, 'レベルは、素材を使うか、クエストをクリアすると上がります。', { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 52, `次のレベルで　HP ${now.maxHp.toString()} → ${next.maxHp.toString()}　攻撃 ${now.atk.toString()} → ${next.atk.toString()}`, { fontSize: '19px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 20, t('hero.enhance.levelHint'), { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 4, panel.bodyTop + 52, t('hero.enhance.nextLevel', { maxHp: now.maxHp.toString(), maxHp2: next.maxHp.toString(), atk: now.atk.toString(), atk2: next.atk.toString() }), { fontSize: '19px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     }
     EXP_ITEMS.forEach((id, i) => {
       const def = ITEMS[id];
@@ -126,7 +129,7 @@ export class EnhanceScene extends InboxScene {
       const y = panel.bodyTop + headH + 8 + i * rowH + rowH / 2;
       panel.container.add(this.add.image(PAD + 34, y, itemIcon(this, id, 56)));
       panel.container.add(body(this, PAD + 76, y - 17, def.name, { fontSize: '22px', fontStyle: 'bold', color: def.color, stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      panel.container.add(caption(this, PAD + 76, y + 15, `EXP +${(def.exp ?? 0).toLocaleString('ja-JP')}　所持 ${have.toLocaleString('ja-JP')}`, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+      panel.container.add(caption(this, PAD + 76, y + 15, t('hero.enhance.itemExp', { exp: (def.exp ?? 0).toLocaleString('ja-JP'), have: have.toLocaleString('ja-JP') }), { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       [1, 10].forEach((count, k) => {
         // ×10 sits at the right edge, ×1 just left of it.
         const x = CARD_WIDTH - PAD - 52 - (1 - k) * 114;
@@ -143,7 +146,7 @@ export class EnhanceScene extends InboxScene {
     const maxed = hero.phase >= MAX_PHASE;
     const have = this.save.phaseMaterials;
     const bodyH = 200;
-    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, 'フェーズ強化', 0x6a3fb0);
+    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, t('hero.enhance.phaseUp'), 0x6a3fb0);
     const top = panel.bodyTop;
     for (let i = 0; i < MAX_PHASE; i++) {
       const filled = i < hero.phase;
@@ -160,15 +163,15 @@ export class EnhanceScene extends InboxScene {
     const cost = maxed ? 0 : phaseMaterialCost(hero.phase);
     const enough = have >= cost;
     panel.container.add(
-      caption(this, PAD + 4, top + 74, maxed ? 'フェーズは最大です。' : `フェーズ ${hero.phase} → ${hero.phase + 1} に、素材が ${cost}個 要ります。`, { fontSize: '20px', fontStyle: 'bold', color: maxed ? '#ffd23f' : enough ? '#9fe39f' : '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
+      caption(this, PAD + 4, top + 74, maxed ? t('hero.enhance.phaseMaxed') : t('hero.enhance.phaseNeed', { phase: hero.phase, phase2: hero.phase + 1, cost }), { fontSize: '20px', fontStyle: 'bold', color: maxed ? '#ffd23f' : enough ? '#9fe39f' : '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5),
     );
-    panel.container.add(caption(this, PAD + 4, top + 104, maxed ? '' : '上のフェーズほど、多く要ります。同じキャラの合成でも上がります。', { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, PAD + 4, top + 104, maxed ? '' : t('hero.enhance.phaseCostHint'), { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const guard = () => this.scroll.isTap();
-    const button = new Button(this, CARD_WIDTH / 2, top + bodyH - 44, CARD_WIDTH - PAD * 2, 70, maxed ? 'フェーズ最大' : 'フェーズ素材で強化', () => this.raisePhase(hero), {
+    const button = new Button(this, CARD_WIDTH / 2, top + bodyH - 44, CARD_WIDTH - PAD * 2, 70, maxed ? t('hero.enhance.phaseMaxButton') : t('hero.enhance.usePhaseMaterial'), () => this.raisePhase(hero), {
       variant: 'gold',
       fontSize: '28px',
-      subLabel: maxed ? undefined : `素材 ${have.toLocaleString('ja-JP')} / 必要 ${cost}`,
+      subLabel: maxed ? undefined : t('hero.enhance.materialHave', { have: have.toLocaleString('ja-JP'), cost }),
       guard,
     });
     button.setEnabled(!maxed);
@@ -187,13 +190,15 @@ export class EnhanceScene extends InboxScene {
     const need = maxed ? 0 : phaseFusionCopies(hero.phase);
     const guard = () => this.scroll.isTap();
     const lines = maxed
-      ? ['フェーズが最大のため、合成できません。']
+      ? [t('hero.enhance.fuseMaxed')]
       : materials.length === 0
-        ? [`フェーズ ${hero.phase} → ${hero.phase + 1} の合成には、同じキャラが ${need}体 要ります。`, '同じキャラのかぶりを持っていません。']
+        ? [t('hero.enhance.fuseNeeds', { phase: hero.phase, phase2: hero.phase + 1, need }), t('hero.enhance.fuseNoDupes')]
         : [
-            `フェーズ ${hero.phase} → ${hero.phase + 1} の合成には、同じキャラが ${need}体 要ります。${materials.length < need ? `（あと ${need - materials.length}体）` : ''}`,
-            need > 1 ? '素材にする個体をタップ → 足りない分は、ほかの個体も使います。' : '素材にする個体をタップ → フェーズが1上がります。',
-            '使った個体は消えます。編成中の個体は、この個体に入れ替わります。',
+            materials.length < need
+              ? t('hero.enhance.fuseNeedsMore', { phase: hero.phase, phase2: hero.phase + 1, need, short: need - materials.length })
+              : t('hero.enhance.fuseNeeds', { phase: hero.phase, phase2: hero.phase + 1, need }),
+            need > 1 ? t('hero.enhance.fuseTapMulti') : t('hero.enhance.fuseTapOne'),
+            t('hero.enhance.fuseLost'),
           ];
 
     let bodyH = 24 + lines.length * 30;
@@ -204,7 +209,7 @@ export class EnhanceScene extends InboxScene {
     const rows = Math.ceil(materials.length / cols);
     if (materials.length > 0) bodyH += 16 + rows * size + (rows - 1) * gridGap + 16 + 70 + 16;
 
-    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, '合成', 0x2f8f7a);
+    const panel = buildInfoPanel(this, CARD_WIDTH, bodyH, t('hero.enhance.fusion'), 0x2f8f7a);
     const top = panel.bodyTop;
     lines.forEach((text, i) => {
       panel.container.add(caption(this, PAD + 4, top + 22 + i * 30, text, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
@@ -221,10 +226,10 @@ export class EnhanceScene extends InboxScene {
     });
     const buttonY = gridTop + rows * size + (rows - 1) * gridGap + 16 + 35;
     const bulkCopies = bulk.reduce((n, g) => n + g.length, 0);
-    const all = new Button(this, CARD_WIDTH / 2, buttonY, CARD_WIDTH - PAD * 2, 70, 'まとめて合成', () => this.askFuse(hero, bulk), {
+    const all = new Button(this, CARD_WIDTH / 2, buttonY, CARD_WIDTH - PAD * 2, 70, t('hero.enhance.fuseAll'), () => this.askFuse(hero, bulk), {
       variant: 'gold',
       fontSize: '28px',
-      subLabel: bulk.length > 0 ? `フェーズ+${bulk.length}（${bulkCopies}体を使用・編成中は除く）` : '編成中以外のかぶりでは足りません',
+      subLabel: bulk.length > 0 ? t('hero.enhance.fuseAllSub', { count: bulk.length, bulkCopies }) : t('hero.enhance.fuseAllShort'),
       guard,
     });
     all.setEnabled(bulk.length > 0);
@@ -252,7 +257,7 @@ export class EnhanceScene extends InboxScene {
   private askFuseWith(hero: HeroData, tapped: HeroData, all: HeroData[]): void {
     const need = phaseFusionCopies(hero.phase);
     if (all.length < need) {
-      showToast(this, `あと ${need - all.length}体 要ります（フェーズ ${hero.phase} → ${hero.phase + 1}）`, '#ffb0a0');
+      showToast(this, t('hero.enhance.toastNeedMore', { need: need - all.length, phase: hero.phase, phase2: hero.phase + 1 }), '#ffb0a0');
       return;
     }
     const group = [tapped, ...all.filter((m) => m.id !== tapped.id)].slice(0, need);
@@ -264,13 +269,16 @@ export class EnhanceScene extends InboxScene {
     if (groups.length === 0) return;
     const materials = groups.flat();
     const after = Math.min(MAX_PHASE, hero.phase + groups.length);
-    const what = materials.length === 1 ? `Lv.${materials[0].level} の${materials[0].name}を素材にして、` : `${materials.length}体を素材にして、`;
+    const confirmText =
+      materials.length === 1
+        ? t('hero.enhance.fuseConfirmOne', { level: materials[0].level, name: materials[0].name, phase: hero.phase, after })
+        : t('hero.enhance.fuseConfirmMany', { count: materials.length, phase: hero.phase, after });
     const inDeck = materials.some((m) => SaveSystem.isInAnyDeck(this.save, m.id));
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
-      title: '合成しますか？',
-      message: `${what}\nフェーズ ${hero.phase} → ${after} に上げます。\n素材にした個体は消えます。${inDeck ? '\n（編成中の枠は、この個体に入れ替わります）' : ''}`,
-      confirmLabel: '合成する',
+      title: t('hero.enhance.fuseTitle'),
+      message: inDeck ? `${confirmText}\n${t('hero.enhance.fuseConfirmSlots')}` : confirmText,
+      confirmLabel: t('hero.enhance.fuseConfirm'),
       confirmVariant: 'gold',
       onConfirm: () => this.fuse(hero, groups),
     });
@@ -306,10 +314,10 @@ export class EnhanceScene extends InboxScene {
         generator: this.generator,
         from: before,
         to: hero.level,
-        lines: [`HP ${statsBefore.maxHp.toString()} → ${now.maxHp.toString()}`, `攻撃 ${statsBefore.atk.toString()} → ${now.atk.toString()}`],
+        lines: [`HP ${statsBefore.maxHp.toString()} → ${now.maxHp.toString()}`, t('hero.enhance.fxAtk', { atk: statsBefore.atk.toString(), atk2: now.atk.toString() })],
       });
     } else {
-      showToast(this, `経験値 +${result.gained.toLocaleString('ja-JP')}`);
+      showToast(this, t('hero.enhance.toastExp', { gained: result.gained.toLocaleString('ja-JP') }));
     }
   }
 
@@ -320,18 +328,18 @@ export class EnhanceScene extends InboxScene {
     this.modal?.close();
     if (have < cost) {
       this.modal = openConfirm(this, this.scroll, {
-        title: 'フェーズ素材が足りません',
-        message: `フェーズ ${hero.phase} → ${hero.phase + 1} には、素材が ${cost}個 要ります。\n（いま ${have}個）\nショップで購入しますか？`,
-        confirmLabel: 'ショップへ',
+        title: t('hero.enhance.noMaterialTitle'),
+        message: t('hero.enhance.noMaterialMessage', { phase: hero.phase, phase2: hero.phase + 1, cost, have }),
+        confirmLabel: t('hero.enhance.goShop'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'materials' }),
       });
       return;
     }
     this.modal = openConfirm(this, this.scroll, {
-      title: 'フェーズを上げますか？',
-      message: `フェーズ素材を ${cost}個 使って、\nフェーズ ${hero.phase} → ${hero.phase + 1} に上げます。\n（いま ${have}個 → ${have - cost}個）`,
-      confirmLabel: '上げる',
+      title: t('hero.enhance.raiseTitle'),
+      message: t('hero.enhance.raiseMessage', { cost, phase: hero.phase, phase2: hero.phase + 1, have, have2: have - cost }),
+      confirmLabel: t('hero.enhance.raiseConfirm'),
       confirmVariant: 'gold',
       onConfirm: () => {
         const from = hero.phase;

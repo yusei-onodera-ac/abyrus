@@ -18,6 +18,7 @@ import { body, caption } from '../ui/theme';
 import { formatSurvival } from '../ui/format';
 import { enter, enterStagger } from '../ui/Transitions';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 16;
@@ -52,7 +53,7 @@ export class InfiniteLobbyScene extends Phaser.Scene {
     resourceBar.update(save);
     enter(this, resourceBar, { dy: -20, duration: 280 });
 
-    buildTitlePlate(this, '無限モード');
+    buildTitlePlate(this, tl('quest.infiniteLobby.title'));
     this.buildList(save);
     new BottomNavBar(this, 720, 1280, 'event');
     enter(this, new BackButton(this, () => this.scene.start('Event')), { dx: -40, dy: 0, duration: 300, delay: 250 });
@@ -86,14 +87,14 @@ export class InfiniteLobbyScene extends Phaser.Scene {
 
   /** What the mode is, in three lines. */
   private buildRulesCard(): { container: Phaser.GameObjects.Container; height: number } {
-    const lines = ['編成したパーティで、次々に現れる敵と戦い続けます。', '敵は時間とともに強くなります。スコアは倒した敵で決まり、強い敵ほど高得点。', '全滅かリタイアで終了。スコアに応じて技素がもらえます。'];
+    const lines = [tl('quest.infiniteLobby.rule1'), tl('quest.infiniteLobby.rule2'), tl('quest.infiniteLobby.rule3')];
     const texts = lines.map((line) => wrappedText(this, PAD, 0, line, CARD_WIDTH - PAD * 2, { fontSize: '20px', color: '#f5e6c8' }));
     let y = 18;
     for (const t of texts) {
       t.setY(y);
       y += t.height + 8;
     }
-    const panel = buildInfoPanel(this, CARD_WIDTH, y + 8, 'ルール', 0xc7701c);
+    const panel = buildInfoPanel(this, CARD_WIDTH, y + 8, tl('quest.infiniteLobby.rules'), 0xc7701c);
     texts.forEach((t) => {
       t.setY(t.y + panel.bodyTop);
       panel.container.add(t);
@@ -105,12 +106,12 @@ export class InfiniteLobbyScene extends Phaser.Scene {
   private buildBestCard(save: SaveData): { container: Phaser.GameObjects.Container; height: number } {
     const best = save.infiniteMode;
     const cellH = 84;
-    const panel = buildInfoPanel(this, CARD_WIDTH, cellH * 2 + 14, '自己ベスト', 0x3f7a3a);
+    const panel = buildInfoPanel(this, CARD_WIDTH, cellH * 2 + 14, tl('quest.infiniteLobby.personalBest'), 0x3f7a3a);
     const cells: [string, string][] = [
-      ['スコア', best.bestScore.toLocaleString('ja-JP')],
-      ['生存時間', formatSurvival(best.bestSurvivalSeconds)],
-      ['撃破数', `${best.bestEnemiesDefeated.toLocaleString('ja-JP')}体`],
-      ['挑戦回数', `${best.totalRuns.toLocaleString('ja-JP')}回`],
+      [tl('quest.infiniteLobby.score'), best.bestScore.toLocaleString('ja-JP')],
+      [tl('quest.infiniteLobby.survivalTime'), formatSurvival(best.bestSurvivalSeconds)],
+      [tl('quest.infiniteLobby.enemiesDefeated'), tl('quest.infiniteLobby.bestEnemiesDefeated', { bestEnemiesDefeated: best.bestEnemiesDefeated.toLocaleString('ja-JP') })],
+      [tl('quest.infiniteLobby.totalRuns'), tl('quest.infiniteLobby.totalRunsValue', { totalRuns: best.totalRuns.toLocaleString('ja-JP') })],
     ];
     cells.forEach(([label, value], i) => {
       const x = PAD + (i % 2) * (CARD_WIDTH / 2);
@@ -126,7 +127,7 @@ export class InfiniteLobbyScene extends Phaser.Scene {
     const { front, back } = SaveSystem.getPartyHeroes(save);
     const party = [...front, ...back];
     const size = 100;
-    const panel = buildInfoPanel(this, CARD_WIDTH, size + 96, '出撃パーティ', 0x3a4f7a);
+    const panel = buildInfoPanel(this, CARD_WIDTH, size + 96, tl('quest.infiniteLobby.party'), 0x3a4f7a);
     const top = panel.bodyTop;
     const slots = front.length + back.length === 0 ? [] : party;
     const gapX = (CARD_WIDTH - PAD * 2 - size * 5) / 4;
@@ -135,16 +136,16 @@ export class InfiniteLobbyScene extends Phaser.Scene {
       panel.container.add(new HeroSlot(this, PAD + size / 2 + i * (size + gapX), top + 16 + size / 2, { hero, generator: this.generator, onTap: () => this.scene.start('Roster'), guard }, size));
     }
     const power = ProgressionSystem.computeDeckTotals(party).power.toString();
-    panel.container.add(caption(this, PAD, top + size + 52, party.length === 0 ? '編成が空です。タップして編成しましょう。' : `総合力：${power}`, { fontSize: '22px', fontStyle: 'bold', color: party.length === 0 ? '#ff9a8a' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    panel.container.add(caption(this, CARD_WIDTH - PAD, top + size + 52, 'タップで編成へ', { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    panel.container.add(caption(this, PAD, top + size + 52, party.length === 0 ? tl('quest.infiniteLobby.partyEmpty') : tl('quest.infiniteLobby.power', { power }), { fontSize: '22px', fontStyle: 'bold', color: party.length === 0 ? '#ff9a8a' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, CARD_WIDTH - PAD, top + size + 52, tl('quest.infiniteLobby.tapToEdit'), { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     return { container: panel.container, height: panel.height };
   }
 
   /** The global top five; the rows fill in when the reply arrives. */
   private buildRankingCard(): { container: Phaser.GameObjects.Container; height: number } {
-    const panel = buildInfoPanel(this, CARD_WIDTH, 24 + RANK_ROWS * RANK_ROW_H + 16, 'グローバルランキング', 0x6a3fb0);
+    const panel = buildInfoPanel(this, CARD_WIDTH, 24 + RANK_ROWS * RANK_ROW_H + 16, tl('quest.infiniteLobby.globalRanking'), 0x6a3fb0);
     const top = panel.bodyTop;
-    const status = caption(this, CARD_WIDTH / 2, top + 20 + (RANK_ROWS * RANK_ROW_H) / 2, '読み込み中…', { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
+    const status = caption(this, CARD_WIDTH / 2, top + 20 + (RANK_ROWS * RANK_ROW_H) / 2, tl('quest.infiniteLobby.loading'), { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
     panel.container.add(status);
     void this.loadRanking(panel.container, top, status);
     return { container: panel.container, height: panel.height };
@@ -154,21 +155,21 @@ export class InfiniteLobbyScene extends Phaser.Scene {
     const result = await LeaderboardSystem.fetchTopScores(RANK_ROWS);
     if (!this.alive) return;
     if (result.status === 'not_configured') {
-      status.setText('ランキング準備中\n（この端末のベストのみ記録されます）');
+      status.setText(tl('quest.infiniteLobby.rankingNotReady'));
       return;
     }
     if (result.status === 'error') {
-      status.setText('ランキングの取得に失敗しました');
+      status.setText(tl('quest.infiniteLobby.rankingError'));
       return;
     }
     if (result.data.length === 0) {
-      status.setText('まだ記録がありません。\n最初の挑戦者になろう！');
+      status.setText(tl('quest.infiniteLobby.rankingEmpty'));
       return;
     }
     status.setText('');
     result.data.forEach((entry, i) => {
       const y = top + 20 + i * RANK_ROW_H + RANK_ROW_H / 2;
-      container.add(body(this, PAD, y, `${i + 1}位`, { fontSize: '22px', fontStyle: 'bold', color: i === 0 ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      container.add(body(this, PAD, y, tl('quest.infiniteLobby.rankPlace', { i: i + 1 }), { fontSize: '22px', fontStyle: 'bold', color: i === 0 ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       container.add(body(this, PAD + 80, y, entry.playerName, { fontSize: '21px', color: '#f5e6c8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       container.add(body(this, CARD_WIDTH - PAD, y, entry.score.toLocaleString('ja-JP'), { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
     });
@@ -189,13 +190,13 @@ export class InfiniteLobbyScene extends Phaser.Scene {
   private buildResumeCard(state: NonNullable<ReturnType<typeof readSuspendedRun>>, guard: () => boolean): { container: Phaser.GameObjects.Container; height: number } {
     const info = describeSuspendedRun(state);
     const h = 194;
-    const panel = buildInfoPanel(this, CARD_WIDTH, h, '中断中の挑戦', 0xe0822a);
+    const panel = buildInfoPanel(this, CARD_WIDTH, h, tl('quest.infiniteLobby.pausedRun'), 0xe0822a);
     const top = panel.bodyTop;
     const cells: [string, string][] = [
-      ['生存時間', formatSurvival(info.survivalSeconds)],
-      ['スコア', info.score.toLocaleString('ja-JP')],
-      ['撃破数', `${info.enemiesDefeated.toLocaleString('ja-JP')}体`],
-      ['難易度', `Lv.${Math.floor(info.difficultyIndex) + 1}`],
+      [tl('quest.infiniteLobby.timeShort'), formatSurvival(info.survivalSeconds)],
+      [tl('quest.infiniteLobby.score'), info.score.toLocaleString('ja-JP')],
+      [tl('quest.infiniteLobby.defeatedShort'), tl('quest.infiniteLobby.enemiesDefeatedValue', { enemiesDefeated: info.enemiesDefeated.toLocaleString('ja-JP') })],
+      [tl('quest.infiniteLobby.difficulty'), `Lv.${Math.floor(info.difficultyIndex) + 1}`],
     ];
     cells.forEach(([label, value], i) => {
       const x = PAD + (i % 2) * (CARD_WIDTH / 2);
@@ -203,7 +204,7 @@ export class InfiniteLobbyScene extends Phaser.Scene {
       panel.container.add(caption(this, x, y + 12, label, { fontSize: '18px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       panel.container.add(body(this, x + 104, y + 12, value, { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     });
-    panel.container.add(new Button(this, CARD_WIDTH / 2, top + 130, CARD_WIDTH - PAD * 2, 76, '続きから', () => this.scene.start('InfiniteRun', { resume: true }), { variant: 'gold', fontSize: '32px', guard }));
+    panel.container.add(new Button(this, CARD_WIDTH / 2, top + 130, CARD_WIDTH - PAD * 2, 76, tl('quest.infiniteLobby.resume'), () => this.scene.start('InfiniteRun', { resume: true }), { variant: 'gold', fontSize: '32px', guard }));
     return { container: panel.container, height: panel.height };
   }
 
@@ -219,9 +220,9 @@ export class InfiniteLobbyScene extends Phaser.Scene {
         return;
       }
       openConfirm(this, this.scroll, {
-        title: '最初からやり直しますか？',
-        message: '中断中の挑戦は消えて、\n新しく始めます。',
-        confirmLabel: '新しく始める',
+        title: tl('quest.infiniteLobby.startOverTitle'),
+        message: tl('quest.infiniteLobby.startOverMessage'),
+        confirmLabel: tl('quest.infiniteLobby.startNew'),
         confirmVariant: 'gold',
         onConfirm: () => {
           delete save.infiniteMode.suspended;
@@ -230,7 +231,7 @@ export class InfiniteLobbyScene extends Phaser.Scene {
         },
       });
     };
-    const button = new Button(this, CARD_WIDTH / 2, h / 2, CARD_WIDTH, h, !hasParty ? '編成が空です' : hasSuspended ? '新しく挑戦する' : '挑戦開始', start, {
+    const button = new Button(this, CARD_WIDTH / 2, h / 2, CARD_WIDTH, h, !hasParty ? tl('quest.shared.emptyParty') : hasSuspended ? tl('quest.infiniteLobby.newRun') : tl('quest.infiniteLobby.startRun'), start, {
       variant: hasParty && !hasSuspended ? 'gold' : 'wood',
       fontSize: '34px',
       guard,

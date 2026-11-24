@@ -1,6 +1,7 @@
 import type { Reward } from './rewards';
 import type { RuriPortrait } from './storyScript';
-import { TRANSFER_TEXT } from './transferText';
+import { tr, trList } from '../i18n';
+import { NAME_STEP_LINES_JA } from './transferText';
 
 /**
  * チュートリアル: the pet (ルリ) walks a new player through the game, in text and - when
@@ -40,13 +41,26 @@ export interface TutorialStep {
 
 const HOME_TAB: TutorialRect = { x: 288, y: 1156, w: 144, h: 124 };
 
-export const TUTORIAL_STEPS: TutorialStep[] = [
+/** The steps with `lines` read through trList each time (English in i18n/data/tutorialEn.ts; the voice stays Japanese). */
+function localizeSteps(steps: TutorialStep[]): TutorialStep[] {
+  return steps.map((step) => {
+    const ja = step.lines;
+    return {
+      ...step,
+      get lines() {
+        return trList('tutorial', step.id, 'lines', ja);
+      },
+    };
+  });
+}
+
+export const TUTORIAL_STEPS: TutorialStep[] = localizeSteps([
   {
     // No voice file for this one (public/assets/voice/name_entry.mp3 is simply not played if it is missing).
     id: 'name_entry',
     mood: 'happy',
     scene: 'Home',
-    lines: [...TRANSFER_TEXT.nameStep.lines],
+    lines: [...NAME_STEP_LINES_JA],
     advance: 'name',
   },
   {
@@ -152,14 +166,14 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     lines: ['これでひと通り。あとは、軍団長の好きに冒険して！', 'ホーム左の「放置報酬」は、ゲームを閉じている間もたまるよ。その下の「ミッション」をこなせば、ごほうびももらえるから、忘れずにね。', 'ルリは、ずっとここにいるから。'],
     advance: 'tap',
   },
-];
+]);
 
 /**
  * 村のチュートリアル: a second, short track. It runs on the first visit to the 村 once the main tutorial is over
  * (finished or skipped), and teaches only the village. Every step is a 'tap' one (the lit spots are pointed at, not
  * pressed), so it never gets in the way of the village's own popups. Voices: `public/assets/voice/<step id>.mp3`.
  */
-export const VILLAGE_TUTORIAL_STEPS: TutorialStep[] = [
+export const VILLAGE_TUTORIAL_STEPS: TutorialStep[] = localizeSteps([
   {
     id: 'village_welcome',
     mood: 'happy',
@@ -230,7 +244,7 @@ export const VILLAGE_TUTORIAL_STEPS: TutorialStep[] = [
     lines: ['あとは、軍団長の好きなように！ 道を敷いたり、木や花、噴水で飾ったりして、自分だけの村を作ってね。'],
     advance: 'tap',
   },
-];
+]);
 
 /** Handed over when the last village step is finished. */
 export const VILLAGE_TUTORIAL_REWARD: Reward[] = [{ type: 'gems', amount: 30 }];
@@ -241,4 +255,6 @@ export const TUTORIAL_REWARD: Reward[] = [
   { type: 'item', item: 'exp_m', amount: 5 },
 ];
 
-export const TUTORIAL_GUIDE_NAME = 'ルリ';
+/** The guide's name as shown: use `tutorialGuideName()` (the English is "Luri"). */
+export const TUTORIAL_GUIDE_NAME = 'ルリ'; // i18n-ignore
+export const tutorialGuideName = (): string => tr('tutorial', 'guide', 'name', TUTORIAL_GUIDE_NAME);

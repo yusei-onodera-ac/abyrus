@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Button } from '../ui/Button';
 import { createPanel } from '../ui/Panel';
 import { caption, CHROME, heading } from '../ui/theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -38,20 +39,20 @@ export class PauseScene extends Phaser.Scene {
     const h = 190 + count * 100;
     createPanel(this, 360, 640, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 20, gradient: false });
     const top = 640 - h / 2;
-    heading(this, 360, top + 62, '一時停止', { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
+    heading(this, 360, top + 62, t('battle.pause.title'), { fontSize: '46px', color: '#ffe9b8', stroke: INK, strokeThickness: 7 }).setOrigin(0.5);
     (data.lines ?? []).forEach((line, i) => {
       caption(this, 360, top + 122 + i * 30, line, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center' }).setOrigin(0.5);
     });
 
     let y = top + 200;
-    new Button(this, 360, y, w - 80, 84, '再開', () => this.close(), { variant: 'gold', fontSize: '34px' });
+    new Button(this, 360, y, w - 80, 84, t('battle.pause.resume'), () => this.close(), { variant: 'gold', fontSize: '34px' });
     if (data.onSuspend) {
       y += 104;
-      new Button(this, 360, y, w - 80, 76, '中断して戻る', () => this.close(data.onSuspend), { variant: 'wood', fontSize: '28px', subLabel: '続きは、あとから再開できます' });
+      new Button(this, 360, y, w - 80, 76, t('battle.pause.suspend'), () => this.close(data.onSuspend), { variant: 'wood', fontSize: '28px', subLabel: t('battle.pause.suspendNote') });
     }
     if (data.onRetire) {
       y += 100;
-      new Button(this, 360, y, w - 80, 76, 'リタイア', () => this.close(data.onRetire), { variant: 'wood', fontSize: '28px', subLabel: 'ここまでの記録で終了します' });
+      new Button(this, 360, y, w - 80, 76, t('battle.pause.retire'), () => this.close(data.onRetire), { variant: 'wood', fontSize: '28px', subLabel: t('battle.pause.retireNote') });
     }
   }
 

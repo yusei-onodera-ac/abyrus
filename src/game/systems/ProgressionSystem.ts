@@ -2,10 +2,26 @@ import { BigNumber } from './BigNumber';
 import { applyGear } from '../data/equipment';
 import { mulberry32 } from '../characters/CharacterGenerator';
 import { FINAL_BOSS_ART, REGION_COUNT, getRegion, pickFeral, type RegionDef } from '../data/regions';
-import { WEEKDAY_NAMES, WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
+import { WEEKDAY_TIERS, getWeekdayDungeon, getWeekdayTier } from '../data/weekdayDungeons';
 import type { LimitedEventDef } from '../data/limitedEvents';
 import type { CombatStats, HeroClass, HeroData, Rarity } from '../types';
 import { expToNextLevel } from './LevelCurve';
+import { t as tl, type PlainKey } from '../i18n';
+
+// The day of the week (0 = Sunday, the order `Date.getDay()` counts in), as a label in the current language. The keys are
+// fixed here and `tl()` runs when the label is drawn, so a language change shows at once.
+const WEEKDAY_SHORT_KEYS: PlainKey[] = ['quest.weekday.short.sun', 'quest.weekday.short.mon', 'quest.weekday.short.tue', 'quest.weekday.short.wed', 'quest.weekday.short.thu', 'quest.weekday.short.fri', 'quest.weekday.short.sat'];
+const WEEKDAY_LONG_KEYS: PlainKey[] = ['quest.weekday.long.sun', 'quest.weekday.long.mon', 'quest.weekday.long.tue', 'quest.weekday.long.wed', 'quest.weekday.long.thu', 'quest.weekday.long.fri', 'quest.weekday.long.sat'];
+
+/** 日 / 月 ... (Sun / Mon ...). */
+export function weekdayShort(day: number): string {
+  return tl(WEEKDAY_SHORT_KEYS[day]);
+}
+
+/** 日曜日 / 月曜日 ... (Sunday / Monday ...). */
+export function weekdayLong(day: number): string {
+  return tl(WEEKDAY_LONG_KEYS[day]);
+}
 
 interface ClassBase {
   hp: number;
@@ -205,7 +221,7 @@ export const ProgressionSystem = {
       index,
       regionIndex: region.index,
       stageInRegion,
-      name: `${region.name} 第${stageInRegion + 1}層`,
+      name: tl('quest.stageName.floor', { name: region.name, stageInRegion: stageInRegion + 1 }),
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
@@ -235,7 +251,7 @@ export const ProgressionSystem = {
           seed: Math.floor(rng() * 2 ** 31),
           heroClass: 'mage',
           rarity: 5,
-          name: '教授の最終実験体・大狂獣ウロボロス',
+          name: tl('quest.stageName.finalBoss'),
           art: FINAL_BOSS_ART,
           isBoss: true,
         });
@@ -247,7 +263,7 @@ export const ProgressionSystem = {
       }
 
       waves.push({
-        name: isClimax ? '最終波 ― 大狂獣ウロボロス' : `第${w + 1}波 ― ${region.name}の狂獣`,
+        name: isClimax ? tl('quest.stageName.finalWave') : tl('quest.stageName.wave', { w: w + 1, name: region.name }),
         difficulty,
         enemies,
       });
@@ -256,7 +272,7 @@ export const ProgressionSystem = {
     const rewardDifficulty = finalDifficulty(waveCount);
     return {
       index: FINAL_STAGE_INDEX,
-      name: '狂化の塔 最奥決戦',
+      name: tl('quest.stageName.finalBattle'),
       waves,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, rewardDifficulty)),
       // The final battle pays three times the last main stage.
@@ -294,7 +310,7 @@ export const ProgressionSystem = {
       index,
       regionIndex: region.index,
       stageInRegion,
-      name: isBossStage ? `${region.name}(特別) ${region.bossName}` : `${region.name}(特別) 第${stageInRegion + 1}層`,
+      name: isBossStage ? tl('quest.stageName.extraBoss', { name: region.name, bossName: region.bossName }) : tl('quest.stageName.extraFloor', { name: region.name, stageInRegion: stageInRegion + 1 }),
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),
@@ -312,6 +328,7 @@ export const ProgressionSystem = {
     const dungeon = getWeekdayDungeon(day);
     const t = getWeekdayTier(tier);
     const tierIndex = WEEKDAY_TIERS.indexOf(t);
+    const dayName = weekdayShort(dungeon.day);
     const region = getRegion(Math.floor(t.likeStage / STAGES_PER_REGION));
     // A tier with its own fixed difficulty (超級, tuned against a fixed squad) has the same enemies every day of the week.
     const rng = mulberry32(31000 + (t.difficulty === undefined ? dungeon.day * 53 : 0) + tierIndex * 7);
@@ -322,7 +339,7 @@ export const ProgressionSystem = {
       index: tierIndex,
       regionIndex: region.index,
       stageInRegion: t.likeStage % STAGES_PER_REGION,
-      name: `${WEEKDAY_NAMES[dungeon.day]}曜 ${dungeon.name} ${t.name}`,
+      name: tl('quest.stageName.weekday', { dayName, name: dungeon.name, name2: t.name }),
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)).mul(dungeon.goldMul),
@@ -370,7 +387,7 @@ export const ProgressionSystem = {
       index,
       regionIndex: region.index,
       stageInRegion: index % STAGES_PER_REGION,
-      name: `襲撃！ ${region.name}の獣の群れ`,
+      name: tl('quest.stageName.raid', { name: region.name }),
       enemies,
       difficulty,
       rewardGold: BigNumber.from(60).mul(BigNumber.pow(1.17, difficulty)),

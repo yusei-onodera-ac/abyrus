@@ -25,6 +25,7 @@ import { homeLinesFor } from '../data/homeLines';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { wrapToWidth } from '../ui/CardParts';
 import { CLASS_LABELS, EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, MAX_LEVEL, MAX_PHASE, hex, type EquipSlot, type HeroData } from '../types';
+import { t } from '../i18n';
 
 interface HeroDetailData {
   heroId: string;
@@ -123,7 +124,7 @@ export class HeroDetailScene extends Phaser.Scene {
     g.fillRoundedRect(206, STAGE_H - 74, 300, 44, 22);
     g.lineStyle(2, CHROME.brassBright, 1);
     g.strokeRoundedRect(206, STAGE_H - 74, 300, 44, 22);
-    const label = body(this, 356, STAGE_H - 52, '最大まで強化した姿', { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+    const label = body(this, 356, STAGE_H - 52, t('hero.detail.maxedBadge'), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
     enter(this, g, { dy: 10, delay: 260 });
     enter(this, label, { dy: 10, delay: 260 });
   }
@@ -196,7 +197,7 @@ export class HeroDetailScene extends Phaser.Scene {
     bar.fillRect(0, 62, 720, 3);
     bar.fillStyle(CHROME.brassBright, 0.55);
     bar.fillRect(0, 58, 720, 1);
-    const title = heading(this, 360, 32, this.detailData.preview ? 'キャラ詳細　最大強化' : 'キャラ詳細', { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
+    const title = heading(this, 360, 32, this.detailData.preview ? t('hero.detail.titleMaxed') : t('hero.detail.title'), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     enter(this, bar, { dy: -20, duration: 280 });
     enter(this, title, { dy: -20, duration: 280, delay: 40 });
   }
@@ -213,7 +214,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const label = body(this, 92, STAGE_H - 49, CLASS_LABELS[hero.heroClass], { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
 
     const power = ProgressionSystem.computeHeroPower(hero).toString();
-    const powerText = body(this, 706, STAGE_H - 14, `総合力：${power}`, { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 1);
+    const powerText = body(this, 706, STAGE_H - 14, t('hero.stat.powerValue', { power }), { fontSize: '25px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 1);
     enter(this, plate, { dx: -30, dy: 0, delay: 200 });
     enter(this, label, { dx: -30, dy: 0, delay: 200 });
     enter(this, powerText, { dx: 30, dy: 0, delay: 200 });
@@ -236,7 +237,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const needed = expToNextLevel(hero.level);
     const atMax = hero.level >= MAX_LEVEL;
     block.add(body(this, x, 68, `Lv.${hero.level}`, { fontSize: '34px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    block.add(caption(this, right, 74, atMax ? 'レベル最大' : `次のLvまで：${Math.max(0, needed - hero.exp).toLocaleString('ja-JP')}`, { fontSize: '21px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    block.add(caption(this, right, 74, atMax ? t('hero.level.max') : t('hero.level.toNext', { value: Math.max(0, needed - hero.exp).toLocaleString('ja-JP') }), { fontSize: '21px', color: atMax ? '#ffd23f' : '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
 
     const barW = right - x;
     const bar = this.add.graphics();
@@ -252,21 +253,21 @@ export class HeroDetailScene extends Phaser.Scene {
     block.add(bar);
 
     block.add(this.statPair('HP', stats.maxHp.toString(), x, 138));
-    block.add(this.statPair('攻撃', stats.atk.toString(), x + 262, 138));
+    block.add(this.statPair(t('hero.stat.atkShort'), stats.atk.toString(), x + 262, 138));
     enter(this, block, { dy: 24, duration: 340, delay: 120 });
     return h;
   }
 
   /** "HP：480" - a small label then its value, the pair's left edge at x. */
   private statPair(label: string, value: string, x: number, y: number): Phaser.GameObjects.Container {
-    const l = caption(this, 0, 0, `${label}：`, { fontSize: '21px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
+    const l = caption(this, 0, 0, t('hero.detail.statLabel', { label }), { fontSize: '21px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     const v = body(this, l.width, 0, value, { fontSize: '26px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
     return this.add.container(x, y, [l, v]);
   }
 
   /** フェーズ: ten pips and "n / 10". Raised in the 強化 screen. */
   private buildPhasePanel(hero: HeroData, y: number): number {
-    const panel = buildInfoPanel(this, PANEL_W, 82, 'フェーズ', 0x6a3fb0);
+    const panel = buildInfoPanel(this, PANEL_W, 82, t('hero.phase.title'), 0x6a3fb0);
     const top = panel.bodyTop;
     for (let i = 0; i < MAX_PHASE; i++) {
       const filled = i < hero.phase;
@@ -279,7 +280,7 @@ export class HeroDetailScene extends Phaser.Scene {
       panel.container.add(g);
     }
     panel.container.add(body(this, PANEL_W - 18, top + 28, `${hero.phase} / ${MAX_PHASE}`, { fontSize: '30px', fontStyle: 'bold', color: '#d9c2ff', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
-    panel.container.add(caption(this, 18, top + 64, this.detailData.preview ? 'フェーズが最大のときの姿です' : '同じキャラを合成するか、フェーズ素材を使うと上がります', { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    panel.container.add(caption(this, 18, top + 64, this.detailData.preview ? t('hero.detail.phasePreview') : t('hero.detail.phaseHint'), { fontSize: '17px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     panel.container.setPosition(PANEL_X, y);
     enter(this, panel.container, { dy: 24, duration: 340, delay: 170 });
     return panel.height;
@@ -288,13 +289,13 @@ export class HeroDetailScene extends Phaser.Scene {
   /** 防御 / 素早さ / 会心率 / 会心倍率 in four cells. */
   private buildStatsPanel(hero: HeroData, y: number): number {
     const stats = ProgressionSystem.computeHeroStats(hero);
-    const panel = buildInfoPanel(this, PANEL_W, 74, 'ステータス', 0x3f7a3a);
+    const panel = buildInfoPanel(this, PANEL_W, 74, t('hero.detail.stats'), 0x3f7a3a);
     const top = panel.bodyTop;
     const cells: [string, string][] = [
-      ['防御力', stats.def.toLocaleString('ja-JP')],
-      ['素早さ', stats.spd.toLocaleString('ja-JP')],
-      ['会心率', `${Math.round(stats.critRate * 100)}%`],
-      ['会心倍率', `×${stats.critMul.toFixed(1)}`],
+      [t('hero.stat.def'), stats.def.toLocaleString('ja-JP')],
+      [t('hero.stat.spd'), stats.spd.toLocaleString('ja-JP')],
+      [t('hero.stat.critRate'), `${Math.round(stats.critRate * 100)}%`],
+      [t('hero.stat.critMul'), `×${stats.critMul.toFixed(1)}`],
     ];
     const cellW = PANEL_W / cells.length;
     cells.forEach(([label, value], i) => {
@@ -318,7 +319,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const x = 12;
     const top = 112;
     const container = this.add.container(0, 0);
-    container.add(caption(this, x + w / 2, top - 8, '装備', { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
+    container.add(caption(this, x + w / 2, top - 8, t('hero.gear.title'), { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
     EQUIP_SLOTS.forEach((slot: EquipSlot, i) => {
       const item = hero.gear[slot];
       const def = item ? getEquipDef(item.defId) : undefined;
@@ -334,9 +335,9 @@ export class HeroDetailScene extends Phaser.Scene {
         const name = body(this, x + 60, y + 19, def.name, { fontSize: '17px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
         if (name.width > w - 66) name.setScale((w - 66) / name.width);
         container.add(name);
-        container.add(caption(this, x + 60, y + 43, `Lv.${item.level} ${describeEquip(item).split(' ')[1] ?? ''}`, { fontSize: '15px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        container.add(caption(this, x + 60, y + 43, `Lv.${item.level} ${describeEquip(item).split(' ').pop() ?? ''}`, { fontSize: '15px', color: '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       } else {
-        container.add(caption(this, x + 14, y + h / 2, `${EQUIP_SLOT_LABELS[slot]}　なし`, { fontSize: '19px', color: '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        container.add(caption(this, x + 14, y + h / 2, t('hero.gear.slotNone', { EQUIP_SLOT_LABELS: EQUIP_SLOT_LABELS[slot] }), { fontSize: '19px', color: '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       }
       const hit = this.add.zone(x + w / 2, y + h / 2, w, h).setOrigin(0.5);
       hit.setInteractive({ useHandCursor: true });
@@ -363,7 +364,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const container = this.add.container(0, 0);
     this.chips = container;
 
-    container.add(caption(this, x + w / 2, top - 8, 'スキル', { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
+    container.add(caption(this, x + w / 2, top - 8, t('hero.detail.skills'), { fontSize: '20px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5, 1));
     let shown = 0;
     for (let slot = 0; slot < slotCount; slot++) {
       const def = loadout[slot];
@@ -378,7 +379,7 @@ export class HeroDetailScene extends Phaser.Scene {
       g.strokeRoundedRect(x, y, w, h, 10);
       container.add(g);
       container.add(body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-      const sub = unlocked ? `Lv.${hero.skillLevels[slot] ?? 1}` : `Lv.${SKILL_SLOT_UNLOCK_LEVEL[slot]}で解放`;
+      const sub = unlocked ? `Lv.${hero.skillLevels[slot] ?? 1}` : t('hero.detail.chipUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] });
       container.add(caption(this, x + 10, y + 44, sub, { fontSize: '17px', color: unlocked ? '#ffd9a0' : '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       if (unlocked) container.add(caption(this, x + w - 10, y + 44, SKILL_KIND_LABELS[def.kind], { fontSize: '14px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     }
@@ -413,8 +414,8 @@ export class HeroDetailScene extends Phaser.Scene {
     const block = this.add.zone(360, cy, w, h).setInteractive();
     modal.add([panel, block]);
 
-    modal.add(body(this, 360, top + 40, `${hero.name} のスキル`, { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
-    const note = this.detailData.preview ? 'すべてのスキルが最大レベルです' : `所持 技素：${this.save.skillEssence.toLocaleString('ja-JP')}`;
+    modal.add(body(this, 360, top + 40, t('hero.detail.skillsTitle', { name: hero.name }), { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    const note = this.detailData.preview ? t('hero.detail.skillsAllMax') : t('hero.detail.skillEssenceHeld', { skillEssence: this.save.skillEssence.toLocaleString('ja-JP') });
     modal.add(caption(this, 360, top + 86, note, { fontSize: '22px', color: '#ffd9a0', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
 
     let row = 0;
@@ -427,7 +428,7 @@ export class HeroDetailScene extends Phaser.Scene {
       this.buildSkillRow(modal, hero, def, slot, left + 28, rowTop + 14, w - 56, rowH - 28);
     }
 
-    modal.add(new Button(this, 360, top + h - footH / 2, 260, 68, '閉じる', () => this.closeSkillModal(), { variant: 'wood', fontSize: '26px' }));
+    modal.add(new Button(this, 360, top + h - footH / 2, 260, 68, t('common.close'), () => this.closeSkillModal(), { variant: 'wood', fontSize: '26px' }));
   }
 
   private buildSkillRow(modal: Phaser.GameObjects.Container, hero: HeroData, def: SkillDefinition, slot: number, x: number, y: number, w: number, h: number): void {
@@ -437,7 +438,7 @@ export class HeroDetailScene extends Phaser.Scene {
     modal.add(caption(this, x, y + 56, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0.5));
 
     if (!unlocked) {
-      modal.add(caption(this, x, y + h - 14, `キャラ Lv.${SKILL_SLOT_UNLOCK_LEVEL[slot]} で解放`, { fontSize: '21px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      modal.add(caption(this, x, y + h - 14, t('hero.detail.rowUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] }), { fontSize: '21px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       return;
     }
 
@@ -452,10 +453,10 @@ export class HeroDetailScene extends Phaser.Scene {
     }
     const maxed = level >= MAX_SKILL_LEVEL;
     const cost = maxed ? 0 : skillUpgradeCost(level);
-    const button = new Button(this, x + w - 80, y + h - 27, 160, 58, maxed ? 'MAX' : '強化', () => this.upgradeSkill(hero, slot), {
+    const button = new Button(this, x + w - 80, y + h - 27, 160, 58, maxed ? 'MAX' : t('hero.detail.skillUpgrade'), () => this.upgradeSkill(hero, slot), {
       variant: 'gold',
       fontSize: '26px',
-      subLabel: maxed ? undefined : `${cost.toLocaleString('ja-JP')} 技素`,
+      subLabel: maxed ? undefined : t('hero.detail.skillCost', { cost: cost.toLocaleString('ja-JP') }),
     });
     button.setEnabled(!maxed && this.save.skillEssence >= cost);
     modal.add(button);
@@ -477,7 +478,7 @@ export class HeroDetailScene extends Phaser.Scene {
   private setAsHome(hero: HeroData): void {
     if (!SaveSystem.setHomeHero(this.save, hero.id)) return;
     SaveSystem.save(this.save);
-    showToast(this, `${hero.name} をホームに設定しました`);
+    showToast(this, t('hero.detail.homeSet', { name: hero.name }));
     this.scene.restart(this.detailData);
   }
 
@@ -485,7 +486,7 @@ export class HeroDetailScene extends Phaser.Scene {
   private buildButtons(hero: HeroData): void {
     if (this.detailData.preview) {
       // Looking only: no button acts on a hero that may not be owned.
-      const note = caption(this, 440, 1114, 'まだ持っていなくても、最大まで強化した姿を見られます', { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+      const note = caption(this, 440, 1114, t('hero.detail.previewNote'), { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
       if (note.width > 520) note.setScale(520 / note.width);
       enter(this, note, { dy: 20, delay: 260 });
       return;
@@ -501,7 +502,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const right = 704;
     const isHome = SaveSystem.getHomeHero(this.save)?.id === hero.id;
     const makeHome = (cx: number, w: number, fontSize: string): Button => {
-      const b = new Button(this, cx, y, w, h, isHome ? 'ホーム表示中' : 'ホームに設定', () => this.setAsHome(hero), { variant: 'wood', fontSize });
+      const b = new Button(this, cx, y, w, h, isHome ? t('hero.detail.onHome') : t('hero.detail.setHome'), () => this.setAsHome(hero), { variant: 'wood', fontSize });
       b.setEnabled(!isHome);
       return b;
     };
@@ -512,9 +513,9 @@ export class HeroDetailScene extends Phaser.Scene {
     const cx = (i: number): number => left + w / 2 + i * (w + gap);
     const small = count === 3 ? '22px' : '26px';
     let i = 0;
-    if (fromRoster) buttons.push(new Button(this, cx(i++), y, w, h, '編成にセット', () => this.scene.start('Roster', { preSelect: hero.id }), { variant: 'wood', fontSize: small }));
+    if (fromRoster) buttons.push(new Button(this, cx(i++), y, w, h, t('hero.detail.addToParty'), () => this.scene.start('Roster', { preSelect: hero.id }), { variant: 'wood', fontSize: small }));
     buttons.push(makeHome(cx(i++), w, small));
-    buttons.push(new Button(this, cx(i), y, w, h, '強化する', enhance, { variant: 'gold', fontSize: count === 3 ? '28px' : '30px' }));
+    buttons.push(new Button(this, cx(i), y, w, h, t('hero.detail.enhance'), enhance, { variant: 'gold', fontSize: count === 3 ? '28px' : '30px' }));
     buttons.forEach((b, i) => enter(this, b, { dy: 20, delay: 260 + i * 50 }));
   }
 }

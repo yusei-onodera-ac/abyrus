@@ -50,6 +50,7 @@ import { applyBattleBackground } from '../ui/Background';
 import { subheading, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { MAX_LEVEL } from '../types';
 import { enter, popIn } from '../ui/Transitions';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -201,7 +202,7 @@ export class BattleScene extends Phaser.Scene {
     // A wood-and-brass strip across the top: 撤退 and the stage's name.
     const hud = this.add.container(0, 0).setDepth(30);
     hud.add(createPanel(this, 360, 62, 696, 92, { fillColor: CHROME.woodFill, fillAlpha: 0.94, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 14, gradient: false }));
-    hud.add(new Button(this, 104, 62, 160, 62, '撤退', () => this.scene.start(this.mode === 'raid' ? 'Village' : 'Home'), { variant: 'wood', fontSize: '26px' }));
+    hud.add(new Button(this, 104, 62, 160, 62, t('battle.hud.retreat'), () => this.scene.start(this.mode === 'raid' ? 'Village' : 'Home'), { variant: 'wood', fontSize: '26px' }));
     const titleText = subheading(this, 408, 62, title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5);
     if (titleText.width > 470) titleText.setScale(470 / titleText.width);
     hud.add(titleText);
@@ -213,7 +214,7 @@ export class BattleScene extends Phaser.Scene {
     this.tweens.timeScale = 1;
     this.time.timeScale = 1;
     if (pFront.length + pBack.length === 0) {
-      caption(this, 360, 640, '編成が空です。\n名鑑でパーティを編成してください。', { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
+      caption(this, 360, 640, t('battle.hud.partyEmpty'), { fontSize: '16px', color: '#ff8080', align: 'center' }).setOrigin(0.5);
       return;
     }
 
@@ -417,7 +418,7 @@ export class BattleScene extends Phaser.Scene {
     const target = targetView.sprite;
     this.anim.lunge(attackerView.sprite, target);
     if (event.blocked) {
-      this.popups.pop(target.x, target.y - 30, event.damage, { label: '無敵' });
+      this.popups.pop(target.x, target.y - 30, event.damage, { label: t('battle.status.immune') });
       this.fx.block(target.x, target.y);
       return;
     }
@@ -451,7 +452,7 @@ export class BattleScene extends Phaser.Scene {
         const pos = this.computePlayerUnitPosition(unit);
         this.createUnitView(unit, pos.x, pos.y, true);
         const view = this.views.get(unit.id);
-        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', '復活');
+        if (view) this.fx.status(view.sprite.x, view.sprite.y, 'heal', t('battle.status.revive'));
         if (view && result.heal) this.popups.pop(view.sprite.x, view.sprite.y - 30, result.heal, { heal: true });
         continue;
       }
@@ -480,16 +481,16 @@ export class BattleScene extends Phaser.Scene {
         this.fx.status(x, y, 'heal');
       } else if (result.buffAtk || result.buffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.gold);
-        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? '攻防UP' : result.buffAtk ? '攻撃UP' : '防御UP');
+        this.fx.status(x, y, 'buff', result.buffAtk && result.buffDef ? t('battle.status.atkDefUp') : result.buffAtk ? t('battle.status.atkUp') : t('battle.status.defUp'));
       } else if (result.debuffAtk || result.debuffDef) {
         this.anim.statusFlash(targetView.sprite, COLORS.danger);
-        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? '攻防DOWN' : result.debuffAtk ? '攻撃DOWN' : '防御DOWN');
+        this.fx.status(x, y, 'debuff', result.debuffAtk && result.debuffDef ? t('battle.status.atkDefDown') : result.debuffAtk ? t('battle.status.atkDown') : t('battle.status.defDown'));
       } else if (result.stunned) {
         this.anim.statusFlash(targetView.sprite, COLORS.textMuted);
-        this.fx.status(x, y, 'stun', 'スタン');
+        this.fx.status(x, y, 'stun', t('battle.status.stun'));
       } else if (result.invincible) {
         this.anim.statusFlash(targetView.sprite, 0x9fe0ff);
-        this.fx.status(x, y, 'invincible', '無敵');
+        this.fx.status(x, y, 'invincible', t('battle.status.immune'));
       }
     }
     return hold;
@@ -642,11 +643,11 @@ export class BattleScene extends Phaser.Scene {
       if (!raid) tiles.push({ kind: 'essence', amount: `+${this.rewardSkillEssence}` });
       tiles.push({ kind: 'rank', amount: `+${playerExp}`, tag: levelUp ? `Lv${levelUp.to}` : undefined });
       if (levelUp) tiles.push({ kind: 'gems', amount: `+${levelUp.gems}`, tag: 'LvUP' });
-      if (eventDef && eventClear) tiles.push({ kind: 'token', token: eventDef.token, amount: `+${eventClear.tokens}`, tag: 'イベント' });
-      if (eventClear && eventClear.gems > 0) tiles.push({ kind: 'gems', amount: `+${eventClear.gems}`, tag: '初回' });
-      if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: '初回' });
-      if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: 'ドロップ' });
-      for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: 'ドロップ' });
+      if (eventDef && eventClear) tiles.push({ kind: 'token', token: eventDef.token, amount: `+${eventClear.tokens}`, tag: t('battle.result.tagEvent') });
+      if (eventClear && eventClear.gems > 0) tiles.push({ kind: 'gems', amount: `+${eventClear.gems}`, tag: t('battle.result.tagFirstClear') });
+      if (bonus.gems > 0) tiles.push({ kind: 'gems', amount: `+${bonus.gems}`, tag: t('battle.result.tagFirstClear') });
+      if (bonus.phaseMaterials > 0) tiles.push({ kind: 'phaseMaterials', amount: `+${bonus.phaseMaterials}`, tag: t('battle.result.tagDrop') });
+      for (const { item, amount } of bonus.items) tiles.push({ kind: 'item', item, amount: `+${amount}`, tag: t('battle.result.tagDrop') });
     } else if (chain) {
       // A loss ends a 連戦.
       chainWins = AutoAdvance.wins(this.game);
@@ -718,7 +719,7 @@ export class BattleScene extends Phaser.Scene {
     panel.setScale(0.85);
     popIn(this, panel, { duration: 320, delay: 100 });
 
-    const title = heading(this, 360, top + (victory ? 58 : 84), victory ? '勝利!' : '敗北…', {
+    const title = heading(this, 360, top + (victory ? 58 : 84), victory ? t('battle.result.victory') : t('battle.result.defeat'), {
       fontSize: '46px',
       color: victory ? '#ffe9b8' : '#ff9a8a',
       stroke: INK,
@@ -728,7 +729,7 @@ export class BattleScene extends Phaser.Scene {
     title.setScale(0);
     popIn(this, title, { duration: 360, delay: 180 });
     if (!victory && wasChain) {
-      container.add(caption(this, 360, top + 130, chainWins > 0 ? `連戦は ${chainWins}勝 で終了です` : '連戦を終了しました', { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
+      container.add(caption(this, 360, top + 130, chainWins > 0 ? t('battle.result.chainEnded', { chainWins }) : t('battle.result.chainEndedPlain'), { fontSize: '20px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
     }
 
     if (partyResult) {
@@ -746,7 +747,7 @@ export class BattleScene extends Phaser.Scene {
 
     if (levelUp) {
       SoundSystem.play(this, 'reveal');
-      showToast(this, `プレイヤーレベル ${levelUp.from} → ${levelUp.to}！ スタミナが全回復しました`, '#ffd23f');
+      showToast(this, t('battle.result.playerLevelUp', { from: levelUp.from, to: levelUp.to }), '#ffd23f');
     }
     const buttons: Button[] = [];
     let countdown: Phaser.Time.TimerEvent | undefined;
@@ -756,13 +757,13 @@ export class BattleScene extends Phaser.Scene {
       const enough = StaminaSystem.canAfford(this.save, cost);
       const rowY = buttonsTop + chainH;
       buttons.push(
-        new Button(this, 360, rowY + 43, 560, 86, '次のステージへ', () => {
+        new Button(this, 360, rowY + 43, 560, 86, t('battle.result.nextStage'), () => {
           countdown?.remove();
           this.goToNextStage(next);
         }, {
           variant: 'gold',
           fontSize: '30px',
-          subLabel: `${questStageName(next)}　スタミナ ${cost}${enough ? '' : '（不足）'}`,
+          subLabel: enough ? t('battle.result.nextStageCost', { questStageName: questStageName(next), cost }) : t('battle.result.nextStageCostShort', { questStageName: questStageName(next), cost }),
         }),
       );
       const toList = (): void => {
@@ -771,18 +772,18 @@ export class BattleScene extends Phaser.Scene {
       if (chaining) {
         // 連戦: the next fight starts by itself after a short count, unless the player stops it.
         let remaining = 4;
-        const note = caption(this, 360, buttonsTop + 14, `連戦中…　${remaining}秒後に次のステージへ`, { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+        const note = caption(this, 360, buttonsTop + 14, t('battle.result.chainCountdown', { remaining }), { fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
         container.add(note);
-        const stop = new Button(this, 160, rowY + 150, 190, 66, 'ストップ', () => {
+        const stop = new Button(this, 160, rowY + 150, 190, 66, t('battle.result.chainStop'), () => {
           countdown?.remove();
           stopAutoAdvance(this.game);
-          note.setText('連戦をとめました');
+          note.setText(t('battle.result.chainStopped'));
           stop.setEnabled(false);
         }, { variant: 'danger', fontSize: '24px' });
         buttons.push(
           stop,
-          new Button(this, 360, rowY + 150, 190, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '22px' }),
-          new Button(this, 560, rowY + 150, 190, 66, 'クエスト一覧', toList, { variant: 'wood', fontSize: '22px' }),
+          new Button(this, 360, rowY + 150, 190, 66, t('battle.result.home'), () => this.scene.start('Home'), { variant: 'wood', fontSize: '22px' }),
+          new Button(this, 560, rowY + 150, 190, 66, t('battle.result.questList'), toList, { variant: 'wood', fontSize: '22px' }),
         );
         countdown = this.time.addEvent({
           delay: 1000,
@@ -790,7 +791,7 @@ export class BattleScene extends Phaser.Scene {
           callback: () => {
             remaining -= 1;
             if (remaining > 0) {
-              note.setText(`連戦中…　${remaining}秒後に次のステージへ`);
+              note.setText(t('battle.result.chainCountdown', { remaining }));
               return;
             }
             countdown?.remove();
@@ -799,13 +800,13 @@ export class BattleScene extends Phaser.Scene {
         });
       } else {
         buttons.push(
-          new Button(this, 215, rowY + 150, 270, 66, 'ホームへ', () => this.scene.start('Home'), { variant: 'wood', fontSize: '24px' }),
-          new Button(this, 505, rowY + 150, 270, 66, 'クエスト一覧', toList, { variant: 'wood', fontSize: '24px' }),
+          new Button(this, 215, rowY + 150, 270, 66, t('battle.result.home'), () => this.scene.start('Home'), { variant: 'wood', fontSize: '24px' }),
+          new Button(this, 505, rowY + 150, 270, 66, t('battle.result.questList'), toList, { variant: 'wood', fontSize: '24px' }),
         );
       }
     } else {
       buttons.push(
-        new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : this.mode === 'raid' ? '村へ戻る' : 'ホームへ戻る', () => this.onContinue(victory), {
+        new Button(this, 360, buttonsTop + 37, 340, 74, victory ? this.continueLabel() : this.mode === 'raid' ? t('battle.result.backToVillage') : t('battle.result.backToHome'), () => this.onContinue(victory), {
           variant: victory ? 'gold' : 'wood',
           fontSize: '28px',
         }),
@@ -835,12 +836,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private continueLabel(): string {
-    if (this.mode === 'final') return 'エンディングへ';
-    if (this.mode === 'extra') return 'クエスト一覧へ';
-    if (this.mode === 'weekday') return 'ダンジョン一覧へ';
-    if (this.mode === 'event') return 'イベントへ戻る';
-    if (this.mode === 'raid') return '村へ戻る';
-    return 'ストーリーへ';
+    if (this.mode === 'final') return t('battle.result.toEnding');
+    if (this.mode === 'extra') return t('battle.result.toQuestList');
+    if (this.mode === 'weekday') return t('battle.result.toDungeons');
+    if (this.mode === 'event') return t('battle.result.backToEvent');
+    if (this.mode === 'raid') return t('battle.result.backToVillage');
+    return t('battle.result.toStory');
   }
 
   /** 次のステージへ: costs that stage's stamina, like entering it from the map.
@@ -851,16 +852,14 @@ export class BattleScene extends Phaser.Scene {
     if (!StaminaSystem.canAfford(this.save, cost)) {
       if (AutoAdvance.isOn(this.game, this.save)) {
         stopAutoAdvance(this.game);
-        showToast(this, 'スタミナが足りないので、連戦を終了しました');
+        showToast(this, t('battle.result.chainEndedNoStamina'));
       }
       const wait = StaminaSystem.formatDuration(StaminaSystem.secondsUntil(this.save, cost));
       // The popup's own dim layer blocks the result panel; there is no list to freeze.
       this.modal = openConfirm(this, { setEnabled: () => {} }, {
-        title: 'スタミナが足りません',
-        message: `${questStageName(next)}はスタミナ ${cost} 必要です。（現在 ${this.save.stamina[0]}）
-回復まで あと ${wait}
-ショップでスタミナを回復しますか？`,
-        confirmLabel: 'ショップへ',
+        title: t('battle.result.notEnoughStamina'),
+        message: t('battle.result.notEnoughStaminaMessage', { questStageName: questStageName(next), cost, stamina: this.save.stamina[0], wait }),
+        confirmLabel: t('battle.result.toShop'),
         confirmVariant: 'gold',
         onConfirm: () => this.scene.start('Shop', { focus: 'stamina' }),
       });

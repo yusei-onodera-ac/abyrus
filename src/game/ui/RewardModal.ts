@@ -4,6 +4,7 @@ import { createPanel } from './Panel';
 import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { buildRewardGrid, type RewardTile } from './RewardTiles';
 import { heading, caption, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 const W = 640;
@@ -35,7 +36,7 @@ export function showRewardModal(
       top + h - 56,
       260,
       70,
-      '確認',
+      t('common.confirm'),
       () => {
         handle.close();
         opts.onClose?.();

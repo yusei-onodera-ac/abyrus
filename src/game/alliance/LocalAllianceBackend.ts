@@ -25,7 +25,7 @@ import type {
   WarRankEntry,
   WarView,
 } from './AllianceBackend';
-import { DESCRIPTION_MAX, EMBLEM_COUNT, LEAGUES, NAME_MAX, NAME_MIN, fail, ok } from './AllianceBackend';
+import { DESCRIPTION_MAX, DONATION_LABEL, EMBLEM_COUNT, LEAGUES, NAME_MAX, NAME_MIN, fail, ok } from './AllianceBackend';
 import {
   emptyDonated,
   emptyMeCounters,
@@ -87,6 +87,7 @@ import {
 import { HERO_ROSTER } from '../data/heroes';
 import { sanitizeText, stripForbidden } from '../systems/ChatSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
+import { t as tl } from '../i18n';
 
 const HOUR = 60 * 60 * 1000;
 /** 長く開かなかったときに、疑似メンバーを進める最大の時間 (それより前の分は、飛ばす)。 */
@@ -277,7 +278,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     const next = others.filter((m) => m.role === 'officer').sort((a, b) => b.contribution - a.contribution)[0] ?? [...others].sort((a, b) => b.contribution - a.contribution)[0];
     next.role = 'leader';
     mine.role = 'member';
-    this.say(own, `同盟長が長く不在のため、${next.name}が新しい同盟長になりました。`, now);
+    this.say(own, tl('alliance.say.autoLeader', { name: next.name }), now);
   }
 
   /** 日替わり (4:00) の境目を越えたら、1日ごとの数を戻す。 */
@@ -325,7 +326,7 @@ export class LocalAllianceBackend implements AllianceBackend {
         own.me.lent += 1;
         own.coins += HELPER_LENDER_COINS;
         own.war.helpers += WAR_HELPER_POINTS;
-        this.say(own, `${m.name}が、あなたの助っ人を借りました（同盟コイン +${HELPER_LENDER_COINS}）`, t);
+        this.say(own, tl('alliance.say.helperBorrowed', { name: m.name, HELPER_LENDER_COINS }), t);
       }
       // スタミナを贈ってくれる
       if (r() < 0.008 * m.act * w && own.me.receivedGifts < SUPPORT_RECEIVE_LIMIT && own.me.pendingStamina < SUPPORT_RECEIVE_LIMIT * SUPPORT_STAMINA) {
@@ -357,7 +358,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       if (f.accept && own.members.length < perks.memberMax && !own.members.some((m) => m.uid === f.uid)) {
         own.members.push(this.makeMember(world, own.id, f.uid, f.name, f.level, 'member', t, true, 0));
         this.growRaid(own);
-        this.say(own, `${f.name}が、フレンドの招待で参加しました。`, t);
+        this.say(own, tl('alliance.say.joinedByFriend', { name: f.name }), t);
       }
     }
   }
@@ -371,7 +372,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (own.joinPolicy === 'open') {
       own.members.push(this.makeMember(world, own.id, uid, name, level, 'member', t, true, 0, power));
       this.growRaid(own);
-      this.say(own, `${name}が参加しました。`, t);
+      this.say(own, tl('alliance.say.joined', { name }), t);
     } else if (own.applicants.length < MAX_APPLICANTS) {
       own.applicants.push({ uid, name, level, power, at: t });
     }
@@ -416,7 +417,17 @@ export class LocalAllianceBackend implements AllianceBackend {
       m.weekContribution = 0;
       m.weekDamage = 0;
     }
-    this.say(own, `新しい週です。今週のボスは「${RAID_BOSSES[own.raid.bossIndex].name}」。対抗戦は${own.pastWar.rank}位でした${promoted ? '（昇格！）' : demoted ? '（降格）' : ''}。`, start);
+    const bossName = RAID_BOSSES[own.raid.bossIndex].name;
+    const lastRank = own.pastWar.rank;
+    this.say(
+      own,
+      promoted
+        ? tl('alliance.say.newWeekPromoted', { bossName, lastRank })
+        : demoted
+          ? tl('alliance.say.newWeekDemoted', { bossName, lastRank })
+          : tl('alliance.say.newWeek', { bossName, lastRank }),
+      start,
+    );
   }
 
   private newRaid(own: OwnAlliance, at: number): StoredRaid {
@@ -469,7 +480,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       if (now - this.save().alliance.leftAt < LEAVE_COOLDOWN_MS) continue;
       const def = directoryOf(world).find((d) => d.id === req.allianceId);
       if (!def || def.memberCount >= perksForLevel(def.level).memberMax) continue;
-      this.joinSimAlliance(world, def, me, req.decideAt, '承認されました。よろしくお願いします！');
+      this.joinSimAlliance(world, def, me, req.decideAt, tl('alliance.say.welcomeApproved'));
     }
   }
 
@@ -583,7 +594,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     own.members = [...members, mine];
     own.raid = this.newRaid(own, at);
     this.seedProgress(world, own, at);
-    this.say(own, `${me.name}が参加しました。${welcome}`, at);
+    this.say(own, tl('alliance.say.joinedWelcome', { name: me.name, welcome }), at);
     world.own = own;
     world.requests = [];
     const save = this.save();
@@ -602,7 +613,7 @@ export class LocalAllianceBackend implements AllianceBackend {
   }
 
   private say(own: OwnAlliance, text: string, at: number): void {
-    this.push(own, { kind: 'system', senderUid: 'system', senderName: 'お知らせ', text, sentAt: at });
+    this.push(own, { kind: 'system', senderUid: 'system', senderName: 'お知らせ', text, sentAt: at }); // i18n-ignore (stored sender; system lines are drawn without it)
   }
 
   private sayAs(own: OwnAlliance, m: AllianceMember, text: string, at: number): void {
@@ -627,7 +638,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       raid.defeatedAt = t;
       raid.lastHit = m.uid;
       lastHit = true;
-      this.say(own, `「${RAID_BOSSES[raid.bossIndex].name}」を倒しました！ 止めは${m.name}。ダメージを与えた全員に、報酬があります。`, t);
+      this.say(own, tl('alliance.say.bossDefeated', { name: RAID_BOSSES[raid.bossIndex].name, name2: m.name }), t);
     }
     return { applied, defeated: raid.defeatedAt !== null, lastHit };
   }
@@ -643,7 +654,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       own.level += 1;
       up = own.level;
       need = allianceExpToNext(own.level);
-      this.say(own, `同盟がLv${own.level}になりました！ メンバー全員に、新しい恩恵があります。`, t);
+      this.say(own, tl('alliance.say.levelUp', { level: own.level }), t);
     }
     if (need === null) own.exp = 0;
     return up;
@@ -657,7 +668,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     m.lastActiveAt = Math.max(m.lastActiveAt, t);
     own.war.donation += rule.contribution;
     const levelUp = this.addAllianceExp(own, rule.allianceExp, t);
-    if (announce) this.say(own, `${m.name}が${rule.label}を寄付しました。`, t);
+    if (announce) this.say(own, tl('alliance.say.donated', { name: m.name, label: tl(DONATION_LABEL[kind]) }), t);
     return { levelUp };
   }
 
@@ -666,7 +677,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     return Object.entries(own.raid.damageBy)
       .filter(([, d]) => d > 0)
       .sort((a, b) => b[1] - a[1])
-      .map(([uid, damage], i) => ({ uid, name: names.get(uid) ?? '（脱退）', damage, rank: i + 1 }));
+      .map(([uid, damage], i) => ({ uid, name: names.get(uid) ?? tl('alliance.say.leftMember'), damage, rank: i + 1 }));
   }
 
   private summaryOf(own: OwnAlliance): AllianceSummary {
@@ -722,18 +733,18 @@ export class LocalAllianceBackend implements AllianceBackend {
 
   private requireOwn(me: PlayerProfile): Result<{ world: LocalWorld; own: OwnAlliance; mine: StoredMember; now: number }> {
     const { world, own, now } = this.sync(me);
-    if (!own) return fail('not_in_alliance', '同盟に入っていません。');
+    if (!own) return fail('not_in_alliance', tl('alliance.error.notInAlliance'));
     const mine = own.members.find((m) => m.uid === me.uid);
-    if (!mine) return fail('not_in_alliance', '同盟に入っていません。');
+    if (!mine) return fail('not_in_alliance', tl('alliance.error.notInAlliance'));
     return ok({ world, own, mine, now });
   }
 
   private validateName(world: LocalWorld, own: OwnAlliance | null, raw: string, except?: string): Result<string> {
     const name = stripForbidden(raw).replace(/\s+/g, '').trim();
     const length = Array.from(name).length;
-    if (name !== raw.replace(/\s+/g, '').trim() || length < NAME_MIN || length > NAME_MAX) return fail('bad_name', `同盟の名前は、${NAME_MIN}〜${NAME_MAX}文字で、絵文字なしで付けてください。`);
+    if (name !== raw.replace(/\s+/g, '').trim() || length < NAME_MIN || length > NAME_MAX) return fail('bad_name', tl('alliance.error.nameRules', { NAME_MIN, NAME_MAX }));
     const taken = directoryOf(world).some((d) => d.name === name && d.id !== except) || (own !== null && own.name === name && own.id !== except);
-    if (taken) return fail('name_taken', 'その名前は、すでに使われています。');
+    if (taken) return fail('name_taken', tl('alliance.error.nameTaken'));
     return ok(name);
   }
 
@@ -743,7 +754,7 @@ export class LocalAllianceBackend implements AllianceBackend {
 
   private cooldownFail(now: number): Result<never> {
     const left = this.cooldownLeft(now);
-    return fail('cooldown', `同盟を抜けてから24時間は、別の同盟に入れません（あと${Math.ceil(left / HOUR)}時間）。`);
+    return fail('cooldown', tl('alliance.error.cooldownLeft', { left: Math.ceil(left / HOUR) }));
   }
 
   // ------------------------------------------------------------------ AllianceBackend: 探す・入る・抜ける
@@ -771,20 +782,20 @@ export class LocalAllianceBackend implements AllianceBackend {
 
   async create(me: PlayerProfile, params: CreateAllianceParams): Promise<Result<AllianceSummary>> {
     const { world, own, now } = this.sync(me);
-    if (own) return fail('already_in_alliance', 'すでに同盟に入っています。');
+    if (own) return fail('already_in_alliance', tl('alliance.error.alreadyInAlliance'));
     if (this.cooldownLeft(now) > 0) return this.cooldownFail(now);
     const name = this.validateName(world, own, params.name);
     if (!name.ok) return name;
-    if (!Number.isInteger(params.emblem) || params.emblem < 0 || params.emblem >= EMBLEM_COUNT) return fail('bad_input', '紋章を選んでください。');
+    if (!Number.isInteger(params.emblem) || params.emblem < 0 || params.emblem >= EMBLEM_COUNT) return fail('bad_input', tl('alliance.error.pickEmblem'));
     const description = stripForbidden(params.description ?? '').replace(/\s+/g, ' ').trim();
-    if (Array.from(description).length > DESCRIPTION_MAX) return fail('bad_input', `説明は、${DESCRIPTION_MAX}文字までです。`);
-    if (!['open', 'approval', 'invite'].includes(params.joinPolicy)) return fail('bad_input', '参加方式を選んでください。');
-    if (!Number.isInteger(params.minPlayerLevel) || params.minPlayerLevel < 0 || params.minPlayerLevel > MIN_PLAYER_LEVEL_MAX) return fail('bad_input', `参加条件のLvは、0〜${MIN_PLAYER_LEVEL_MAX}です。`);
+    if (Array.from(description).length > DESCRIPTION_MAX) return fail('bad_input', tl('alliance.error.descriptionTooLong', { DESCRIPTION_MAX }));
+    if (!['open', 'approval', 'invite'].includes(params.joinPolicy)) return fail('bad_input', tl('alliance.error.pickJoinPolicy'));
+    if (!Number.isInteger(params.minPlayerLevel) || params.minPlayerLevel < 0 || params.minPlayerLevel > MIN_PLAYER_LEVEL_MAX) return fail('bad_input', tl('alliance.error.minLevelRange', { MIN_PLAYER_LEVEL_MAX }));
     const id = `a${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
     const created = this.baseOwn(me, now, id, { name: name.value, emblem: params.emblem, description, joinPolicy: params.joinPolicy, minPlayerLevel: params.minPlayerLevel, level: 1 });
     created.raid = this.newRaid(created, now);
     created.recruitTarget = params.joinPolicy === 'invite' ? 0 : CREATED_RECRUIT_TARGET;
-    this.say(created, `同盟「${created.name}」が結成されました。`, now);
+    this.say(created, tl('alliance.say.formed', { name: created.name }), now);
     world.own = created;
     world.requests = [];
     const save = this.save();
@@ -796,20 +807,20 @@ export class LocalAllianceBackend implements AllianceBackend {
 
   async join(me: PlayerProfile, allianceId: string): Promise<Result<'joined' | 'requested'>> {
     const { world, own, now } = this.sync(me);
-    if (own) return fail('already_in_alliance', 'すでに同盟に入っています。');
+    if (own) return fail('already_in_alliance', tl('alliance.error.alreadyInAlliance'));
     if (this.cooldownLeft(now) > 0) return this.cooldownFail(now);
     const def = directoryOf(world).find((d) => d.id === allianceId);
-    if (!def) return fail('not_found', 'その同盟は見つかりません。');
-    if (me.level < def.minPlayerLevel) return fail('level_too_low', `この同盟は、プレイヤーLv${def.minPlayerLevel}から入れます。`);
-    if (def.memberCount >= perksForLevel(def.level).memberMax) return fail('full', 'この同盟は、満員です。');
-    if (def.joinPolicy === 'invite') return fail('invite_only', 'この同盟は、招待がないと入れません。');
+    if (!def) return fail('not_found', tl('alliance.error.noSuchAlliance'));
+    if (me.level < def.minPlayerLevel) return fail('level_too_low', tl('alliance.error.needLevelLocal', { minPlayerLevel: def.minPlayerLevel }));
+    if (def.memberCount >= perksForLevel(def.level).memberMax) return fail('full', tl('alliance.error.allianceFull'));
+    if (def.joinPolicy === 'invite') return fail('invite_only', tl('alliance.error.inviteOnly'));
     if (def.joinPolicy === 'open') {
-      this.joinSimAlliance(world, def, me, now, 'よろしくお願いします！');
+      this.joinSimAlliance(world, def, me, now, tl('alliance.say.welcome'));
       this.persist();
       return ok('joined');
     }
-    if (world.requests.some((r) => r.allianceId === allianceId)) return fail('already_requested', 'すでに申請しています。');
-    if (world.requests.length >= MAX_REQUESTS) return fail('limit_reached', `申請できるのは、${MAX_REQUESTS}つまでです。`);
+    if (world.requests.some((r) => r.allianceId === allianceId)) return fail('already_requested', tl('alliance.error.alreadyApplied'));
+    if (world.requests.length >= MAX_REQUESTS) return fail('limit_reached', tl('alliance.error.tooManyApplications', { MAX_REQUESTS }));
     const r = rngOf(world.seed, 'request', allianceId, Math.floor(now / 1000));
     world.requests.push({ allianceId, at: now, decideAt: now + Math.floor((120 + r() * 480) * 1000), accept: r() < 0.9 });
     this.persist();
@@ -820,7 +831,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     const { world } = this.sync(me);
     const before = world.requests.length;
     world.requests = world.requests.filter((r) => r.allianceId !== allianceId);
-    if (world.requests.length === before) return fail('not_found', 'その申請は、ありません。');
+    if (world.requests.length === before) return fail('not_found', tl('alliance.error.noSuchRequest'));
     this.persist();
     return ok(true);
   }
@@ -841,33 +852,33 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { world, own, mine, now } = got.value;
-    if (mine.role === 'member') return fail('no_permission', '招待できるのは、同盟長と幹部です。');
+    if (mine.role === 'member') return fail('no_permission', tl('alliance.error.inviteLeaderOfficer'));
     const friend = this.save().social.friends.find((f) => f.id === friendUid);
-    if (!friend) return fail('not_found', 'フレンドではありません。');
-    if (own.members.some((m) => m.uid === friendUid)) return fail('bad_input', 'すでに同盟のメンバーです。');
-    if (own.friendInvites.some((f) => f.uid === friendUid)) return fail('already_requested', 'すでに招待しています。');
-    if (own.members.length >= perksForLevel(own.level).memberMax) return fail('full', '同盟が満員です。');
+    if (!friend) return fail('not_found', tl('alliance.error.notFriend'));
+    if (own.members.some((m) => m.uid === friendUid)) return fail('bad_input', tl('alliance.error.alreadyMember'));
+    if (own.friendInvites.some((f) => f.uid === friendUid)) return fail('already_requested', tl('alliance.error.alreadyInvited'));
+    if (own.members.length >= perksForLevel(own.level).memberMax) return fail('full', tl('alliance.error.theAllianceIsFull'));
     const day = dayKeyOf(now);
-    if (world.inviteSent[friendUid] === day) return fail('limit_reached', 'そのフレンドへの招待は、1日1回までです。');
+    if (world.inviteSent[friendUid] === day) return fail('limit_reached', tl('alliance.error.inviteOncePerDay'));
     world.inviteSent[friendUid] = day;
     const r = rngOf(world.seed, 'finvite', friendUid, Math.floor(now / HOUR));
     own.friendInvites.push({ uid: friend.id, name: friend.name, level: friend.level, decideAt: now + Math.floor((1 + r() * 2) * HOUR), accept: r() < 0.65 });
-    this.say(own, `${mine.name}が、フレンドの${friend.name}を招待しました。`, now);
+    this.say(own, tl('alliance.say.friendInvited', { name: mine.name, name2: friend.name }), now);
     this.persist();
     return ok(true);
   }
 
   async acceptInvite(me: PlayerProfile, allianceId: string): Promise<Result<true>> {
     const { world, own, now } = this.sync(me);
-    if (own) return fail('already_in_alliance', 'すでに同盟に入っています。');
+    if (own) return fail('already_in_alliance', tl('alliance.error.alreadyInAlliance'));
     if (this.cooldownLeft(now) > 0) return this.cooldownFail(now);
     const invite = world.invites.find((i) => i.allianceId === allianceId);
-    if (!invite) return fail('not_found', 'その招待は、ありません。');
+    if (!invite) return fail('not_found', tl('alliance.error.noSuchInvite'));
     const def = directoryOf(world).find((d) => d.id === allianceId);
-    if (!def) return fail('not_found', 'その同盟は、もうありません。');
-    if (def.memberCount >= perksForLevel(def.level).memberMax) return fail('full', 'この同盟は、満員です。');
+    if (!def) return fail('not_found', tl('alliance.error.allianceGone'));
+    if (def.memberCount >= perksForLevel(def.level).memberMax) return fail('full', tl('alliance.error.allianceFull'));
     world.invites = world.invites.filter((i) => i.allianceId !== allianceId);
-    this.joinSimAlliance(world, def, me, now, `${invite.fromName}さんの招待で参加しました。`);
+    this.joinSimAlliance(world, def, me, now, tl('alliance.say.welcomeInvited', { fromName: invite.fromName }));
     this.persist();
     return ok(true);
   }
@@ -876,7 +887,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     const { world } = this.sync(me);
     const before = world.invites.length;
     world.invites = world.invites.filter((i) => i.allianceId !== allianceId);
-    if (world.invites.length === before) return fail('not_found', 'その招待は、ありません。');
+    if (world.invites.length === before) return fail('not_found', tl('alliance.error.noSuchInvite'));
     this.persist();
     return ok(true);
   }
@@ -885,15 +896,15 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { world, own, mine, now } = got.value;
-    if (mine.role === 'member') return fail('no_permission', '申請を決められるのは、同盟長と幹部です。');
+    if (mine.role === 'member') return fail('no_permission', tl('alliance.error.decideLeaderOfficer'));
     const req = own.applicants.find((a) => a.uid === uid);
-    if (!req) return fail('not_found', 'その申請は、ありません。');
+    if (!req) return fail('not_found', tl('alliance.error.noSuchRequest'));
     own.applicants = own.applicants.filter((a) => a.uid !== uid);
     if (accept) {
-      if (own.members.length >= perksForLevel(own.level).memberMax) return fail('full', '同盟が満員です。');
+      if (own.members.length >= perksForLevel(own.level).memberMax) return fail('full', tl('alliance.error.theAllianceIsFull'));
       own.members.push(this.makeMember(world, own.id, req.uid, req.name, req.level, 'member', now, true, 0, req.power));
       this.growRaid(own);
-      this.say(own, `${req.name}の参加が承認されました。`, now);
+      this.say(own, tl('alliance.say.requestApproved', { name: req.name }), now);
     }
     this.persist();
     return ok(true);
@@ -904,7 +915,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { world, own, mine, now } = got.value;
     const others = own.members.filter((m) => m.uid !== me.uid);
-    if (mine.role === 'leader' && others.length > 0) return fail('no_permission', '同盟長は、ほかの人に同盟長を譲ってから抜けてください。');
+    if (mine.role === 'leader' && others.length > 0) return fail('no_permission', tl('alliance.error.leaderMustTransfer'));
     world.own = null;
     const save = this.save();
     save.alliance.allianceId = null;
@@ -918,12 +929,12 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
-    if (mine.role === 'member') return fail('no_permission', '除名できるのは、同盟長と幹部です。');
+    if (mine.role === 'member') return fail('no_permission', tl('alliance.error.kickLeaderOfficer'));
     const target = own.members.find((m) => m.uid === uid);
-    if (!target || uid === me.uid) return fail('not_found', 'そのメンバーは、いません。');
-    if (target.role === 'leader' || (mine.role === 'officer' && target.role !== 'member')) return fail('no_permission', 'この人は、除名できません。');
+    if (!target || uid === me.uid) return fail('not_found', tl('alliance.error.noSuchMember'));
+    if (target.role === 'leader' || (mine.role === 'officer' && target.role !== 'member')) return fail('no_permission', tl('alliance.error.cantKick'));
     own.members = own.members.filter((m) => m.uid !== uid);
-    this.say(own, `${target.name}が同盟から外されました。`, now);
+    this.say(own, tl('alliance.say.removed', { name: target.name }), now);
     this.persist();
     return ok(true);
   }
@@ -932,12 +943,12 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
-    if (mine.role !== 'leader') return fail('no_permission', '役職を決められるのは、同盟長だけです。');
+    if (mine.role !== 'leader') return fail('no_permission', tl('alliance.error.leaderOnlyRoles'));
     const target = own.members.find((m) => m.uid === uid);
-    if (!target || uid === me.uid) return fail('not_found', 'そのメンバーは、いません。');
-    if (role === 'officer' && target.role !== 'officer' && own.members.filter((m) => m.role === 'officer').length >= OFFICER_MAX) return fail('limit_reached', `幹部は、${OFFICER_MAX}人までです。`);
+    if (!target || uid === me.uid) return fail('not_found', tl('alliance.error.noSuchMember'));
+    if (role === 'officer' && target.role !== 'officer' && own.members.filter((m) => m.role === 'officer').length >= OFFICER_MAX) return fail('limit_reached', tl('alliance.error.officerMax', { OFFICER_MAX }));
     target.role = role;
-    this.say(own, role === 'officer' ? `${target.name}が幹部になりました。` : `${target.name}が幹部をやめました。`, now);
+    this.say(own, role === 'officer' ? tl('alliance.say.becameOfficer', { name: target.name }) : tl('alliance.say.steppedDown', { name: target.name }), now);
     this.persist();
     return ok(true);
   }
@@ -946,13 +957,13 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
-    if (mine.role !== 'leader') return fail('no_permission', '同盟長を譲れるのは、同盟長だけです。');
+    if (mine.role !== 'leader') return fail('no_permission', tl('alliance.error.leaderOnlyTransfer'));
     const target = own.members.find((m) => m.uid === uid);
-    if (!target || uid === me.uid) return fail('not_found', 'そのメンバーは、いません。');
+    if (!target || uid === me.uid) return fail('not_found', tl('alliance.error.noSuchMember'));
     const officers = own.members.filter((m) => m.role === 'officer' && m.uid !== uid).length;
     target.role = 'leader';
     mine.role = officers < OFFICER_MAX ? 'officer' : 'member';
-    this.say(own, `${target.name}が新しい同盟長になりました。`, now);
+    this.say(own, tl('alliance.say.newLeader', { name: target.name }), now);
     this.persist();
     return ok(true);
   }
@@ -961,27 +972,27 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { world, own, mine } = got.value;
-    if (mine.role !== 'leader') return fail('no_permission', '設定を変えられるのは、同盟長だけです。');
+    if (mine.role !== 'leader') return fail('no_permission', tl('alliance.error.leaderOnlySettings'));
     if (patch.name !== undefined) {
       const name = this.validateName(world, own, patch.name, own.id);
       if (!name.ok) return name;
       own.name = name.value;
     }
     if (patch.emblem !== undefined) {
-      if (!Number.isInteger(patch.emblem) || patch.emblem < 0 || patch.emblem >= EMBLEM_COUNT) return fail('bad_input', '紋章を選んでください。');
+      if (!Number.isInteger(patch.emblem) || patch.emblem < 0 || patch.emblem >= EMBLEM_COUNT) return fail('bad_input', tl('alliance.error.pickEmblem'));
       own.emblem = patch.emblem;
     }
     if (patch.description !== undefined) {
       const description = stripForbidden(patch.description).replace(/\s+/g, ' ').trim();
-      if (Array.from(description).length > DESCRIPTION_MAX) return fail('bad_input', `説明は、${DESCRIPTION_MAX}文字までです。`);
+      if (Array.from(description).length > DESCRIPTION_MAX) return fail('bad_input', tl('alliance.error.descriptionTooLong', { DESCRIPTION_MAX }));
       own.description = description;
     }
     if (patch.joinPolicy !== undefined) {
-      if (!['open', 'approval', 'invite'].includes(patch.joinPolicy)) return fail('bad_input', '参加方式を選んでください。');
+      if (!['open', 'approval', 'invite'].includes(patch.joinPolicy)) return fail('bad_input', tl('alliance.error.pickJoinPolicy'));
       own.joinPolicy = patch.joinPolicy;
     }
     if (patch.minPlayerLevel !== undefined) {
-      if (!Number.isInteger(patch.minPlayerLevel) || patch.minPlayerLevel < 0 || patch.minPlayerLevel > MIN_PLAYER_LEVEL_MAX) return fail('bad_input', `参加条件のLvは、0〜${MIN_PLAYER_LEVEL_MAX}です。`);
+      if (!Number.isInteger(patch.minPlayerLevel) || patch.minPlayerLevel < 0 || patch.minPlayerLevel > MIN_PLAYER_LEVEL_MAX) return fail('bad_input', tl('alliance.error.minLevelRange', { MIN_PLAYER_LEVEL_MAX }));
       own.minPlayerLevel = patch.minPlayerLevel;
     }
     this.persist();
@@ -992,7 +1003,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { world, mine } = got.value;
-    if (mine.role !== 'leader') return fail('no_permission', '解散できるのは、同盟長だけです。');
+    if (mine.role !== 'leader') return fail('no_permission', tl('alliance.error.leaderOnlyDisband'));
     world.own = null;
     const save = this.save();
     save.alliance.allianceId = null;
@@ -1063,11 +1074,11 @@ export class LocalAllianceBackend implements AllianceBackend {
     const perks = perksForLevel(own.level);
     let claimable: RaidView['claimable'] = null;
     if (raid.defeatedAt !== null && !raid.claimed && (myEntry?.damage ?? 0) > 0) {
-      claimable = { label: `撃破の報酬（ダメージ ${myEntry!.rank}位）`, reward: raidDefeatReward(myEntry!.rank) };
+      claimable = { label: tl('alliance.reward.defeatRank', { rank: myEntry!.rank }), reward: raidDefeatReward(myEntry!.rank) };
     } else if (own.pastRaid && !own.pastRaid.claimed && own.pastRaid.myDamage > 0) {
       claimable = own.pastRaid.defeated
-        ? { label: '先週の撃破の報酬', reward: raidDefeatReward(own.pastRaid.myRank) }
-        : { label: '先週の参加の報酬', reward: { ...RAID_REWARD_PARTICIPATION } };
+        ? { label: tl('alliance.reward.lastWeekDefeat'), reward: raidDefeatReward(own.pastRaid.myRank) }
+        : { label: tl('alliance.reward.lastWeekParticipation'), reward: { ...RAID_REWARD_PARTICIPATION } };
     }
     void now;
     return {
@@ -1110,7 +1121,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       breakdown: { raid: own.war.raid, donation: own.war.donation, stages: own.war.stages, helpers: own.war.helpers },
       table,
       rewards: WAR_REWARDS.map((b) => ({ fromRank: b.fromRank, toRank: b.toRank, label: b.label, reward: warRewardFor(b.fromRank, own.war.league) })),
-      claimable: past && !past.claimed && past.participated ? { label: `先週の対抗戦（${past.rank}位）`, rank: past.rank, promoted: past.promoted, demoted: past.demoted, reward: warRewardFor(past.rank, past.league) } : null,
+      claimable: past && !past.claimed && past.participated ? { label: tl('alliance.reward.lastWeekWar', { rank: past.rank }), rank: past.rank, promoted: past.promoted, demoted: past.demoted, reward: warRewardFor(past.rank, past.league) } : null,
     };
   }
 
@@ -1121,8 +1132,8 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
     const rule = DONATIONS[kind];
-    if (!rule) return fail('bad_input', 'その寄付は、できません。');
-    if (own.me.donated[kind] >= rule.limit) return fail('limit_reached', `今日の${rule.label}の寄付は、もう上限です。`);
+    if (!rule) return fail('bad_input', tl('alliance.error.badDonation'));
+    if (own.me.donated[kind] >= rule.limit) return fail('limit_reached', tl('alliance.error.donationLimit', { label: tl(DONATION_LABEL[kind]) }));
     own.me.donated[kind] += 1;
     mine.contribution += rule.contribution;
     mine.weekContribution += rule.contribution;
@@ -1138,8 +1149,8 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own } = got.value;
-    if (!Number.isInteger(amount) || amount < 0) return fail('bad_input', '数が正しくありません。');
-    if (own.coins < amount) return fail('not_enough', '同盟コインが足りません。');
+    if (!Number.isInteger(amount) || amount < 0) return fail('bad_input', tl('alliance.error.badAmount'));
+    if (own.coins < amount) return fail('not_enough', tl('alliance.error.notEnoughCoins'));
     own.coins -= amount;
     this.persist();
     return ok(own.coins);
@@ -1152,11 +1163,11 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own, now } = got.value;
     const raid = own.raid;
-    if (raid.defeatedAt !== null || now >= raid.endsAt) return fail('raid_over', '今週のボスは、もう倒されました。');
-    if (own.ticket && now - own.ticket.issuedAt <= RAID_TICKET_TTL_MS) return fail('limit_reached', '前回の挑戦が、まだ終わっていません（10分で失効します）。');
+    if (raid.defeatedAt !== null || now >= raid.endsAt) return fail('raid_over', tl('alliance.error.bossAlreadyDefeated'));
+    if (own.ticket && now - own.ticket.issuedAt <= RAID_TICKET_TTL_MS) return fail('limit_reached', tl('alliance.error.attemptInProgress'));
     own.ticket = null;
     const perks = perksForLevel(own.level);
-    if (own.me.used >= perks.raidAttemptsPerDay) return fail('limit_reached', '今日の挑戦回数を、使い切りました（毎日4:00に回復します）。');
+    if (own.me.used >= perks.raidAttemptsPerDay) return fail('limit_reached', tl('alliance.error.noAttemptsLeft'));
     own.me.used += 1;
     const ticket = { id: `t${now.toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`, weekId: raid.weekId, issuedAt: now, maxDamage: raidDamageCap(me.power), durationMs: RAID_DURATION_MS };
     own.ticket = ticket;
@@ -1169,19 +1180,19 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
     const stored = own.ticket;
-    if (!stored || stored.id !== ticket.id) return fail('bad_input', 'この挑戦は、無効です。');
+    if (!stored || stored.id !== ticket.id) return fail('bad_input', tl('alliance.error.attemptInvalid'));
     own.ticket = null;
     if (now - stored.issuedAt > RAID_TICKET_TTL_MS) {
       this.persist();
-      return fail('limit_reached', '時間切れで、この挑戦は無効になりました。');
+      return fail('limit_reached', tl('alliance.error.attemptTimedOut'));
     }
     if (stored.weekId !== own.raid.weekId) {
       this.persist();
-      return fail('raid_over', '週が変わったため、この挑戦は無効です。');
+      return fail('raid_over', tl('alliance.error.attemptWeekChanged'));
     }
     if (typeof damage !== 'number' || !Number.isFinite(damage) || damage < 0) {
       this.persist();
-      return fail('bad_input', 'ダメージが正しくありません。');
+      return fail('bad_input', tl('alliance.error.badDamage'));
     }
     const capped = Math.min(damage, stored.maxDamage);
     const before = own.war.raid;
@@ -1203,7 +1214,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       own.pastRaid.claimed = true;
       reward = own.pastRaid.defeated ? raidDefeatReward(own.pastRaid.myRank) : { ...RAID_REWARD_PARTICIPATION };
     }
-    if (!reward) return fail('limit_reached', '受け取れる報酬は、ありません。');
+    if (!reward) return fail('limit_reached', tl('alliance.error.nothingToClaim'));
     own.coins += reward.coins ?? 0;
     this.persist();
     return ok(reward);
@@ -1215,13 +1226,13 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own } = got.value;
-    if (!Number.isFinite(points) || points <= 0) return fail('bad_input', 'ポイントが正しくありません。');
+    if (!Number.isFinite(points) || points <= 0) return fail('bad_input', tl('alliance.error.badPoints'));
     const add = Math.min(WAR_POINTS_MAX_PER_CALL, Math.floor(points));
     if (source === 'raid') own.war.raid += add;
     else if (source === 'donation') own.war.donation += add;
     else if (source === 'stages') own.war.stages += add;
     else if (source === 'helpers') own.war.helpers += add;
-    else return fail('bad_input', 'ポイントの種類が正しくありません。');
+    else return fail('bad_input', tl('alliance.error.badPointType'));
     this.persist();
     return ok(true);
   }
@@ -1231,7 +1242,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own } = got.value;
     const past = own.pastWar;
-    if (!past || past.claimed || !past.participated) return fail('limit_reached', '受け取れる報酬は、ありません。');
+    if (!past || past.claimed || !past.participated) return fail('limit_reached', tl('alliance.error.nothingToClaim'));
     past.claimed = true;
     const reward = warRewardFor(past.rank, past.league);
     own.coins += reward.coins ?? 0;
@@ -1245,7 +1256,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { mine, now } = got.value;
-    if (helper && helper.ownerUid !== me.uid) return fail('bad_input', '自分のキャラだけが、助っ人にできます。');
+    if (helper && helper.ownerUid !== me.uid) return fail('bad_input', tl('alliance.error.ownHeroOnly'));
     mine.helper = helper ? { ...helper, skillLevels: [...helper.skillLevels], ownerName: me.name, setAt: now } : null;
     this.persist();
     return ok(true);
@@ -1255,10 +1266,10 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own, now } = got.value;
-    if (ownerUid === me.uid) return fail('bad_input', '自分の助っ人は、借りられません。');
+    if (ownerUid === me.uid) return fail('bad_input', tl('alliance.error.ownHelper'));
     const owner = own.members.find((m) => m.uid === ownerUid);
-    if (!owner) return fail('not_found', 'そのメンバーは、いません。');
-    if (!owner.helper) return fail('not_found', 'このメンバーは、助っ人を登録していません。');
+    if (!owner) return fail('not_found', tl('alliance.error.noSuchMember'));
+    if (!owner.helper) return fail('not_found', tl('alliance.error.noHelperSet'));
     const count = (own.me.borrowed[ownerUid] ?? 0) + 1;
     own.me.borrowed[ownerUid] = count;
     // 貸した側の報酬は、同じ人の助っ人で、1日に3回まで。
@@ -1275,9 +1286,9 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own } = got.value;
-    if (toUid === me.uid || !own.members.some((m) => m.uid === toUid)) return fail('not_found', 'そのメンバーは、いません。');
-    if (own.me.staminaSent.includes(toUid)) return fail('limit_reached', 'その人には、今日はもう贈りました。');
-    if (own.me.staminaSent.length >= SUPPORT_SEND_LIMIT) return fail('limit_reached', `スタミナを贈れるのは、1日${SUPPORT_SEND_LIMIT}人までです。`);
+    if (toUid === me.uid || !own.members.some((m) => m.uid === toUid)) return fail('not_found', tl('alliance.error.noSuchMember'));
+    if (own.me.staminaSent.includes(toUid)) return fail('limit_reached', tl('alliance.error.alreadySentToday'));
+    if (own.me.staminaSent.length >= SUPPORT_SEND_LIMIT) return fail('limit_reached', tl('alliance.error.sendLimit', { SUPPORT_SEND_LIMIT }));
     own.me.staminaSent.push(toUid);
     this.persist();
     return ok(true);
@@ -1297,9 +1308,10 @@ export class LocalAllianceBackend implements AllianceBackend {
     const got = this.requireOwn(me);
     if (!got.ok) return got;
     const { own, now } = got.value;
-    if (what !== 'raid' && what !== 'village') return fail('bad_input', '救援の種類が正しくありません。');
-    if (now - own.me.lastHelpRequestAt < HELP_REQUEST_INTERVAL_MS) return fail('limit_reached', '救援要請は、1時間に1回までです。');
+    if (what !== 'raid' && what !== 'village') return fail('bad_input', tl('alliance.error.badHelpType'));
+    if (now - own.me.lastHelpRequestAt < HELP_REQUEST_INTERVAL_MS) return fail('limit_reached', tl('alliance.error.helpRequestInterval'));
     own.me.lastHelpRequestAt = now;
+    // i18n-ignore (stored text of the request; the card draws its own wording)
     this.push(own, { kind: 'help', senderUid: me.uid, senderName: me.name, text: what === 'raid' ? 'ボスの討伐を、手伝ってください！' : '村の襲撃に、力を貸してください！', sentAt: now, help: { what, helpers: [], open: true } });
     this.persist();
     return ok(true);
@@ -1310,10 +1322,10 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own, mine, now } = got.value;
     const msg = own.chat.find((c) => c.id === messageId && c.kind === 'help');
-    if (!msg || !msg.help) return fail('not_found', 'その救援要請は、ありません。');
-    if (msg.senderUid === me.uid) return fail('bad_input', '自分の要請には、答えられません。');
-    if (!msg.help.open) return fail('limit_reached', 'この要請は、もう締め切られました。');
-    if (msg.help.helpers.includes(me.name)) return fail('limit_reached', 'この要請には、もう答えました。');
+    if (!msg || !msg.help) return fail('not_found', tl('alliance.error.noSuchHelpRequest'));
+    if (msg.senderUid === me.uid) return fail('bad_input', tl('alliance.error.cantAnswerOwn'));
+    if (!msg.help.open) return fail('limit_reached', tl('alliance.error.requestClosed'));
+    if (msg.help.helpers.includes(me.name)) return fail('limit_reached', tl('alliance.error.alreadyAnswered'));
     msg.help.helpers.push(me.name);
     if (msg.help.helpers.length >= 5) msg.help.open = false;
     mine.contribution += HELP_ANSWER_CONTRIBUTION;
@@ -1341,7 +1353,7 @@ export class LocalAllianceBackend implements AllianceBackend {
     if (!got.ok) return got;
     const { own, now } = got.value;
     const clean = sanitizeText(text);
-    if (!clean) return fail('bad_input', 'メッセージが空です。');
+    if (!clean) return fail('bad_input', tl('alliance.error.emptyMessage'));
     const msg = this.push(own, { kind: 'text', senderUid: me.uid, senderName: me.name, text: clean, sentAt: now });
     this.persist();
     return ok({ ...msg });

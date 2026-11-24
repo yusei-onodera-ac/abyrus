@@ -6,6 +6,7 @@ import { showToast } from './Toast';
 import { fullDigits } from './AllianceParts';
 import { Button } from './Button';
 import { body, CHROME } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 export const HELPER_ROW_HEIGHT = 100;
@@ -44,10 +45,10 @@ export function addHelperRow(scene: Phaser.Scene, container: Phaser.GameObjects.
     bg.lineStyle(2, choice.helper ? CHROME.brassBright : CHROME.brassDark, 1);
     bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 14);
     row.add(bg);
-    row.add(body(scene, -w / 2 + 20, -20, '助っ人', { fontSize: '26px', fontStyle: 'bold', color: choice.helper ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    row.add(body(scene, -w / 2 + 20, -20, t('hero.helper.title'), { fontSize: '26px', fontStyle: 'bold', color: choice.helper ? '#ffd23f' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     const h0 = choice.helper;
-    row.add(body(scene, -w / 2 + 20, 18, h0 ? `${h0.name}　Lv.${h0.level}　（${h0.ownerName}）` : helpers.length > 0 ? '借りない　▶で選べます' : '借りられる助っ人がいません', { fontSize: '19px', color: h0 ? '#f5e6c8' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    if (h0) row.add(body(scene, w / 2 - 20, -20, `総合力 ${fullDigits(h0.power)}`, { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    row.add(body(scene, -w / 2 + 20, 18, h0 ? t('hero.helper.pick', { name: h0.name, level: h0.level, ownerName: h0.ownerName }) : helpers.length > 0 ? t('hero.helper.none') : t('hero.helper.noneAvailable'), { fontSize: '19px', color: h0 ? '#f5e6c8' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    if (h0) row.add(body(scene, w / 2 - 20, -20, t('hero.helper.power', { fullDigits: fullDigits(h0.power) }), { fontSize: '16px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     const step = (delta: number): void => {
       // -1 (none), 0 .. n-1
       const n = helpers.length;
@@ -74,7 +75,7 @@ export async function launchWithHelper(scene: Phaser.Scene, save: SaveData, rout
   if (helper) {
     const result = await AllianceService.borrowHelper(save, helper.ownerUid);
     if (result.ok) borrowed = result.value;
-    else showToast(scene, `助っ人を借りられませんでした：${result.message}`, '#ffb0a0');
+    else showToast(scene, t('hero.helper.toastFailed', { message: result.message }), '#ffb0a0');
   }
   if (!scene.scene.isActive()) return;
   if (!borrowed) {

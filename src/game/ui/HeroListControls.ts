@@ -3,6 +3,7 @@ import { CLASS_LABELS, type HeroClass } from '../types';
 import { HERO_SORTS, type HeroListView } from '../systems/HeroListView';
 import { Button } from './Button';
 import { caption } from './theme';
+import { t } from '../i18n';
 
 const INK = '#1c130a';
 const ROW_H = 46;
@@ -35,15 +36,15 @@ export function buildHeroListControls(scene: Phaser.Scene, width: number, view: 
 
   row(
     0,
-    '並び',
-    HERO_SORTS.map((s) => ({ text: s.label, active: view.sort === s.key, pick: () => ({ ...view, sort: s.key }) })),
+    t('hero.list.sort'),
+    HERO_SORTS.map((s) => ({ text: t(s.label), active: view.sort === s.key, pick: () => ({ ...view, sort: s.key }) })),
   );
   row(1, '★', [
-    { text: '全部', active: view.rarity === 0, pick: () => ({ ...view, rarity: 0 }) },
+    { text: t('hero.list.all'), active: view.rarity === 0, pick: () => ({ ...view, rarity: 0 }) },
     ...[6, 5, 4, 3, 2, 1].map((r) => ({ text: `★${r}`, active: view.rarity === r, pick: () => ({ ...view, rarity: r }) })),
   ]);
-  row(2, '職業', [
-    { text: '全部', active: view.heroClass === '', pick: () => ({ ...view, heroClass: '' as const }) },
+  row(2, t('hero.list.class'), [
+    { text: t('hero.list.all'), active: view.heroClass === '', pick: () => ({ ...view, heroClass: '' as const }) },
     ...classes.map((c) => ({ text: CLASS_LABELS[c], active: view.heroClass === c, pick: () => ({ ...view, heroClass: c }) })),
   ]);
 

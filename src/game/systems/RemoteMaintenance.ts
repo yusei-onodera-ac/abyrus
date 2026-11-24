@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { isLeaderboardConfigured } from './firebaseConfig';
 import { openFirestore, withTimeout } from './firestoreRead';
 
@@ -12,7 +13,14 @@ import { openFirestore, withTimeout } from './firestoreRead';
  */
 
 export const MAINTENANCE_MESSAGE_MAX = 300;
-export const DEFAULT_MAINTENANCE_MESSAGE = 'ただいまメンテナンス中です。\nしばらくしてから、もう一度お試しください。';
+/** The built-in message, kept as Japanese: it is what `parseMaintenance` hands back when the operator wrote none (and what tests compare
+ *  with). To SHOW a message, pass it through `maintenanceMessageText`, which gives this one in the player's language. */
+export const DEFAULT_MAINTENANCE_MESSAGE = 'ただいまメンテナンス中です。\nしばらくしてから、もう一度お試しください。'; // i18n-ignore
+
+/** The text to show for a state's message: the operator's own words as written, or (when it is the built-in default) the default message in the player's language. */
+export function maintenanceMessageText(message: string): string {
+  return message === DEFAULT_MAINTENANCE_MESSAGE ? t('social.maintenance.defaultMessage') : message;
+}
 
 export interface MaintenanceState {
   enabled: boolean;

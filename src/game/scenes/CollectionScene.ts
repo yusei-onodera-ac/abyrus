@@ -15,24 +15,33 @@ import { tilesForGranted } from '../ui/RewardTiles';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
+import { t, type PlainKey } from '../i18n';
 
 const INK = '#1c130a';
 const PAD = 14;
 const COLS = 5;
 const NAME_H = 30;
 
-const REWARD_NAME: Record<string, string> = { gems: '魔晶石', gold: 'ゴールド', stamina: 'スタミナ', phaseMaterials: 'フェーズ素材', skillEssence: '技素' };
+const REWARD_NAME: Record<string, PlainKey> = {
+  gems: 'hero.res.gems',
+  gold: 'hero.res.gold',
+  stamina: 'hero.res.stamina',
+  phaseMaterials: 'hero.res.phaseMaterial',
+  skillEssence: 'hero.res.skillEssence',
+};
 
 function rewardText(r: Reward): string {
-  if (r.type === 'equipment') return `装備★${r.rarity} ×${r.amount}`;
-  const name = r.type === 'item' ? ITEMS[r.item].short : REWARD_NAME[r.type];
+  if (r.type === 'equipment') return t('hero.collection.rewardGear', { rarity: r.rarity, amount: r.amount });
+  const name = r.type === 'item' ? ITEMS[r.item].short : t(REWARD_NAME[r.type]);
   return `${name} ${r.amount.toLocaleString('ja-JP')}`;
 }
 
 /** 図鑑: every character of the game in rows by rarity - the ones held shown, the rest as black silhouettes - and the
  *  rewards for how many are held. Tapping a held character opens it; tapping a silhouette shows what it becomes at its best. */
 export class CollectionScene extends InboxScene {
-  protected readonly screenTitle = '図鑑';
+  protected get screenTitle(): string {
+    return t('hero.collection.title');
+  }
   protected emptyText = '';
   protected readonly navTab = null;
 
@@ -66,8 +75,8 @@ export class CollectionScene extends InboxScene {
     const total = CollectionSystem.total();
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height));
-    container.add(heading(this, PAD + 6, 34, '集めたキャラ', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(body(this, CARD_WIDTH - PAD - 6, 34, `${owned} / ${total}体`, { fontSize: '30px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
+    container.add(heading(this, PAD + 6, 34, t('hero.collection.collected'), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(body(this, CARD_WIDTH - PAD - 6, 34, t('hero.collection.ownedOfTotal', { owned, total }), { fontSize: '30px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(1, 0.5));
     const barW = CARD_WIDTH - PAD * 2 - 12;
     const bar = this.add.graphics();
     bar.fillStyle(0x0d0905, 1);
@@ -97,7 +106,7 @@ export class CollectionScene extends InboxScene {
     const height = head + milestones.length * rowH + 8;
     const container = this.add.container(0, 0);
     container.add(buildCardPanel(this, CARD_WIDTH, height, CollectionSystem.claimable(this.save) > 0));
-    container.add(heading(this, PAD + 6, head / 2, '集めた数の報酬', { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(heading(this, PAD + 6, head / 2, t('hero.collection.rewards'), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
     milestones.forEach((m, i) => this.milestoneRow(container, m, head + i * rowH, rowH, guard));
     return { container, height };
   }
@@ -107,17 +116,17 @@ export class CollectionScene extends InboxScene {
     const cy = top + h / 2;
     const all = m.count >= CollectionSystem.total();
     container.add(this.add.rectangle(CARD_WIDTH / 2, top, CARD_WIDTH - PAD * 2, 2, CHROME.brassDark, 0.6));
-    container.add(body(this, PAD + 6, cy - 14, all ? `全${m.count}体` : `${m.count}体`, { fontSize: '27px', fontStyle: 'bold', color: state === 'claimed' ? '#8a7a5a' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    container.add(caption(this, PAD + 6, cy + 20, all ? 'コンプリート' : `あと ${Math.max(0, m.count - CollectionSystem.owned(this.save))}体`, { fontSize: '17px', color: state === 'locked' ? '#cdbb94' : '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    container.add(body(this, PAD + 6, cy - 14, all ? t('hero.collection.milestoneAll', { count: m.count }) : t('hero.collection.milestone', { count: m.count }), { fontSize: '27px', fontStyle: 'bold', color: state === 'claimed' ? '#8a7a5a' : '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    container.add(caption(this, PAD + 6, cy + 20, all ? t('hero.collection.complete') : t('hero.collection.remaining', { value: Math.max(0, m.count - CollectionSystem.owned(this.save)) }), { fontSize: '17px', color: state === 'locked' ? '#cdbb94' : '#9fe39f', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const text = m.rewards.map(rewardText).join('\n');
     const label = body(this, 150, cy, text, { fontSize: '19px', fontStyle: 'bold', color: state === 'claimed' ? '#8a7a5a' : '#fff4dc', stroke: INK, strokeThickness: 3, lineSpacing: 2 }).setOrigin(0, 0.5);
     container.add(label);
     const bw = 150;
     const bx = CARD_WIDTH - PAD - bw / 2 - 4;
     if (state === 'claimable') {
-      container.add(new Button(this, bx, cy, bw, 62, '受け取る', () => this.claim(m), { variant: 'gold', fontSize: '24px', guard }));
+      container.add(new Button(this, bx, cy, bw, 62, t('common.claim'), () => this.claim(m), { variant: 'gold', fontSize: '24px', guard }));
     } else {
-      const b = new Button(this, bx, cy, bw, 62, state === 'claimed' ? '受け取り済み' : '未達成', () => undefined, { variant: 'wood', fontSize: state === 'claimed' ? '19px' : '22px' });
+      const b = new Button(this, bx, cy, bw, 62, state === 'claimed' ? t('common.claimed') : t('hero.collection.notYet'), () => undefined, { variant: 'wood', fontSize: state === 'claimed' ? '19px' : '22px' });
       b.setEnabled(false);
       container.add(b);
     }
@@ -129,7 +138,7 @@ export class CollectionScene extends InboxScene {
     SaveSystem.save(this.save);
     this.refreshResources();
     this.modal?.close();
-    this.modal = showRewardModal(this, this.scroll, { title: `${m.count >= CollectionSystem.total() ? '図鑑コンプリート' : `${m.count}体を集めた`}報酬`, tiles: tilesForGranted(granted), onClose: () => this.queueRender() });
+    this.modal = showRewardModal(this, this.scroll, { title: m.count >= CollectionSystem.total() ? t('hero.collection.rewardComplete') : t('hero.collection.rewardCount', { count: m.count }), tiles: tilesForGranted(granted), onClose: () => this.queueRender() });
   }
 
   // ------------------------------------------------------------ the book --
@@ -178,7 +187,7 @@ export class CollectionScene extends InboxScene {
           size,
         ),
       );
-      const name = caption(this, cx, cy + size / 2 + 18, have ? def.name : '？？？', { fontSize: '15px', fontStyle: 'bold', color: have ? '#f5e6c8' : '#6f6552', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+      const name = caption(this, cx, cy + size / 2 + 18, have ? def.name : t('hero.collection.unknown'), { fontSize: '15px', fontStyle: 'bold', color: have ? '#f5e6c8' : '#6f6552', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
       const room = size + gapX - 6;
       if (name.width > room) name.setScale(room / name.width);
       container.add(name);

@@ -1,0 +1,161 @@
+// i18n: the message lookup (fallback, {placeholders}, plurals), the device-language choice, the language kept in a save, and
+// that every key the code asks for exists in the Japanese table.
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
+import { formatMessage, formatNumber, getLanguage, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
+import { detectLanguage, fallbackChain, isLanguage, LANGUAGES } from '../../src/game/i18n/languages';
+import { TABLES } from '../../src/game/i18n/tables';
+import { tr } from '../../src/game/i18n/dataTexts';
+import { enData } from '../../src/game/i18n/data/en';
+import { SettingsSystem } from '../../src/game/systems/SettingsSystem';
+import { SaveSystem } from '../../src/game/systems/SaveSystem';
+
+let failures = 0;
+function ok(cond: unknown, label: string): void {
+  if (!cond) failures++;
+  console.log(`${cond ? 'PASS' : 'FAIL'}  ${label}`);
+}
+
+// the tables are plain objects: this test adds a few keys of its own (and takes them out again)
+const ja = TABLES.ja as Record<string, string>;
+const en = TABLES.en as Record<string, string>;
+const mem = (table: Record<string, string>, key: string, value: string): void => void (table[key] = value);
+mem(ja, 'test.both', 'JA both');
+mem(en, 'test.both', 'EN both');
+mem(ja, 'test.onlyJa', 'JA only');
+mem(ja, 'test.hello', 'こんにちは、{name}さん');
+mem(en, 'test.hello', 'Hello, {name}!');
+mem(ja, 'test.items', '{count}個');
+mem(en, 'test.items', '{count, plural, one {# item} other {# items}}');
+mem(ja, 'test.mixed', '{who}が{count}個');
+mem(en, 'test.mixed', '{who} has {count, plural, =0 {nothing} one {# item} other {# items}} ({count} total)');
+
+// ---- language state
+setLanguage('ja', { persist: false });
+ok(getLanguage() === 'ja', 'the language can be set');
+let heard: string[] = [];
+const stop = onLanguageChange((l) => heard.push(l));
+setLanguage('en', { persist: false });
+setLanguage('en', { persist: false });
+ok(heard.length === 1 && heard[0] === 'en', 'a listener hears a change once (not a repeat of the same language)');
+stop();
+setLanguage('ja', { persist: false });
+ok(heard.length === 1, 'a stopped listener hears nothing more');
+// @ts-expect-error an unknown language is ignored, not stored
+setLanguage('xx', { persist: false });
+ok(getLanguage() === 'ja', 'an unknown language is ignored');
+heard = [];
+
+// ---- lookup and fallback
+ok(translate('ja', 'test.both') === 'JA both' && translate('en', 'test.both') === 'EN both', 'each language gets its own text');
+ok(translate('en', 'test.onlyJa') === 'JA only', 'a key missing in English falls back to Japanese');
+ok(fallbackChain('en')[0] === 'en' && fallbackChain('en').at(-1) === 'ja', 'the fallback chain ends in Japanese');
+ok(fallbackChain('ja').join() === 'ja', 'Japanese falls back to nothing else');
+const warn = console.warn;
+let warned = 0;
+console.warn = () => void warned++;
+ok(translate('en', 'test.nowhere') === 'test.nowhere', 'a key nobody has is returned as it is (visible, not blank)');
+translate('en', 'test.nowhere');
+console.warn = warn;
+ok(warned === 1, 'and is reported once');
+setLanguage('en', { persist: false });
+ok(tDynamic('test.both') === 'EN both', 'tDynamic looks up in the current language');
+setLanguage('ja', { persist: false });
+ok(tDynamic('test.both') === 'JA both', 'and follows a language change');
+
+// ---- interpolation
+ok(translate('ja', 'test.hello', { name: 'ルリ' }) === 'こんにちは、ルリさん', 'a {placeholder} is filled');
+ok(translate('en', 'test.hello', { name: 'Luri' }) === 'Hello, Luri!', 'in each language');
+ok(formatMessage('{a}-{a}-{b}', { a: 1, b: 'x' }, 'en-US') === '1-1-x', 'a placeholder may repeat; numbers are written as they are');
+ok(formatMessage('{a} {missing}', { a: 'x' }, 'en-US') === 'x {missing}', 'a placeholder with no value stays visible');
+ok(formatMessage('no braces', undefined, 'en-US') === 'no braces', 'text without placeholders is untouched');
+ok(formatMessage('100%の{x}', { x: 5 }, 'ja-JP') === '100%の5', 'other symbols pass through');
+ok(formatMessage('{a}', { a: 12345678901234 }, 'en-US') === '12345678901234', 'a big number keeps every digit (no abbreviation)');
+
+// ---- plurals
+ok(translate('en', 'test.items', { count: 1 }) === '1 item', 'English: one -> singular');
+ok(translate('en', 'test.items', { count: 2 }) === '2 items', 'English: other -> plural');
+ok(translate('en', 'test.items', { count: 0 }) === '0 items', 'English: zero -> plural');
+ok(translate('ja', 'test.items', { count: 3 }) === '3個', 'Japanese has no plural');
+ok(translate('en', 'test.mixed', { who: 'Ann', count: 0 }) === 'Ann has nothing (0 total)', '=0 matches exactly, and the placeholder after a plural still works');
+ok(translate('en', 'test.mixed', { who: 'Ann', count: 1 }) === 'Ann has 1 item (1 total)', 'the plural inside a sentence');
+ok(translate('ja', 'test.mixed', { who: 'アン', count: 4 }) === 'アンが4個', 'the same key in Japanese');
+ok(formatNumber(1234567, 'en') === '1,234,567' && formatNumber(1234567, 'ja') === '1,234,567', 'numbers are grouped, with every digit');
+ok(formatNumber(123456789012345678901234567890n, 'en') === '123,456,789,012,345,678,901,234,567,890', 'even a bigint is written in full');
+
+// ---- device language (first run)
+ok(detectLanguage('ja') === 'ja' && detectLanguage('ja-JP') === 'ja' && detectLanguage('JA-jp') === 'ja', 'ja* -> Japanese');
+ok(detectLanguage('en-US') === 'en' && detectLanguage('en') === 'en' && detectLanguage('en_GB') === 'en', 'en* -> English');
+ok(detectLanguage('fr-FR') === 'en' && detectLanguage('de') === 'en' && detectLanguage('zh-Hant-TW') === 'en' && detectLanguage('ko-KR') === 'en', 'another language we do not have yet -> English');
+ok(detectLanguage(undefined) === 'ja' && detectLanguage('') === 'ja' && detectLanguage(null) === 'ja' && detectLanguage([]) === 'ja', 'no language at all -> Japanese');
+ok(detectLanguage('???') === 'ja' && detectLanguage('x') === 'ja', 'garbage -> Japanese');
+ok(detectLanguage(['en-GB', 'ja']) === 'en' && detectLanguage(['ja-JP', 'en']) === 'ja', 'a list of preferences: the first one counts');
+ok(detectLanguage('jav') === 'en', '"jav" (Javanese) is not "ja"');
+
+// ---- the language in a save
+{
+  ok(isLanguage('ja') && isLanguage('en') && !isLanguage('fr') && !isLanguage(undefined), 'isLanguage');
+  ok(LANGUAGES.every((l) => isLanguage(l.code) && l.name.length > 0 && l.locale.length >= 2), 'every language has a name and a locale');
+  const old = SettingsSystem.restore({ email: '', twitter: '' } as never);
+  ok(old.language === 'ja', 'a save from before languages existed (settings without one) is Japanese');
+  ok(SettingsSystem.restore(undefined).language === 'ja', 'a save with no settings at all is Japanese');
+  ok(SettingsSystem.restore({ language: 'fr' } as never).language === 'ja', 'an unknown language in a save becomes Japanese');
+  ok(SettingsSystem.restore({ language: 'en' } as never).language === 'en', 'a saved English stays English');
+  const fresh = SaveSystem.createDefault();
+  ok(isLanguage(fresh.settings.language), 'a new save starts with a language of the device');
+  const roundTrip = SettingsSystem.restore(JSON.parse(JSON.stringify({ ...fresh.settings, language: 'en' })));
+  ok(roundTrip.language === 'en', 'the language survives being saved and loaded');
+}
+
+// ---- data lookup seam
+{
+  setLanguage('en', { persist: false });
+  ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: a text with no translation is the Japanese of the data');
+  enData.hero = { nobody: { name: 'Luri' } };
+  ok(tr('hero', 'nobody', 'name', 'ルリ') === 'Luri', 'tr: a translated text comes from the data table');
+  ok(tr('hero', 'nobody', 'title', '先生') === '先生', 'tr: a field with no translation falls back too');
+  setLanguage('ja', { persist: false });
+  ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: Japanese is the data as it is');
+  delete enData.hero;
+}
+
+// ---- every key the code asks for exists
+function files(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const p = path.join(dir, name);
+    if (statSync(p).isDirectory()) files(p, out);
+    else if (p.endsWith('.ts')) out.push(p);
+  }
+  return out;
+}
+{
+  const src = path.join(process.cwd(), 'src');
+  const known = new Set(Object.keys(TABLES.ja));
+  for (const k of ['test.both', 'test.onlyJa', 'test.hello', 'test.items', 'test.mixed']) known.delete(k);
+  const used = new Set<string>();
+  const missing: string[] = [];
+  let calls = 0;
+  for (const file of files(src)) {
+    if (file.includes(`${path.sep}i18n${path.sep}`)) continue;
+    const text = readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/\bt\(\s*(['"`])([A-Za-z][\w.]*)\1/g)) {
+      calls++;
+      used.add(m[2]);
+      if (!known.has(m[2])) missing.push(`${path.relative(process.cwd(), file)}: ${m[2]}`);
+    }
+    // keys kept in maps / arrays (typed MessageKey) are plain string literals
+    for (const m of text.matchAll(/'([a-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_]+)+)'/g)) if (known.has(m[1])) used.add(m[1]);
+  }
+  ok(missing.length === 0, `every t('key') in src/ exists in ja.ts (${calls} calls, ${known.size} keys)${missing.length ? `: ${missing.slice(0, 5).join('; ')}` : ''}`);
+  const unused = [...known].filter((k) => !used.has(k));
+  console.log(`INFO  ${unused.length} key(s) are not referenced as a literal (they may be built from a map or be waiting for a screen)`);
+  const enKeys = Object.keys(TABLES.en).filter((k) => !k.startsWith('test.'));
+  ok(enKeys.length === known.size && enKeys.every((k) => known.has(k)), 'English has exactly the Japanese keys');
+}
+
+for (const k of ['test.both', 'test.onlyJa', 'test.hello', 'test.items', 'test.mixed']) {
+  delete ja[k];
+  delete en[k];
+}
+void t;
+process.exit(failures ? 1 : 0);

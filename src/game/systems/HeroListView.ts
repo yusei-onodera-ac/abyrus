@@ -1,5 +1,6 @@
 import { ProgressionSystem } from './ProgressionSystem';
 import type { HeroClass, HeroData } from '../types';
+import type { PlainKey } from '../i18n';
 
 /**
  * How a list of the player's heroes is ordered and narrowed (the 編成 screen's roster and the 強化 tab's list share it).
@@ -7,12 +8,13 @@ import type { HeroClass, HeroData } from '../types';
  */
 export type HeroSort = 'rarity' | 'level' | 'power' | 'new' | 'class';
 
-export const HERO_SORTS: { key: HeroSort; label: string }[] = [
-  { key: 'rarity', label: '★順' },
-  { key: 'level', label: 'Lv順' },
-  { key: 'power', label: '総合力' },
-  { key: 'new', label: '新しい順' },
-  { key: 'class', label: '職業順' },
+/** `label` is a message key: the chip text is looked up (t) where it is drawn, so it follows the language. */
+export const HERO_SORTS: { key: HeroSort; label: PlainKey }[] = [
+  { key: 'rarity', label: 'hero.list.sortRarity' },
+  { key: 'level', label: 'hero.list.sortLevel' },
+  { key: 'power', label: 'hero.stat.power' },
+  { key: 'new', label: 'hero.list.sortNewest' },
+  { key: 'class', label: 'hero.list.sortClass' },
 ];
 
 export interface HeroListView {

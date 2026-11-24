@@ -7,6 +7,7 @@
  * どちらも、この `AllianceBackend` を実装する。ここの型は、サーバーに保存できる形（数は number か string、BigNumber は使わない。
  * ダメージなどの大きな数は、double の number で持つ: 1e300 まで入るので足りる）。
  */
+import type { PlainKey } from '../i18n';
 
 // ---------------------------------------------------------------------------------------------- 共通
 
@@ -55,8 +56,9 @@ export interface PlayerProfile {
 
 export type AllianceRole = 'leader' | 'officer' | 'member';
 export type JoinPolicy = 'open' | 'approval' | 'invite';
-export const ALLIANCE_ROLE_LABEL: Record<AllianceRole, string> = { leader: '同盟長', officer: '幹部', member: 'メンバー' };
-export const JOIN_POLICY_LABEL: Record<JoinPolicy, string> = { open: '自由参加', approval: '承認制', invite: '招待のみ' };
+/** The names of the roles / join rules: keys, so the text is looked up (`t(ALLIANCE_ROLE_LABEL[role])`) where it is drawn. */
+export const ALLIANCE_ROLE_LABEL: Record<AllianceRole, PlainKey> = { leader: 'alliance.role.leader', officer: 'alliance.role.officer', member: 'alliance.role.member' };
+export const JOIN_POLICY_LABEL: Record<JoinPolicy, PlainKey> = { open: 'alliance.joinPolicy.open', approval: 'alliance.joinPolicy.approval', invite: 'alliance.joinPolicy.invite' };
 
 export const EMBLEM_COUNT = 12;
 export const NAME_MIN = 2;
@@ -86,7 +88,8 @@ export interface AllianceSummary {
 
 export type League = 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond';
 export const LEAGUES: League[] = ['bronze', 'silver', 'gold', 'platinum', 'diamond'];
-export const LEAGUE_LABEL: Record<League, string> = { bronze: 'ブロンズ', silver: 'シルバー', gold: 'ゴールド', platinum: 'プラチナ', diamond: 'ダイヤ' };
+export const DONATION_LABEL: Record<DonationKind, PlainKey> = { gold: 'alliance.donation.gold', materials: 'alliance.donation.materials', gems: 'alliance.donation.gems' };
+export const LEAGUE_LABEL: Record<League, PlainKey> = { bronze: 'alliance.league.bronze', silver: 'alliance.league.silver', gold: 'alliance.league.gold', platinum: 'alliance.league.platinum', diamond: 'alliance.league.diamond' };
 
 /** 助っ人に登録された、キャラの写し（戦闘に出すのに足りるだけ）。 */
 export interface HelperHero {

@@ -4,17 +4,48 @@ import type { GiftReward } from '../systems/SaveSystem';
 import { coinIcon, gemIcon, phaseMaterialIcon, staminaIcon } from './Icons';
 import { ITEMS, isItemId } from '../data/items';
 import { itemIcon, skillEssenceIcon } from './ItemIcons';
+import { t } from '../i18n';
 
-export const REWARD_LABEL: Record<GiftReward['type'], string> = { gems: '魔晶石', gold: 'ゴールド' };
+// (the label tables are getters: the name is looked up each time it is read, so it follows the language)
+export const REWARD_LABEL: Record<GiftReward['type'], string> = {
+  get gems() {
+    return t('sys.good.gems');
+  },
+  get gold() {
+    return t('sys.good.gold');
+  },
+};
 export const REWARD_COLOR: Record<GiftReward['type'], string> = { gems: '#bfeaff', gold: '#ffe79a' };
 
 /** Same, for everything the shop hands out. */
 type BaseGood = 'gems' | 'gold' | 'stamina' | 'phaseMaterials' | 'skillEssence';
-const BASE_LABEL: Record<BaseGood, string> = { gems: '魔晶石', gold: 'ゴールド', stamina: 'スタミナ', phaseMaterials: 'フェーズ素材', skillEssence: '技素' };
+const BASE_LABEL: Record<BaseGood, string> = {
+  get gems() {
+    return t('sys.good.gems');
+  },
+  get gold() {
+    return t('sys.good.gold');
+  },
+  get stamina() {
+    return t('sys.good.stamina');
+  },
+  get phaseMaterials() {
+    return t('sys.good.phaseMaterials');
+  },
+  get skillEssence() {
+    return t('sys.good.skillEssence');
+  },
+};
 const BASE_COLOR: Record<BaseGood, string> = { gems: '#bfeaff', gold: '#ffe79a', stamina: '#ffd9a0', phaseMaterials: '#d9c2ff', skillEssence: '#9fe3b0' };
 
 /** Names and colours of every shop good, the 素材 of data/items.ts included. */
-export const GOOD_LABEL = { ...BASE_LABEL, ...Object.fromEntries(Object.values(ITEMS).map((i) => [i.id, i.name])) } as Record<GoodType, string>;
+export const GOOD_LABEL = Object.defineProperties(
+  {} as Record<GoodType, string>,
+  Object.fromEntries([
+    ...(Object.keys(BASE_LABEL) as BaseGood[]).map((k) => [k, { enumerable: true, get: () => BASE_LABEL[k] }]),
+    ...Object.values(ITEMS).map((i) => [i.id, { enumerable: true, get: () => i.name }]),
+  ]),
+);
 export const GOOD_COLOR = { ...BASE_COLOR, ...Object.fromEntries(Object.values(ITEMS).map((i) => [i.id, i.color])) } as Record<GoodType, string>;
 
 /** Fits a supplied image (kept in its own aspect) into a `size` square. */

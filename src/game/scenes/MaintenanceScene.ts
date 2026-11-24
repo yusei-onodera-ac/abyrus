@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
-import { RemoteMaintenance } from '../systems/RemoteMaintenance';
+import { RemoteMaintenance, maintenanceMessageText } from '../systems/RemoteMaintenance';
 import { Button } from '../ui/Button';
 import { wrappedText } from '../ui/CardParts';
 import { createDivider, createPanel } from '../ui/Panel';
 import { CHROME, heading } from '../ui/theme';
+import { t } from '../i18n';
 
 export interface MaintenanceData {
   message: string;
@@ -35,14 +36,14 @@ export class MaintenanceScene extends Phaser.Scene {
     const inner = w - 80;
     const left = 360 - inner / 2;
     createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: 5, gradient: false });
-    heading(this, 360, cy - h / 2 + 64, 'メンテナンス中', { fontSize: '40px' }).setOrigin(0.5);
+    heading(this, 360, cy - h / 2 + 64, t('home.maintenance.underMaintenance'), { fontSize: '40px' }).setOrigin(0.5);
     createDivider(this, 360, cy - h / 2 + 112, inner, CHROME.brassDark);
-    wrappedText(this, left, cy - h / 2 + 140, data.message, inner, { fontSize: '25px', color: '#f5e6c8', lineSpacing: 10 });
+    wrappedText(this, left, cy - h / 2 + 140, maintenanceMessageText(data.message), inner, { fontSize: '25px', color: '#f5e6c8', lineSpacing: 10 });
     const status = this.add.text(360, cy + h / 2 - 150, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5);
 
     const recheck = async (): Promise<void> => {
       if (this.going) return;
-      status.setText('確かめています…');
+      status.setText(t('home.maintenance.checking'));
       const state = await RemoteMaintenance.check();
       if (this.going) return;
       if (!state.enabled) {
@@ -50,9 +51,9 @@ export class MaintenanceScene extends Phaser.Scene {
         this.scene.start(data.next.scene, data.next.data);
         return;
       }
-      status.setText('まだメンテナンス中です。');
+      status.setText(t('home.maintenance.stillUnderMaintenance'));
     };
-    new Button(this, 360, cy + h / 2 - 80, 380, 76, 'もう一度確かめる', () => void recheck(), { variant: 'wood', fontSize: '26px' });
+    new Button(this, 360, cy + h / 2 - 80, 380, 76, t('home.maintenance.checkAgain'), () => void recheck(), { variant: 'wood', fontSize: '26px' });
     this.time.addEvent({ delay: RECHECK_MS, loop: true, callback: () => void recheck() });
   }
 }
