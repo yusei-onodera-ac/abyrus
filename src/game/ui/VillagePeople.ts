@@ -5,6 +5,7 @@ import { villagePlotTierOf } from './VillageArt';
 import type { SaveData } from '../systems/SaveSystem';
 import { castleLevel, footprints, villageSize } from '../systems/VillageIncome';
 import { showToast } from './Toast';
+import { trList } from '../i18n';
 import type { Pt } from './VillageArt';
 
 /**
@@ -529,7 +530,8 @@ export class VillageWalkers {
     w.hop = 360;
     w.path = [];
     w.wait = 1800;
-    showToast(this.scene, w.def.lines[Math.floor(Math.random() * w.def.lines.length)], '#ffe9b8');
+    const lines = trList('villager', w.def.id, 'lines', w.def.lines);
+    showToast(this.scene, lines[Math.floor(Math.random() * lines.length)], '#ffe9b8');
     if (!w.bubble) this.say(w, w.def.kind === 'animal' ? '♪' : '!');
   }
 

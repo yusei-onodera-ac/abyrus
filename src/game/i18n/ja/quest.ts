@@ -181,4 +181,6 @@ export const quest = {
   'quest.stageName.extraFloor': '{name}(特別) 第{stageInRegion}層',
   'quest.stageName.weekday': '{dayName}曜 {name} {name2}',
   'quest.stageName.raid': '襲撃！ {name}の獣の群れ',
+  // regions.ts: an enemy is named by an adjective and an animal (written together in Japanese, with a space in English)
+  'quest.feral.name': '{prefix}{animal}',
 } as const;

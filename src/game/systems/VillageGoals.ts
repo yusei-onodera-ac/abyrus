@@ -1,10 +1,11 @@
-import { getBuilding, type MaterialBundle } from '../data/village';
+import { getBuilding, materialName, type MaterialBundle } from '../data/village';
 import { GOAL_TIERS, VILLAGE_GOALS, getVillageGoal, unlocksAt, type GoalMetric, type VillageGoal, type UnlockLine } from '../data/villageGoals';
 import { BigNumber } from './BigNumber';
 import { IdleSystem } from './IdleSystem';
 import { SaveSystem, type PlacedBuilding, type SaveData } from './SaveSystem';
 import { VillageSystem } from './VillageSystem';
 import { builderCount, castleLevel, defensePoints, effectiveLevel, incomeMultiplier } from './VillageIncome';
+import { t } from '../i18n';
 
 /**
  * 村の目標 (data/villageGoals.ts): how far each goal has got, and taking what it pays. Like the other systems this changes
@@ -172,13 +173,13 @@ export const VillageGoals = {
     if (b.kind === 'shop' || b.kind === 'market') {
       const gain = VillageSystem.incomeAfter(save, b, now);
       const base = IdleSystem.baseGoldPerHour(save);
-      lines.push(`売上　+${base.mul(gain.now).toString()} → +${base.mul(gain.after).toString()}/時`);
+      lines.push(t('village.goals.gainSales', { mul: base.mul(gain.now).toString(), mul2: base.mul(gain.after).toString() }));
     } else if (b.kind === 'house') {
-      lines.push(`店の売上　+${Math.round(was * 1000) / 10}% → +${Math.round(next.value * 1000) / 10}%`);
+      lines.push(t('village.goals.gainHouse', { was: Math.round(was * 1000) / 10, value: Math.round(next.value * 1000) / 10 }));
     } else if (def.produces) {
-      lines.push(`${def.produces === 'wood' ? '木材' : def.produces === 'iron' ? '鉄' : '石'}　+${was} → +${next.value}/時`);
+      lines.push(t('village.goals.gainMaterial', { material: materialName(def.produces), was, value: next.value }));
     } else if (def.defense) {
-      lines.push(`防衛　+${was} → +${next.value}`);
+      lines.push(t('village.goals.gainDefense', { was, value: next.value }));
     }
     return lines;
   },

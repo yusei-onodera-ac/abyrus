@@ -1,4 +1,5 @@
 import type { Reward } from './rewards';
+import { localized } from '../i18n';
 
 /**
  * 朝夕の補給: two times of the day (the player's own clock) at which a small reward can be taken, once each per day.
@@ -19,7 +20,7 @@ export interface SupplySlot {
   rewards: Reward[];
 }
 
-export const SUPPLY_SLOTS: SupplySlot[] = [
+const SUPPLY_ROWS: SupplySlot[] = [
   {
     id: 'morning',
     name: '朝の補給',
@@ -43,6 +44,9 @@ export const SUPPLY_SLOTS: SupplySlot[] = [
     ],
   },
 ];
+
+/** The names are read through tr() each time (English: i18n/data/missionsEn.ts). */
+export const SUPPLY_SLOTS: SupplySlot[] = SUPPLY_ROWS.map((row) => localized('supply', row.id, row, ['name']));
 
 /** What taking every slot of one day adds on top. */
 export const SUPPLY_BOTH_BONUS: Reward[] = [

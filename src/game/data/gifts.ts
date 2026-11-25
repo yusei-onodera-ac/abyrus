@@ -1,4 +1,5 @@
 import type { GiftReward } from '../systems/SaveSystem';
+import { localized } from '../i18n';
 
 export interface GiftCampaign {
   id: string;
@@ -19,7 +20,7 @@ export interface GiftCampaign {
  * to everyone, and one the player deleted never comes back. This is the thing
  * to edit for a handout; no code elsewhere needs to change.
  */
-export const GIFT_CAMPAIGNS: GiftCampaign[] = [
+const GIFT_ROWS: GiftCampaign[] = [
   {
     id: 'welcome-gems',
     title: 'ようこそ記念',
@@ -42,3 +43,6 @@ export const GIFT_CAMPAIGNS: GiftCampaign[] = [
     expireDays: 7,
   },
 ];
+
+/** The texts are read through tr() (English: i18n/data/missionsEn.ts) when a gift is delivered to a save, which keeps them from then on. */
+export const GIFT_CAMPAIGNS: GiftCampaign[] = GIFT_ROWS.map((row) => localized('gift', row.id, row, ['title', 'message']));

@@ -1,4 +1,5 @@
 import { BUILDINGS, VILLAGE_BUILDERS, getBuilding, type BuildingKind, type MaterialBundle } from './village';
+import { localized, t } from '../i18n';
 
 /**
  * 村の目標: one-time goals for the village to grow toward, each paying a small reward the first time it is met (魔晶石,
@@ -49,7 +50,8 @@ export interface VillageGoal {
 /** The top tier (the 城's highest level). */
 export const GOAL_TIERS = 6;
 
-const goal = (id: string, tier: number, text: string, metric: GoalMetric, target: number, reward: GoalReward): VillageGoal => ({ id, tier, text, metric, target, reward });
+/** The text is read through tr() each time (English: i18n/data/villageEn.ts), so it follows the language. */
+const goal = (id: string, tier: number, text: string, metric: GoalMetric, target: number, reward: GoalReward): VillageGoal => localized('villageGoal', id, { id, tier, text, metric, target, reward }, ['text']);
 
 export const VILLAGE_GOALS: VillageGoal[] = [
   // ---- 城 Lv.1: a village begins.
@@ -159,11 +161,11 @@ export function unlocksAt(level: number): UnlockLine[] {
   const lines: UnlockLine[] = [];
   const builders = VILLAGE_BUILDERS[Math.min(VILLAGE_BUILDERS.length, level) - 1];
   const before = VILLAGE_BUILDERS[Math.min(VILLAGE_BUILDERS.length, level - 1) - 1];
-  if (builders > before) lines.push({ text: `建築員　${before}人 → ${builders}人` });
+  if (builders > before) lines.push({ text: t('village.unlock.builders', { before, builders }) });
 
   const things = BUILDINGS.filter((d) => d.buildable);
   const fresh = things.filter((d) => allowed(d.kind, level - 1) === 0 && allowed(d.kind, level) > 0);
-  for (const d of fresh) lines.push({ text: `${d.name}が${d.decor ? '置ける' : '建てられる'}ようになる`, kind: d.kind });
+  for (const d of fresh) lines.push({ text: t(d.decor ? 'village.unlock.canPlace' : 'village.unlock.canBuild', { name: d.name }), kind: d.kind });
   // Higher levels: the buildings that gain the same step are told together.
   const caps = new Map<string, { names: string[]; kind: BuildingKind }>();
   for (const d of things.filter((x) => !x.decor)) {
@@ -178,12 +180,12 @@ export function unlocksAt(level: number): UnlockLine[] {
   }
   for (const [key, entry] of caps) {
     const [was, now] = key.split('-');
-    lines.push({ text: `${entry.names.length > 3 ? 'ほとんどの建物' : entry.names.join('・')}の最大レベル　Lv${was} → Lv${now}`, kind: entry.kind });
+    lines.push({ text: t('village.unlock.maxLevel', { names: entry.names.length > 3 ? t('village.unlock.mostBuildings') : entry.names.join(t('village.listSeparator')), was, now }), kind: entry.kind });
   }
   for (const d of things) {
     const was = allowed(d.kind, level - 1);
     const now = allowed(d.kind, level);
-    if (was > 0 && now > was) lines.push({ text: `${d.name}の数　${was} → ${now}`, kind: d.kind });
+    if (was > 0 && now > was) lines.push({ text: t('village.unlock.count', { name: d.name, was, now }), kind: d.kind });
   }
   return lines;
 }

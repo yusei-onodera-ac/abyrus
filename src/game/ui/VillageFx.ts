@@ -5,6 +5,7 @@ import { SoundSystem } from '../systems/SoundSystem';
 import type { PlacedBuilding } from '../systems/SaveSystem';
 import { body, heading, CHROME } from './theme';
 import { buildingArt, isoPoint, type Pt } from './VillageArt';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 /** Above the village's own popups (200), under the tutorial (300). */
@@ -228,8 +229,8 @@ export class VillageFx {
   private banner(job: Job): Phaser.GameObjects.Container {
     const { scene } = this.host;
     const def = getBuilding(job.kind);
-    const title = job.how === 'moved' ? '移転完了！' : '完成！';
-    const sub = job.how === 'moved' ? def.name : def.decor ? def.name : `${def.name}　Lv.${job.level}`;
+    const title = job.how === 'moved' ? tl('village.fx.moved') : tl('village.fx.completed');
+    const sub = job.how === 'moved' ? def.name : def.decor ? def.name : tl('village.fx.nameLevel', { name: def.name, level: job.level });
     const big = scene.add.text(0, -12, title, { fontFamily: FONT, fontSize: '34px', color: '#fff4a8', stroke: '#8a3a00', strokeThickness: 7 }).setOrigin(0.5);
     const small = scene.add.text(0, 22, sub, { fontFamily: FONT, fontSize: '19px', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
     const w = Math.max(big.width, small.width) + 56;
@@ -303,11 +304,11 @@ export class VillageFx {
     };
     t.later(460, burst);
 
-    const level = body(scene, cx, 780, `村Lv.${job.level - 1}`, { fontSize: '72px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 10 }).setOrigin(0.5).setAlpha(0).setScale(0.6);
+    const level = body(scene, cx, 780, tl('village.fx.villageLevel', { level: job.level - 1 }), { fontSize: '72px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 10 }).setOrigin(0.5).setAlpha(0).setScale(0.6);
     layer.add(level);
     t.tween({ targets: level, alpha: 1, scale: 1, duration: 300, delay: 800, ease: 'Back.easeOut' });
     t.later(1150, () => {
-      level.setText(`村Lv.${job.level}`).setColor('#ffd23f');
+      level.setText(tl('village.fx.villageLevel', { level: job.level })).setColor('#ffd23f');
       t.tween({ targets: level, scale: { from: 1.4, to: 1 }, duration: 340, ease: 'Back.easeOut' });
       this.sparkBurst(layer, t, cx, 780, 16);
     });
@@ -331,7 +332,7 @@ export class VillageFx {
     let canClose = false;
     let closed = false;
     t.later(900, () => (canClose = true));
-    const hint = body(scene, cx, 1230, 'タップで閉じる', { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
+    const hint = body(scene, cx, 1230, tl('village.fx.tapToClose'), { fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 }).setOrigin(0.5).setAlpha(0);
     layer.add(hint);
     t.later(doneAt, () => t.tween({ targets: hint, alpha: { from: 0, to: 0.85 }, duration: 600, yoyo: true, repeat: -1 }));
     const close = (): void => {

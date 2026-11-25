@@ -1,4 +1,5 @@
 import type { HeroClass } from '../types';
+import { localized, t, tr } from '../i18n';
 
 /**
  * The 5 regions of the Quest campaign (クエストモード), each 30 main
@@ -72,7 +73,7 @@ export const FERAL_PREFIXES: string[] = [
   '呪われし', '瘴気纏う', '暴れ', '目の爛れた', '牙まみれの',
 ];
 
-export const REGIONS: RegionDef[] = [
+const REGION_ROWS: RegionDef[] = [
   {
     id: 'forest',
     index: 0,
@@ -163,6 +164,11 @@ export const REGIONS: RegionDef[] = [
   },
 ];
 
+/** Names and descriptions are read through tr() each time (English: i18n/data/worldEn.ts), so they follow the language. */
+export const REGIONS: RegionDef[] = REGION_ROWS.map((row) =>
+  localized('region', row.id, { ...row, feralAnimals: row.feralAnimals.map((a, i) => localized('feralAnimal', `${row.id}_${i}`, a, ['name'])) }, ['name', 'mapDescription', 'bossName']),
+);
+
 export const REGION_COUNT = REGIONS.length;
 
 export function getRegion(index: number): RegionDef {
@@ -172,9 +178,10 @@ export function getRegion(index: number): RegionDef {
 /** Deterministically builds a feral enemy from a region + PRNG draws: an
  *  adjective plus one of the region's animals ("牙剥く熊"), with that animal's picture. */
 export function pickFeral(region: RegionDef, rng: () => number): { name: string; art?: string } {
-  const prefix = FERAL_PREFIXES[Math.floor(rng() * FERAL_PREFIXES.length)];
+  const prefixIndex = Math.floor(rng() * FERAL_PREFIXES.length);
   const animal = region.feralAnimals[Math.floor(rng() * region.feralAnimals.length)];
-  return { name: prefix + animal.name, art: animal.art };
+  const prefix = tr('feralPrefix', String(prefixIndex), 'name', FERAL_PREFIXES[prefixIndex]);
+  return { name: t('quest.feral.name', { prefix, animal: animal.name }), art: animal.art };
 }
 
 /** Every picture a region's animals or boss ask for: what BootScene loads. */

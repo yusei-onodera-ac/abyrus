@@ -24,7 +24,7 @@ import { buildRegionBackdrop, drawPadlock, drawRoad, mixColor, stageMedallion, t
 import { showToast } from '../ui/Toast';
 import { body, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
-import { t } from '../i18n';
+import { t, tr } from '../i18n';
 
 /** 0-4 = a region's 30-stage page (region 4's page also carries the final
  *  battle node); 'extra' = the post-ending Extra page. */
@@ -159,7 +159,7 @@ export class StageSelectScene extends Phaser.Scene {
       if (!unlocked) drawPadlock(g, w / 2 - 15, -TAB_H / 2 + 15, 0.9, CHROME.brassDark);
       container.add(g);
 
-      const name = key === 'extra' ? 'EX' : REGIONS[key].name;
+      const name = key === 'extra' ? 'EX' : tr('region', REGIONS[key].id, 'tab', REGIONS[key].name);
       const count = key === 'extra' ? `${save.extraProgress}/${EXTRA_STAGE_COUNT}` : `${this.clearedIn(key, save)}/${STAGES_PER_REGION}`;
       const labelColor = unlocked ? (active ? '#ffe9b8' : '#e8dcc0') : '#7a6a4a';
       container.add(body(this, 0, unlocked ? -9 : -2, name, { fontSize: key === 'extra' ? '24px' : '18px', fontStyle: 'bold', color: labelColor, stroke: INK, strokeThickness: 3 }).setOrigin(0.5));

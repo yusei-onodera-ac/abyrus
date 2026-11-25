@@ -15,6 +15,7 @@ import type { RewardTile } from './RewardTiles';
 import { ScrollView } from './ScrollView';
 import { body, caption, heading, CHROME } from './theme';
 import { villageThumb } from './VillageFx';
+import { t as tl } from '../i18n';
 
 const INK = '#1c130a';
 const W = 664;
@@ -82,7 +83,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
   const root = modal.container;
   root.add(createPanel(scene, 360, 640, W, H, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 20, rarity: 5, gradient: false }));
   root.add(scene.add.zone(360, 640, W, H).setInteractive());
-  root.add(heading(scene, 360, TOP + 46, '村の目標', { fontSize: '36px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
+  root.add(heading(scene, 360, TOP + 46, tl('village.goals.title'), { fontSize: '36px', color: '#ffe9b8', stroke: INK, strokeThickness: 6 }).setOrigin(0.5));
   const summary = caption(scene, 360, TOP + 90, '', { fontSize: '19px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   root.add(summary);
 
@@ -104,7 +105,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     modal.close();
     host.onClosed();
   };
-  root.add(new Button(scene, 360, TOP + H - 46, 220, 58, '閉じる', close, { variant: 'wood', fontSize: '26px' }));
+  root.add(new Button(scene, 360, TOP + H - 46, 220, 58, tl('common.close'), close, { variant: 'wood', fontSize: '26px' }));
 
   /** A tall card in the list: its container goes at the running y. */
   let y = 0;
@@ -123,14 +124,14 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     const panel = (height: number): void => {
       c.addAt(createPanel(scene, CARD_W / 2, height / 2, CARD_W, height, { fillColor: 0x241810, fillAlpha: 1, borderColor: CHROME.brassBright, glowColor: CHROME.brass, radius: 14, gradient: false }), 0);
     };
-    c.add(heading(scene, 18, 32, '村の発展', { fontSize: '27px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    const tag = buildChip(scene, 0, 32, `村Lv.${level}`, { fill: 0xc7701c, color: '#fff4dc', fontSize: 20 });
+    c.add(heading(scene, 18, 32, tl('village.goals.growth'), { fontSize: '27px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    const tag = buildChip(scene, 0, 32, tl('village.goals.villageLevel', { level }), { fill: 0xc7701c, color: '#fff4dc', fontSize: 20 });
     tag.container.setX(CARD_W - 18 - tag.width);
     c.add(tag.container);
 
     if (!next) {
       c.add(villageThumb(scene, 'castle', level, 200).setPosition(CARD_W / 2, 150));
-      c.add(heading(scene, CARD_W / 2, 262, '村は最大レベルです', { fontSize: '27px', color: '#ffd23f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+      c.add(heading(scene, CARD_W / 2, 262, tl('village.goals.maxLevel'), { fontSize: '27px', color: '#ffd23f', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
       panel(300);
       return { container: c, height: 300 };
     }
@@ -150,10 +151,10 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
 
     // What it takes: ゴールド and time, then the 素材 (red where there is not enough).
     const haveGold = SaveSystem.getGold(save).gte(next.gold);
-    c.add(caption(scene, 18, 292, `Lv.${next.level} にするには`, { fontSize: '17px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    c.add(caption(scene, 18, 292, tl('village.goals.toReach', { level: next.level }), { fontSize: '17px', fontStyle: 'bold', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     c.add(addGoodIcon(scene, 'gold', 32, 326, 28));
     c.add(body(scene, 54, 326, next.gold.toString(), { fontSize: '21px', fontStyle: 'bold', color: haveGold ? '#fff4dc' : '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    c.add(caption(scene, CARD_W - 18, 326, `所要 ${formatSpan(next.seconds)}`, { fontSize: '19px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    c.add(caption(scene, CARD_W - 18, 326, tl('village.goals.takes', { formatSpan: formatSpan(next.seconds) }), { fontSize: '19px', fontStyle: 'bold', color: '#ffd9a0', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     let mx = 18;
     for (const { id } of VILLAGE_MATERIALS) {
       const need = (next.materials as MaterialBundle)[id] ?? 0;
@@ -168,10 +169,10 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     let ly = 410;
     const lines = next.unlocks.slice(0, 6);
     if (lines.length > 0) {
-      c.add(heading(scene, 18, ly, `Lv.${next.level} で解放`, { fontSize: '22px', color: '#9fe39f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      c.add(heading(scene, 18, ly, tl('village.goals.unlockedAt', { level: next.level }), { fontSize: '22px', color: '#9fe39f', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       ly += 36;
       for (const line of lines) {
-        c.add(caption(scene, 34, ly, `・${line.text}`, { fontSize: '19px', fontStyle: 'bold', color: '#f5e6c8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+        c.add(caption(scene, 34, ly, tl('village.goals.bullet', { text: line.text }), { fontSize: '19px', fontStyle: 'bold', color: '#f5e6c8', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
         ly += 30;
       }
     }
@@ -186,7 +187,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
         ly + 34,
         CARD_W - 36,
         46,
-        '城を見る',
+        tl('village.goals.viewCastle'),
         () => {
           close();
           host.showCastle();
@@ -224,7 +225,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
 
     rewardChips(scene, c, 16, 84, VillageGoals.reward(save, goal));
 
-    const text = claimed ? '受け取り済み' : progress.done ? '受け取る' : '未達成';
+    const text = claimed ? tl('common.claimed') : progress.done ? tl('common.claim') : tl('village.incomplete');
     const button = new Button(scene, CARD_W - 16 - 66, 46, 132, 58, text, () => claim(goal.id), { variant: lit ? 'gold' : 'wood', fontSize: lit ? '24px' : '16px', guard });
     button.setEnabled(lit);
     c.add(button);
@@ -236,8 +237,8 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     const c = scene.add.container(0, 0);
     const s = VillageGoals.tierSummary(save, tier);
     c.add(createPanel(scene, CARD_W / 2, 26, CARD_W, 50, { fillColor: color, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassDark, radius: 12, gradient: false }));
-    c.add(heading(scene, 16, 26, `城Lv.${tier} の目標`, { fontSize: '23px', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    c.add(caption(scene, CARD_W - 16, 26, claimedAll ? 'すべて達成' : `${s.claimed}/${s.total} 達成${s.waiting > 0 ? `　受け取れる ${s.waiting}` : ''}${note ? `　${note}` : ''}`, { fontSize: '17px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    c.add(heading(scene, 16, 26, tl('village.goals.tierTitle', { tier }), { fontSize: '23px', color: '#fff4dc', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    c.add(caption(scene, CARD_W - 16, 26, claimedAll ? tl('village.goals.allDone') : tl('village.goals.tierProgress', { claimed: s.claimed, total: s.total, rest: `${s.waiting > 0 ? tl('village.goals.waiting', { waiting: s.waiting }) : ''}${note ? tl('village.goals.note', { note }) : ''}` }), { fontSize: '17px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     return { container: c, height: 56 };
   };
 
@@ -245,9 +246,9 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     const goals = goalsOfTier(tier);
     const c = scene.add.container(0, 0);
     c.add(createPanel(scene, CARD_W / 2, 36, CARD_W, 72, { fillColor: 0x1a120b, fillAlpha: 1, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 12, gradient: false }));
-    c.add(heading(scene, 16, 26, `城Lv.${tier} の目標`, { fontSize: '21px', color: '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    c.add(caption(scene, 16, 54, `${goals.length}個　報酬 魔晶石 合計 ${totalGems(goals)} ほか`, { fontSize: '16px', color: '#8a7a5a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    c.add(caption(scene, CARD_W - 16, 36, `城Lv.${tier} で解放`, { fontSize: '17px', fontStyle: 'bold', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    c.add(heading(scene, 16, 26, tl('village.goals.tierTitle', { tier }), { fontSize: '21px', color: '#9a8a6a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+    c.add(caption(scene, 16, 54, tl('village.goals.teaserRewards', { count: goals.length, totalGems: totalGems(goals) }), { fontSize: '16px', color: '#8a7a5a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
+    c.add(caption(scene, CARD_W - 16, 36, tl('village.goals.teaserUnlock', { tier }), { fontSize: '17px', fontStyle: 'bold', color: '#9a8a6a', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     return { container: c, height: 76 };
   };
 
@@ -259,7 +260,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     const current = VillageGoals.currentTier(save, now);
     const waiting = VillageGoals.claimable(save, now).length;
     const claimedTotal = VILLAGE_GOALS.filter((g) => VillageGoals.isClaimed(save, g)).length;
-    summary.setText(`達成 ${claimedTotal} / ${VILLAGE_GOALS.length}${waiting > 0 ? `　受け取れる ${waiting}` : ''}`);
+    summary.setText(tl('village.goals.summary', { claimed: claimedTotal, total: VILLAGE_GOALS.length, rest: waiting > 0 ? tl('village.goals.waiting', { waiting }) : '' }));
     summary.setColor(waiting > 0 ? '#ffd23f' : '#d8c49a');
 
     stack(growthCard());
@@ -275,11 +276,11 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
         stack(tierHeader(tier, '', 0x4a3a1c));
         for (const g of left) stack(goalRow(g, false));
       } else if (tier === current) {
-        stack(tierHeader(tier, 'いまここ', 0xc7701c));
+        stack(tierHeader(tier, tl('village.goals.current'), 0xc7701c));
         // Collected goals sink to the bottom of their level.
         for (const g of [...goals.filter((x) => !VillageGoals.isClaimed(save, x)), ...goals.filter((x) => VillageGoals.isClaimed(save, x))]) stack(goalRow(g, false));
       } else if (tier === current + 1) {
-        stack(tierHeader(tier, '次の目標', 0x3a4f7a));
+        stack(tierHeader(tier, tl('village.goals.next'), 0x3a4f7a));
         for (const g of goals) stack(goalRow(g, true));
       } else {
         stack(teaser(tier));
@@ -295,7 +296,7 @@ export function openVillageGoals(host: GoalsModalHost): ModalHandle {
     if (!paid) return;
     host.onChanged();
     // The list is redrawn when the receipt is closed (and not from this tap: it would destroy the button mid-click).
-    showRewardModal(scene, scroll, { title: '目標を達成しました', tiles: tilesOf(paid), onClose: () => queueRebuild() });
+    showRewardModal(scene, scroll, { title: tl('village.goals.achieved'), tiles: tilesOf(paid), onClose: () => queueRebuild() });
   };
   const queueRebuild = (): void => {
     if (closed || rebuildQueued) return;

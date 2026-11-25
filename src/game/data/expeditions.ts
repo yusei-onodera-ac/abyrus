@@ -1,6 +1,7 @@
 import type { HeroClass } from '../types';
 import type { Reward } from './rewards';
 import type { MaterialBundle } from './village';
+import { localized } from '../i18n';
 
 /**
  * 遠征: send heroes away for a few hours, take what they bring home when they are back, send
@@ -39,7 +40,7 @@ export interface ExpeditionDef {
   materials?: MaterialBundle;
 }
 
-export const EXPEDITIONS: ExpeditionDef[] = [
+const EXPEDITION_ROWS: ExpeditionDef[] = [
   {
     id: 'forest-patrol',
     name: '森の見回り',
@@ -140,6 +141,9 @@ export const EXPEDITIONS: ExpeditionDef[] = [
     materials: { stone: 800, iron: 300, wood: 350 },
   },
 ];
+
+/** Names and descriptions are read through tr() each time (English: i18n/data/worldEn.ts). */
+export const EXPEDITIONS: ExpeditionDef[] = EXPEDITION_ROWS.map((row) => localized('expedition', row.id, row, ['name', 'description']));
 
 export function getExpedition(id: string): ExpeditionDef | undefined {
   return EXPEDITIONS.find((e) => e.id === id);
