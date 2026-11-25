@@ -12,7 +12,7 @@
  *              onAllianceDeleted             解散した同盟の、残りのデータを消す
  *   scheduled  weeklyRollover (月曜 0:00 JST) 対抗戦の集計 (順位・昇降格・結果) と、新しいシーズン・新しいボス
  *              leaderHandover (毎日 5:00)     7日間来ていない同盟長を、次の人に譲る
- *              cleanup (毎日 4:30)            古いチャット・切符・1日ごとの文書を消す
+ *              cleanup (毎日 4:30)            古いチャット・切符・1日ごとの文書・ミッションの掲示板を消す
  */
 import { initializeApp } from 'firebase-admin/app';
 import { FieldValue, Timestamp, getFirestore, type DocumentData, type DocumentReference, type Firestore, type Query, type QueryDocumentSnapshot, type WriteBatch } from 'firebase-admin/firestore';
@@ -378,7 +378,7 @@ export const leaderHandover = onSchedule({ schedule: '0 5 * * *', timeZone: 'Asi
   }
 });
 
-/** 毎日 4:30: 30日より古いチャット、期限が1日以上前に切れた切符、14日より古い「1日ごとの文書」を消す。 */
+/** 毎日 4:30: 30日より古いチャット、期限が1日以上前に切れた切符、14日より古い「1日ごとの文書」と同盟ミッションの掲示板を消す。 */
 export const cleanup = onSchedule({ schedule: '30 4 * * *', timeZone: 'Asia/Tokyo', timeoutSeconds: 300 }, async () => {
   const now = Date.now();
   const writer = db.bulkWriter();
@@ -395,5 +395,6 @@ export const cleanup = onSchedule({ schedule: '30 4 * * *', timeZone: 'Asia/Toky
   await sweep(db.collectionGroup('chat').where('sentAt', '<', Timestamp.fromMillis(now - 30 * 86_400_000)));
   await sweep(db.collectionGroup('tickets').where('expiresAt', '<', now - 86_400_000));
   await sweep(db.collectionGroup('daily').where('updatedAt', '<', Timestamp.fromMillis(now - 14 * 86_400_000)));
+  await sweep(db.collectionGroup('missionTotals').where('updatedAt', '<', Timestamp.fromMillis(now - 14 * 86_400_000)));
   await writer.close();
 });

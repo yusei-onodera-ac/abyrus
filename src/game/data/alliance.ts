@@ -6,7 +6,9 @@ import type {
   RaidBossDef,
 } from '../alliance/AllianceBackend';
 import { LEAGUES } from '../alliance/AllianceBackend';
+import { tr } from '../i18n';
 import { REGIONS } from './regions';
+import { researchBonusOfSave } from './allianceResearch';
 import type { SaveData } from '../systems/SaveSystem';
 
 /**
@@ -65,13 +67,17 @@ export function perksOfSave(save: Pick<SaveData, 'alliance'>): AlliancePerks {
   const level = allianceLevelOf(save);
   return level > 0 ? perksForLevel(level) : NO_PERKS;
 }
-/** 放置ゴールドの増え (0.08 = +8%)。 */
+/** 放置ゴールドの増え (0.08 = +8%)。同盟Lv の恩恵に、同盟研究 (収入) が足される。 */
 export function allianceIdleGoldBonus(save: Pick<SaveData, 'alliance'>): number {
-  return perksOfSave(save).idleGoldBonus;
+  return perksOfSave(save).idleGoldBonus + researchBonusOfSave(save, 'idleGold');
 }
-/** 経験値素材ドロップの増え。 */
+/** 経験値素材ドロップの増え。同盟Lv の恩恵に、同盟研究 (成長) が足される。 */
 export function allianceExpDropBonus(save: Pick<SaveData, 'alliance'>): number {
-  return perksOfSave(save).expDropBonus;
+  return perksOfSave(save).expDropBonus + researchBonusOfSave(save, 'expDrop');
+}
+/** 戦闘で、味方全員の攻撃力とHPにかかる増え (0.03 = +3%)。同盟研究 (戦闘)。無限モードには、かけない。 */
+export function allianceBattleBonus(save: Pick<SaveData, 'alliance'>): number {
+  return researchBonusOfSave(save, 'battle');
 }
 /** スタミナ上限の増え。 */
 export function allianceStaminaBonus(save: Pick<SaveData, 'alliance'>): number {
@@ -116,14 +122,23 @@ const BOSS_TEXT = [
   '闇を走る大狼。速さに、ついていけるか。',
 ];
 
-/** 週ごとのボス (地方のボスを順に回す)。 */
-export const RAID_BOSSES: RaidBossDef[] = REGIONS.slice(0, RAID_BOSS_COUNT).map((r, i) => ({
-  id: `raid_${r.id}`,
-  name: r.bossName,
-  art: r.bossArt,
-  heroClass: r.bossClass,
-  description: BOSS_TEXT[i] ?? '',
-}));
+/** 週ごとのボス (地方のボスを順に回す)。名前と説明は、読むたびに (画面に出すときに) 引くので、言語を変えても、ついてくる:
+ *  名前は、地方の表の名前 (`REGIONS` の行が訳を持てば、その訳) を元に、`tr('allianceBoss', id, 'name', …)` の訳があればそれ。 */
+export const RAID_BOSSES: RaidBossDef[] = REGIONS.slice(0, RAID_BOSS_COUNT).map((r, i) => {
+  const id = `raid_${r.id}`;
+  const text = BOSS_TEXT[i] ?? '';
+  return {
+    id,
+    get name() {
+      return tr('allianceBoss', id, 'name', r.bossName);
+    },
+    art: r.bossArt,
+    heroClass: r.bossClass,
+    get description() {
+      return tr('allianceBoss', id, 'description', text);
+    },
+  };
+});
 
 /** 1回の挑戦で出るダメージは、auto で、総合力のおよそ4〜6.5倍 (戦闘を画面なしで動かして測った: 総合力が1,000から260万まで、
  *  ほぼ一定。auto を切って手で押さないと、2.8倍ほど)。ボスのHPは、これを元に決める。 */

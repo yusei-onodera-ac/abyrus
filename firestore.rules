@@ -48,6 +48,12 @@ service cloud.firestore {
       let t = request.time + duration.value(5, 'h');
       return string(t.year()) + '-' + string(t.month()) + '-' + string(t.day());
     }
+    // 月曜 0:00 (日本時間) 区切りの週。その週の月曜の日付 (桁はそろえない)。src/game/alliance/onlineLogic.ts の mondayKey() と同じ形。
+    function weekKey() {
+      let t = request.time + duration.value(9, 'h');
+      let monday = t - duration.value(t.dayOfWeek() - 1, 'd');
+      return string(monday.year()) + '-' + string(monday.month()) + '-' + string(monday.day());
+    }
     function dailyPath(a, u) {
       return /databases/$(database)/documents/alliances/$(a)/members/$(u)/daily/$(dayKey());
     }
@@ -484,7 +490,8 @@ service cloud.firestore {
               && ((exists(memberPath(a, uid())) && !existsAfter(memberPath(a, uid()))) || isOfficerUp(a))));
     }
 
-    // 寄付: 同盟EXPと同盟Lv、今週のポイント。同じバッチで、自分の「今日の寄付」が1つ増えるときだけ。
+    // 寄付: 同盟EXPと同盟Lv、今週のポイント、同盟の資金 (研究に使う。寄付1回で、同盟EXPと同じだけ増える: 最大300)。
+    // 同じバッチで、自分の「今日の寄付」が1つ増えるときだけ。
     // Lvは1つずつしか上がらず、上がれるのは、EXPが足りる (あと300で届く) ときだけ。
     function isDonationUpdate(a) {
       let n = request.resource.data;
@@ -493,14 +500,50 @@ service cloud.firestore {
       let d = dailyPath(a, uid());
       let before = exists(d) ? get(d).data.get('total', 0) : 0;
       return isMember(a)
-        && n.diff(o).affectedKeys().hasOnly(['exp', 'level', 'memberMax', 'weekPoints', 'updatedAt'])
+        && n.diff(o).affectedKeys().hasOnly(['exp', 'level', 'memberMax', 'weekPoints', 'fund', 'updatedAt'])
         && n.updatedAt == request.time
         && n.memberMax == memberMaxFor(n.level)
         && n.weekPoints >= o.weekPoints && n.weekPoints - o.weekPoints <= 30
+        && n.get('fund', 0) >= o.get('fund', 0) && n.get('fund', 0) - o.get('fund', 0) <= 300
         && ((n.level == o.level && n.exp >= o.exp && n.exp - o.exp <= 300)
             || (o.level < 10 && n.level == o.level + 1 && n.exp >= 0 && n.exp < 300 && o.exp + 300 >= need[o.level - 1]))
         && existsAfter(d)
         && getAfter(d).data.get('total', 0) == before + 1;
+    }
+
+    // 研究: 同盟長・副長が、同盟の資金で、1つの系統を1段進める。値段と必要な同盟Lvは、段で決まる (どの系統も同じ。
+    // src/game/data/allianceResearch.ts の RESEARCH_STEPS と同じ数)。資金は、その値段だけ減る。
+    function researchLevel(d, line) {
+      return d.get('research', {}).get(line, 0);
+    }
+    function researchCost(step) {
+      return [15000, 30000, 60000, 110000, 180000][step];
+    }
+    function researchNeedLevel(step) {
+      return [2, 3, 5, 7, 9][step];
+    }
+    function researchSame(line) {
+      return researchLevel(request.resource.data, line) == researchLevel(resource.data, line);
+    }
+    function researchStep(line) {
+      let n = request.resource.data;
+      let o = resource.data;
+      let before = researchLevel(o, line);
+      return before is int && before >= 0 && before < 5
+        && researchLevel(n, line) == before + 1
+        && o.level >= researchNeedLevel(before)
+        && o.get('fund', 0) >= researchCost(before)
+        && n.fund == o.get('fund', 0) - researchCost(before);
+    }
+    function isResearchUpdate(a) {
+      let n = request.resource.data;
+      return isOfficerUp(a)
+        && n.diff(resource.data).affectedKeys().hasOnly(['fund', 'research', 'updatedAt'])
+        && n.updatedAt == request.time
+        && n.research is map && n.research.keys().hasOnly(['battle', 'income', 'growth'])
+        && ((researchStep('battle') && researchSame('income') && researchSame('growth'))
+            || (researchStep('income') && researchSame('battle') && researchSame('growth'))
+            || (researchStep('growth') && researchSame('battle') && researchSame('income')));
     }
 
     match /alliances/{allianceId} {
@@ -514,7 +557,7 @@ service cloud.firestore {
         && existsAfter(/databases/$(database)/documents/allianceNames/$(request.resource.data.nameLower));
 
       allow update: if signedIn()
-        && (isLeaderSettingsUpdate(allianceId) || isMemberCountUpdate(allianceId) || isDonationUpdate(allianceId));
+        && (isLeaderSettingsUpdate(allianceId) || isMemberCountUpdate(allianceId) || isDonationUpdate(allianceId) || isResearchUpdate(allianceId));
 
       // 解散。ほかのメンバーの文書と、サブコレクションは、Cloud Functions (onAllianceDeleted) が消す。
       allow delete: if signedIn() && isLeader(allianceId);
@@ -675,6 +718,87 @@ service cloud.firestore {
       // 切符: サーバーだけ。
       match /tickets/{ticketId} {
         allow read, write: if false;
+      }
+
+      // ---------------------------------------------------------------- 同盟ミッション (1日 / 1週間ごとの掲示板)
+      // missionTotals/{d2026-11-24 | w2026-11-23}: その期間の目標 (goals: 期間の初めに、最初に足した人が決める。そのあとは変えられない)、
+      // 同盟の合計 (progress)、メンバーごとの貢献 (by)、メンバーごとの受け取り済み (claims)。文書IDは、いまの期間のものだけ。
+      // 足せるのは、自分の貢献だけ (by.{自分}) で、合計は、自分の貢献が増えた分と同じだけ増える。1人が1期間に足せる数には、上限がある
+      // (行動ごと。1日の上限 × 週は7倍: src/game/data/allianceMissions.ts の MISSION_DAILY_CAP と同じ数)。
+      // 受け取りは、1人が1つずつ。合計が目標に届いていて、自分の貢献が1以上のときだけ。
+      function missionBoardId(kind) {
+        return kind == 'daily' ? 'd' + dayKey() : 'w' + weekKey();
+      }
+      // 1つの行動について: 自分の貢献は、減らず、上限 (cap) を超えず、合計は、自分の貢献が増えた分だけ増える。
+      // (a, b = 自分の貢献の、あと / まえ。p, q = 合計の、あと / まえ。ルールには、式の数に上限 (1リクエストで1000) があるので、短く書いてある。)
+      function missionStep(a, b, p, q, k, cap) {
+        return a.get(k, 0) >= b.get(k, 0) && a.get(k, 0) <= cap
+          && p.get(k, 0) - q.get(k, 0) == a.get(k, 0) - b.get(k, 0);
+      }
+      // 行動は8つ (src/game/alliance/AllianceBackend.ts の MISSION_METRICS)。上限は、1日の分に、週なら7を掛ける
+      // (src/game/data/allianceMissions.ts の MISSION_DAILY_CAP と同じ数)。
+      function missionStepsOk(a, b, p, q, m) {
+        return a.keys().hasOnly(['stage', 'gacha', 'donate', 'raid', 'stamina', 'idle', 'enhance', 'helper'])
+          && p.keys().hasOnly(['stage', 'gacha', 'donate', 'raid', 'stamina', 'idle', 'enhance', 'helper'])
+          && missionStep(a, b, p, q, 'stage', 300 * m) && missionStep(a, b, p, q, 'gacha', 300 * m)
+          && missionStep(a, b, p, q, 'donate', 13 * m) && missionStep(a, b, p, q, 'raid', 5 * m)
+          && missionStep(a, b, p, q, 'stamina', 1000 * m) && missionStep(a, b, p, q, 'idle', 10 * m)
+          && missionStep(a, b, p, q, 'enhance', 200 * m) && missionStep(a, b, p, q, 'helper', 20 * m);
+      }
+      function missionGoalOk(goals, i) {
+        return goals.size() <= i
+          || (goals[i] is map && goals[i].keys().hasOnly(['id', 'metric', 'target'])
+              && goals[i].id is string && goals[i].id.size() >= 1 && goals[i].id.size() <= 20
+              && goals[i].metric in ['stage', 'gacha', 'donate', 'raid', 'stamina', 'idle', 'enhance', 'helper']
+              && goals[i].target is number && goals[i].target >= 1 && goals[i].target <= 10000000);
+      }
+      function validNewMissionBoard(boardId, d) {
+        return d.keys().hasOnly(['kind', 'members', 'goals', 'progress', 'by', 'claims', 'updatedAt'])
+          && d.kind in ['daily', 'weekly']
+          && boardId == missionBoardId(d.kind)
+          && d.members is int && d.members == get(alliancePath(allianceId)).data.memberCount
+          && d.goals is list && d.goals.size() >= 1 && d.goals.size() <= (d.kind == 'daily' ? 3 : 1)
+          && missionGoalOk(d.goals, 0) && missionGoalOk(d.goals, 1) && missionGoalOk(d.goals, 2)
+          && d.by is map && d.by.keys().hasOnly([uid()])
+          && d.progress is map
+          && missionStepsOk(d.by.get(uid(), {}), {}, d.progress, {}, d.kind == 'weekly' ? 7 : 1)
+          && d.claims == {}
+          && d.updatedAt == request.time;
+      }
+      function isMissionReport() {
+        let n = request.resource.data;
+        let o = resource.data;
+        return n.diff(o).affectedKeys().hasOnly(['progress', 'by', 'updatedAt'])
+          && n.updatedAt == request.time
+          && n.by.diff(o.by).affectedKeys().hasOnly([uid()])
+          && missionStepsOk(n.by[uid()], o.by.get(uid(), {}), n.progress, o.progress, o.kind == 'weekly' ? 7 : 1);
+      }
+      function missionGoalMet(d, id, i) {
+        return d.goals.size() > i && d.goals[i].id == id
+          && d.progress.get(d.goals[i].metric, 0) >= d.goals[i].target
+          && d.by.get(uid(), {}).get(d.goals[i].metric, 0) >= 1;
+      }
+      function isMissionClaim() {
+        let n = request.resource.data;
+        let o = resource.data;
+        let after = n.claims.get(uid(), []);
+        let before = o.claims.get(uid(), []);
+        return n.diff(o).affectedKeys().hasOnly(['claims', 'updatedAt'])
+          && n.updatedAt == request.time
+          && n.claims.diff(o.claims).affectedKeys().hasOnly([uid()])
+          && after.size() == before.size() + 1
+          && after.hasAll(before)
+          && !(after[before.size()] in before)
+          && (missionGoalMet(o, after[before.size()], 0) || missionGoalMet(o, after[before.size()], 1) || missionGoalMet(o, after[before.size()], 2));
+      }
+
+      match /missionTotals/{boardId} {
+        allow read: if signedIn() && isMember(allianceId);
+        allow create: if signedIn() && isMember(allianceId) && validNewMissionBoard(boardId, request.resource.data);
+        allow update: if signedIn() && isMember(allianceId)
+          && boardId == missionBoardId(resource.data.kind)
+          && (isMissionReport() || isMissionClaim());
+        allow delete: if false;
       }
 
       // 助っ人を貸した回数 (貸した人 × 今日)。ID は「{貸した人}_{今日}」。1日に、お礼の対象になるのは3回まで。

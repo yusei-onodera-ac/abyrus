@@ -30,6 +30,7 @@ import { FINAL_BATTLE_TINT, getRegion } from '../data/regions';
 import { BattleSystem, BattleEngine, ULT_MAX, type UnitInstance, type BattleEvent } from '../systems/BattleSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { AllianceService } from '../alliance/AllianceService';
+import { allianceBattleBonus } from '../data/alliance';
 import type { HelperHero } from '../alliance/AllianceBackend';
 import { ENEMY_ROW_Y, ENEMY_SPACING, fitEnemyArt } from '../characters/EnemyArt';
 import { fitPartyArt, PARTY_ROW_Y, PARTY_SPACING } from '../characters/PartyLayout';
@@ -218,12 +219,14 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
 
+    // The 同盟's 戦闘研究 raises everyone on the player's side (a borrowed 助っ人 too).
+    const allianceMul = 1 + allianceBattleBonus(this.save);
     const playerUnits: UnitInstance[] = [
-      ...pFront.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i)),
-      ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
+      ...pFront.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i, allianceMul)),
+      ...pBack.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i, allianceMul)),
     ];
     const helperHero = this.helper ? AllianceService.helperToHeroData(this.helper) : undefined;
-    if (helperHero) playerUnits.push(BattleSystem.createPlayerUnit(helperHero, 'back', pBack.length));
+    if (helperHero) playerUnits.push(BattleSystem.createPlayerUnit(helperHero, 'back', pBack.length, allianceMul));
     this.layoutUnits(playerUnits, true, true);
     this.partyBar = new PartyBar(this, {
       generator: this.generator,

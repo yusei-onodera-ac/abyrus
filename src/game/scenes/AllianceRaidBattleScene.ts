@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { AllianceService } from '../alliance/AllianceService';
 import type { HelperHero, RaidOutcome, RaidTicket } from '../alliance/AllianceBackend';
+import { allianceBattleBonus } from '../data/alliance';
 import { AnimationController } from '../characters/AnimationController';
 import { BattleFx, type Positioned } from '../characters/BattleFx';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
@@ -94,12 +95,14 @@ export class AllianceRaidBattleScene extends Phaser.Scene {
       this.time.delayedCall(1500, () => this.scene.start('AllianceRaid'));
       return;
     }
+    // The 同盟's 戦闘研究 raises everyone on the player's side (the cap on the damage, power x 15, has room for it).
+    const allianceMul = 1 + allianceBattleBonus(this.save);
     const players: UnitInstance[] = [
-      ...front.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i)),
-      ...back.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i)),
+      ...front.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'front', i, allianceMul)),
+      ...back.map((hero, i) => BattleSystem.createPlayerUnit(hero, 'back', i, allianceMul)),
     ];
     // A borrowed 助っ人 stands in the back row as the sixth.
-    if (this.helper) players.push(BattleSystem.createPlayerUnit(AllianceService.helperToHeroData(this.helper), 'back', back.length));
+    if (this.helper) players.push(BattleSystem.createPlayerUnit(AllianceService.helperToHeroData(this.helper), 'back', back.length, allianceMul));
 
     // The boss: one big unit that cannot fall in this fight. It hits as hard as the party can bear for about the minute
     // (a hit takes about 1/34 of the party's HP), so tanks and healers matter.

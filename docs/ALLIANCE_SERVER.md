@@ -5,6 +5,9 @@
 > **状態：未検証。** Firebase プロジェクトがまだ無いので、ここに書いたルール・コード・Functions は、実際の Firestore には、
 > 一度もつないでいない。型は通っている（ゲーム側）が、動作は、プロジェクトをつないで確かめる必要がある。
 > 本番に出す前に、必ず、エミュレーター（下の「試し方」）で、ひと通り動かすこと。
+>
+> 例外：**同盟ミッションと同盟研究の分のルール**（`missionTotals` と、`alliances` の `fund` / `research`）は、Firestore エミュレーターで、75項目を試した
+> （`tools/alliance/rules/alliance_depth.test.ts`。下の「ルールの試験」）。ほかの部分は、これまでどおり、未検証。
 
 ## 全体
 
@@ -31,7 +34,7 @@
 | `users/{認証uid}/requestsOut/{同盟ID}` | 自分が出した申請の控え | ● 本人 |
 | `playerIndex/{フレンドID}` | `{ authUid }`（先着。あとから変えられない） | ● 本人 |
 | `allianceNames/{名前の正規形}` | `{ allianceId }`（名前の重複防止） | ● 同盟長（作成・改名・解散と同じバッチ） |
-| `alliances/{同盟ID}` | `name, nameLower, emblem, description, level, exp, memberCount, memberMax, joinPolicy, minPlayerLevel, leaderName, leaderAuth, weekPoints, power, league, createdAt, updatedAt` | ● 同盟長（設定）／メンバー（人数・寄付）／○ `power`・`league` |
+| `alliances/{同盟ID}` | `name, nameLower, emblem, description, level, exp, memberCount, memberMax, joinPolicy, minPlayerLevel, leaderName, leaderAuth, weekPoints, power, league, fund, research, createdAt, updatedAt` | ● 同盟長（設定）／メンバー（人数・寄付・`fund` の増え）／幹部以上（研究: `fund` の減りと `research`）／○ `power`・`league`。`fund`（同盟の資金）と `research`（`{battle, income, growth}`: 系統ごとの段）は、なければ 0 として読む（作るときには書かない） |
 | `alliances/{id}/members/{認証uid}` | `playerId, name, level, power, role, contribution, weekContribution, weekId, coins, lastActiveAt, joinedAt, helper` | ● 本人（自分の情報・貢献）／同盟長（役職）／幹部以上（外す） |
 | `…/members/{uid}/daily/{その日}` | 1日ごとの回数: `donGold, donMaterials, donGems, total, stages, answers, staminaSent, staminaReceived, lendCoinsClaimed, raidAttempts, updatedAt` | ● 本人（`raidAttempts` 以外）／○ `raidAttempts` |
 | `…/members/{uid}/inbox/{id}` | 受け取り箱: `kind('stamina'\|'lend'), amount, fromAuth, fromName, at` | ● 同盟のメンバーが入れる／本人が消す |
@@ -41,6 +44,7 @@
 | `…/raid/{週ID}/hits/{id}` | 1回ごとの記録（監査用）: `authUid, damage, at` | ○ |
 | `…/raid/{週ID}/claims/{認証uid}` | 報酬の受け取り済み: `at, rank` | ● 本人（1回だけ） |
 | `alliances/{id}/tickets/{id}` | 挑戦の切符: `authUid, playerId, weekId, issuedAt, expiresAt, durationMs, maxDamage, used` | ○ |
+| `alliances/{id}/missionTotals/{d2026-11-24 \| w2026-11-23}` | 同盟ミッションの掲示板（1日 = `d` + 4:00区切りの日付 / 1週間 = `w` + その週の月曜の日付。どちらも日本時間）: `kind('daily'\|'weekly'), members, goals[{id,metric,target}], progress{行動: 数}, by{認証uid: {行動: 数}}, claims{認証uid: [ミッションID]}, updatedAt` | ● メンバー（最初に足した人が作る。あとは、自分の `by` と `claims` だけ） |
 | `alliances/{id}/lends/{貸した人uid}_{その日}` | 助っ人を貸した回数 `{ n }`（お礼は、1日3回まで） | ● メンバー |
 | `alliances/{id}/chat/{id}` | `kind('text'\|'help'\|'system'), senderAuth, senderPlayerId, senderName, text, sentAt, help{what,helpers[],open}` | ● text / help ／○ system |
 | `seasons/{週ID}/entries/{同盟ID}` | リーグ表の1行: `allianceId, name, emblem, league, groupId, power, points, raid, donation, stages, helpers, updatedAt` | ○ 作成／● 寄付・ステージ・助っ人のポイント／○ ボスのポイント |
@@ -70,7 +74,7 @@
 | `alliances` | `joinPolicy ↑, weekPoints ↓` | おすすめ（`joinPolicy in [open, approval]` を、今週のポイント順に） |
 | `entries`（シーズンの下） | `groupId ↑, points ↓` | リーグ表（自分の組を、ポイント順に） |
 | `entries` | `league ↑, power ↓` | 運用用（リーグごとの総合力順） |
-| コレクショングループ `chat.sentAt` / `tickets.expiresAt` / `daily.updatedAt` / `members.role` | 単一フィールドの、コレクショングループ索引 | 掃除（古いものの削除）、同盟長の引き継ぎ（`role == leader`） |
+| コレクショングループ `chat.sentAt` / `tickets.expiresAt` / `daily.updatedAt` / `missionTotals.updatedAt` / `members.role` | 単一フィールドの、コレクショングループ索引 | 掃除（古いものの削除）、同盟長の引き継ぎ（`role == leader`） |
 
 名前の検索は、**前方一致**（`nameLower >= q` と `nameLower <= q + `）。部分一致は、Firestore ではできない。
 
@@ -91,8 +95,11 @@
 | 24時間の待ち | `users.leftAt` は、本人が「いまの時刻」にしか、できない（消せない）。入るときに、ルールが確かめる。 |
 | チャット | 本人の名前で、text / help だけ。system は、サーバーだけ。 |
 | 受け取り箱 | メンバーが、決まった額（スタミナ10・コイン5）だけ入れられる。受け取る側が、1日の上限（スタミナ10個・コイン15）を、自分の `daily` で数える。 |
+| 同盟の資金 | `alliances.fund` は、寄付のバッチ（`daily` の `total` が +1 になる書き込み）で、1回に +300 まで増える。減るのは、研究のときだけ。 |
+| 研究 | 同盟長・副長だけ。1回の書き込みで、1つの系統が 1段だけ上がり、資金は、その段の値段（15,000 〜 180,000）ちょうどだけ減る。必要な同盟Lv（2・3・5・7・9）に届いていて、資金が足りるときだけ。ほかの項目は、同時に変えられない。 |
+| 同盟ミッションの掲示板 | 文書IDは、いまの期間のものだけ（昨日の分は、書けない）。作れるのはメンバーで、`members` は同盟の人数と同じ、目標は日3件・週1件まで、貢献は作った人の分だけ。足せるのは、自分の貢献（`by.{自分}`）で、**合計は、自分の貢献が増えた分と、ちょうど同じだけ**増える（行動ごと）。1人が1期間に足せる量には、行動ごとの上限（1日: stage 300・gacha 300・donate 13・raid 5・stamina 1,000・idle 10・enhance 200・helper 20。週は7倍）。受け取り（`claims.{自分}`）は、1回の書き込みで1つ、合計が目標に届いていて、自分の貢献が1以上のときだけ。取り消せない。削除は、誰にもできない。 |
 
-**ルール内の数字**（EXP表・1日の上限・ポイントの上限）は、`onlineLogic.ts` と合わせてある。変えたら、
+**ルール内の数字**（EXP表・1日の上限・ポイントの上限・研究の値段と必要なLv・ミッションの行動ごとの上限）は、`onlineLogic.ts` と `data/allianceResearch.ts` / `data/allianceMissions.ts` に合わせてある。変えたら、
 `node tools/alliance/check-sync.mjs`（下の「値の同期」）で、ずれを調べる。
 
 ### 守れないもの（と、その対策）
@@ -155,6 +162,30 @@ Firebase コンソールの「ルール プレイグラウンド」で、`firest
 - ボスへの挑戦：`beginRaid` → 60秒後に `finishRaid`（上限で切られる）。早すぎる提出は、断られる。
 - 週の切り替え（`weeklyRollover` を、手動で1回実行）：結果の文書と、新しいリーグ表の行ができる。
 
+### ルールの試験（ミッション・研究の分）
+
+`tools/alliance/rules/alliance_depth.test.ts`（75項目）が、Firestore エミュレーターに、実際の `firestore.rules` を読み込ませて、許されること・断られることを、1つずつ確かめる。
+本番には、つながらない（`demo-` で始まるプロジェクトで、エミュレーターにしか、つながらない）。vitest と `@firebase/rules-unit-testing` が要る
+（このリポジトリの `package.json` には入れていない。abyrus-admin の `npm run test:rules` と同じ道具）。この2つが入っているフォルダ（例：abyrus-admin を clone したもの）の `tests/` に、
+テストファイルを置いて、そこから:
+
+```
+RULES_PATH=<このリポジトリ>/firestore.rules firebase emulators:exec --only firestore --project demo-abyrus-alliance-depth "vitest run"
+```
+
+要るもの: Java（エミュレーターが使う）、`firebase-tools`。確かめている内容: 研究（幹部以上だけ・値段ちょうど・1段ずつ・必要な同盟Lv・資金が足りるとき・2系統同時や、ほかの項目の同時変更は不可）、資金（寄付1回で最大300）、
+ミッション掲示板の作成（いまの期間のIDだけ・人数・目標の数と形・作った人の貢献だけ）、足す（自分の貢献が増えた分だけ合計が増える・上限・ほかの人の分は触れない・昨日の掲示板は閉じている）、受け取り（1回1つ・目標に届いたときだけ・貢献が1以上・取り消せない）。
+わざとルールを壊して（幹部の条件を外す・値段を緩める・上限を10倍・人数の確認を外す・二重の受け取りの確認を外す）、テストが落ちることも確かめた。
+「いまの時刻」は実時間なので、4:00（日本時間）の前後数秒に走らせると、1回だけ落ちることがある。週の境目（日曜の夜と月曜の朝）は、実時間でしか試せないので、`tools/alliance/check-sync.mjs` が、`mondayKey` の計算（`2026-11-29 23:59` は `2026-11-23`、`2026-11-30 0:00` は `2026-11-30`）を確かめている。
+
+**サーバー版のコードごと、エミュレーターで通す試験**（`tools/alliance/rules/online_backend_e2e.ts`、29項目）：`OnlineAllianceBackend` を、Auth と Firestore のエミュレーターにつないで、
+実際のルールで、作成 → 寄付（資金が増える）→ ミッションの報告（掲示板の作成と、足す）→ 受け取り（同盟コインが入る・2回目は断られる）→ 研究（資金・同盟Lv の確認・2系統）を、通す。
+`node tools/alliance/rules/bundle_e2e.mjs <フォルダ>/e2e` でまとめて、`firebase emulators:exec --only firestore,auth --project demo-abyrus-alliance-depth "node e2e/alliance_online.mjs"` で動かす
+（リポジトリの `firebase.json` に、エミュレーターの設定（auth 9099・firestore 8080）を足した。公開（deploy）には関係しない）。「E2E DONE」と出れば、全部通った。
+このとき、これまで未検証だった**寄付のルール**（EXP・Lv・1日の回数の同時更新）も、本物のルールで通ることが分かった。
+
+エミュレーターで分かったこと: ルールには「1リクエストで評価できる式は1,000まで」の上限がある。ミッションの掲示板のルール（行動8つ × 上限・合計の一致）は、そのために、短く書いてある（`missionStep`）。変えるときは、エミュレーターで確かめること。
+
 ### 値の同期
 
 同じ数字が、3か所にある。変えたら、すべてそろえる。
@@ -163,9 +194,11 @@ Firebase コンソールの「ルール プレイグラウンド」で、`firest
 |---|---|
 | EXP表・恩恵・寄付・ボスのHP・ダメージ上限・ポイント・昇降格・助っ人のお礼 | `src/game/alliance/onlineLogic.ts`（ゲーム）と `functions/src/constants.ts`（サーバー）。後者は、前者の写し |
 | 1日の上限・EXP表・ポイントの上限・24時間の待ち | `firestore.rules`（数字を、直接書いてある） |
+| 研究の値段・必要な同盟Lv・段の数 | `src/game/data/allianceResearch.ts`（ゲーム。ローカルも、同じ表）と `firestore.rules` の `researchCost` / `researchNeedLevel` |
+| ミッションの行動と、1人の上限（1日。週は7倍）・目標の数 | `src/game/data/allianceMissions.ts`（ゲーム。ローカルも、同じ表）と `firestore.rules` の `missionStepsOk`。目標の数は、ルールには書かない（最初に足した人が、掲示板に書く） |
 
 `node tools/alliance/check-sync.mjs` で、(1) ゲームとサーバーが、同じ答えを返すか、(2) ルールの数字が、`onlineLogic.ts` と合っているか、
-(3) 日付・週・ポイントの基本の計算が、正しいかを、確かめる（50項目）。
+(3) 日付・週・ポイントの基本の計算が、正しいか、(4) 研究の値段・必要なLv・ミッションの上限が、ルールと表で合っているかを、確かめる（66項目）。
 ローカル版（fork L の `data/alliance.ts`）の表も、最終的に、`onlineLogic.ts` と、1か所にまとめる。
 
 ## 運用メモ
@@ -174,12 +207,28 @@ Firebase コンソールの「ルール プレイグラウンド」で、`firest
 - **ボスのHPと報酬の調整**：`raidBossHp`・`raidReward`（`onlineLogic.ts` と `constants.ts`）。HP は、同盟の総合力に比例する。
 - **同盟の強制解散・メンバーの調整**：Firebase コンソールか、Admin SDK で、文書を直接変える（クライアントのルールの外）。
 - **リーグ表の名前**：`entries.name` は、週の頭に写したもの。週の途中の改名は、次の週から反映される。
-- **掃除**：`cleanup` が、毎日、古いチャット（30日）・切符（期限切れ1日後）・1日ごとの文書（14日）を消す。
+- **掃除**：`cleanup` が、毎日、古いチャット（30日）・切符（期限切れ1日後）・1日ごとの文書（14日）・ミッションの掲示板（14日）を消す。
+- **ミッションの目標・報酬を変える**：`data/allianceMissions.ts` の表を直すだけ。すでにできている今日・今週の掲示板は、できたときの目標のまま（報酬は、表の新しい値）。
+  研究の値段・効果は、`data/allianceResearch.ts`（値段と必要Lvは、ルールの `researchCost` / `researchNeedLevel` も）。
 - **解散した同盟の下のデータ**：`onAllianceDeleted` が、消す。残ったメンバーの `users.allianceId` は、本人が次に開いたときに、直る。
+
+## ミッション・研究のルールを公開するとき（持ち主の作業。ここでは、公開していない）
+
+1. **ルールの置き場**：Firebase プロジェクトは、ゲームと管理画面（abyrus-admin）で共用で、ルールは、1プロジェクトに1つだけ公開できる。
+   このリポジトリの `firestore.rules` は、管理画面の分も含んだ全部。**abyrus-admin の `firestore.rules` にも、同じ内容を写す**こと（管理画面の側から公開すると、
+   写していないほうの分が消える）。管理画面の節（`// 管理画面` 以下）は、abyrus-admin の側が正なので、そちらに変更が入っていれば、それも取り込んでから写す。
+2. 公開する前に、エミュレーターで試験する（上の「ルールの試験」。75項目が通ること）。`node tools/alliance/check-sync.mjs` も通すこと。
+3. 公開：`firebase deploy --only firestore:rules,firestore:indexes`（索引に、`missionTotals.updatedAt` の分が増えた。数分かかる）。
+4. 古い掲示板の掃除（`cleanup`）を使うなら、Functions も公開：`firebase deploy --only functions`（この変更は `cleanup` に1行だけ。Blaze プランが要る）。
+   公開しなくても、ゲームは動く（掲示板が、たまっていくだけ）。
+5. 公開したあとの確認：2つの端末（または、2つの同盟メンバー）で、ミッション画面を開いて、片方の行動が、もう片方の進みに出ること。同盟長で、研究が進むこと。
 
 ## 未検証・未実装
 
-- すべて、実際の Firestore・Functions では、動かしていない。ルール・索引・Functions は、読み合わせだけ。
+- すべて、実際の Firestore・Functions では、動かしていない。ルール・索引・Functions は、読み合わせだけ（ミッション・研究のルールは、エミュレーターで試験済み）。
+- ミッションと研究の Online 側（`OnlineAllianceBackend` の `reportMissions` / `claimMission` / `researchUp`）は、エミュレーターで通した（上の「ルールの試験」。メンバー1人だけの動き。
+  2人以上が同時に足す競合は、transaction に任せていて、試していない）。ミッションの掲示板は、リアルタイムの購読には、入れていない（開き直すと、最新になる。読み取りを減らすため）。
+- ミッションの目標の数は、最初に足した人が決めるので、改造したクライアントが、小さな目標を書けてしまう（報酬は端末のセーブに入るので、ほかの持ち物と同じ限界）。
 - ルールの `get / exists` の回数は、1リクエストあたりの上限（バッチは20）に収まる想定だが、本番で確かめる。
 - 4:00（1日の切り替え）の、前後数秒に書くと、手元とサーバーの日付がずれて、1回だけ失敗することがある（もう一度で通る）。
 - ゲーム側を、エミュレーターに向けるつなぎは、未実装。

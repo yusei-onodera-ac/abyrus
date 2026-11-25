@@ -6,7 +6,7 @@
  * それまで、ここは docs/ALLIANCE_DESIGN.md の数字をそのまま写してある。
  */
 import type { AllianceReward, AlliancePerks, DonationKind, League, RaidBossDef } from './AllianceBackend';
-import { t as tl } from '../i18n';
+import { t as tl, tr } from '../i18n';
 
 // ---------------------------------------------------------------------------------------------- 時刻
 
@@ -23,6 +23,11 @@ const pad = (n: number): string => String(n);
 export function dayKey(ms: number): string {
   const d = new Date(ms + DAY_SHIFT);
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** その日 (4:00 区切り) の終わり = 次の 4:00 JST のミリ秒。 */
+export function dayEndMs(ms: number): number {
+  return Math.floor((ms + DAY_SHIFT) / DAY) * DAY + DAY - DAY_SHIFT;
 }
 
 /** 今週の始まり (月曜 0:00 JST) のミリ秒。 */
@@ -46,6 +51,22 @@ export function weekId(ms: number): string {
   const dayOfYear = Math.floor((thursday.getTime() - Date.UTC(year, 0, 1)) / DAY) + 1;
   const week = Math.ceil(dayOfYear / 7);
   return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+/** 今週の月曜の日付 ("2026-11-23"。月日は桁をそろえない。Firestore ルールの weekKey() と同じ形)。同盟ミッションの、1週間の名前。 */
+export function mondayKey(ms: number): string {
+  const d = new Date(weekStartMs(ms) + JST);
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
+/** 同盟ミッションの、期間の名前: 1日 = 4:00 区切りの日付 / 1週間 = その週の月曜の日付。 */
+export function missionPeriodKey(scope: 'daily' | 'weekly', ms: number): string {
+  return scope === 'daily' ? dayKey(ms) : mondayKey(ms);
+}
+
+/** 同盟ミッションの掲示板の文書ID: 1日 = "d2026-11-24" / 1週間 = "w2026-11-23"。 */
+export function missionBoardId(scope: 'daily' | 'weekly', ms: number): string {
+  return `${scope === 'daily' ? 'd' : 'w'}${missionPeriodKey(scope, ms)}`;
 }
 
 /** 通し番号の週 (ボスの順番を回すのに使う。2026-01-05 (月) の週 = 0)。 */
@@ -151,6 +172,20 @@ export const RAID_BOSSES: RaidBossDef[] = [
   { id: 'necrodraco', name: '古骨の竜・ネクロドラコ', art: 'necrodraco', heroClass: 'mage', description: 'よみがえった、骨の竜。' }, // i18n-ignore
   { id: 'kurogane', name: '闇走りの大狼・クロガネ', art: 'wolf', heroClass: 'warrior', description: '夜を駆ける、黒鉄の狼。' }, // i18n-ignore
 ];
+
+/** サーバー (週のボスの文書・切符) が持つボスの定義を、いまの言語の名前・説明にする。日本語のままなのは、訳がないとき (`tr('allianceBoss', id, …)`)。
+ *  文書に入っている定義は、言語によらず、サーバーが書いた日本語。読むたびに (画面に出すときに) 引くので、読み込み済みの同盟でも、言語を変えると、ついてくる。 */
+export function localizedBoss(def: RaidBossDef): RaidBossDef {
+  return {
+    ...def,
+    get name() {
+      return tr('allianceBoss', def.id, 'name', def.name);
+    },
+    get description() {
+      return tr('allianceBoss', def.id, 'description', def.description);
+    },
+  };
+}
 
 export function raidBossFor(ms: number): RaidBossDef {
   const i = ((weekIndex(ms) % RAID_BOSSES.length) + RAID_BOSSES.length) % RAID_BOSSES.length;

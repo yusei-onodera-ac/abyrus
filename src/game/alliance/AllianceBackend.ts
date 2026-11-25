@@ -305,6 +305,93 @@ export interface SupportState {
   receiveLeft: number;
 }
 
+// ---------------------------------------------------------------------------------------------- 同盟ミッション
+
+/** 同盟ミッションに数えられる行動 (メンバー全員の分が足されて、同盟の進み具合になる)。 */
+export type MissionMetric = 'stage' | 'gacha' | 'donate' | 'raid' | 'stamina' | 'idle' | 'enhance' | 'helper';
+export const MISSION_METRICS: MissionMetric[] = ['stage', 'gacha', 'donate', 'raid', 'stamina', 'idle', 'enhance', 'helper'];
+export type MissionScope = 'daily' | 'weekly';
+
+/** その期間 (1日 / 1週間) の目標の1つ。目標の数 (target) は、期間の初めに、メンバーの数から決まって、そのまま変わらない。 */
+export interface MissionGoal {
+  id: string;
+  metric: MissionMetric;
+  target: number;
+}
+
+/** 期間ごとの掲示板 (Online では、`alliances/{id}/missionTotals/{期間}` の文書と同じ形。Local では、セーブの中)。 */
+export interface MissionBoard {
+  scope: MissionScope;
+  /** 期間の名前 (1日: 4:00区切りの日付 / 1週間: その週の月曜の日付)。 */
+  key: string;
+  /** 期間の初めの、メンバーの数 (目標の数を決めた)。 */
+  members: number;
+  goals: MissionGoal[];
+  /** 行動ごとの、同盟の合計。 */
+  progress: Partial<Record<MissionMetric, number>>;
+  /** メンバー (Online: 認証uid / Local: フレンドID) ごとの、行動ごとの貢献。 */
+  by: Record<string, Partial<Record<MissionMetric, number>>>;
+  /** メンバーごとの、受け取り済みのミッションのID。 */
+  claims: Record<string, string[]>;
+}
+
+export interface MissionView {
+  id: string;
+  metric: MissionMetric;
+  title: PlainKey;
+  target: number;
+  /** 同盟の合計 (目標を超えていることもある)。 */
+  progress: number;
+  /** 自分の貢献と、同盟内の順位 (貢献がなければ 0)。 */
+  mine: number;
+  myRank: number;
+  /** 受け取れる最低の貢献 (これに届かないと、達成していても受け取れない)。 */
+  minShare: number;
+  /** 貢献の上位3人。 */
+  top: { name: string; count: number }[];
+  reward: AllianceReward;
+  done: boolean;
+  claimed: boolean;
+  claimable: boolean;
+}
+
+export interface MissionBoardView {
+  scope: MissionScope;
+  /** この期間の終わり。 */
+  endsAt: Millis;
+  missions: MissionView[];
+}
+
+export interface MissionsView {
+  daily: MissionBoardView;
+  weekly: MissionBoardView;
+  /** いま受け取れるミッションの数 (赤丸)。 */
+  claimable: number;
+}
+
+// ---------------------------------------------------------------------------------------------- 同盟研究
+
+/** 研究の系統: battle = 戦闘 (攻撃力・HP) / income = 収入 (放置ゴールド) / growth = 成長 (経験値素材)。 */
+export type ResearchLine = 'battle' | 'income' | 'growth';
+export const RESEARCH_LINE_IDS: ResearchLine[] = ['battle', 'income', 'growth'];
+
+export interface ResearchView {
+  /** 系統ごとの、いまの段 (0 = まだ)。 */
+  levels: Record<ResearchLine, number>;
+  /** 研究を進められる (同盟長・副長)。 */
+  canResearch: boolean;
+}
+
+export interface ResearchResult {
+  line: ResearchLine;
+  /** 進んだあとの段。 */
+  level: number;
+  /** 使った資金。 */
+  spent: number;
+  /** 資金の残り。 */
+  fundLeft: number;
+}
+
 // ---------------------------------------------------------------------------------------------- 同盟の全体像
 
 /** 自分が入っている同盟の、画面に必要なすべて。 */
@@ -327,6 +414,12 @@ export interface AllianceDetail {
   raid: RaidView;
   war: WarView;
   support: SupportState;
+  /** 同盟の資金 (寄付で貯まる。研究に使う)。 */
+  fund: number;
+  /** 同盟研究。 */
+  research: ResearchView;
+  /** 同盟ミッション (今日の3件と、今週の1件)。 */
+  missions: MissionsView;
   /** サーバーの現在時刻 (ミリ秒)。 */
   now: Millis;
 }
@@ -389,6 +482,15 @@ export interface AllianceBackend {
   donate(me: PlayerProfile, kind: DonationKind): Promise<Result<DonationResult>>;
   /** 同盟コインを使う (同盟ショップ)。足りなければ not_enough。 */
   spendCoins(me: PlayerProfile, amount: number): Promise<Result<number>>;
+
+  /** 同盟の資金を使って、研究を1段進める (同盟長・副長だけ)。 */
+  researchUp(me: PlayerProfile, line: ResearchLine): Promise<Result<ResearchResult>>;
+
+  // ---- 同盟ミッション
+  /** 自分の行動の数を、同盟ミッションに足す (今日の掲示板と、今週の掲示板の、両方に)。1回の呼び出しで足せる数と、1期間の合計には、上限がある。 */
+  reportMissions(me: PlayerProfile, counts: Partial<Record<MissionMetric, number>>): Promise<Result<true>>;
+  /** 達成したミッションの報酬を受け取る (1人1回)。返る報酬のコインは、Backend が足し済み。 */
+  claimMission(me: PlayerProfile, missionId: string): Promise<Result<AllianceReward>>;
 
   // ---- 共闘ボス
   beginRaid(me: PlayerProfile): Promise<Result<RaidTicket>>;
