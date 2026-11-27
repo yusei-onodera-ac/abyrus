@@ -20,6 +20,7 @@ import { EXPEDITIONS } from '../../src/game/data/expeditions';
 import { ITEMS } from '../../src/game/data/items';
 import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tutorial';
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
+import { ALL_HEROES, defShort } from '../../src/game/data/heroes';
 
 let failures = 0;
 function ok(cond: unknown, label: string): void {
@@ -66,6 +67,10 @@ function collect(): [string, string, string, string][] {
   for (const r of Object.values(ITEMS)) add('item', r.id, r, ['name', 'short', 'description']);
   for (const step of [...TUTORIAL_STEPS, ...VILLAGE_TUTORIAL_STEPS]) if (step.lines) out.push(['tutorial', step.id, 'lines', step.lines.join('\n')]);
   for (const p of PEOPLE) out.push(['villager', p.id, 'lines', trList('villager', p.id, 'lines', p.lines).join('\n')]);
+  for (const r of ALL_HEROES) {
+    add('hero', r.id, r, ['name']);
+    out.push(['hero', r.id, 'short', defShort(r)]);
+  }
   return out;
 }
 
@@ -89,6 +94,16 @@ let seed = 1;
 const rng = (): number => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const names = REGIONS.flatMap((r) => Array.from({ length: 40 }, () => pickFeral(r, rng).name));
 ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n)), `enemy names read as English (${names.slice(0, 3).join(', ')})`);
+
+// a character's name: "Name, the Title" with the given name alone as the short form; each given name is its own (the short forms are what a
+// roster card shows, so two characters must not share one)
+{
+  const shorts = ALL_HEROES.map((r) => defShort(r));
+  ok(ALL_HEROES.every((r) => /^[A-Z][A-Za-z]+, the [A-Z][A-Za-z' -]+$/.test(r.name)), 'a name is "Given, the Title" in English');
+  ok(ALL_HEROES.every((r, i) => r.name.startsWith(`${shorts[i]}, the `)), 'the short form is the given name the full name starts with');
+  ok(new Set(shorts).size === shorts.length, `no two characters share a short name (${shorts.length - new Set(shorts).size} shared)`);
+  ok(ALL_HEROES.every((r) => r.name.length <= 40), `no name is longer than 40 letters (longest ${Math.max(...ALL_HEROES.map((r) => r.name.length))})`);
+}
 
 setLanguage('ja', { persist: false });
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);
