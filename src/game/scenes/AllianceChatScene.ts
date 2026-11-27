@@ -7,7 +7,7 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { applyBackground } from '../ui/Background';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { Button } from '../ui/Button';
-import { buildChip } from '../ui/CardParts';
+import { buildChip, textWrap } from '../ui/CardParts';
 import { emojiTexture } from '../ui/EmojiIcons';
 import { formatChatTime } from '../ui/format';
 import { createPanel } from '../ui/Panel';
@@ -132,7 +132,7 @@ export class AllianceChatScene extends Phaser.Scene {
   }
 
   private addSystem(parent: Phaser.GameObjects.Container, m: AllianceChatMessage, y: number): number {
-    const t = body(this, SCREEN_VIEW.w / 2, y + 16, m.text, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: SCREEN_VIEW.w - 80 } }).setOrigin(0.5, 0);
+    const t = body(this, SCREEN_VIEW.w / 2, y + 16, m.text, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(SCREEN_VIEW.w - 80) }).setOrigin(0.5, 0);
     parent.add(t);
     return t.height + 22;
   }

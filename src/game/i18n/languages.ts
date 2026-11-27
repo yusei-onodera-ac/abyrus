@@ -14,16 +14,21 @@ export interface LanguageInfo {
   readonly match: readonly string[];
   /** A language that is still being written: its table may lack keys (they show in Japanese) and the checker only reports the gap. */
   readonly partial?: boolean;
+  /** Phaser's own text wrapping (it breaks only at spaces) is not enough for this language, so the places that use it (`textWrap` in
+   *  ui/CardParts.ts) use the game's own line breaking instead: Chinese has no spaces at all, and a Korean word wider than the line
+   *  has to be cut. Japanese is not marked: its texts there are written with explicit line breaks, and they stay as they have always
+   *  been (English too: Phaser's wrapping is right for it). */
+  readonly ownWrap?: boolean;
 }
 
 export const LANGUAGES = [
   { code: 'ja', name: '日本語', locale: 'ja-JP', fallback: [], match: ['ja'] },
   { code: 'en', name: 'English', locale: 'en-US', fallback: ['ja'], match: ['en'] },
   // The three below are being translated (their tables are partial): a gap shows in English, then in Japanese.
-  { code: 'ko', name: '한국어', locale: 'ko-KR', fallback: ['en'], match: ['ko'], partial: true },
+  { code: 'ko', name: '한국어', locale: 'ko-KR', fallback: ['en'], match: ['ko'], partial: true, ownWrap: true },
   // (the names are written in each language's own script: 简体 = Simplified, 繁體 = Traditional)
-  { code: 'zh-Hans', name: '简体中文', locale: 'zh-Hans-CN', fallback: ['en'], match: ['zh', 'zh-hans', 'zh-cn', 'zh-sg'], partial: true },
-  { code: 'zh-Hant', name: '繁體中文', locale: 'zh-Hant-TW', fallback: ['en'], match: ['zh-hant', 'zh-tw', 'zh-hk', 'zh-mo'], partial: true },
+  { code: 'zh-Hans', name: '简体中文', locale: 'zh-Hans-CN', fallback: ['en'], match: ['zh', 'zh-hans', 'zh-cn', 'zh-sg'], partial: true, ownWrap: true },
+  { code: 'zh-Hant', name: '繁體中文', locale: 'zh-Hant-TW', fallback: ['en'], match: ['zh-hant', 'zh-tw', 'zh-hk', 'zh-mo'], partial: true, ownWrap: true },
 ] as const satisfies readonly LanguageInfo[];
 
 export type Language = (typeof LANGUAGES)[number]['code'];

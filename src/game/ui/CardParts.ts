@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { createPanel } from './Panel';
 import { breakLines, lineText, NEWLINE, tokenize } from './TextLayout';
 import { CHROME } from './theme';
-import { fontFamily } from '../i18n';
+import { fontFamily, getLanguage, languageInfo } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -68,6 +68,24 @@ function wrapText(text: string, font: string, width: number, hangAllowance: numb
  *  can't be left to wrap. */
 export function wrapToWidth(text: string, width: number, fontSize: number, strokeThickness = 0, fontStyle = 'normal'): string {
   return wrapText(text, `${fontStyle} ${fontSize}px ${fontFamily('sans')}`, width - strokeThickness - fontSize, fontSize);
+}
+
+/** The `wordWrap` option of a Phaser text that is wrapped by Phaser itself (a caption, a dialog message): Japanese, English and Korean
+ *  keep Phaser's own wrapping, exactly as before (it breaks at spaces). Chinese has no spaces, so Phaser's would never break it
+ *  (`basic`) or break only where a word starts, and a Korean word wider than the line would run out of the box (`basic`): those
+ *  get the game's own line breaking (kinsoku, a Korean word kept whole unless it is too wide, as `wrappedText`). `advanced` is
+ *  Phaser's `useAdvancedWrap` (collapses spaces, trims the lines). */
+export function textWrap(width: number, advanced = false): Phaser.Types.GameObjects.Text.TextWordWrap {
+  if (!languageInfo(getLanguage()).ownWrap) return advanced ? { width, useAdvancedWrap: true } : { width };
+  return {
+    width,
+    callback: (text: string, obj: Phaser.GameObjects.Text) => {
+      const style = obj.style;
+      const size = parseInt(String(style.fontSize), 10) || 16;
+      const font = `${style.fontStyle || 'normal'} ${size}px ${style.fontFamily}`;
+      return wrapText(text, font, width - (style.strokeThickness ?? 0) - size, size);
+    },
+  };
 }
 
 /** Text that wraps at `width`: Japanese line-breaking rules (kinsoku), words kept whole in English (Phaser's own

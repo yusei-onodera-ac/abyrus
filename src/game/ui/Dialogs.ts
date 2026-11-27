@@ -4,6 +4,7 @@ import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { createPanel } from './Panel';
 import { body, heading, CHROME } from './theme';
 import { t, fontFamily } from '../i18n';
+import { textWrap } from './CardParts';
 
 const INK = '#1c130a';
 
@@ -127,7 +128,7 @@ export function openConfirm(scene: Phaser.Scene, scroll: ModalLock, opts: Confir
   const modal = openModal(scene, scroll, 0.75, false);
   const cy = 600;
   const w = 600;
-  const text = body(scene, 360, 0, opts.message, { fontSize: '24px', color: '#fff4dc', align: 'center', wordWrap: { width: w - 80 }, stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+  const text = body(scene, 360, 0, opts.message, { fontSize: '24px', color: '#fff4dc', align: 'center', wordWrap: textWrap(w - 80), stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   // A long message makes the popup taller instead of running into the buttons.
   const extraH = opts.extra?.height ?? 0;
   const h = Math.max(330, Math.round(text.height) + 240 + extraH);
@@ -236,7 +237,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
 
   const hint = body(scene, 360, boxTop + boxH + 34, '', { fontSize: '19px', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   modal.container.add(hint);
-  if (opts.note) modal.container.add(body(scene, 360, boxTop + boxH + 72, opts.note, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: inner } }).setOrigin(0.5, 0));
+  if (opts.note) modal.container.add(body(scene, 360, boxTop + boxH + 72, opts.note, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(inner) }).setOrigin(0.5, 0));
 
   const updateCount = (): void => {
     count.setText(`${Array.from(field.value).length} / ${opts.maxLength}`);

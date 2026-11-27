@@ -34,7 +34,7 @@ import { copyText } from '../ui/share';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { LANGUAGES, getLanguage, setLanguage, t, type Language } from '../i18n';
+import { LANGUAGES, fontFamily, getLanguage, setLanguage, t, type Language } from '../i18n';
 import { heroShortOf } from '../data/heroes';
 
 const PAD = 14;
@@ -225,9 +225,13 @@ export class SettingsScene extends InboxScene {
     container.add(caption(this, PAD + 4, PAD + 12, '言語 / Language', { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const current = getLanguage();
     LANGUAGES.forEach((lang, i) => {
-      const cx = PAD + buttonW / 2 + (i % perRow) * (buttonW + gap);
-      const cy = 58 + Math.floor(i / perRow) * 66 + 29 - 6;
-      container.add(new Button(this, cx, cy, buttonW, 58, lang.name, () => this.chooseLanguage(lang.code), { variant: lang.code === current ? 'gold' : 'wood', fontSize: '23px', guard }));
+      // (a row that is not full - the last one - is centred; each name is set in its own language's font, whatever the screen is in)
+      const row = Math.floor(i / perRow);
+      const inRow = Math.min(perRow, LANGUAGES.length - row * perRow);
+      const left = PAD + (CARD_WIDTH - PAD * 2 - (inRow * buttonW + (inRow - 1) * gap)) / 2;
+      const cx = left + buttonW / 2 + (i % perRow) * (buttonW + gap);
+      const cy = 58 + row * 66 + 29 - 6;
+      container.add(new Button(this, cx, cy, buttonW, 58, lang.name, () => this.chooseLanguage(lang.code), { variant: lang.code === current ? 'gold' : 'wood', fontSize: '23px', fontFamily: fontFamily('sans', lang.code), guard }));
     });
     container.addAt(buildCardPanel(this, CARD_WIDTH, height), 0);
     return { container, height };

@@ -7,7 +7,7 @@ import { PLAYER_NAME_MAX, cleanPlayerName } from '../systems/SettingsSystem';
 import { isTransferAvailable } from '../systems/TransferStore';
 import { VoiceSystem } from '../systems/VoiceSystem';
 import { Button } from './Button';
-import { wrapToWidth } from './CardParts';
+import { wrapToWidth, textWrap } from './CardParts';
 import { addDomField, focusField } from './DomField';
 import { createPanel } from './Panel';
 import { addPetFace } from './PetPortrait';
@@ -239,7 +239,7 @@ export class TutorialOverlay {
     const { dom, field } = addDomField(this.scene, 360, top + 108, innerW, 72, { maxLength: PLAYER_NAME_MAX * 2, placeholder: T.placeholder, fontSize: 34 });
     this.nameDom = dom;
     const hint = this.add(
-      body(this.scene, 360, top + 176, T.hint(PLAYER_NAME_MAX), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: innerW } }).setOrigin(0.5, 0),
+      body(this.scene, 360, top + 176, T.hint(PLAYER_NAME_MAX), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(innerW) }).setOrigin(0.5, 0),
     );
     const say = (text: string, error: boolean): void => {
       hint.setText(text);
@@ -283,7 +283,7 @@ export class TutorialOverlay {
     const line = this.add(this.scene.add.graphics()) as Phaser.GameObjects.Graphics;
     line.lineStyle(2, CHROME.brassDark, 0.7);
     line.lineBetween(left + 40, top + 328, left + cardW - 40, top + 328);
-    this.add(body(this.scene, 360, top + 356, T.restoreCaption, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: innerW } }).setOrigin(0.5, 0.5));
+    this.add(body(this.scene, 360, top + 356, T.restoreCaption, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(innerW) }).setOrigin(0.5, 0.5));
     this.add(
       new Button(
         this.scene,
