@@ -4,7 +4,7 @@ import { createHeroInstance } from '../data/heroes';
 import { describeEquip, getEquipDef } from '../data/equipment';
 import { equipIcon } from '../ui/ItemIcons';
 import { getHeroDefinition } from '../data/heroes';
-import { MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillUpgradeCost, type SkillDefinition } from '../data/skills';
+import { MAX_SKILL_LEVEL, SKILL_SLOT_UNLOCK_LEVEL, formatSkillEffectSummary, getHeroSkillLoadout, getSkillSlotCount, isSkillSlotUnlocked, skillKindLabel, skillUpgradeCost, type SkillDefinition } from '../data/skills';
 import { ProgressionSystem } from '../systems/ProgressionSystem';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { pinnedHeroIds, queueHeroArt, trimHeroArt } from '../characters/HeroArt';
@@ -378,10 +378,12 @@ export class HeroDetailScene extends Phaser.Scene {
       g.lineStyle(2, unlocked ? CHROME.brass : CHROME.brassDark, unlocked ? 1 : 0.6);
       g.strokeRoundedRect(x, y, w, h, 10);
       container.add(g);
-      container.add(body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      const name = body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+      if (name.width > w - 20) name.setScale((w - 20) / name.width); // (a long name in another language is squeezed to the tag, as the gear names below are)
+      container.add(name);
       const sub = unlocked ? `Lv.${hero.skillLevels[slot] ?? 1}` : t('hero.detail.chipUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] });
       container.add(caption(this, x + 10, y + 44, sub, { fontSize: '17px', color: unlocked ? '#ffd9a0' : '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      if (unlocked) container.add(caption(this, x + w - 10, y + 44, SKILL_KIND_LABELS[def.kind], { fontSize: '14px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+      if (unlocked) container.add(caption(this, x + w - 10, y + 44, skillKindLabel(def.kind), { fontSize: '14px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
     }
     const listH = shown * (h + gap) - gap;
     const hit = this.add.zone(x + w / 2, top + listH / 2, w, listH).setOrigin(0.5);
@@ -434,8 +436,9 @@ export class HeroDetailScene extends Phaser.Scene {
   private buildSkillRow(modal: Phaser.GameObjects.Container, hero: HeroData, def: SkillDefinition, slot: number, x: number, y: number, w: number, h: number): void {
     const unlocked = isSkillSlotUnlocked(slot, hero.level);
     modal.add(body(this, x, y + 20, def.name, { fontSize: '27px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    modal.add(caption(this, x + w, y + 20, SKILL_KIND_LABELS[def.kind], { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
-    modal.add(caption(this, x, y + 56, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0.5));
+    modal.add(caption(this, x + w, y + 20, skillKindLabel(def.kind), { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
+    // (hung from its top, so a description of two lines in another language grows downward, clear of the name above)
+    modal.add(caption(this, x, y + 44, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0));
 
     if (!unlocked) {
       modal.add(caption(this, x, y + h - 14, t('hero.detail.rowUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] }), { fontSize: '21px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
