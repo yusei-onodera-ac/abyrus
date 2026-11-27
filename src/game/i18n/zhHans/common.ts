@@ -19,5 +19,5 @@ export const common: Partial<Part<'common'>> = {
   'common.details': '详情',
   'common.yes': '是',
   'common.no': '否',
-  'common.ok': '好的',
+  'common.ok': 'OK',
 };
