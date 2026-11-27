@@ -5,9 +5,9 @@ import { periodKey } from './ShopSystem';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** プレミアムパス. There is no store/server behind it yet, so a "subscription" is
- *  a 30-day period that is bought (through PaymentSystem) and bought again to
- *  carry on - nothing renews by itself. */
+/** プレミアムパス. A "subscription" here is a 30-day period that is bought (through
+ *  PaymentSystem: in the App Store it is a non-renewing subscription) and bought again
+ *  to carry on - nothing renews by itself. */
 export const PremiumSystem = {
   isActive(save: SaveData, now = Date.now()): boolean {
     return save.premium.expiresAt > now;

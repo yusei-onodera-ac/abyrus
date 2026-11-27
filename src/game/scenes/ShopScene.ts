@@ -74,8 +74,8 @@ function priceText(product: ShopProduct): string {
  *  the アイテムショップ sells items for 魔晶石 or ゴールド. What is for sale is
  *  data/shop.ts; this scene only lays it out and runs the purchase.
  *
- *  Real-money purchases go through PaymentSystem, which has no real store behind
- *  it yet (see there): a dev build "pays" for free, a production build refuses. */
+ *  Real-money purchases go through PaymentSystem (see there, and docs/PAYMENTS.md): the iOS app
+ *  pays through the App Store, a dev build "pays" for free, any other build refuses. */
 export class ShopScene extends InboxScene {
   protected get screenTitle(): string {
     return t('shop.title');
