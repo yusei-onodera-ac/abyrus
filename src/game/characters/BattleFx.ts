@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { heading } from '../ui/theme';
+import { fontFamily } from '../i18n';
 
 /**
  * Battle spectacle: everything that makes a hit, a skill, a kill and a win feel big - spark
@@ -336,7 +337,7 @@ export class BattleFx {
   /** A short word popping up beside a unit: 攻撃UP, スタン, ... */
   private floatLabel(x: number, y: number, text: string, color: number): void {
     const t = this.scene.add
-      .text(x, y, text, { fontFamily: 'Arial Black, sans-serif', fontSize: '28px', color: '#ffffff', stroke: hexString(color), strokeThickness: 7 })
+      .text(x, y, text, { fontFamily: fontFamily('black'), fontSize: '28px', color: '#ffffff', stroke: hexString(color), strokeThickness: 7 })
       .setOrigin(0.5)
       .setDepth(DEPTH + 6)
       .setScale(0.3);

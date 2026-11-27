@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { CHROME } from './theme';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
 
 const W = 156;
 const H = 64;
@@ -53,7 +53,7 @@ export class BackButton extends Phaser.GameObjects.Container {
 
     this.add(
       scene.add
-        .text(94, 0, t('common.back'), { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '29px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 })
+        .text(94, 0, t('common.back'), { fontFamily: fontFamily('sans'), fontSize: '29px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 5 })
         .setOrigin(0.5),
     );
 

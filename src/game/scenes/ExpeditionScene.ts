@@ -14,7 +14,8 @@ import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { showToast } from '../ui/Toast';
 import { body, caption, heading } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { t } from '../i18n';
+import { getLanguage, t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 const INK = '#1c130a';
 const PAD = 16;
@@ -160,7 +161,7 @@ export class ExpeditionScene extends InboxScene {
     chip.container.setX(CARD_WIDTH - PAD - chip.width);
     container.add(chip.container);
 
-    const names = run.heroIds.map((id) => SaveSystem.getHero(this.save, id)?.name ?? t('quest.expedition.unknownHero')).join(t('quest.expedition.nameSeparator'));
+    const names = run.heroIds.map((id) => ((h) => (h ? heroShortOf(h) : t('quest.expedition.unknownHero')))(SaveSystem.getHero(this.save, id))).join(t('quest.expedition.nameSeparator'));
     const members = caption(this, PAD + 4, 72, t('quest.expedition.members', { names }), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);
     if (members.width > CARD_WIDTH - PAD * 2 - 130) members.setScale((CARD_WIDTH - PAD * 2 - 130) / members.width);
     container.add(members);
@@ -263,7 +264,7 @@ export class ExpeditionScene extends InboxScene {
   private candidates(def: ExpeditionDef): HeroData[] {
     return [...this.save.heroes].sort(
       (a, b) =>
-        Number(b.heroClass === def.favored) - Number(a.heroClass === def.favored) || b.rarity - a.rarity || b.level - a.level || a.name.localeCompare(b.name, 'ja'),
+        Number(b.heroClass === def.favored) - Number(a.heroClass === def.favored) || b.rarity - a.rarity || b.level - a.level || heroShortOf(a).localeCompare(heroShortOf(b), getLanguage()),
     );
   }
 
@@ -301,7 +302,7 @@ export class ExpeditionScene extends InboxScene {
     container.add(portrait);
 
     const color = RARITY_COLORS[hero.rarity];
-    const name = body(this, PAD + 112, 30, hero.name, { fontSize: '26px', fontStyle: 'bold', color: away ? '#9a8a6a' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+    const name = body(this, PAD + 112, 30, heroShortOf(hero), { fontSize: '26px', fontStyle: 'bold', color: away ? '#9a8a6a' : '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
     if (name.width > 250) name.setScale(250 / name.width);
     container.add(name);
     container.add(caption(this, PAD + 112, 62, '★'.repeat(hero.rarity), { fontSize: '20px', color: hex(color), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));

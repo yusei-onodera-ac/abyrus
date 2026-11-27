@@ -136,7 +136,10 @@ export class EventQuestScene extends InboxScene {
     container.add(outline);
     y += bannerH + 12;
 
-    container.add(heading(this, PAD + 4, y + 20, def.title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    const titleText = heading(this, PAD + 4, y + 20, def.title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
+    // (a long title, as English ones are, is shrunk to the width of the card)
+    if (titleText.width > CARD_WIDTH - PAD * 2 - 8) titleText.setScale((CARD_WIDTH - PAD * 2 - 8) / titleText.width);
+    container.add(titleText);
     y += 48;
     const story = wrappedText(this, PAD + 4, y, def.story, CARD_WIDTH - PAD * 2 - 8, { fontSize: '20px', color: '#f5e6c8' });
     container.add(story);

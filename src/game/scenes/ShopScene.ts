@@ -23,7 +23,7 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { t, type PlainKey } from '../i18n';
+import { t, type PlainKey, fontFamily } from '../i18n';
 
 type ShopTab = 'gems' | 'items';
 
@@ -369,7 +369,7 @@ export class ShopScene extends InboxScene {
     const button = new Button(this, x, y, w, h, '', onTap, { variant: 'gold', guard });
     const icon = addGoodIcon(this, price.currency, 0, 0, 40);
     const amount = this.add
-      .text(0, 0, price.amount.toLocaleString('ja-JP'), { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: '#4a2406', strokeThickness: 5 })
+      .text(0, 0, price.amount.toLocaleString('ja-JP'), { fontFamily: fontFamily('sans'), fontSize: '30px', fontStyle: 'bold', color: '#ffffff', stroke: '#4a2406', strokeThickness: 5 })
       .setOrigin(0, 0.5);
     const total = 40 + 8 + amount.width;
     icon.setX(-total / 2 + 20);

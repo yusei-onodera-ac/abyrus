@@ -25,6 +25,7 @@ import { showToast } from '../ui/Toast';
 import { body, caption, heading, CHROME, COLORS } from '../ui/theme';
 import { enter, enterStagger } from '../ui/Transitions';
 import { t, tr } from '../i18n';
+import { textWrap } from '../ui/CardParts';
 
 /** 0-4 = a region's 30-stage page (region 4's page also carries the final
  *  battle node); 'extra' = the post-ending Extra page. */
@@ -191,7 +192,7 @@ export class StageSelectScene extends Phaser.Scene {
     const panel = createPanel(this, w / 2, top + h / 2, w - 16, h, { fillColor: CHROME.woodFill, fillAlpha: 0.95, borderColor: CHROME.brassDark, glowColor: CHROME.brass, radius: 14, gradient: false });
     const name = heading(this, 28, top + 28, title, { fontSize: '30px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
     const progress = body(this, w - 28, top + 28, `${done} / ${total}`, { fontSize: '24px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5);
-    const desc = caption(this, 28, top + 62, description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 72, useAdvancedWrap: true } }).setOrigin(0, 0.5);
+    const desc = caption(this, 28, top + 62, description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: textWrap(w - 72, true) }).setOrigin(0, 0.5);
 
     const barX = 28;
     const barW = w - 56;

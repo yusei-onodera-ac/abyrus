@@ -1,7 +1,7 @@
 import { SCHEDULED_EVENTS, SCHEDULED_GACHAS } from './schedule';
 import { formatDate, formatDateTime } from '../ui/format';
 import { remoteNotices } from '../systems/RemoteNotices';
-import { localized } from '../i18n';
+import { localized, t } from '../i18n';
 
 export interface NoticeEntry {
   id: string;
@@ -65,50 +65,30 @@ export function scheduleNotices(now = Date.now()): NoticeEntry[] {
   };
   for (const e of SCHEDULED_EVENTS) {
     if (!keep(e.startsAt)) continue;
-    const period = `${formatDateTime(new Date(e.startsAt).getTime())} 〜 ${formatDateTime(new Date(e.endsAt).getTime())}`;
-    const how = e.kind === 'dungeon' ? `イベントダンジョンに挑戦して、${e.token.name}を集めましょう。` : `いつもの冒険のミッションで、${e.token.name}が集まります。`;
+    const period = t('sys.event.range', { from: formatDateTime(new Date(e.startsAt).getTime()), to: formatDateTime(new Date(e.endsAt).getTime()) });
+    const how = e.kind === 'dungeon' ? t('social.notice.eventHowDungeon', { token: e.token.name }) : t('social.notice.eventHowMission', { token: e.token.name });
     out.push({
       id: `event-${e.id}`,
-      category: 'イベント',
-      title: `「${e.title}」開催のお知らせ`,
+      category: 'イベント', // i18n-ignore (the key the notice board maps to its label)
+      title: t('social.notice.eventTitle', { title: e.title }),
       date: formatDate(new Date(e.startsAt).getTime()),
       textureKey: `event_banner_${e.id}`,
       image: e.image,
-      body:
-        `期間限定イベント「${e.title}」を開催します。
-
-${e.story}
-
-${how}
-集めた${e.token.name}は、累計報酬や交換所のごほうびと交換できます。
-
-` +
-        `【開催期間】
-${period}
-※終了後${e.exchangeDays}日間は、交換所と報酬の受け取りだけできます。
-
-イベント画面は、画面下の「イベント」から開けます。`,
+      body: t('social.notice.eventBody', { title: e.title, story: e.story, how, token: e.token.name, period, exchangeDays: e.exchangeDays }),
       at: new Date(e.startsAt).getTime(),
     });
   }
   for (const g of SCHEDULED_GACHAS) {
     if (!keep(g.startsAt!)) continue;
-    const period = `${formatDateTime(new Date(g.startsAt!).getTime())} 〜 ${formatDateTime(new Date(g.endsAt!).getTime())}`;
+    const period = t('sys.event.range', { from: formatDateTime(new Date(g.startsAt!).getTime()), to: formatDateTime(new Date(g.endsAt!).getTime()) });
     out.push({
       id: `gacha-${g.id}`,
-      category: 'ガチャ',
-      title: `「${g.title}」開催のお知らせ`,
+      category: 'ガチャ', // i18n-ignore (the key the notice board maps to its label)
+      title: t('social.notice.gachaTitle', { title: g.title }),
       date: formatDate(new Date(g.startsAt!).getTime()),
       textureKey: `gacha_banner_${g.id}`,
       image: g.image,
-      body:
-        `ガチャ「${g.title}」を開催します。
-${g.description}
-
-【開催期間】
-${period}
-
-排出率・ピックアップ・天井の回数は、ガチャ画面の「詳細」からご確認いただけます。`,
+      body: t('social.notice.gachaBody', { title: g.title, description: g.description, period }),
       at: new Date(g.startsAt!).getTime(),
     });
   }

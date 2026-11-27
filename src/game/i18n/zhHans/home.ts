@@ -1,0 +1,88 @@
+import type { Part } from '../types';
+
+// 简体中文 (Simplified Chinese) messages: home.* — the same keys as ja/home.ts (copy en/home.ts and translate; keep every {placeholder}).
+// Typed Partial: a typo or an extra key is a compile error, a key not written yet shows in English. See docs/I18N.md.
+export const home: Partial<Part<'home'>> = {
+  // HomeScene.ts
+  'home.quest': '冒险',
+  'home.summon': '召唤',
+  'home.roster': '编队',
+  'home.loginBonus': '登录奖励',
+  'home.dayReward': '第{dayOfMonth}天的奖励',
+  'home.idleRewards': '挂机奖励',
+  'home.units.hour': '小时',
+  'home.units.minute': '分钟',
+  'home.missions': '任务',
+  'home.idleRewardsClaimed': '已领取挂机奖励',
+  'home.messages': '消息',
+  'home.noMessagesYet': '还没有消息',
+  // IdleScene.ts
+  'home.idle.hoursMinutes': '{total}小时{total2}分钟',
+  'home.idle.storedTime': '已累积时间',
+  'home.idle.maxH': '上限 {capHours}小时',
+  'home.idle.premiumPassActiveMax': '高级通行证生效中（上限 {idleCapHours}小时）',
+  'home.idle.fullyStoredTimeTo': '已累积到上限，快去领取吧。',
+  'home.idle.premiumPassRaisesThe': '高级通行证可将上限从{IDLE_BASE_CAP_HOURS}提升至{idleCapHours}小时',
+  'home.idle.gear': '装备',
+  'home.idle.readyToClaim': '当前可领取的奖励',
+  'home.idle.storageIsFull': '已累积到上限',
+  'home.idle.noBoostsLeftToday': '今日次数已用完',
+  'home.idle.testAd': '（测试广告）',
+  'home.idle.watchAdH': '观看广告，快进{IDLE_AD_BOOST_HOURS}小时',
+  'home.idle.idleRewardsClaimed': '已领取挂机奖励',
+  'home.idle.playingAd': '广告播放中…',
+  'home.idle.hAdded': '已快进{IDLE_AD_BOOST_HOURS}小时',
+  'home.idle.canTAdvanceRight': '现在无法快进',
+  'home.idle.adsAreUnavailable': '广告暂不可用',
+  // HomeHeroScene.ts
+  'home.homeHero.currentHomeHero': '当前的主页英雄',
+  'home.homeHero.lv': '{CLASS_LABELS}　Lv.{level}',
+  'home.homeHero.text': '「{line}」',
+  'home.homeHero.chooseAHero': '选择英雄',
+  'home.homeHero.tapToShowOn': '点击设为主页英雄',
+  'home.homeHero.isNowYourHome': '已将{name}设为主页英雄',
+  // MaintenanceScene.ts
+  'home.maintenance.underMaintenance': '维护中',
+  'home.maintenance.checking': '确认中…',
+  'home.maintenance.stillUnderMaintenance': '仍在维护中。',
+  'home.maintenance.checkAgain': '重新确认',
+  // ResourceBar.ts
+  'home.resourceBar.gems': '{gems} 魔晶石',
+  'home.resourceBar.playerLvMax': '玩家Lv{playerLevel}（满级）',
+  'home.resourceBar.playerLvExpTo': '玩家Lv{playerLevel}　距下一级还差{playerExpToNext}（冒险获胜可获得）',
+  // LoginBonusCalendar.ts
+  'home.loginBonusCalendar.loginBonus': '{year}年{month}月登录奖励',
+  // BannerCarousel.ts
+  'home.bannerCarousel.bannerComingSoon': '海报准备中',
+  // SupplyModal.ts
+  'home.supplyModal.n00': '{startHour}:00 ~ {value}',
+  'home.supplyModal.in': '{formatDuration}后',
+  'home.supplyModal.closed': '已结束',
+  'home.supplyModal.morningEveningSupplies': '早晚补给',
+  'home.supplyModal.onceEachMorningAnd': '早晚各领1次。两次都领取有额外奖励！',
+  'home.supplyModal.bonusForClaimingBoth': '全勤额外奖励',
+  'home.supplyModal.alreadyClaimedToday': '今日已领取',
+  'home.supplyModal.claimBothMorningAnd': '早晚两次都领取后即可获得',
+  'home.supplyModal.notAvailableYouMissed': '今天有错过的时段，无法获得',
+  'home.supplyModal.claimed': '已领取{name}',
+  'home.supplyModal.includesTheBothSlots': '含两次全领的额外奖励',
+  // SupplySystem.ts
+  'home.supply.alreadyClaimed': '已领取',
+  'home.supply.itIsnTTime': '还没到领取时间',
+  'home.supply.theClaimWindowHas': '已过领取时间',
+  // manual (constants that are looked up where they are drawn)
+  'home.nav.event': '活动',
+  'home.nav.alliance': '同盟',
+  'home.nav.home': '主页',
+  'home.nav.enhance': '强化',
+  'home.nav.shop': '商店',
+  'home.weekday.sun': '日',
+  'home.weekday.mon': '一',
+  'home.weekday.tue': '二',
+  'home.weekday.wed': '三',
+  'home.weekday.thu': '四',
+  'home.weekday.fri': '五',
+  'home.weekday.sat': '六',
+  'home.homeHero.title': '主页英雄',
+  'home.idle.boostsLeft': '今日还剩 {left} / {perDay} 次',
+};

@@ -6,7 +6,7 @@ import { createPanel, createDivider } from './Panel';
 import { AllianceService } from '../alliance/AllianceService';
 import { allianceTabIcon, enhanceTabIcon, eventTabIcon, homeTabIcon, shopTabIcon } from './Icons';
 import { CHROME } from './theme';
-import { t, type PlainKey } from '../i18n';
+import { t, type PlainKey, fontFamily } from '../i18n';
 
 // Sampled from the topbar artwork (see CHROME in theme.ts), so this
 // code-drawn bar reads as the same physical material as that illustrated bar.
@@ -152,7 +152,7 @@ export class BottomNavBar extends Phaser.GameObjects.Container {
 
       const label = scene.add
         .text(cx, barY + BAR_HEIGHT * 0.87, t(TAB_LABELS[tab]), {
-          fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
+          fontFamily: fontFamily('sans'),
           fontSize: isActive ? '15px' : '13px',
           color: isActive ? '#ffe9b8' : '#d8c49a',
           fontStyle: isActive ? 'bold' : 'normal',

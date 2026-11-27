@@ -1,4 +1,5 @@
 import type { HeroData, Rarity } from '../types';
+import { localized, t, type PlainKey } from '../i18n';
 
 /** How many skill slots a hero's rarity grants (not all may be unlocked yet -
  *  see SKILL_SLOT_UNLOCK_LEVEL). Only the rarest ★5 heroes reach the full
@@ -30,20 +31,26 @@ export type SkillEffectKind =
   | 'heal_aoe'
   | 'revive';
 
-export const SKILL_KIND_LABELS: Record<SkillEffectKind, string> = {
-  nuke_single: '単体攻撃',
-  nuke_aoe: '範囲攻撃',
-  drain_single: '吸収攻撃',
-  buff_atk: '攻撃強化',
-  buff_def: '防御強化',
-  debuff_atk: '攻撃低下',
-  debuff_def: '防御低下',
-  stun: '行動封じ',
-  invincible: '無敵',
-  heal_single: '単体回復',
-  heal_aoe: '範囲回復',
-  revive: '復活',
+/** The name of each kind of skill (the small tag beside a skill's name). A key, not the text, so it is read in the current
+ *  language where it is drawn: `skillKindLabel(kind)`. */
+const SKILL_KIND_LABEL_KEYS: Record<SkillEffectKind, PlainKey> = {
+  nuke_single: 'hero.skill.kind.nukeSingle',
+  nuke_aoe: 'hero.skill.kind.nukeAoe',
+  drain_single: 'hero.skill.kind.drainSingle',
+  buff_atk: 'hero.skill.kind.buffAtk',
+  buff_def: 'hero.skill.kind.buffDef',
+  debuff_atk: 'hero.skill.kind.debuffAtk',
+  debuff_def: 'hero.skill.kind.debuffDef',
+  stun: 'hero.skill.kind.stun',
+  invincible: 'hero.skill.kind.invincible',
+  heal_single: 'hero.skill.kind.healSingle',
+  heal_aoe: 'hero.skill.kind.healAoe',
+  revive: 'hero.skill.kind.revive',
 };
+
+export function skillKindLabel(kind: SkillEffectKind): string {
+  return t(SKILL_KIND_LABEL_KEYS[kind]);
+}
 
 export interface SkillTuning {
   basePotency: number;
@@ -155,29 +162,31 @@ export function getUnlockedSkillsForHero(hero: HeroData): UnlockedSkill[] {
   return unlocked;
 }
 
-/** Short Japanese readout of a skill's live numeric effect at its current
- *  level, for the HeroDetail skill list. */
+/** Short readout of a skill's live numeric effect at its current level, for the
+ *  HeroDetail skill list, in the current language ("Power 232% / Drain 52%"). */
 export function formatSkillEffectSummary(def: SkillDefinition, level: number): string {
   const effect = getSkillEffect(def, level);
+  const potency = Math.round(effect.potency);
+  const seconds = (effect.durationMs / 1000).toFixed(1);
   switch (def.kind) {
     case 'nuke_single':
     case 'nuke_aoe':
-      return `威力 ${Math.round(effect.potency)}%`;
+      return t('hero.skill.summary.power', { potency });
     case 'drain_single':
-      return `威力 ${Math.round(effect.potency)}% / 吸収 ${Math.round(effect.secondaryPotency)}%`;
+      return t('hero.skill.summary.powerDrain', { potency, drain: Math.round(effect.secondaryPotency) });
     case 'buff_atk':
     case 'buff_def':
-      return `+${Math.round(effect.potency)}% / ${(effect.durationMs / 1000).toFixed(1)}秒`;
+      return t('hero.skill.summary.buff', { potency, seconds });
     case 'debuff_atk':
     case 'debuff_def':
-      return `-${Math.round(effect.potency)}% / ${(effect.durationMs / 1000).toFixed(1)}秒`;
+      return t('hero.skill.summary.debuff', { potency, seconds });
     case 'stun':
     case 'invincible':
-      return `${(effect.durationMs / 1000).toFixed(1)}秒`;
+      return t('hero.skill.summary.duration', { seconds });
     case 'heal_single':
     case 'heal_aoe':
     case 'revive':
-      return `回復量 ${Math.round(effect.potency)}%`;
+      return t('hero.skill.summary.heal', { potency });
   }
 }
 
@@ -191,7 +200,7 @@ export function formatSkillEffectSummary(def: SkillDefinition, level: number): s
  * Array index == skill slot index (0-3); length must equal
  * RARITY_SKILL_SLOTS[hero's rarity].
  */
-export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
+const HERO_SKILL_ROWS: Record<string, SkillDefinition[]> = {
   // --- ★6 : the full 4-skill kit at the strongest potency ---------------------
   aion: [
     defineSkill(6, 'nuke_aoe', '無限の裁き', '無限に連なる光の環を解き放ち、敵全体を裁く。'),
@@ -958,3 +967,10 @@ export const HERO_SKILLS: Record<string, SkillDefinition[]> = {
     defineSkill(5, 'revive', '再生の祈り', '祈りが、倒れた味方を呼び戻す。'),
   ],
 };
+
+/** HERO_SKILL_ROWS with each skill's `name` and `description` read through tr() every time they are used (`localized()`), so the
+ *  text follows the language and no call site changes. The English is in i18n/data/skillsEn.ts under `skill.<heroId>_<slot>`
+ *  (slot = the position in the hero's kit above). `id` stays what defineSkill made of the Japanese, so it never changes. */
+export const HERO_SKILLS: Record<string, SkillDefinition[]> = Object.fromEntries(
+  Object.entries(HERO_SKILL_ROWS).map(([heroId, kit]) => [heroId, kit.map((def, slot) => localized('skill', `${heroId}_${slot}`, def, ['name', 'description']))]),
+);

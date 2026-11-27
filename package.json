@@ -9,12 +9,15 @@
     "preview": "vite preview",
     "test": "node tools/tests/run.mjs",
     "i18n:check": "node tools/i18n/check.mjs",
+    "i18n:hant": "node tools/i18n/zh-hant.mjs",
+    "i18n:export": "node tools/i18n/export.mjs",
     "schedule:doc": "node tools/schedule/export.mjs",
     "ios:sync": "npm run build && cap sync ios",
     "ios:open": "cap open ios"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.6.2",
+    "opencc-js": "^1.4.2",
     "typescript": "~6.0.3",
     "vite": "^8.3.4"
   },

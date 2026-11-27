@@ -2,10 +2,12 @@
 // that every key the code asks for exists in the Japanese table.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { formatMessage, formatNumber, getLanguage, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
+import { formatMessage, formatNumber, getLanguage, pluralOf, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
 import { detectLanguage, fallbackChain, isLanguage, LANGUAGES } from '../../src/game/i18n/languages';
+import { fontFamily } from '../../src/game/i18n/fonts';
+import { abbreviatedNumber, dataCells, dataProblems, digitsOf, leftover, messageProblems, placeholdersOf } from '../i18n/lang-rules.mjs';
 import { TABLES } from '../../src/game/i18n/tables';
-import { tr } from '../../src/game/i18n/dataTexts';
+import { DATA_TEXTS, tr } from '../../src/game/i18n/dataTexts';
 import { enData } from '../../src/game/i18n/data/en';
 import { SettingsSystem } from '../../src/game/systems/SettingsSystem';
 import { SaveSystem } from '../../src/game/systems/SaveSystem';
@@ -82,15 +84,59 @@ ok(translate('en', 'test.mixed', { who: 'Ann', count: 1 }) === 'Ann has 1 item (
 ok(translate('ja', 'test.mixed', { who: 'アン', count: 4 }) === 'アンが4個', 'the same key in Japanese');
 ok(formatNumber(1234567, 'en') === '1,234,567' && formatNumber(1234567, 'ja') === '1,234,567', 'numbers are grouped, with every digit');
 ok(formatNumber(123456789012345678901234567890n, 'en') === '123,456,789,012,345,678,901,234,567,890', 'even a bigint is written in full');
+// (Korean and Chinese could write 억 / 万 / 億 with a compact notation: the game never asks for it, and neither does anything here)
+ok(LANGUAGES.every((l) => formatNumber(1234567890123, l.code) === '1,234,567,890,123' && formatNumber(123456789012345678901234567890n, l.code) === '123,456,789,012,345,678,901,234,567,890' && formatNumber(12345, l.code) === '12,345'), 'every language writes a big number with every digit, grouped by thousands (no 万 億 亿 萬 만 억)');
+ok(LANGUAGES.every((l) => /^[\d,]+$/.test((98765432101234).toLocaleString(l.locale)) && /^[\d,]+$/.test((98765432101234).toLocaleString('ja-JP'))), 'and so does toLocaleString, which the screens call with ja-JP');
+ok(['ko', 'zh-Hans', 'zh-Hant'].every((code) => pluralOf(1, code as 'ko') === 'other' && pluralOf(2, code as 'ko') === 'other') && pluralOf(1, 'en') === 'one', 'Korean and Chinese have one plural form, English two');
 
 // ---- device language (first run)
 ok(detectLanguage('ja') === 'ja' && detectLanguage('ja-JP') === 'ja' && detectLanguage('JA-jp') === 'ja', 'ja* -> Japanese');
 ok(detectLanguage('en-US') === 'en' && detectLanguage('en') === 'en' && detectLanguage('en_GB') === 'en', 'en* -> English');
-ok(detectLanguage('fr-FR') === 'en' && detectLanguage('de') === 'en' && detectLanguage('zh-Hant-TW') === 'en' && detectLanguage('ko-KR') === 'en', 'another language we do not have yet -> English');
+ok(detectLanguage('fr-FR') === 'en' && detectLanguage('de') === 'en' && detectLanguage('es-419') === 'en' && detectLanguage('th') === 'en', 'another language we do not have -> English');
+ok(detectLanguage('ko') === 'ko' && detectLanguage('ko-KR') === 'ko' && detectLanguage('ko_KR') === 'ko' && detectLanguage('KO-kr') === 'ko', 'ko* -> Korean');
+// iOS tags: language-script-region. The script decides first (zh-Hant-CN is Traditional, zh-Hans-TW is Simplified), then the region.
+{
+  const hans = ['zh-Hans', 'zh-Hans-CN', 'zh-Hans-JP', 'zh-Hans-US', 'zh-CN', 'zh-SG', 'zh', 'zh_CN', 'ZH-hans-hk', 'zh-Hans-TW', 'zh-Hans-MO'];
+  const hant = ['zh-Hant', 'zh-Hant-TW', 'zh-Hant-HK', 'zh-Hant-MO', 'zh-Hant-JP', 'zh-Hant-CN', 'zh-TW', 'zh-HK', 'zh-MO', 'zh_TW', 'ZH-hant'];
+  ok(hans.every((tag) => detectLanguage(tag) === 'zh-Hans'), `Simplified Chinese: ${hans.filter((tag) => detectLanguage(tag) !== 'zh-Hans').join(' ') || 'all of ' + hans.join(' ')}`);
+  ok(hant.every((tag) => detectLanguage(tag) === 'zh-Hant'), `Traditional Chinese: ${hant.filter((tag) => detectLanguage(tag) !== 'zh-Hant').join(' ') || 'all of ' + hant.join(' ')}`);
+  ok(detectLanguage(['zh-Hant-TW', 'ja']) === 'zh-Hant' && detectLanguage(['ko-KR', 'en']) === 'ko', 'a list of preferences: the first one counts (Chinese and Korean too)');
+  ok(detectLanguage('zho') === 'en' && detectLanguage('zhx-CN') === 'en', '"zho" / "zhx" are not "zh"');
+}
 ok(detectLanguage(undefined) === 'ja' && detectLanguage('') === 'ja' && detectLanguage(null) === 'ja' && detectLanguage([]) === 'ja', 'no language at all -> Japanese');
 ok(detectLanguage('???') === 'ja' && detectLanguage('x') === 'ja', 'garbage -> Japanese');
 ok(detectLanguage(['en-GB', 'ja']) === 'en' && detectLanguage(['ja-JP', 'en']) === 'ja', 'a list of preferences: the first one counts');
 ok(detectLanguage('jav') === 'en', '"jav" (Javanese) is not "ja"');
+
+// ---- fonts: one function picks the stack from the language; Han characters must meet the right country's font first
+{
+  ok(fontFamily('sans', 'ja') === 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', 'Japanese keeps the stack the game always had (body)');
+  ok(fontFamily('serif', 'ja') === 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif' && fontFamily('black', 'ja') === 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', 'and for headings and the heavy face');
+  ok(fontFamily('sans', 'en') === fontFamily('sans', 'ja'), 'English uses the same stack as Japanese');
+  const at = (lang: 'ko' | 'zh-Hans' | 'zh-Hant', name: string): number => fontFamily('sans', lang).indexOf(name);
+  ok(at('ko', 'Apple SD Gothic Neo') > 0 && at('ko', 'Malgun Gothic') > at('ko', 'Apple SD Gothic Neo') && at('ko', 'Noto Sans KR') > at('ko', 'Malgun Gothic'), 'Korean: Apple SD Gothic Neo, Malgun Gothic, Noto Sans KR, in that order');
+  ok(at('zh-Hans', 'PingFang SC') > 0 && at('zh-Hans', 'Microsoft YaHei') > at('zh-Hans', 'PingFang SC') && at('zh-Hans', 'Noto Sans SC') > at('zh-Hans', 'Microsoft YaHei'), 'Simplified: PingFang SC, Microsoft YaHei, Noto Sans SC');
+  ok(at('zh-Hant', 'PingFang TC') > 0 && at('zh-Hant', 'Microsoft JhengHei') > at('zh-Hant', 'PingFang TC') && at('zh-Hant', 'Noto Sans TC') > at('zh-Hant', 'Microsoft JhengHei'), 'Traditional: PingFang TC, Microsoft JhengHei, Noto Sans TC');
+  ok(LANGUAGES.filter((l) => l.code !== 'ja' && l.code !== 'en').every((l) => (['sans', 'serif', 'black'] as const).every((kind) => !/Hiragino|Noto (Sans|Serif) JP/.test(fontFamily(kind, l.code)))), 'no Japanese font in the Korean or Chinese stacks (a Han character would take its Japanese shape)');
+  ok(LANGUAGES.every((l) => fontFamily('sans', l.code).startsWith('Arial, ') && fontFamily('black', l.code).startsWith('Arial Black, ') && fontFamily('serif', l.code).startsWith('Georgia, ')), 'every stack starts with the Latin face (digits and Latin letters look the same in every language)');
+  setLanguage('zh-Hant', { persist: false });
+  ok(fontFamily() === fontFamily('sans', 'zh-Hant') && fontFamily('black') === fontFamily('black', 'zh-Hant'), 'with no language given it follows the language being shown');
+  setLanguage('ja', { persist: false });
+  ok(fontFamily() === fontFamily('sans', 'ja'), 'and a language change');
+}
+
+// ---- the page's lang attribute follows the language (it decides which country's shapes a Han character gets)
+{
+  const doc = { documentElement: { lang: '' } };
+  (globalThis as { document?: unknown }).document = doc;
+  const seen: string[] = [];
+  for (const code of ['ko', 'zh-Hans', 'zh-Hant', 'en', 'ja'] as const) {
+    setLanguage(code, { persist: false });
+    seen.push(doc.documentElement.lang);
+  }
+  ok(seen.join() === 'ko,zh-Hans,zh-Hant,en,ja', `document.documentElement.lang follows the language: ${seen.join(' ')}`);
+  delete (globalThis as { document?: unknown }).document;
+}
 
 // ---- the language in a save
 {
@@ -111,12 +157,13 @@ ok(detectLanguage('jav') === 'en', '"jav" (Javanese) is not "ja"');
 {
   setLanguage('en', { persist: false });
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: a text with no translation is the Japanese of the data');
-  enData.hero = { nobody: { name: 'Luri' } };
+  const heroTable = enData.hero; // (the real table: put back below, other checks read it)
+  enData.hero = { ...heroTable, nobody: { name: 'Luri' } };
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'Luri', 'tr: a translated text comes from the data table');
   ok(tr('hero', 'nobody', 'title', '先生') === '先生', 'tr: a field with no translation falls back too');
   setLanguage('ja', { persist: false });
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: Japanese is the data as it is');
-  delete enData.hero;
+  enData.hero = heroTable;
 }
 
 // ---- every key the code asks for exists
@@ -157,5 +204,40 @@ for (const k of ['test.both', 'test.onlyJa', 'test.hello', 'test.items', 'test.m
   delete ja[k];
   delete en[k];
 }
+
+// ---- the rules every language's text follows (tools/i18n/lang-rules.mjs: what `npm run i18n:check` also runs)
+{
+  ok(leftover('en', 'Gems are not enough.') === null && leftover('en', 'Gems が足りません') !== null && leftover('en', '（Gems）') !== null, 'en: Japanese in a text is found (kana, kanji, full-width forms)');
+  ok(leftover('ko', '마정석이 부족합니다') === null && leftover('ko', '마정석が足りない') !== null && leftover('ko', '魔晶石이 부족') !== null && leftover('ko', '카타카나ー') !== null, 'ko: kana and kanji in a text are found');
+  ok(leftover('zh-Hans', '魔晶石不足，请先获得') === null && leftover('zh-Hans', '魔晶石が足りない') !== null && leftover('zh-Hans', 'ステージ', 'ステージ') !== null, 'zh: kana is found, and a kana source that is passed through unchanged');
+  ok(leftover('zh-Hant', '魔晶石', '魔晶石') === null && leftover('zh-Hant', '魔晶石不足', '魔晶石が足りない') === null, 'zh: a text made of kanji only is a fine translation even when it equals the source (kanji cannot tell)');
+  const big = ['10万', '3億', '1000万', '10亿', '5萬', '5만', '3억', '10K', '2.5M', '1,000B', '3 兆', '7조'];
+  const fine = ['10,000', '1,234,567', 'Lv.5', '2h 05m', '30分', '3 minutes', '100 골드', '金币100', 'x3', '+25%', '2.4s', '2026/11/20', 'Max HP', 'NEW', 'VIP'];
+  ok(big.every((s) => abbreviatedNumber(s)), `a shortened big number is found: ${big.filter((s) => !abbreviatedNumber(s)).join(' ') || big.join(' ')}`);
+  ok(fine.every((s) => abbreviatedNumber(s) === null), `and a full one is not: ${fine.filter((s) => abbreviatedNumber(s)).join(' ') || 'all fine'}`);
+  ok(digitsOf('★4以上を30回目までに') === digitsOf('By the 30th pull, ★4 or better') && digitsOf('1回') === digitsOf('once') && digitsOf('1,500個') === digitsOf('1500 pcs') && digitsOf('１２３') === '123', 'numbers are compared as digits (order, commas, full-width and a lone 1 are free)');
+  ok(digitsOf('100') !== digitsOf('10') && digitsOf('3回') !== digitsOf('4 times'), 'and a different number is a difference');
+  ok(placeholdersOf('{name}が{count}個') === 'count,name' && placeholdersOf('{n, plural, one {# item} other {# items}}') === 'n' && placeholdersOf('{count}개의 {name}') === 'count,name', 'placeholders are compared by name');
+
+  // every language's tables, as written
+  const jaTable = TABLES.ja as Record<string, string>;
+  const enData = DATA_TEXTS.en!;
+  const enCells = dataCells(enData);
+  for (const lang of LANGUAGES) {
+    if (lang.code === 'ja') continue;
+    const table = TABLES[lang.code] as Record<string, string>;
+    const extra = Object.keys(table).filter((k) => !(k in jaTable));
+    ok(extra.length === 0, `${lang.code}: no UI key that Japanese does not have${extra.length ? ` (${extra.slice(0, 5).join(', ')})` : ''}`);
+    const problems = messageProblems(lang.code, table, jaTable);
+    ok(problems.length === 0, `${lang.code}: ${Object.keys(table).length} UI messages keep their placeholders and numbers, leave no source script, shorten no number${problems.length ? ` (${problems.length}, e.g. ${problems.slice(0, 3).map(([k, why]) => `${k}: ${why}`).join('; ')})` : ''}`);
+    const cells = dataCells(DATA_TEXTS[lang.code]);
+    const dataExtra = lang.code === 'en' ? [] : [...cells.keys()].filter((c) => !enCells.has(c));
+    ok(dataExtra.length === 0, `${lang.code}: no data row that English does not have (a misspelled id)${dataExtra.length ? ` (${dataExtra.slice(0, 5).join(', ')})` : ''}`);
+    const dataBad = dataProblems(lang.code, DATA_TEXTS[lang.code]);
+    ok(dataBad.length === 0, `${lang.code}: ${cells.size} data rows leave no source script and shorten no number${dataBad.length ? ` (${dataBad.length}, e.g. ${dataBad.slice(0, 3).map(([k, why]) => `${k}: ${why}`).join('; ')})` : ''}`);
+    if (lang.partial) console.log(`INFO  ${lang.code}: ${Object.keys(table).length}/${Object.keys(jaTable).length} UI keys and ${cells.size}/${enCells.size} data rows written`);
+  }
+}
 void t;
+void enData;
 process.exit(failures ? 1 : 0);

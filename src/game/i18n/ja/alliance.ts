@@ -567,4 +567,6 @@ export const alliance = {
   'alliance.error.researchLevel': '同盟Lv.{needLevel}になると、進められます。',
   'alliance.error.researchFund': '同盟の資金が足りません。',
   'alliance.error.badMissionReport': '数が正しくありません。',
+  // a made-up alliance's name from its two parts (data/alliance.ts, simAllianceName)
+  'alliance.sim.allianceName': '{prefix}{suffix}',
 } as const;

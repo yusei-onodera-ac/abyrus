@@ -17,6 +17,7 @@ import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
 import { t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 const INK = '#1c130a';
 const PAD = 14;
@@ -129,7 +130,7 @@ export class EnhanceHubScene extends InboxScene {
 
     const x = PAD + 112;
     const atMax = hero.level >= MAX_LEVEL;
-    const name = body(this, x, 24, hero.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+    const name = body(this, x, 24, heroShortOf(hero), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
     if (name.width > 250) name.setScale(250 / name.width);
     container.add(name);
     const stars = this.add.text(x, 52, '★'.repeat(hero.rarity), { fontSize: '17px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5);

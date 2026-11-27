@@ -3,7 +3,8 @@ import { Button, type ButtonVariant } from './Button';
 import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { createPanel } from './Panel';
 import { body, heading, CHROME } from './theme';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
+import { textWrap } from './CardParts';
 
 const INK = '#1c130a';
 
@@ -62,7 +63,7 @@ export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: Tex
     360,
     top + 174,
     'input',
-    `width:${fieldW}px;height:${fieldH}px;box-sizing:border-box;padding:0 20px;font:bold 32px Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+    `width:${fieldW}px;height:${fieldH}px;box-sizing:border-box;padding:0 20px;font:bold 32px ${fontFamily('sans')};` +
       'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
       'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35),0 0 0 5px rgba(255,220,160,0.22);',
   );
@@ -127,7 +128,7 @@ export function openConfirm(scene: Phaser.Scene, scroll: ModalLock, opts: Confir
   const modal = openModal(scene, scroll, 0.75, false);
   const cy = 600;
   const w = 600;
-  const text = body(scene, 360, 0, opts.message, { fontSize: '24px', color: '#fff4dc', align: 'center', wordWrap: { width: w - 80 }, stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+  const text = body(scene, 360, 0, opts.message, { fontSize: '24px', color: '#fff4dc', align: 'center', wordWrap: textWrap(w - 80), stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   // A long message makes the popup taller instead of running into the buttons.
   const extraH = opts.extra?.height ?? 0;
   const h = Math.max(330, Math.round(text.height) + 240 + extraH);
@@ -225,7 +226,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
     360,
     boxTop + boxH / 2,
     'textarea',
-    `width:${inner}px;height:${boxH}px;box-sizing:border-box;padding:14px 18px;resize:none;font:24px/1.5 Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+    `width:${inner}px;height:${boxH}px;box-sizing:border-box;padding:14px 18px;resize:none;font:24px/1.5 ${fontFamily('sans')};` +
       'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
       'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35),0 0 0 5px rgba(255,220,160,0.22);',
   );
@@ -236,7 +237,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
 
   const hint = body(scene, 360, boxTop + boxH + 34, '', { fontSize: '19px', color: '#ff9a8a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
   modal.container.add(hint);
-  if (opts.note) modal.container.add(body(scene, 360, boxTop + boxH + 72, opts.note, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: inner } }).setOrigin(0.5, 0));
+  if (opts.note) modal.container.add(body(scene, 360, boxTop + boxH + 72, opts.note, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(inner) }).setOrigin(0.5, 0));
 
   const updateCount = (): void => {
     count.setText(`${Array.from(field.value).length} / ${opts.maxLength}`);

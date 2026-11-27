@@ -5,13 +5,12 @@ import { SoundSystem } from '../systems/SoundSystem';
 import type { PlacedBuilding } from '../systems/SaveSystem';
 import { body, heading, CHROME } from './theme';
 import { buildingArt, isoPoint, type Pt } from './VillageArt';
-import { t as tl } from '../i18n';
+import { fontFamily, t as tl } from '../i18n';
 
 const INK = '#1c130a';
 /** Above the village's own popups (200), under the tutorial (300). */
 const DEPTH = 260;
 const RAYS = 'villagefx_rays';
-const FONT = 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif';
 const SPARKLE_COLORS = [0xfff2a0, 0xffd23f, 0xffffff, 0xbfe6ff, 0xffb86b];
 const CONFETTI_COLORS = [0xff6b6b, 0xffd23f, 0x6bd6ff, 0x8cf08c, 0xd59bff, 0xffffff];
 
@@ -231,8 +230,8 @@ export class VillageFx {
     const def = getBuilding(job.kind);
     const title = job.how === 'moved' ? tl('village.fx.moved') : tl('village.fx.completed');
     const sub = job.how === 'moved' ? def.name : def.decor ? def.name : tl('village.fx.nameLevel', { name: def.name, level: job.level });
-    const big = scene.add.text(0, -12, title, { fontFamily: FONT, fontSize: '34px', color: '#fff4a8', stroke: '#8a3a00', strokeThickness: 7 }).setOrigin(0.5);
-    const small = scene.add.text(0, 22, sub, { fontFamily: FONT, fontSize: '19px', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
+    const big = scene.add.text(0, -12, title, { fontFamily: fontFamily('black'), fontSize: '34px', color: '#fff4a8', stroke: '#8a3a00', strokeThickness: 7 }).setOrigin(0.5);
+    const small = scene.add.text(0, 22, sub, { fontFamily: fontFamily('black'), fontSize: '19px', color: '#ffffff', stroke: INK, strokeThickness: 4 }).setOrigin(0.5);
     const w = Math.max(big.width, small.width) + 56;
     const bg = scene.add.graphics();
     bg.fillStyle(0x1b1209, 0.92);
@@ -291,7 +290,7 @@ export class VillageFx {
     t.tween({ targets: castle, scale: 1, duration: 520, delay: 140, ease: 'Back.easeOut' });
 
     const title = scene.add
-      .text(cx, 170, 'VILLAGE LEVEL UP!', { fontFamily: FONT, fontSize: '58px', color: '#fff4a8', stroke: '#8a3a00', strokeThickness: 12 })
+      .text(cx, 170, 'VILLAGE LEVEL UP!', { fontFamily: fontFamily('black'), fontSize: '58px', color: '#fff4a8', stroke: '#8a3a00', strokeThickness: 12 })
       .setOrigin(0.5)
       .setScale(0)
       .setAlpha(0);

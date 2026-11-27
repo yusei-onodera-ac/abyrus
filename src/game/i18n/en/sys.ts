@@ -57,6 +57,6 @@ export const sys: Part<'sys'> = {
   'sys.campaign.drop': 'Material Drops',
   'sys.campaign.stamina': 'Stamina Cost',
   'sys.campaign.idle': 'Idle Rewards',
-  'sys.campaign.half': '{name} Half',
+  'sys.campaign.half': 'Half {name}',
   'sys.campaign.times': '{name} ×{mul}',
 };

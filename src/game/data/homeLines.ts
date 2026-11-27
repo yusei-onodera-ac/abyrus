@@ -1,5 +1,6 @@
 import type { HeroClass } from '../types';
 import { PERSONAL_LINES } from './heroLines';
+import { tr } from '../i18n';
 
 /**
  * ホーム画面のキャラをタップしたときのセリフ。吹き出しに文字が出て、音声ファイルがあれば
@@ -24,9 +25,10 @@ export const CLASS_LINES: Record<HeroClass, string[]> = {
   healer: ['傷ついたら、すぐに言ってくださいね。', 'みんなが無事なのが、いちばんです。', '今日も、一緒にがんばりましょう。'],
 };
 
-/** What the hero can say and which voice files go with it: [text, voice id] pairs. */
+/** What the hero can say and which voice files go with it: [text, voice id] pairs. The text is read through tr() when asked for, in the
+ *  language of the moment (the voice stays Japanese: English is i18n/data/heroLinesEn.ts, numbered like the voice files, 1 first). */
 export function homeLinesFor(heroId: string, heroClass: HeroClass): { text: string; voice: string }[] {
   const own = HERO_LINES[heroId];
-  if (own && own.length > 0) return own.map((text, i) => ({ text, voice: `home_${heroId}_${i + 1}` }));
-  return CLASS_LINES[heroClass].map((text, i) => ({ text, voice: `home_${heroClass}_${i + 1}` }));
+  if (own && own.length > 0) return own.map((text, i) => ({ text: tr('heroLine', heroId, String(i + 1), text), voice: `home_${heroId}_${i + 1}` }));
+  return CLASS_LINES[heroClass].map((text, i) => ({ text: tr('classLine', heroClass, String(i + 1), text), voice: `home_${heroClass}_${i + 1}` }));
 }
