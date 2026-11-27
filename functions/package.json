@@ -1,19 +1,26 @@
 {
   "name": "abyrus-alliance-functions",
   "private": true,
-  "description": "ABYRUS 同盟 (アライアンス) の Cloud Functions。docs/ALLIANCE_SERVER.md を参照。",
+  "description": "ABYRUS の Cloud Functions (同盟・課金のレシート確認)。docs/ALLIANCE_SERVER.md と docs/PAYMENTS.md を参照。",
   "main": "lib/index.js",
-  "engines": { "node": "20" },
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "build": "tsc",
     "serve": "npm run build && firebase emulators:start --only functions,firestore",
-    "deploy": "firebase deploy --only functions"
+    "deploy": "firebase deploy --only functions",
+    "test": "tsc -p tsconfig.test.json && node --test .test-out/test/iapVerify.test.js .test-out/test/products.test.js .test-out/test/appleRoots.test.js",
+    "test:emulator": "tsc -p tsconfig.test.json && firebase emulators:exec --only firestore --project demo-abyrus-iap \"node --test .test-out/test/emulator.test.js\""
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.0.0"
   },
   "devDependencies": {
+    "@types/jsrsasign": "^10.5.15",
+    "jsrsasign": "^11.1.5",
     "typescript": "^5.5.0"
   }
 }
