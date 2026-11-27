@@ -86,7 +86,17 @@ ok(formatNumber(123456789012345678901234567890n, 'en') === '123,456,789,012,345,
 // ---- device language (first run)
 ok(detectLanguage('ja') === 'ja' && detectLanguage('ja-JP') === 'ja' && detectLanguage('JA-jp') === 'ja', 'ja* -> Japanese');
 ok(detectLanguage('en-US') === 'en' && detectLanguage('en') === 'en' && detectLanguage('en_GB') === 'en', 'en* -> English');
-ok(detectLanguage('fr-FR') === 'en' && detectLanguage('de') === 'en' && detectLanguage('zh-Hant-TW') === 'en' && detectLanguage('ko-KR') === 'en', 'another language we do not have yet -> English');
+ok(detectLanguage('fr-FR') === 'en' && detectLanguage('de') === 'en' && detectLanguage('es-419') === 'en' && detectLanguage('th') === 'en', 'another language we do not have -> English');
+ok(detectLanguage('ko') === 'ko' && detectLanguage('ko-KR') === 'ko' && detectLanguage('ko_KR') === 'ko' && detectLanguage('KO-kr') === 'ko', 'ko* -> Korean');
+// iOS tags: language-script-region. The script decides first (zh-Hant-CN is Traditional, zh-Hans-TW is Simplified), then the region.
+{
+  const hans = ['zh-Hans', 'zh-Hans-CN', 'zh-Hans-JP', 'zh-Hans-US', 'zh-CN', 'zh-SG', 'zh', 'zh_CN', 'ZH-hans-hk', 'zh-Hans-TW', 'zh-Hans-MO'];
+  const hant = ['zh-Hant', 'zh-Hant-TW', 'zh-Hant-HK', 'zh-Hant-MO', 'zh-Hant-JP', 'zh-Hant-CN', 'zh-TW', 'zh-HK', 'zh-MO', 'zh_TW', 'ZH-hant'];
+  ok(hans.every((tag) => detectLanguage(tag) === 'zh-Hans'), `Simplified Chinese: ${hans.filter((tag) => detectLanguage(tag) !== 'zh-Hans').join(' ') || 'all of ' + hans.join(' ')}`);
+  ok(hant.every((tag) => detectLanguage(tag) === 'zh-Hant'), `Traditional Chinese: ${hant.filter((tag) => detectLanguage(tag) !== 'zh-Hant').join(' ') || 'all of ' + hant.join(' ')}`);
+  ok(detectLanguage(['zh-Hant-TW', 'ja']) === 'zh-Hant' && detectLanguage(['ko-KR', 'en']) === 'ko', 'a list of preferences: the first one counts (Chinese and Korean too)');
+  ok(detectLanguage('zho') === 'en' && detectLanguage('zhx-CN') === 'en', '"zho" / "zhx" are not "zh"');
+}
 ok(detectLanguage(undefined) === 'ja' && detectLanguage('') === 'ja' && detectLanguage(null) === 'ja' && detectLanguage([]) === 'ja', 'no language at all -> Japanese');
 ok(detectLanguage('???') === 'ja' && detectLanguage('x') === 'ja', 'garbage -> Japanese');
 ok(detectLanguage(['en-GB', 'ja']) === 'en' && detectLanguage(['ja-JP', 'en']) === 'ja', 'a list of preferences: the first one counts');

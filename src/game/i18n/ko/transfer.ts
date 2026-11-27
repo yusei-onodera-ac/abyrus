@@ -1,0 +1,5 @@
+import type { Part } from '../types';
+
+// 한국어 (Korean) messages: transfer.* — the same keys as ja/transfer.ts (copy en/transfer.ts and translate; keep every {placeholder}).
+// Typed Partial: a typo or an extra key is a compile error, a key not written yet shows in English. See docs/I18N.md.
+export const transfer: Partial<Part<'transfer'>> = {};

@@ -1,11 +1,16 @@
 import { enData } from './data/en';
+import { koData } from './data/ko';
+import { zhHansData } from './data/zhHans';
+import { zhHantData } from './data/zhHant';
 import { getLanguage } from './core';
 import { fallbackChain, type Language } from './languages';
 
 /** Translated text of the game's data tables: `{ table: { id: { field: text } } }`, e.g. `{ hero: { h012: { name: 'Lia' } } }`. */
 export type DataTexts = Record<string, Record<string, Record<string, string>>>;
 
-const DATA_TEXTS: Partial<Record<Language, DataTexts>> = { en: enData };
+/** The data text of each language (Japanese has none: it is the data itself). Korean and the two Chinese are being translated: a row
+ *  they lack shows in English (their `fallback`), then in Japanese. zh-Hant is generated from zh-Hans (tools/i18n/zh-hant.mjs). */
+export const DATA_TEXTS: Partial<Record<Language, DataTexts>> = { en: enData, ko: koData, 'zh-Hans': zhHansData, 'zh-Hant': zhHantData };
 
 /** The seam for text that lives in a data table (a hero's name, a skill's description, a stage title ...): returns the table's
  *  translation for the current language, or `ja` (the text as it stands in the data, always Japanese) when there is none.
