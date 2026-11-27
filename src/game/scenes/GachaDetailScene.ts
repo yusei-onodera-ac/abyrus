@@ -2,7 +2,7 @@ import { CharacterGenerator } from '../characters/CharacterGenerator';
 import { EQUIP_DEFS, describeEquip } from '../data/equipment';
 import { getActiveGachaBanners, type GachaBannerEntry } from '../data/gachaBanners';
 import { formatDateTime } from '../ui/format';
-import { createHeroInstance } from '../data/heroes';
+import { createHeroInstance, defShort } from '../data/heroes';
 import { costOf, heroRatesOf, pickupNote, pityLeft, ratesOf, tenPullNote, type RateRow } from '../systems/GachaSystem';
 import { RARITY_COLORS, hex, type Rarity } from '../types';
 import { buildCardPanel, buildChip, wrappedText } from '../ui/CardParts';
@@ -151,7 +151,7 @@ export class GachaDetailScene extends InboxScene {
         const chip = buildChip(this, x - SLOT / 2 + 4, top + 12, t('gacha.detail.rateUpChip'), { fill: 0xc23232, color: '#fff0d0', fontSize: 13 });
         container.add(chip.container);
       }
-      this.addTileText(container, x, top + SLOT, def.name, percent(rate), pickup);
+      this.addTileText(container, x, top + SLOT, defShort(def), percent(rate), pickup);
     });
     return { container, height };
   }

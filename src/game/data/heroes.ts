@@ -1,6 +1,7 @@
 import { emptyGear, type HeroClass, type HeroData, type Rarity } from '../types';
 import { isHeroReleased } from './heroRelease';
 import { MAX_SKILL_SLOTS } from './skills';
+import { localized, tr } from '../i18n';
 
 /** A roster slot: one fixed character with its own portrait, name and class.
  *  Gacha pulls and starter heroes are always instances of one of these. */
@@ -11,8 +12,8 @@ export interface HeroDefinition {
   rarity: Rarity;
 }
 
-/** Every character in the game, released or not: the 30 made ahead of time (the last block) come out two at a time (data/heroRelease.ts). */
-export const ALL_HEROES: HeroDefinition[] = [
+/** The names, in Japanese: the title and the given name together ("算盤王ガウス"). Read ALL_HEROES, not this: its `name` is looked up each time. */
+const HERO_ROWS: HeroDefinition[] = [
   { id: 'gauss', name: '算盤王ガウス', heroClass: 'tank', rarity: 5 },
   { id: 'aria', name: '虚数姫アリア', heroClass: 'healer', rarity: 5 },
   { id: 'zeno', name: '無限桁のゼノ', heroClass: 'mage', rarity: 5 },
@@ -228,6 +229,27 @@ export const ALL_HEROES: HeroDefinition[] = [
   { id: 'lumen', name: '灯火の看護師ルーメン', heroClass: 'healer', rarity: 5 },
   { id: 'pax', name: '平和の使徒パックス', heroClass: 'healer', rarity: 5 },
 ];
+
+/** Every character in the game, released or not: the 30 made ahead of time (the last block) come out two at a time (data/heroRelease.ts).
+ *  `name` is read through tr() each time ("Gauss, the Abacus King": i18n/data/heroesEn.ts); use `heroShortOf` where a card is narrow. */
+export const ALL_HEROES: HeroDefinition[] = HERO_ROWS.map((row) => localized('hero', row.id, row, ['name']));
+
+/** A character's name in the current language. `hero.name` of a copy the player owns is the Japanese the save was made with (a save keeps
+ *  what it was given), so a screen reads the name through here, by the character's id. */
+export function heroNameOf(hero: { heroId: string; name: string }): string {
+  return tr('hero', hero.heroId, 'name', hero.name);
+}
+
+/** The short form for a narrow place (a roster card, a grid cell, a list row): the given name alone in English ("Gauss"); in Japanese the
+ *  whole name, as before (it is short already). */
+export function heroShortOf(hero: { heroId: string; name: string }): string {
+  return tr('hero', hero.heroId, 'short', heroNameOf(hero));
+}
+
+/** The same for a character's definition (`def.name` is already in the current language). */
+export function defShort(def: HeroDefinition): string {
+  return heroShortOf({ heroId: def.id, name: def.name });
+}
 
 /**
  * The characters in the game right now: ALL_HEROES without the ones that are not out yet (data/heroRelease.ts). The gacha pools, the 図鑑,

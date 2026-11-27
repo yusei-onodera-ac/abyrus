@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SaveSystem, expToNextLevel, type SaveData } from '../systems/SaveSystem';
-import { createHeroInstance } from '../data/heroes';
+import { createHeroInstance, heroNameOf, heroShortOf } from '../data/heroes';
 import { describeEquip, getEquipDef } from '../data/equipment';
 import { equipIcon } from '../ui/ItemIcons';
 import { getHeroDefinition } from '../data/heroes';
@@ -231,7 +231,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const x = 168;
     const right = PANEL_W - 18;
     const color = RARITY_COLORS[hero.rarity];
-    block.add(body(this, x, 26, hero.name, { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    block.add(body(this, x, 26, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     block.add(this.add.text(right, 26, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(color), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
 
     const needed = expToNextLevel(hero.level);
@@ -414,7 +414,7 @@ export class HeroDetailScene extends Phaser.Scene {
     const block = this.add.zone(360, cy, w, h).setInteractive();
     modal.add([panel, block]);
 
-    modal.add(body(this, 360, top + 40, t('hero.detail.skillsTitle', { name: hero.name }), { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(body(this, 360, top + 40, t('hero.detail.skillsTitle', { name: heroShortOf(hero) }), { fontSize: '32px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     const note = this.detailData.preview ? t('hero.detail.skillsAllMax') : t('hero.detail.skillEssenceHeld', { skillEssence: this.save.skillEssence.toLocaleString('ja-JP') });
     modal.add(caption(this, 360, top + 86, note, { fontSize: '22px', color: '#ffd9a0', stroke: INK, strokeThickness: 4 }).setOrigin(0.5));
 
@@ -478,7 +478,7 @@ export class HeroDetailScene extends Phaser.Scene {
   private setAsHome(hero: HeroData): void {
     if (!SaveSystem.setHomeHero(this.save, hero.id)) return;
     SaveSystem.save(this.save);
-    showToast(this, t('hero.detail.homeSet', { name: hero.name }));
+    showToast(this, t('hero.detail.homeSet', { name: heroShortOf(hero) }));
     this.scene.restart(this.detailData);
   }
 

@@ -37,6 +37,7 @@ import { buildBannerCarousel } from '../ui/BannerCarousel';
 import { getHomeBanners } from '../data/banners';
 import { RARITY_COLORS, type HeroData } from '../types';
 import { t as tl } from '../i18n';
+import { heroNameOf } from '../data/heroes';
 
 /** Character-first home hub: a big asymmetric portrait of the player's best
  *  hero layered over the background, with a round icon-cluster nav
@@ -204,7 +205,7 @@ export class HomeScene extends Phaser.Scene {
     // growing upward, so it never covers the face.
     const w = BUBBLE_W;
     const text = body(this, 0, 0, wrapToWidth(line.text, w - 36, 22, 4, 'bold'), { fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4, lineSpacing: 7 }).setOrigin(0.5);
-    const nameText = caption(this, 0, 0, hero.name, { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5);
+    const nameText = caption(this, 0, 0, heroNameOf(hero), { fontSize: '17px', fontStyle: 'bold', color: '#ffd9a0', stroke: '#1c130a', strokeThickness: 3 }).setOrigin(0.5);
     const h = text.height + 54;
     const bottom = Math.max(BUBBLE_BOTTOM, 134 + h);
     const box = this.add.container(BUBBLE_X, bottom - h / 2).setDepth(20);

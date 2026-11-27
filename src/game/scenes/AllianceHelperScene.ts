@@ -18,6 +18,7 @@ import { CLASS_LABELS, type HeroData } from '../types';
 import type { InboxCard } from './InboxScene';
 import { AllianceScene, INK, PAD } from './AllianceBase';
 import { t } from '../i18n';
+import { heroNameOf, heroShortOf } from '../data/heroes';
 
 const noLock = { setEnabled: () => {} };
 
@@ -89,7 +90,7 @@ export class AllianceHelperScene extends AllianceScene {
       bg.strokeRoundedRect(0, 0, w - 60, rowH, 12);
       row.add(bg);
       row.add(new HeroSlot(this, 62, rowH / 2, { hero, generator: this.generator }, 86));
-      row.add(body(this, 124, 34, hero.name, { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      row.add(body(this, 124, 34, heroNameOf(hero), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       row.add(body(this, 124, 72, t('alliance.helper.pickRowInfo', { level: hero.level, phase: hero.phase, computeHeroPower: ProgressionSystem.computeHeroPower(hero).toString() }), { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       const hit = this.add.zone((w - 60) / 2, rowH / 2, w - 60, rowH).setOrigin(0.5);
       hit.setInteractive({ useHandCursor: true });
@@ -99,7 +100,7 @@ export class AllianceHelperScene extends AllianceScene {
         handle.close();
         void this.run(AllianceService.setHelper(this.save, hero.id), () => {
           SaveSystem.save(this.save);
-          showToast(this, t('alliance.helper.nowHelper', { name: hero.name }));
+          showToast(this, t('alliance.helper.nowHelper', { name: heroShortOf(hero) }));
         });
       });
       row.add(hit);
