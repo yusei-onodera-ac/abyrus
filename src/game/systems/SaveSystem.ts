@@ -124,6 +124,9 @@ export interface ChatState {
  *  count belongs to; a count from an earlier period no longer applies. */
 export interface ShopState {
   purchases: Record<string, { period: string; count: number }>;
+  /** The store's transaction ids (real-money purchases) already handed over, oldest first and kept short
+   *  (systems/PurchaseDelivery.ts): the same transaction arriving twice - a crash between saving and telling the store - pays out once. */
+  paid: string[];
 }
 
 /** An expedition under way (data/expeditions.ts): which one, who is away on it, when they left, and
@@ -646,6 +649,11 @@ function restoreSocial(raw: Partial<SocialState> | undefined, fallback: SocialSt
   };
 }
 
+/** The list of handed-over transaction ids from a stored save: strings only, the newest 50 (a save from before it existed has none). */
+function restorePaid(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 64).slice(-50) : [];
+}
+
 export const SaveSystem = {
   createDefault(): SaveData {
     // Starters are drawn from the illustrated roster, not the un-illustrated
@@ -682,7 +690,7 @@ export const SaveSystem = {
       readNotices: [],
       social: SocialSystem.createDefaultState(Date.now()),
       chat: ChatSystem.createDefaultState(Date.now()),
-      shop: { purchases: {} },
+      shop: { purchases: {}, paid: [] },
       settings: SettingsSystem.createDefaultState(),
       reports: [],
       infiniteMode: { bestScore: 0, bestSurvivalSeconds: 0, bestEnemiesDefeated: 0, bestDifficultyReached: 0, totalRuns: 0 },
@@ -734,7 +742,7 @@ export const SaveSystem = {
     // (before the stamina maximum below, which a 同盟 adds to)
     merged.alliance = restoreAlliance(parsed.alliance);
     merged.chat = Array.isArray(parsed.chat?.messages) ? { messages: parsed.chat.messages } : merged.chat;
-    merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases } : merged.shop;
+    merged.shop = parsed.shop && typeof parsed.shop.purchases === 'object' && parsed.shop.purchases ? { purchases: parsed.shop.purchases, paid: restorePaid(parsed.shop.paid) } : merged.shop;
     merged.settings = SettingsSystem.restore(parsed.settings);
     merged.reports = SettingsSystem.restoreReports(parsed.reports);
     if (typeof parsed.staminaAt !== 'number' || !Number.isFinite(parsed.staminaAt)) merged.staminaAt = Date.now();

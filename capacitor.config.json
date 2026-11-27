@@ -6,5 +6,10 @@
     "contentInset": "never",
     "backgroundColor": "#0a0b12",
     "scrollEnabled": false
+  },
+  "plugins": {
+    "NativePurchases": {
+      "autoFinishTransactions": false
+    }
   }
 }

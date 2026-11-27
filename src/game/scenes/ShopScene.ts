@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { COMMERCE_NOTICE, FUNDS_NOTICE } from '../data/legal';
 import { isItemId } from '../data/items';
-import { GEM_PRODUCTS, GOLD_PRODUCTS, ITEM_PRODUCTS, PACKS, type Good, type GoodType, type Price, type ShopFocus, type ShopProduct } from '../data/shop';
-import { PaymentSystem } from '../systems/PaymentSystem';
+import { GEM_PRODUCTS, GOLD_PRODUCTS, ITEM_PRODUCTS, PACKS, type Good, type GoodType, type ShopFocus, type ShopProduct } from '../data/shop';
+import { PaymentSystem, type PaymentResult } from '../systems/PaymentSystem';
+import { PurchaseDelivery } from '../systems/PurchaseDelivery';
 import { PREMIUM } from '../data/premium';
 import { PremiumSystem } from '../systems/PremiumSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
@@ -47,8 +48,6 @@ const BLOCK_TEXT: Record<BlockReason, PlainKey> = {
 /** Which tab and which section a top-bar + button lands on. */
 const FOCUS_TAB: Record<ShopFocus, ShopTab> = { premium: 'gems', packs: 'gems', gems: 'gems', gold: 'gems', stamina: 'items', materials: 'items' };
 
-const yen = (n: number): string => `¥${n.toLocaleString('ja-JP')}`;
-
 /** A product's contents, one good per line: "魔晶石 ×300". */
 /** How many of a good the player holds, as a line for its card. */
 function heldLine(save: SaveData, type: GoodType): string {
@@ -63,8 +62,10 @@ function goodLines(goods: Good[]): string[] {
   return goods.map((g) => `${GOOD_LABEL[g.type]} ×${g.amount.toLocaleString('ja-JP')}`);
 }
 
-function priceText(price: Price): string {
-  if (price.currency === 'yen') return yen(price.amount);
+/** A product's price as text: for yen the store's price in the player's own currency when it has one ("$4.99"), else "¥480". */
+function priceText(product: ShopProduct): string {
+  const { price } = product;
+  if (price.currency === 'yen') return PaymentSystem.priceLabel(product.id, price.amount);
   return t(price.currency === 'gems' ? 'shop.price.gems' : 'shop.price.gold', { amount: price.amount.toLocaleString('ja-JP') });
 }
 
@@ -73,8 +74,8 @@ function priceText(price: Price): string {
  *  the アイテムショップ sells items for 魔晶石 or ゴールド. What is for sale is
  *  data/shop.ts; this scene only lays it out and runs the purchase.
  *
- *  Real-money purchases go through PaymentSystem, which has no real store behind
- *  it yet (see there): a dev build "pays" for free, a production build refuses. */
+ *  Real-money purchases go through PaymentSystem (see there, and docs/PAYMENTS.md): the iOS app
+ *  pays through the App Store, a dev build "pays" for free, any other build refuses. */
 export class ShopScene extends InboxScene {
   protected get screenTitle(): string {
     return t('shop.title');
@@ -101,6 +102,12 @@ export class ShopScene extends InboxScene {
     this.tab = data?.focus ? FOCUS_TAB[data.focus] : 'gems';
     this.sectionTops = {};
     this.paying = false;
+    // (a store that had not answered yet when the game started: ask again, and show its prices once they are in)
+    void PaymentSystem.getGateway()
+      .refreshPrices?.()
+      .then((changed) => {
+        if (changed && this.scene.isActive()) this.queueRender();
+      });
   }
 
   /** The top bar's + buttons, while already in the shop: jump instead of reloading. */
@@ -155,7 +162,7 @@ export class ShopScene extends InboxScene {
     };
 
     if (this.tab === 'gems') {
-      add(this.sectionCard(t('shop.premiumPass'), PremiumSystem.isActive(this.save) ? t('shop.section.premiumActive', { daysLeft: PremiumSystem.daysLeft(this.save) }) : t('shop.section.premiumMonthly', { yen: yen(PREMIUM.yen) })), 'premium');
+      add(this.sectionCard(t('shop.premiumPass'), PremiumSystem.isActive(this.save) ? t('shop.section.premiumActive', { daysLeft: PremiumSystem.daysLeft(this.save) }) : t('shop.section.premiumMonthly', { price: PaymentSystem.priceLabel(PREMIUM.productId, PREMIUM.yen) })), 'premium');
       add(buildPremiumBenefitsCard(this));
       add(buildPremiumPackCard(this));
       add(buildPremiumActionCard(this, this.save, { guard: () => this.scroll.isTap(), onBuy: () => this.buyPremium(), onClaimDaily: () => this.claimPremiumDaily() }));
@@ -364,7 +371,11 @@ export class ShopScene extends InboxScene {
       return new Button(this, x, y, w, h, label, onTap, { variant: 'wood', fontSize: '24px', guard }).setEnabled(false);
     }
     const { price } = product;
-    if (price.currency === 'yen') return new Button(this, x, y, w, h, yen(price.amount), onTap, { variant: 'gold', fontSize: '30px', subLabel: t('shop.taxIncluded'), guard });
+    if (price.currency === 'yen') {
+      // (a product the operator added from the admin that the store does not have cannot be paid for)
+      if (!PaymentSystem.canSell(product.id)) return new Button(this, x, y, w, h, t('shop.button.unavailable'), onTap, { variant: 'wood', fontSize: '24px', guard }).setEnabled(false);
+      return new Button(this, x, y, w, h, PaymentSystem.priceLabel(product.id, price.amount), onTap, { variant: 'gold', fontSize: '30px', subLabel: t('shop.taxIncluded'), guard });
+    }
     // 魔晶石 / ゴールド: the currency's own icon in front of the amount.
     const button = new Button(this, x, y, w, h, '', onTap, { variant: 'gold', guard });
     const icon = addGoodIcon(this, price.currency, 0, 0, 40);
@@ -414,7 +425,7 @@ export class ShopScene extends InboxScene {
 
   private confirm(product: ShopProduct): void {
     const gateway = PaymentSystem.getGateway();
-    const lines = [product.name, ...goodLines(product.goods), '', t(product.price.currency === 'yen' ? 'shop.confirm.buyYen' : 'shop.confirm.buy', { price: priceText(product.price) })];
+    const lines = [product.name, ...goodLines(product.goods), '', t(product.price.currency === 'yen' ? 'shop.confirm.buyYen' : 'shop.confirm.buy', { price: priceText(product) })];
     if (product.price.currency === 'yen' && gateway.isTest) lines.push(t('shop.confirm.devNote'));
     this.modal?.close();
     this.modal = openConfirm(this, this.scroll, {
@@ -440,26 +451,31 @@ export class ShopScene extends InboxScene {
   }
 
   /** Real-money purchase: the goods are handed over only once the gateway says
-   *  the money was taken - and then even if the player has left this screen. */
+   *  the money was taken - and then even if the player has left this screen. With a store behind it, the
+   *  store is told it is done only AFTER the goods are saved (receipt.finish): until then it keeps the payment. */
   private pay(product: ShopProduct): void {
     this.paying = true;
     void PaymentSystem.getGateway()
       .purchase({ productId: product.id, name: product.name, yen: product.price.amount })
-      .catch((): { status: 'failed' } => ({ status: 'failed' }))
+      .catch((): PaymentResult => ({ status: 'failed' }))
       .then((result) => {
         this.paying = false;
         if (result.status === 'paid') {
-          const goods = ShopSystem.completePaid(this.save, product);
+          const delivery = PurchaseDelivery.deliver(this.save, product.id, result.receipt?.transactionId, product);
           SaveSystem.save(this.save);
-          if (!this.scene.isActive()) return;
+          void result.receipt?.finish();
+          // ('duplicate': the same payment was already handed over - by itself, while this one was open - and has been announced)
+          if (delivery.kind !== 'goods' || !this.scene.isActive()) return;
           this.refreshResources();
-          this.announce(product, goods);
+          this.announce(product, delivery.goods);
           this.queueRender();
           return;
         }
         if (!this.scene.isActive()) return;
         if (result.status === 'unavailable') showToast(this, t('shop.toast.paymentNotReady'), '#ff8a8a');
         else if (result.status === 'failed') showToast(this, t('shop.toast.purchaseFailed'), '#ff8a8a');
+        else if (result.status === 'pending') showToast(this, t('shop.toast.purchasePending'));
+        else if (result.status === 'later') showToast(this, t('shop.toast.purchaseLater'), '#ffd98a');
       });
   }
 

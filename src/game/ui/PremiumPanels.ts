@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { IDLE_BASE_CAP_HOURS } from '../data/idle';
 import { PREMIUM, PREMIUM_JOIN_PACK, premiumName } from '../data/premium';
-import { PaymentSystem } from '../systems/PaymentSystem';
+import { PaymentSystem, type PaymentResult } from '../systems/PaymentSystem';
 import { PremiumSystem } from '../systems/PremiumSystem';
+import { PurchaseDelivery } from '../systems/PurchaseDelivery';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { Button } from './Button';
 import { buildCardPanel, buildChip, wrappedText } from './CardParts';
@@ -35,7 +36,7 @@ export function buildPremiumStatusCard(scene: Phaser.Scene, save: SaveData): Pan
   const chip = buildChip(scene, 0, 40, active ? t('shop.premium.active') : t('shop.premium.inactive'), { fill: active ? 0x2f7a3a : 0x4a3a3a, color: active ? '#e6ffe0' : '#d8c8c8', fontSize: 20 });
   chip.container.setX(CARD_WIDTH - PAD - chip.width);
   container.add(chip.container);
-  container.add(body(scene, PAD + 104, 88, t('shop.premium.monthly', { yen: PREMIUM.yen.toLocaleString('ja-JP'), durationDays: PREMIUM.durationDays }), { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+  container.add(body(scene, PAD + 104, 88, t('shop.premium.monthly', { price: PaymentSystem.priceLabel(PREMIUM.productId, PREMIUM.yen), durationDays: PREMIUM.durationDays }), { fontSize: '28px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
   const until = new Date(save.premium.expiresAt);
   const line = active ? t('shop.premium.daysLeftUntil', { daysLeft: PremiumSystem.daysLeft(save), month: until.getMonth() + 1, day: until.getDate() }) : t('shop.premium.joinToUnlock');
   container.add(caption(scene, PAD + 104, 130, line, { fontSize: '21px', color: active ? '#9fe39f' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
@@ -125,7 +126,7 @@ export function buildPremiumActionCard(scene: Phaser.Scene, save: SaveData, hand
     new Button(scene, CARD_WIDTH / 2, 160, CARD_WIDTH - PAD * 2, 84, active ? t('shop.premium.renew', { durationDays: PREMIUM.durationDays }) : t('shop.buy'), handlers.onBuy, {
       variant: active ? 'wood' : 'gold',
       fontSize: '30px',
-      subLabel: t(gateway.isTest ? 'shop.premium.priceTaxTest' : 'shop.premium.priceTax', { yen: PREMIUM.yen.toLocaleString('ja-JP') }),
+      subLabel: t(gateway.isTest ? 'shop.premium.priceTaxTest' : 'shop.premium.priceTax', { price: PaymentSystem.priceLabel(PREMIUM.productId, PREMIUM.yen) }),
       guard: handlers.guard,
     }),
   );
@@ -141,7 +142,8 @@ export function claimPremiumDaily(scene: Phaser.Scene, lock: ModalLock, save: Sa
   return showRewardModal(scene, lock, { title: t('shop.premium.dailyGemsTitle'), tiles: [{ kind: 'gems', amount: `+${gems.toLocaleString('ja-JP')}` }], note: t('shop.premium.dailyGemsNote'), onClose: onClosed });
 }
 
-/** Confirm, pay through PaymentSystem, and on success start/extend the pass and show what came with it. */
+/** Confirm, pay through PaymentSystem, and on success start/extend the pass and show what came with it. The pass is handed over and saved
+ *  even if the player has left the screen meanwhile; with a store behind it, the store is told it is done only AFTER that (receipt.finish). */
 export function askBuyPremium(
   scene: Phaser.Scene,
   lock: ModalLock,
@@ -162,25 +164,31 @@ export function askBuyPremium(
   hooks.setModal(
     openConfirm(scene, lock, {
       title: PremiumSystem.isActive(save) ? t('shop.premium.renewPass') : t('shop.premium.buyPass'),
-      message: t(gateway.isTest ? 'shop.premium.confirmMessageTest' : 'shop.premium.confirmMessage', { name: premiumName(), yen: PREMIUM.yen.toLocaleString('ja-JP') }),
+      message: t(gateway.isTest ? 'shop.premium.confirmMessageTest' : 'shop.premium.confirmMessage', { name: premiumName(), price: PaymentSystem.priceLabel(PREMIUM.productId, PREMIUM.yen) }),
       confirmLabel: t('shop.buy'),
       confirmVariant: 'gold',
       onConfirm: () => {
         void (async () => {
           hooks.setBusy(true);
-          const result = await PaymentSystem.getGateway().purchase({ productId: PREMIUM.productId, name: premiumName(), yen: PREMIUM.yen });
+          const result = await PaymentSystem.getGateway()
+            .purchase({ productId: PREMIUM.productId, name: premiumName(), yen: PREMIUM.yen })
+            .catch((): PaymentResult => ({ status: 'failed' }));
           hooks.setBusy(false);
-          if (!scene.scene.isActive()) return;
           if (result.status === 'paid') {
-            const pack = PremiumSystem.activate(save);
+            const delivery = PurchaseDelivery.deliver(save, PREMIUM.productId, result.receipt?.transactionId);
             SaveSystem.save(save);
+            void result.receipt?.finish();
+            // ('duplicate': the same payment was already handed over - by itself, while this one was open - and has been announced)
+            if (delivery.kind !== 'premium' || !scene.scene.isActive()) return;
             hooks.onPaid();
-            hooks.setModal(showRewardModal(scene, lock, { title: t('shop.premium.joinedTitle'), tiles: tilesForGranted(pack), note: t('shop.premium.packClaimed'), onClose: hooks.onClosed }));
-          } else if (result.status === 'unavailable') {
-            showToast(scene, t('shop.toast.paymentUnavailable'), '#ff8a8a');
-          } else if (result.status === 'failed') {
-            showToast(scene, t('shop.toast.paymentFailed'), '#ff8a8a');
+            hooks.setModal(showRewardModal(scene, lock, { title: t('shop.premium.joinedTitle'), tiles: tilesForGranted(delivery.granted), note: t('shop.premium.packClaimed'), onClose: hooks.onClosed }));
+            return;
           }
+          if (!scene.scene.isActive()) return;
+          if (result.status === 'unavailable') showToast(scene, t('shop.toast.paymentUnavailable'), '#ff8a8a');
+          else if (result.status === 'failed') showToast(scene, t('shop.toast.paymentFailed'), '#ff8a8a');
+          else if (result.status === 'pending') showToast(scene, t('shop.toast.purchasePending'));
+          else if (result.status === 'later') showToast(scene, t('shop.toast.purchaseLater'), '#ffd98a');
         })();
       },
     }),

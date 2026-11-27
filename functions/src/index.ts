@@ -10,6 +10,7 @@
  *   trigger    onAllianceCreated             新しい同盟を、今週の対抗戦と、ボスに入れる
  *              onMemberWritten               メンバーの出入りのシステムメッセージと、同盟の総合力の集計
  *              onAllianceDeleted             解散した同盟の、残りのデータを消す
+ *   callable   verifyPurchase                本物の課金 (App Store) の、署名つき取引の確認 (purchases.ts。docs/PAYMENTS.md)
  *   scheduled  weeklyRollover (月曜 0:00 JST) 対抗戦の集計 (順位・昇降格・結果) と、新しいシーズン・新しいボス
  *              leaderHandover (毎日 5:00)     7日間来ていない同盟長を、次の人に譲る
  *              cleanup (毎日 4:30)            古いチャット・切符・1日ごとの文書・ミッションの掲示板を消す
@@ -36,6 +37,7 @@ import {
   weekStartMs,
   type League,
 } from './constants';
+import { makeVerifyPurchase } from './purchases';
 
 // Firestore のデータベースを作った地域と、同じにすること (トリガーは、データベースと同じ地域でしか動かない)。
 setGlobalOptions({ region: 'asia-northeast1', maxInstances: 10 });
@@ -107,6 +109,11 @@ function newRaidDoc(alliance: DocumentData, nowMs: number): DocumentData {
 function systemMessage(text: string): DocumentData {
   return { kind: 'system', senderAuth: 'system', senderPlayerId: 'system', senderName: '同盟', text, sentAt: FieldValue.serverTimestamp() };
 }
+
+// ---------------------------------------------------------------------------------------------- 課金 (callable)
+
+/** App Store の署名つき取引を確かめ、取引 ID をその人に結びつける。中身は purchases.ts。 */
+export const verifyPurchase = makeVerifyPurchase(db);
 
 // ---------------------------------------------------------------------------------------------- 共闘ボス (callable)
 

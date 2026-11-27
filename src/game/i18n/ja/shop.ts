@@ -25,10 +25,10 @@ export const shop = {
   'shop.limit.perWeek': '週{count}回まで',
   'shop.limit.perMonth': '月{count}回まで',
   // PremiumPanels.ts
-  'shop.premium.priceTax': '¥{yen}（税込）',
-  'shop.premium.priceTaxTest': '¥{yen}（税込）　テスト決済・請求なし',
-  'shop.premium.confirmMessage': '{name}\n¥{yen}（税込）',
-  'shop.premium.confirmMessageTest': '{name}\n¥{yen}（税込）\n※テスト決済です。実際には請求されません。',
+  'shop.premium.priceTax': '{price}（税込）',
+  'shop.premium.priceTaxTest': '{price}（税込）　テスト決済・請求なし',
+  'shop.premium.confirmMessage': '{name}\n{price}（税込）',
+  'shop.premium.confirmMessageTest': '{name}\n{price}（税込）\n※テスト決済です。実際には請求されません。',
   // ShopScene.ts
   'shop.staminaNow': 'スタミナ {stamina} / {stamina2}',
   'shop.held.phaseMaterials': '所持 {phaseMaterials}個',
@@ -37,7 +37,7 @@ export const shop = {
   'shop.tab.gems': '魔晶石ショップ',
   'shop.tab.items': 'アイテムショップ',
   'shop.section.premiumActive': '加入中（あと{daysLeft}日）',
-  'shop.section.premiumMonthly': '月額 {yen}',
+  'shop.section.premiumMonthly': '月額 {price}',
   'shop.section.packs': 'お得パック',
   'shop.section.packsNote': '円・魔晶石で購入',
   'shop.section.gemsNote': '価格は税込です',
@@ -67,7 +67,7 @@ export const shop = {
   // PremiumPanels.ts
   'shop.premium.active': '加入中',
   'shop.premium.inactive': '未加入',
-  'shop.premium.monthly': '月額 ¥{yen}（{durationDays}日間）',
+  'shop.premium.monthly': '月額 {price}（{durationDays}日間）',
   'shop.premium.daysLeftUntil': 'あと{daysLeft}日（{month}/{day}まで）',
   'shop.premium.joinToUnlock': '加入すると、下の特典がすべて使えます',
   'shop.premium.benefit.gemsTitle': '毎日 魔晶石 {dailyGems}個',
@@ -95,4 +95,8 @@ export const shop = {
   'shop.premium.packClaimed': '加入特典パックを受け取りました',
   'shop.toast.paymentUnavailable': 'ただいま決済を利用できません',
   'shop.toast.paymentFailed': '決済に失敗しました',
+  // PaymentSystem.ts / systems/StoreKitPayment.ts (the App Store)
+  'shop.toast.purchasePending': '購入は承認待ちです。承認されると、品物が届きます',
+  'shop.toast.purchaseLater': '購入の手続きは済みました。確認でき次第、品物が届きます',
+  'shop.recovered.title': '購入の品が届きました',
 } as const;

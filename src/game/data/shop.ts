@@ -256,3 +256,7 @@ export const PACKS: ShopProduct[] = localizedProducts(PACK_ROWS);
 export const GEM_PRODUCTS: ShopProduct[] = localizedProducts(GEM_ROWS);
 export const GOLD_PRODUCTS: ShopProduct[] = localizedProducts(GOLD_ROWS);
 export const ITEM_PRODUCTS: ShopProduct[] = localizedProducts(ITEM_ROWS);
+
+/** The real-money products exactly as written above, copied before the operator's admin can swap any (systems/RemoteShopConfig.ts changes the
+ *  arrays above in place): what a purchase that has already been paid for is handed over from if the live list no longer holds it. */
+export const STATIC_YEN_PRODUCTS: readonly ShopProduct[] = [...PACKS, ...GEM_PRODUCTS].filter((p) => p.price.currency === 'yen');
