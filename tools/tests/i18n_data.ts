@@ -197,7 +197,8 @@ ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n
   setLanguage('en', { persist: false });
   ok(sameCount, 'each character has as many lines in English as in Japanese, with the same voice ids');
   const all = ALL_HEROES.flatMap((r) => homeLinesFor(r.id, r.heroClass).map((l) => l.text));
-  ok(all.every((l) => l.length >= 8 && l.length <= 75 && !l.includes('\n')), `every line is 8 to 75 letters, one piece (longest ${Math.max(...all.map((l) => l.length))})`);
+  const tooLong = all.filter((l) => l.length > 66);
+  ok(all.every((l) => l.length >= 8 && l.length <= 66 && !l.includes('\n')), `every line is 8 to 66 letters, one piece (the bubble is 208 px wide and grows up)${tooLong.length ? `: ${tooLong.join(' / ')}` : ''}`);
   ok(Object.keys(HERO_LINES).every((id) => ALL_HEROES.some((r) => r.id === id)), 'no English lines for a character that does not exist');
 }
 

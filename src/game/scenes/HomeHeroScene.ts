@@ -62,7 +62,10 @@ export class HomeHeroScene extends InboxScene {
     container.add(new HeroSlot(this, PAD + 66, height / 2, { hero, generator: this.generator }, 132));
     const x = PAD + 132 + 20;
     container.add(caption(this, x, 28, t('home.homeHero.currentHomeHero'), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-    container.add(body(this, x, 66, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
+    const nameText = body(this, x, 66, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
+    const nameRoom = CARD_WIDTH - PAD - 8 - x;
+    if (nameText.width > nameRoom) nameText.setScale(nameRoom / nameText.width);
+    container.add(nameText);
     container.add(this.add.text(x, 104, '★'.repeat(hero.rarity), { fontSize: '20px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     container.add(caption(this, x + 110, 104, t('home.homeHero.lv', { CLASS_LABELS: CLASS_LABELS[hero.heroClass], level: hero.level }), { fontSize: '19px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
     const line = homeLinesFor(hero.heroId, hero.heroClass)[0]?.text ?? '';

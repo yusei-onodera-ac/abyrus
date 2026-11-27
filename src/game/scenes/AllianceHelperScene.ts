@@ -90,7 +90,9 @@ export class AllianceHelperScene extends AllianceScene {
       bg.strokeRoundedRect(0, 0, w - 60, rowH, 12);
       row.add(bg);
       row.add(new HeroSlot(this, 62, rowH / 2, { hero, generator: this.generator }, 86));
-      row.add(body(this, 124, 34, heroNameOf(hero), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      const nameText = body(this, 124, 34, heroNameOf(hero), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+      if (nameText.width > w - 60 - 124 - 16) nameText.setScale((w - 60 - 124 - 16) / nameText.width);
+      row.add(nameText);
       row.add(body(this, 124, 72, t('alliance.helper.pickRowInfo', { level: hero.level, phase: hero.phase, computeHeroPower: ProgressionSystem.computeHeroPower(hero).toString() }), { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       const hit = this.add.zone((w - 60) / 2, rowH / 2, w - 60, rowH).setOrigin(0.5);
       hit.setInteractive({ useHandCursor: true });

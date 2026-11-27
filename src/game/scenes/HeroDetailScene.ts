@@ -231,8 +231,12 @@ export class HeroDetailScene extends Phaser.Scene {
     const x = 168;
     const right = PANEL_W - 18;
     const color = RARITY_COLORS[hero.rarity];
-    block.add(body(this, x, 26, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    block.add(this.add.text(right, 26, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(color), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+    const nameText = body(this, x, 26, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
+    const starsText = this.add.text(right, 26, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(color), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5);
+    // (a long name, such as an English "Name, the Title", is made to fit between the left edge and the stars)
+    const nameRoom = right - starsText.width - 14 - x;
+    if (nameText.width > nameRoom) nameText.setScale(nameRoom / nameText.width);
+    block.add([nameText, starsText]);
 
     const needed = expToNextLevel(hero.level);
     const atMax = hero.level >= MAX_LEVEL;
