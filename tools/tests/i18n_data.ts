@@ -22,6 +22,7 @@ import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tuto
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
 import { ALL_HEROES, defShort } from '../../src/game/data/heroes';
 import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
+import { OPENING_SCRIPTS, getEndingScript, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript, getRegionOutroScript, speakerName, type StoryScript } from '../../src/game/data/storyScript';
 
 let failures = 0;
 function ok(cond: unknown, label: string): void {
@@ -30,6 +31,17 @@ function ok(cond: unknown, label: string): void {
 }
 
 const JA = /[　-ヿ㐀-鿿＀-￯]/;
+
+/** Every story script, in the order the game plays them. */
+const STORY_SCRIPTS = (): StoryScript[] => [
+  ...OPENING_SCRIPTS,
+  ...[0, 1, 2, 3, 4].flatMap((i) => [getRegionIntroScript(i), getRegionOutroScript(i), getExtraIntroScript(i)]),
+  getFinalIntroScript(),
+  getEndingScript(),
+];
+
+/** The numbers in a text, as plain digits (a comma or a full-width digit does not change a number), sorted. */
+const numbersOf = (s: string): string => (s.replace(/[０-９]/g, (c) => String(c.charCodeAt(0) - 0xff10)).replace(/(\d),(\d)/g, '$1$2').match(/\d+/g) ?? []).sort().join(',');
 
 /** [table, id, field, value] for each text field of each row. */
 function collect(): [string, string, string, string][] {
@@ -74,6 +86,12 @@ function collect(): [string, string, string, string][] {
     homeLinesFor(r.id, r.heroClass).forEach((line, i) => out.push(['heroLine', r.id, String(i + 1), line.text]));
   }
   for (const cls of Object.keys(CLASS_LINES) as (keyof typeof CLASS_LINES)[]) homeLinesFor('nobody', cls).forEach((line, i) => out.push(['classLine', cls, String(i + 1), line.text]));
+  for (const script of STORY_SCRIPTS()) {
+    script.lines.forEach((line, i) => {
+      out.push(['story', `${script.id}.${i + 1}`, 'text', line.text]);
+      if (line.speaker) out.push(['storySpeaker', line.speaker, 'name', speakerName(line.speaker)]);
+    });
+  }
   return out;
 }
 
@@ -89,6 +107,22 @@ const enRows = collect();
 ok(enRows.length === jaRows.length, 'the same fields in English');
 const stillJa = enRows.filter(([, , , v]) => JA.test(v));
 ok(stillJa.length === 0, `no text field is still Japanese in English${stillJa.length ? ` (${stillJa.length}, e.g. ${stillJa.slice(0, 5).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+// a number in the text is the same number in English (the amount, the days, the count): compared row by row, in the tables whose text
+// carries them (the story and the lines have none)
+{
+  const NUMBERED = new Set(['event', 'eventToken', 'eventMission', 'eventShop', 'gachaBanner', 'campaign', 'allianceBoss', 'allianceShop', 'allianceDonation', 'allianceWar']);
+  const differ = enRows.filter((row, i) => NUMBERED.has(row[0]) && numbersOf(row[3]) !== numbersOf(jaRows[i][3]));
+  ok(differ.length === 0, `the numbers in a text are the same in English${differ.length ? ` (${differ.length}, e.g. ${differ.slice(0, 4).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+}
+{
+  const storyLines = (): number[] => STORY_SCRIPTS().map((s) => s.lines.length);
+  setLanguage('ja', { persist: false });
+  const jaCounts = storyLines();
+  setLanguage('en', { persist: false });
+  ok(jaCounts.length === 5 * 3 + 3 + 2 && jaCounts.every((n, i) => n === storyLines()[i]), `${jaCounts.length} story scripts, each with its lines`);
+  const narration = STORY_SCRIPTS().flatMap((s) => s.lines).filter((l) => !l.speaker);
+  ok(narration.length > 40, 'the narration lines have no nameplate');
+}
 const empty = enRows.filter(([, , , v]) => v.trim() === '');
 ok(empty.length === 0, 'and none is empty');
 

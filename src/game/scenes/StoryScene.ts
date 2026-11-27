@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { STORY_BACKGROUNDS, STORY_BACKGROUND_REGION, type StoryLine, type RuriPortrait } from '../data/storyScript';
+import { STORY_BACKGROUNDS, STORY_BACKGROUND_REGION, speakerName, type StoryLine, type RuriPortrait } from '../data/storyScript';
 import { REGIONS } from '../data/regions';
 import { MovieSystem } from '../systems/MovieSystem';
 import { SettingsSystem } from '../systems/SettingsSystem';
@@ -350,7 +350,7 @@ export class StoryScene extends Phaser.Scene {
         radius: 10,
         gradient: false,
       }).setDepth(4);
-      const text = subheading(this, left + 220, top - 6, speaker, { fontSize: '27px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5).setDepth(4);
+      const text = subheading(this, left + 220, top - 6, speakerName(speaker), { fontSize: '27px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0.5).setDepth(4);
       this.nameplate = this.add.container(0, 0, [plate, text]).setDepth(4);
       enter(this, this.nameplate, { duration: 180, dy: 0, dx: -10 });
 
