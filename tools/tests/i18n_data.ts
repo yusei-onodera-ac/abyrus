@@ -21,6 +21,7 @@ import { ITEMS } from '../../src/game/data/items';
 import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tutorial';
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
 import { ALL_HEROES, defShort } from '../../src/game/data/heroes';
+import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
 
 let failures = 0;
 function ok(cond: unknown, label: string): void {
@@ -70,7 +71,9 @@ function collect(): [string, string, string, string][] {
   for (const r of ALL_HEROES) {
     add('hero', r.id, r, ['name']);
     out.push(['hero', r.id, 'short', defShort(r)]);
+    homeLinesFor(r.id, r.heroClass).forEach((line, i) => out.push(['heroLine', r.id, String(i + 1), line.text]));
   }
+  for (const cls of Object.keys(CLASS_LINES) as (keyof typeof CLASS_LINES)[]) homeLinesFor('nobody', cls).forEach((line, i) => out.push(['classLine', cls, String(i + 1), line.text]));
   return out;
 }
 
@@ -103,6 +106,22 @@ ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n
   ok(ALL_HEROES.every((r, i) => r.name.startsWith(`${shorts[i]}, the `)), 'the short form is the given name the full name starts with');
   ok(new Set(shorts).size === shorts.length, `no two characters share a short name (${shorts.length - new Set(shorts).size} shared)`);
   ok(ALL_HEROES.every((r) => r.name.length <= 40), `no name is longer than 40 letters (longest ${Math.max(...ALL_HEROES.map((r) => r.name.length))})`);
+}
+
+// the lines a character says: the same count as the Japanese, each in one piece (no stray line break), the voice stays the Japanese one
+{
+  const ja = (id: string, cls: 'warrior'): { text: string; voice: string }[] => (setLanguage('ja', { persist: false }), homeLinesFor(id, cls));
+  const sameCount = ALL_HEROES.every((r) => {
+    const jaLines = ja(r.id, 'warrior');
+    setLanguage('en', { persist: false });
+    const enLines = homeLinesFor(r.id, r.heroClass);
+    return jaLines.length === enLines.length && enLines.every((l, i) => l.voice === jaLines[i].voice);
+  });
+  setLanguage('en', { persist: false });
+  ok(sameCount, 'each character has as many lines in English as in Japanese, with the same voice ids');
+  const all = ALL_HEROES.flatMap((r) => homeLinesFor(r.id, r.heroClass).map((l) => l.text));
+  ok(all.every((l) => l.length >= 8 && l.length <= 75 && !l.includes('\n')), `every line is 8 to 75 letters, one piece (longest ${Math.max(...all.map((l) => l.length))})`);
+  ok(Object.keys(HERO_LINES).every((id) => ALL_HEROES.some((r) => r.id === id)), 'no English lines for a character that does not exist');
 }
 
 setLanguage('ja', { persist: false });
