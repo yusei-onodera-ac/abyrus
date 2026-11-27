@@ -27,6 +27,7 @@ import { scheduleNotices } from '../../src/game/data/notices';
 import { scheduleItems } from '../../src/game/systems/ScheduleView';
 import { DONATIONS, DONATION_KINDS, RAID_BOSSES, SHOP_ITEMS, WAR_REWARDS, simAllianceName, simWords, type SimWordKind } from '../../src/game/data/alliance';
 import { SocialSystem } from '../../src/game/systems/SocialSystem';
+import { enData } from '../../src/game/i18n/data/en';
 import { ChatSystem } from '../../src/game/systems/ChatSystem';
 import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
 import { OPENING_SCRIPTS, getEndingScript, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript, getRegionOutroScript, speakerName, type StoryScript } from '../../src/game/data/storyScript';
@@ -187,19 +188,21 @@ ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n
 
 // the lines a character says: the same count as the Japanese, each in one piece (no stray line break), the voice stays the Japanese one
 {
-  const ja = (id: string, cls: 'warrior'): { text: string; voice: string }[] => (setLanguage('ja', { persist: false }), homeLinesFor(id, cls));
+  // (the Japanese lines are the data's own: HERO_LINES / CLASS_LINES; the voice ids come from them and do not change with the language)
   const sameCount = ALL_HEROES.every((r) => {
-    const jaLines = ja(r.id, 'warrior');
-    setLanguage('en', { persist: false });
+    const jaLines = HERO_LINES[r.id] ?? CLASS_LINES[r.heroClass];
     const enLines = homeLinesFor(r.id, r.heroClass);
-    return jaLines.length === enLines.length && enLines.every((l, i) => l.voice === jaLines[i].voice);
+    return jaLines.length === enLines.length && enLines.every((l, i) => l.voice === `home_${HERO_LINES[r.id] ? r.id : r.heroClass}_${i + 1}`);
   });
-  setLanguage('en', { persist: false });
-  ok(sameCount, 'each character has as many lines in English as in Japanese, with the same voice ids');
+  ok(sameCount, 'each character has as many lines in English as in Japanese, with the voice ids of the Japanese');
   const all = ALL_HEROES.flatMap((r) => homeLinesFor(r.id, r.heroClass).map((l) => l.text));
   const tooLong = all.filter((l) => l.length > 66);
   ok(all.every((l) => l.length >= 8 && l.length <= 66 && !l.includes('\n')), `every line is 8 to 66 letters, one piece (the bubble is 208 px wide and grows up)${tooLong.length ? `: ${tooLong.join(' / ')}` : ''}`);
-  ok(Object.keys(HERO_LINES).every((id) => ALL_HEROES.some((r) => r.id === id)), 'no English lines for a character that does not exist');
+  // nothing in the English tables that no row asks for (a typo in an id would silently leave the Japanese on screen, and a left-over would hide)
+  const known = (table: string, ids: string[]): boolean => Object.keys(enData[table] ?? {}).every((id) => ids.includes(id));
+  ok(known('hero', ALL_HEROES.map((r) => r.id)) && known('heroLine', Object.keys(HERO_LINES)) && known('classLine', Object.keys(CLASS_LINES)), 'no English name or line for a character or class that does not exist');
+  ok(known('story', STORY_SCRIPTS().flatMap((sc) => sc.lines.map((_, i) => `${sc.id}.${i + 1}`))), 'no English story line for a script line that does not exist');
+  ok(known('event', [...SCHEDULED_EVENTS.map((e) => e.id), ...EVENTS.map((e) => e.id)]) && known('scheduledGacha', SCHEDULED_GACHAS.map((g) => g.id)) && known('campaign', SCHEDULED_CAMPAIGNS.map((c) => c.id)), 'no English event, summon or campaign for an id that does not exist');
 }
 
 // the made-up alliances' words: the names are told apart (a roster picks them by name), and an alliance's name reads as two words in English
