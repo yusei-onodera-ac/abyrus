@@ -2,4 +2,71 @@ import type { Part } from '../types';
 
 // 简体中文 (Simplified Chinese) messages: battle.* — the same keys as ja/battle.ts (copy en/battle.ts and translate; keep every {placeholder}).
 // Typed Partial: a typo or an extra key is a compile error, a key not written yet shows in English. See docs/I18N.md.
-export const battle: Partial<Part<'battle'>> = {};
+export const battle: Partial<Part<'battle'>> = {
+  // BattleScene.ts
+  'battle.hud.retreat': '撤退',
+  'battle.hud.partyEmpty': '编队为空。\n请前往编队界面进行编队。',
+  'battle.status.immune': '无敌',
+  'battle.status.revive': '复活',
+  'battle.status.atkDefUp': '攻防提升',
+  'battle.status.atkUp': '攻击提升',
+  'battle.status.defUp': '防御提升',
+  'battle.status.atkDefDown': '攻防下降',
+  'battle.status.atkDown': '攻击下降',
+  'battle.status.defDown': '防御下降',
+  'battle.status.stun': '眩晕',
+  'battle.result.tagEvent': '活动',
+  'battle.result.tagFirstClear': '首通',
+  'battle.result.tagDrop': '掉落',
+  'battle.result.victory': '胜利！',
+  'battle.result.defeat': '失败…',
+  'battle.result.chainEnded': '连战结束，共{chainWins}胜',
+  'battle.result.chainEndedPlain': '连战已结束',
+  'battle.result.playerLevelUp': '玩家等级 {from} → {to}！体力已全部恢复',
+  'battle.result.nextStage': '下一关',
+  'battle.result.nextStageCost': '{questStageName}　体力 {cost}',
+  'battle.result.nextStageCostShort': '{questStageName}　体力 {cost}（不足）',
+  'battle.result.chainCountdown': '连战中…　{remaining}秒后进入下一关',
+  'battle.result.chainStop': '停止',
+  'battle.result.chainStopped': '已停止连战',
+  'battle.result.home': '主页',
+  'battle.result.questList': '冒险列表',
+  'battle.result.backToVillage': '返回村庄',
+  'battle.result.backToHome': '返回主页',
+  'battle.result.toEnding': '前往结局',
+  'battle.result.toQuestList': '前往冒险列表',
+  'battle.result.toDungeons': '前往地下城',
+  'battle.result.backToEvent': '返回活动',
+  'battle.result.toStory': '前往剧情',
+  'battle.result.chainEndedNoStamina': '体力不足，连战已结束',
+  'battle.result.notEnoughStamina': '体力不足',
+  'battle.result.notEnoughStaminaMessage': '{questStageName}需要体力 {cost}。（当前 {stamina}）\n距离恢复还需 {wait}\n要去商店恢复体力吗？',
+  'battle.result.toShop': '前往商店',
+  // PauseScene.ts
+  'battle.pause.title': '暂停',
+  'battle.pause.resume': '继续',
+  'battle.pause.suspend': '中断返回',
+  'battle.pause.suspendNote': '之后可以继续挑战',
+  'battle.pause.retire': '放弃挑战',
+  'battle.pause.retireNote': '以目前的记录结束',
+  // AutoAdvanceToggle.ts
+  'battle.autoAdvance.title': '连战',
+  'battle.autoAdvance.description': '自动挑战下一关，直到失败',
+  'battle.autoAdvance.passOnly': '通行证专属',
+  'battle.autoAdvance.passOnlyTitle': '连战为高级通行证专属',
+  'battle.autoAdvance.passOnlyMessage': '每次获胜后自动进入下一关，\n一直挑战到失败为止。',
+  'battle.shared.viewPass': '查看通行证',
+  // AutoSkillToggle.ts
+  'battle.auto.label': '自动',
+  // SpeedToggle.ts
+  'battle.speed.label': '{battleSpeed}倍速',
+  'battle.speed.passOnly': '通行证专属',
+  'battle.speed.passOnlyTitle': '{battleSpeed}倍速为高级通行证专属',
+  'battle.speed.passOnlyMessage': '加入高级通行证后，\n冒险和无限模式都能以{battleSpeed}倍速进行。',
+  // GemDrop.ts
+  'battle.gemDrop.title': '把魔晶石投入魔法阵！',
+  'battle.gemDrop.hint': '拖动或点击',
+  'battle.gemDrop.cost': '魔晶石 {cost}',
+  // DeckSystem.ts
+  'battle.deck.defaultName': '队伍{n}',
+};
