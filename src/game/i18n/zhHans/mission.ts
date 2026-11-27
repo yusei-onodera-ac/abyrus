@@ -91,7 +91,7 @@ export const mission: Partial<Part<'mission'>> = {
   'mission.eventQuest.tabRewards': '累计奖励',
   'mission.eventQuest.stamina': '体力 {stamina}',
   'mission.eventQuest.staminaDiscounted': '体力 {stamina}（折扣）',
-  'mission.eventQuest.enemiesNote': '{enemies}名敌人　{note}',
+  'mission.eventQuest.enemiesNote': '{enemies}个敌人　{note}',
   'mission.schedule.all': '全部',
   'mission.schedule.kindEvent': '活动',
   'mission.schedule.kindGacha': '召唤',
