@@ -3,6 +3,7 @@ import { tutorialEn } from './tutorialEn';
 import { villageEn } from './villageEn';
 import { missionsEn } from './missionsEn';
 import { shopEn } from './shopEn';
+import { skillsEn } from './skillsEn';
 import { worldEn } from './worldEn';
 
 /** English text of the game's data (heroes, skills, enemies, stages, story, items ...): see docs/I18N.md. Anything not listed here
@@ -14,6 +15,7 @@ export const enData: DataTexts = {
   ...villageEn,
   ...missionsEn,
   ...shopEn,
+  ...skillsEn,
   ...worldEn,
   tutorial: tutorialEn,
   item: {
