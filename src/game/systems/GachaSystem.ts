@@ -118,7 +118,7 @@ export function tenPullNote(banner: GachaBannerEntry): string | null {
 export function pickupNote(banner: GachaBannerEntry): string | null {
   const picks = pickupHeroesOf(banner);
   if (picks.length === 0) return null;
-  return [...picks].sort((a, b) => b.rarity - a.rarity).map((h) => `★${h.rarity} ${h.name}`).join('　'); // i18n-ignore (a separator)
+  return [...picks].sort((a, b) => b.rarity - a.rarity).map((h) => `★${h.rarity} ${h.name}`).join(t('gacha.detail.pickupSeparator'));
 }
 
 export function costOf(banner: GachaBannerEntry, count: 1 | 10): number {
