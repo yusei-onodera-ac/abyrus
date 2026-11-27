@@ -124,7 +124,8 @@ if (problems.length) {
 
 let changed = 0;
 for (const [file, text] of files) {
-  const current = existsSync(file) ? readFileSync(file, 'utf8') : null;
+  // (a Windows checkout turns LF into CRLF: line endings are not a difference)
+  const current = existsSync(file) ? readFileSync(file, 'utf8').replaceAll(String.fromCharCode(13, 10), String.fromCharCode(10)) : null;
   if (current === text) continue;
   changed++;
   if (check) {
