@@ -1,5 +1,6 @@
 import type { MissionKey } from './missions';
 import type { Reward } from './rewards';
+import { localized } from '../i18n';
 
 /**
  * 期間限定イベント: an event that runs between two dates, has its own currency (the 通貨 the player collects), a track of
@@ -182,20 +183,24 @@ export function standardMissions(kind: LimitedEventKind): EventMissionDef[] {
 
 // ------------------------------------------------------------------------------------------ lookups
 
-/** Builds a complete event from the few things that make it its own; the rest is the standard (templates above). */
+/** Builds a complete event from the few things that make it its own; the rest is the standard (templates above). The text (the title, the
+ *  currency, the missions, the exchange items) is read through tr() each time it is used: English is i18n/data/scheduleEn.ts, by the event's
+ *  id (the missions and the exchange items every event shares, by their own ids). */
 export function makeEvent(
   spec: Pick<LimitedEventDef, 'id' | 'kind' | 'title' | 'description' | 'story' | 'image' | 'accent' | 'emblem' | 'startsAt' | 'endsAt' | 'token'> &
     Partial<Pick<LimitedEventDef, 'region' | 'tokenPerStamina' | 'exchangeDays'>> & { headline?: EventHeadline },
 ): LimitedEventDef {
   const { headline, ...rest } = spec;
-  return {
+  const def: LimitedEventDef = {
     region: 0,
     tokenPerStamina: 2,
     exchangeDays: 3,
     ...rest,
+    token: localized('eventToken', spec.id, spec.token, ['name', 'glyph']),
     firstClearGems: EVENT_TIER_FIRST_CLEAR_GEMS,
-    missions: standardMissions(spec.kind),
+    missions: standardMissions(spec.kind).map((m) => localized('eventMission', m.id, m, ['title'])),
     milestones: standardMilestones(spec.kind, headline),
-    shop: standardShop(spec.kind, headline),
+    shop: standardShop(spec.kind, headline).map((item) => localized('eventShop', item.id, item, ['name'])),
   };
+  return localized('event', spec.id, def, ['title', 'description', 'story', 'emblem']);
 }

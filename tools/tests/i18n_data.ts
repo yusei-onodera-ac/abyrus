@@ -21,6 +21,10 @@ import { ITEMS } from '../../src/game/data/items';
 import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tutorial';
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
 import { ALL_HEROES, defShort } from '../../src/game/data/heroes';
+import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULED_GACHAS, SCHEDULE_NEXT } from '../../src/game/data/schedule';
+import { EVENTS } from '../../src/game/data/events';
+import { scheduleNotices } from '../../src/game/data/notices';
+import { scheduleItems } from '../../src/game/systems/ScheduleView';
 import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
 import { OPENING_SCRIPTS, getEndingScript, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript, getRegionOutroScript, speakerName, type StoryScript } from '../../src/game/data/storyScript';
 
@@ -39,6 +43,9 @@ const STORY_SCRIPTS = (): StoryScript[] => [
   getFinalIntroScript(),
   getEndingScript(),
 ];
+
+/** One day after each event and summon of the year starts (the day its notice is on the board). */
+const SCHEDULE_NOTICE_TIMES: number[] = [...SCHEDULED_EVENTS, ...SCHEDULED_GACHAS].map((x) => new Date(x.startsAt!).getTime() + 24 * 3600 * 1000);
 
 /** The numbers in a text, as plain digits (a comma or a full-width digit does not change a number), sorted. */
 const numbersOf = (s: string): string => (s.replace(/[０-９]/g, (c) => String(c.charCodeAt(0) - 0xff10)).replace(/(\d),(\d)/g, '$1$2').match(/\d+/g) ?? []).sort().join(',');
@@ -86,6 +93,25 @@ function collect(): [string, string, string, string][] {
     homeLinesFor(r.id, r.heroClass).forEach((line, i) => out.push(['heroLine', r.id, String(i + 1), line.text]));
   }
   for (const cls of Object.keys(CLASS_LINES) as (keyof typeof CLASS_LINES)[]) homeLinesFor('nobody', cls).forEach((line, i) => out.push(['classLine', cls, String(i + 1), line.text]));
+  for (const e of SCHEDULED_EVENTS) {
+    add('event', e.id, e, ['title', 'description', 'story', 'emblem']);
+    add('eventToken', e.id, e.token, ['name', 'glyph']);
+    for (const m of e.missions) add('eventMission', m.id, m, ['title']);
+    for (const s of e.shop) add('eventShop', s.id, s, ['name']);
+  }
+  for (const e of EVENTS.filter((x) => x.kind !== 'limited')) add('event', e.id, e, ['title', 'description', 'actionLabel']);
+  for (const g of SCHEDULED_GACHAS) add('gachaBanner', g.id, g, ['title', 'description', 'emblem']);
+  for (const c of SCHEDULED_CAMPAIGNS) add('campaign', c.id, c, ['title']);
+  out.push(['scheduleNext', 'next', 'title', SCHEDULE_NEXT.title]);
+  // the notices the calendar makes (one for each event and summon, on the day after it starts) and the lines of the yearly schedule
+  for (const at of SCHEDULE_NOTICE_TIMES) {
+    for (const n of scheduleNotices(at)) {
+      if (!out.some(([tb, id]) => tb === 'scheduleNotice' && id === n.id)) {
+        add('scheduleNotice', n.id, n, ['title', 'body']);
+      }
+    }
+  }
+  for (const item of scheduleItems()) add('scheduleItem', `${item.kind}-${item.id}`, item, ['title', 'detail']);
   for (const script of STORY_SCRIPTS()) {
     script.lines.forEach((line, i) => {
       out.push(['story', `${script.id}.${i + 1}`, 'text', line.text]);
@@ -98,7 +124,8 @@ function collect(): [string, string, string, string][] {
 setLanguage('ja', { persist: false });
 const jaRows = collect();
 ok(jaRows.length > 400, `${jaRows.length} text fields are checked`);
-ok(jaRows.every(([, , , v]) => JA.test(v) || /^[\x20-\x7e]*$/.test(v)), 'in Japanese the rows are the Japanese the data holds');
+const notJa = jaRows.filter(([, , , v]) => !(JA.test(v) || /^[\x20-\x7e★♥♛∞π]*$/.test(v))); // (a symbol alone, such as the emblem ♥, is fine)
+ok(notJa.length === 0, `in Japanese the rows are the Japanese the data holds${notJa.length ? ` (e.g. ${notJa.slice(0, 4).map(([tb, id, f, v]) => `${tb}.${id}.${f}=${v}`).join(', ')})` : ''}`);
 ok(t('quest.feral.name', { prefix: FERAL_PREFIXES[0], animal: 'X' }) === `${FERAL_PREFIXES[0]}X`, 'an enemy name is written together in Japanese');
 
 setLanguage('en', { persist: false });

@@ -1,7 +1,7 @@
 import { describeCampaign } from '../data/campaigns';
-import { GACHA_BANNERS } from '../data/gachaBanners';
 import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULE_NEXT, SCHEDULED_GACHAS } from '../data/schedule';
 import { pickupHeroesOf } from './GachaSystem';
+import { defShort } from '../data/heroes';
 import { t } from '../i18n';
 
 /**
@@ -45,7 +45,7 @@ function pickupSummary(banner: Parameters<typeof pickupHeroesOf>[0]): string | n
   const top = Math.max(...picks.map((h) => h.rarity));
   const best = picks.filter((h) => h.rarity === top);
   const rest = picks.length - best.length;
-  return `★${top} ${best.map((h) => h.name).join(t('mission.schedule.nameSeparator'))}${rest > 0 ? t('mission.schedule.andMore', { rest }) : ''}`;
+  return `★${top} ${best.map((h) => defShort(h)).join(t('mission.schedule.nameSeparator'))}${rest > 0 ? t('mission.schedule.andMore', { rest }) : ''}`;
 }
 
 export function scheduleItems(): ScheduleItem[] {
@@ -54,8 +54,7 @@ export function scheduleItems(): ScheduleItem[] {
     items.push({ kind: 'event', id: e.id, title: e.title, startsAt: e.startsAt, endsAt: e.endsAt, detail: e.kind === 'dungeon' ? t('mission.schedule.dungeonDetail', { token: e.token.name }) : t('mission.schedule.missionDetail', { token: e.token.name }), accent: e.accent });
   }
   for (const g of SCHEDULED_GACHAS) {
-    const banner = GACHA_BANNERS.find((b) => b.id === g.id) ?? g;
-    items.push({ kind: 'gacha', id: g.id, title: g.title, startsAt: g.startsAt!, endsAt: g.endsAt!, detail: pickupSummary(banner) ?? g.description, accent: g.accent ?? 0x6a3aa8 });
+    items.push({ kind: 'gacha', id: g.id, title: g.title, startsAt: g.startsAt!, endsAt: g.endsAt!, detail: pickupSummary(g) ?? g.description, accent: g.accent ?? 0x6a3aa8 });
   }
   for (const c of SCHEDULED_CAMPAIGNS) {
     items.push({ kind: 'campaign', id: c.id, title: c.title, startsAt: c.startsAt, endsAt: c.endsAt, detail: describeCampaign(c), accent: 0x2f7a3a });

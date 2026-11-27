@@ -234,6 +234,11 @@ const HERO_ROWS: HeroDefinition[] = [
  *  `name` is read through tr() each time ("Gauss, the Abacus King": i18n/data/heroesEn.ts); use `heroShortOf` where a card is narrow. */
 export const ALL_HEROES: HeroDefinition[] = HERO_ROWS.map((row) => localized('hero', row.id, row, ['name']));
 
+/** A character's name as the data holds it, in Japanese whatever the language is now (for the text that is built from names at load time). */
+export function heroNameJa(heroId: string): string | undefined {
+  return HERO_ROWS.find((h) => h.id === heroId)?.name;
+}
+
 /** A character's name in the current language. `hero.name` of a copy the player owns is the Japanese the save was made with (a save keeps
  *  what it was given), so a screen reads the name through here, by the character's id. */
 export function heroNameOf(hero: { heroId: string; name: string }): string {

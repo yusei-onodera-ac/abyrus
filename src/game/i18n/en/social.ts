@@ -143,6 +143,14 @@ export const social: Part<'social'> = {
   'social.notice.categoryNotice': 'Notice',
   'social.notice.categoryEvent': 'Event',
   'social.notice.categorySummon': 'Summon',
+  'social.notice.eventTitle': '"{title}" Is Now Live',
+  'social.notice.eventHowDungeon': 'Take on the Event Dungeon to collect {token}.',
+  'social.notice.eventHowMission': 'Your usual adventure missions will earn you {token}.',
+  'social.notice.eventBody':
+    'The limited-time event "{title}" is now on.\n\n{story}\n\n{how}\nTrade the {token} you collect for Milestone Rewards and Exchange items.\n\n[Event Period]\n{period}\n*For {exchangeDays, plural, one {# day} other {# days}} after it ends, you can still use the Exchange and claim rewards.\n\nOpen the event screen from "Events" at the bottom of the screen.',
+  'social.notice.gachaTitle': '"{title}" Is Now Live',
+  'social.notice.gachaBody':
+    'The Summon "{title}" is now on.\n{description}\n\n[Period]\n{period}\n\nCheck the rates, Rate-Up heroes and Pity count in "Details" on the Summon screen.',
   'social.gift.title': 'Gifts',
   'social.gift.empty': 'No gifts',
   'social.gift.friendGiftLabel': 'Gold ×{amount}',

@@ -7,6 +7,7 @@ import { worldEn } from './worldEn';
 import { heroesEn } from './heroesEn';
 import { heroLinesEn } from './heroLinesEn';
 import { storyEn } from './storyEn';
+import { scheduleEn } from './scheduleEn';
 
 /** English text of the game's data (heroes, skills, enemies, stages, story, items ...): see docs/I18N.md. Anything not listed here
  *  is shown in Japanese by `tr()`. Shape: `{ <table>: { <id>: { <field>: 'text' } } }`. One file per area: villageEn (the village), missionsEn
@@ -21,6 +22,7 @@ export const enData: DataTexts = {
   ...heroesEn,
   ...heroLinesEn,
   ...storyEn,
+  ...scheduleEn,
   tutorial: tutorialEn,
   item: {
     exp_s: { name: 'EXP Material (S)', short: 'EXP (S)', description: 'Gives a hero +100 EXP.' },
