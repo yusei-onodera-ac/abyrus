@@ -2,6 +2,7 @@
 // Japanese (a row without an English entry falls back to its Japanese, which this test then reports), and in Japanese they must still be
 // the text the data holds. Add a table here when its English is added (docs/I18N.md, "データ表の文字").
 import { getLanguage, setLanguage, t, tr, trList } from '../../src/game/i18n';
+import { enData } from '../../src/game/i18n/data/en';
 import { BUILD_TABS, BUILDINGS, VILLAGE_MATERIALS, WANDERERS } from '../../src/game/data/village';
 import { VILLAGE_GOALS, unlocksAt } from '../../src/game/data/villageGoals';
 import { VILLAGE_QUESTS } from '../../src/game/data/villageQuests';
@@ -19,6 +20,7 @@ import { WEEKDAY_DUNGEONS, WEEKDAY_TIERS } from '../../src/game/data/weekdayDung
 import { EXPEDITIONS } from '../../src/game/data/expeditions';
 import { ITEMS } from '../../src/game/data/items';
 import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tutorial';
+import { HERO_SKILLS, formatSkillEffectSummary, skillKindLabel, type SkillEffectKind } from '../../src/game/data/skills';
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
 
 let failures = 0;
@@ -28,6 +30,9 @@ function ok(cond: unknown, label: string): void {
 }
 
 const JA = /[　-ヿ㐀-鿿＀-￯]/;
+
+const SKILL_KINDS: SkillEffectKind[] = ['nuke_single', 'nuke_aoe', 'drain_single', 'buff_atk', 'buff_def', 'debuff_atk', 'debuff_def', 'stun', 'invincible', 'heal_single', 'heal_aoe', 'revive'];
+const SKILL_OF_KIND = new Map(Object.values(HERO_SKILLS).flat().map((def) => [def.kind, def] as const));
 
 /** [table, id, field, value] for each text field of each row. */
 function collect(): [string, string, string, string][] {
@@ -66,6 +71,13 @@ function collect(): [string, string, string, string][] {
   for (const r of Object.values(ITEMS)) add('item', r.id, r, ['name', 'short', 'description']);
   for (const step of [...TUTORIAL_STEPS, ...VILLAGE_TUTORIAL_STEPS]) if (step.lines) out.push(['tutorial', step.id, 'lines', step.lines.join('\n')]);
   for (const p of PEOPLE) out.push(['villager', p.id, 'lines', trList('villager', p.id, 'lines', p.lines).join('\n')]);
+  // the heroes' skills: name and description of each, the tag of each kind, and the numbers readout under a skill (level 1 and 10)
+  for (const [heroId, kit] of Object.entries(HERO_SKILLS)) kit.forEach((def, slot) => add('skill', `${heroId}_${slot}`, def, ['name', 'description']));
+  for (const kind of SKILL_KINDS) {
+    out.push(['skillKind', kind, 'label', skillKindLabel(kind)]);
+    const def = SKILL_OF_KIND.get(kind);
+    if (def) for (const level of [1, 10]) out.push(['skillSummary', `${kind}.${level}`, 'text', formatSkillEffectSummary(def, level)]);
+  }
   return out;
 }
 
@@ -83,6 +95,46 @@ const stillJa = enRows.filter(([, , , v]) => JA.test(v));
 ok(stillJa.length === 0, `no text field is still Japanese in English${stillJa.length ? ` (${stillJa.length}, e.g. ${stillJa.slice(0, 5).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
 const empty = enRows.filter(([, , , v]) => v.trim() === '');
 ok(empty.length === 0, 'and none is empty');
+
+// numbers must survive translation: the digits of a Japanese text (full-width too, thousands commas ignored) are the digits of its English (the order may
+// change: 30回目までに★4以上 = "★4 or better by the 30th pull")
+// (a lone "1" is left out: 1回 / 1段階 / 1時間 become "once" / "one step" / "per hour")
+const digitsOf = (s: string): string => (s.normalize('NFKC').replace(/(\d),(?=\d{3})/g, '$1').match(/\d+(?:\.\d+)?/g) ?? []).filter((n) => n !== '1').sort().join(' ');
+const digitsDiffer = jaRows.filter((row, i) => digitsOf(row[3]) !== digitsOf(enRows[i][3]));
+for (const row of digitsDiffer) console.log(`      ${row[0]}.${row[1]}.${row[2]}: ${row[3].replace(/\n/g, ' / ')}  =>  ${enRows[jaRows.indexOf(row)][3].replace(/\n/g, ' / ')}`);
+ok(digitsDiffer.length === 0, `the numbers of every text field are the same in English${digitsDiffer.length ? ` (${digitsDiffer.length}, e.g. ${digitsDiffer.slice(0, 5).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+
+// skills: a number written as a kanji in Japanese (二刀 = two swords, 百矢 = a hundred arrows, 千里 = a thousand miles) comes out as a number in English;
+// no English entry names a skill that does not exist; the name stays short (a 148 px tag at 19 px bold, and the big banner when it is cast)
+const KANJI_NUMBER: Record<string, RegExp> = { 二: /\b(2|two|twin|dual|double|pair)\b/i, 三: /\b(3|three|trident|triple)\b/i, 五: /\b(5|five)\b/i, 六: /\b(6|six)\b/i, 百: /\b(100|hundred)\b/i, 千: /\b(1,?000|thousand)\b/i };
+const skillRows = (rows: typeof jaRows): Map<string, string> => {
+  const byId = new Map<string, string>();
+  for (const [table, id, field, value] of rows) if (table === 'skill') byId.set(`${id}.${field}`, value);
+  return byId;
+};
+const jaSkills = skillRows(jaRows);
+const enSkills = skillRows(enRows);
+const lostNumbers: string[] = [];
+for (const id of new Set([...jaSkills.keys()].map((k) => k.split('.')[0]))) {
+  const ja = `${jaSkills.get(`${id}.name`)}${jaSkills.get(`${id}.description`)}`.replace(/千鳥/g, ''); // (千鳥足 = a zigzag walk, not a number)
+  const en = `${enSkills.get(`${id}.name`)} ${enSkills.get(`${id}.description`)}`;
+  for (const [kanji, word] of Object.entries(KANJI_NUMBER)) if (ja.includes(kanji) && !word.test(en)) lostNumbers.push(`${id} (${kanji})`);
+}
+ok(lostNumbers.length === 0, `a skill's number in kanji is a number in English${lostNumbers.length ? ` (${lostNumbers.join(', ')})` : ''}`);
+const skillIds = new Set(Object.entries(HERO_SKILLS).flatMap(([heroId, kit]) => kit.map((_, slot) => `${heroId}_${slot}`)));
+const strayIds = Object.keys(enData.skill ?? {}).filter((id) => !skillIds.has(id));
+ok(strayIds.length === 0 && Object.keys(enData.skill ?? {}).length === skillIds.size, `the English skills are exactly the ${skillIds.size} skills of the kits${strayIds.length ? ` (not skills: ${strayIds.slice(0, 5).join(', ')})` : ''}`);
+const longSkill = [...enSkills].filter(([k, v]) => v.length > (k.endsWith('.name') ? 20 : 110)).map(([k]) => k);
+ok(longSkill.length === 0, `skill names are 20 characters or fewer and descriptions 110 or fewer in English${longSkill.length ? ` (${longSkill.slice(0, 5).join(', ')})` : ''}`);
+
+// a skill held across a language change follows it (the text is read when it is shown), and its id does not change
+const held = HERO_SKILLS.aion[0];
+const heldId = held.id;
+ok(held.name === 'Infinite Judgment' && held.id === heldId, 'a skill read in English says so');
+setLanguage('ja', { persist: false });
+ok(held.name === '無限の裁き' && held.description.endsWith('。') && held.id === heldId && heldId === 'nuke_aoe-無限の裁き', 'the same skill, held across a language change, is Japanese again (and keeps its id)');
+setLanguage('en', { persist: false });
+ok(held.name === 'Infinite Judgment', 'and English again');
 
 // an enemy's name: an adjective and an animal, joined by a space in English, with no Japanese left
 let seed = 1;
