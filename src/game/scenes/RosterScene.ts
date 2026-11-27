@@ -25,6 +25,7 @@ import { describeEquip, equipMaxLevel, getEquipDef } from '../data/equipment';
 import { equipIcon } from '../ui/ItemIcons';
 import { EQUIP_SLOTS, EQUIP_SLOT_LABELS, RARITY_COLORS, hex, type EquipSlot, type HeroData, type Row } from '../types';
 import { t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 interface RosterSceneData {
   /** Hero id to arrive with, ready to drop into a slot of the deck in use -
@@ -356,7 +357,7 @@ export class RosterScene extends Phaser.Scene {
     modal.add(createPanel(this, 360, cy, w, h, { fillColor: CHROME.woodFill, fillAlpha: 1, borderColor: CHROME.brass, glowColor: CHROME.brassBright, radius: 16, rarity: hero.rarity, gradient: false }));
     // Swallows taps so touching the panel itself doesn't dismiss the popup.
     modal.add(this.add.zone(360, cy, w, h).setInteractive());
-    modal.add(heading(this, 360, top + 48, t('hero.roster.gearTitle', { name: hero.name }), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
+    modal.add(heading(this, 360, top + 48, t('hero.roster.gearTitle', { name: heroShortOf(hero) }), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     modal.add(caption(this, 360, top + 92, t('hero.roster.gearSubtitle', { level: hero.level, computeHeroPower: ProgressionSystem.computeHeroPower(hero).toString() }), { fontSize: '20px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0.5));
 
     EQUIP_SLOTS.forEach((slot: EquipSlot, i) => {

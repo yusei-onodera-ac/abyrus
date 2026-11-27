@@ -105,13 +105,16 @@ const GACHA_BANNER_ROWS: GachaBannerEntry[] = [
     image: 'standard.jpg',
     description: '★5以下の全キャラクターが排出対象',
   },
-  // The year's limited gachas (ピックアップ and 装備の感謝祭): data/schedule.ts. getActiveGachaBanners puts the ones that are on first.
-  ...SCHEDULED_GACHAS,
 ];
 
 /** Title and description are read through tr() each time (English: i18n/data/shopEn.ts for the permanent four; the limited ones are
- *  data/schedule.ts's, with the events). */
-export const GACHA_BANNERS: GachaBannerEntry[] = GACHA_BANNER_ROWS.map((row) => localized('gachaBanner', row.id, row, ['title', 'description']));
+ *  data/schedule.ts's, with the events: i18n/data/scheduleEn.ts). */
+export const GACHA_BANNERS: GachaBannerEntry[] = [
+  ...GACHA_BANNER_ROWS.map((row) => localized('gachaBanner', row.id, row, ['title', 'description', 'emblem'])),
+  // The year's limited gachas (ピックアップ and 装備の感謝祭): data/schedule.ts, which reads their text through tr() itself.
+  // getActiveGachaBanners puts the ones that are on first.
+  ...SCHEDULED_GACHAS,
+];
 
 /** Promo strip beside the フレンドガチャ button, under public/assets/gacha/.
  *  About 4.6:1 (e.g. 1290x280). */

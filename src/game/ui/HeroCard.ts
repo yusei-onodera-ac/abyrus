@@ -4,6 +4,7 @@ import type { CharacterGenerator } from '../characters/CharacterGenerator';
 import { createPanel } from './Panel';
 import { addRainbowFrame } from './Rainbow';
 import { COLORS } from './theme';
+import { heroShortOf } from '../data/heroes';
 
 /** Portrait card used in the roster grid and gacha reveal: a rarity-framed
  *  panel, generated sprite, rarity stars, name/level, and optional HP/ult
@@ -42,7 +43,7 @@ export class HeroCard extends Phaser.GameObjects.Container {
       this.portrait = scene.add.sprite(0, -4, textureKey).setDisplaySize(width * 0.8, width * 0.8);
     }
     const stars = scene.add.text(0, width / 2 - 14 * k, '★'.repeat(hero.rarity), { fontSize: `${Math.round(12 * k)}px`, color: hex(rarityColor) }).setOrigin(0.5);
-    const nameText = scene.add.text(0, -width / 2 + 10 * k, `${hero.name} Lv${hero.level}`, { fontSize: `${Math.round(11 * k)}px`, color: '#ffffff' }).setOrigin(0.5);
+    const nameText = scene.add.text(0, -width / 2 + 10 * k, `${heroShortOf(hero)} Lv${hero.level}`, { fontSize: `${Math.round(11 * k)}px`, color: '#ffffff' }).setOrigin(0.5);
 
     const hpBg = scene.add.rectangle(0, width / 2 - 26 * k, width * 0.8, 6 * k, 0x000000, 0.6).setRounded(3 * k);
     this.hpFill = scene.add.rectangle(-width * 0.4, width / 2 - 26 * k, width * 0.8, 6 * k, 0x4caf50).setOrigin(0, 0.5).setRounded(3 * k);

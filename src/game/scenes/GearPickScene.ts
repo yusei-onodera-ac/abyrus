@@ -6,6 +6,7 @@ import { buildEquipmentRow } from '../ui/EquipmentRow';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
 import { t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 interface GearPickData {
   heroId: string;
@@ -53,7 +54,7 @@ export class GearPickScene extends InboxScene {
 
     const worn = hero.gear[slot];
     if (worn) {
-      cards.push(buildEquipmentRow(this, worn, { wornBy: hero.name, actions: [{ label: t('hero.gearPick.unequip'), variant: 'wood', onTap: () => this.unequip() }], guard }));
+      cards.push(buildEquipmentRow(this, worn, { wornBy: heroShortOf(hero), actions: [{ label: t('hero.gearPick.unequip'), variant: 'wood', onTap: () => this.unequip() }], guard }));
     }
     const candidates = this.save.equipment
       .filter((i) => getEquipDef(i.defId)?.slot === slot)

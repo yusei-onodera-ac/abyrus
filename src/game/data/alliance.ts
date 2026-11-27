@@ -6,7 +6,7 @@ import type {
   RaidBossDef,
 } from '../alliance/AllianceBackend';
 import { LEAGUES } from '../alliance/AllianceBackend';
-import { tr } from '../i18n';
+import { getLanguage, localized, t, tr } from '../i18n';
 import { REGIONS } from './regions';
 import { researchBonusOfSave } from './allianceResearch';
 import type { SaveData } from '../systems/SaveSystem';
@@ -98,11 +98,13 @@ export interface DonationRule {
   cost: { goldHours?: number; materials?: number; gems?: number };
 }
 
-export const DONATIONS: Record<DonationKind, DonationRule> = {
-  gold: { kind: 'gold', label: 'ゴールド', allianceExp: 100, contribution: 10, limit: 5, cost: { goldHours: 1 } },
-  materials: { kind: 'materials', label: '素材', allianceExp: 120, contribution: 12, limit: 5, cost: { materials: 100 } },
-  gems: { kind: 'gems', label: '魔晶石', allianceExp: 300, contribution: 30, limit: 3, cost: { gems: 10 } },
-};
+/** The label is read through tr() each time (English: i18n/data/allianceEn.ts). */
+const DONATION_ROWS: DonationRule[] = [
+  { kind: 'gold', label: 'ゴールド', allianceExp: 100, contribution: 10, limit: 5, cost: { goldHours: 1 } },
+  { kind: 'materials', label: '素材', allianceExp: 120, contribution: 12, limit: 5, cost: { materials: 100 } },
+  { kind: 'gems', label: '魔晶石', allianceExp: 300, contribution: 30, limit: 3, cost: { gems: 10 } },
+];
+export const DONATIONS = Object.fromEntries(DONATION_ROWS.map((row) => [row.kind, localized('allianceDonation', row.kind, row, ['label'])])) as Record<DonationKind, DonationRule>;
 export const DONATION_KINDS: DonationKind[] = ['gold', 'materials', 'gems'];
 
 // ---------------------------------------------------------------------------------------------- 共闘ボス
@@ -217,7 +219,7 @@ export function leagueForLevel(level: number): League {
   return LEAGUES[Math.min(LEAGUES.length - 1, Math.floor((Math.max(1, level) - 1) / 2))];
 }
 
-export const WAR_REWARDS: { fromRank: number; toRank: number; label: string; reward: AllianceReward }[] = [
+const WAR_REWARD_ROWS: { fromRank: number; toRank: number; label: string; reward: AllianceReward }[] = [
   { fromRank: 1, toRank: 1, label: '1位', reward: { gems: 300, coins: 400, phaseMaterials: 5 } },
   { fromRank: 2, toRank: 2, label: '2位', reward: { gems: 200, coins: 300, phaseMaterials: 3 } },
   { fromRank: 3, toRank: 3, label: '3位', reward: { gems: 150, coins: 250, phaseMaterials: 2 } },
@@ -225,6 +227,8 @@ export const WAR_REWARDS: { fromRank: number; toRank: number; label: string; rew
   { fromRank: 7, toRank: 10, label: '7〜10位', reward: { gems: 60, coins: 100 } },
   { fromRank: 11, toRank: 20, label: '11〜20位', reward: { gems: 30, coins: 50 } },
 ];
+/** The label is read through tr() each time (English: i18n/data/allianceEn.ts, by "<from>-<to>"). */
+export const WAR_REWARDS = WAR_REWARD_ROWS.map((row) => localized('allianceWar', `${row.fromRank}-${row.toRank}`, row, ['label']));
 
 /** 順位の報酬 (リーグが高いほど、魔晶石と同盟コインが増える)。 */
 export function warRewardFor(rank: number, league: League): AllianceReward {
@@ -266,13 +270,15 @@ export interface ShopItem {
   weeklyLimit: number;
 }
 
-export const SHOP_ITEMS: ShopItem[] = [
+const SHOP_ITEM_ROWS: ShopItem[] = [
   { id: 'phase', name: 'フェーズ素材 ×1', cost: 150, reward: { phaseMaterials: 1 }, weeklyLimit: 5 },
   { id: 'equip', name: '装備強化素材 ×100', cost: 40, reward: { items: { equip_essence: 100 } }, weeklyLimit: 0 },
   { id: 'exp_m', name: '経験値素材(中) ×3', cost: 30, reward: { items: { exp_m: 3 } }, weeklyLimit: 0 },
   { id: 'exp_l', name: '経験値素材(大) ×3', cost: 90, reward: { items: { exp_l: 3 } }, weeklyLimit: 0 },
   { id: 'gems', name: '魔晶石 ×30', cost: 300, reward: { gems: 30 }, weeklyLimit: 1 },
 ];
+/** The name is read through tr() each time (English: i18n/data/allianceEn.ts). */
+export const SHOP_ITEMS: ShopItem[] = SHOP_ITEM_ROWS.map((row) => localized('allianceShop', row.id, row, ['name']));
 
 export function getShopItem(id: string): ShopItem | undefined {
   return SHOP_ITEMS.find((s) => s.id === id);
@@ -366,3 +372,25 @@ export const SIM_CHAT_LINES = [
   'さっきのボス戦、会心が3回出ました:star:',
 ];
 export const SIM_HELP_LINES = ['ボスが強くて…手伝ってください！', '村に襲撃が来ています。助けて！'];
+
+const SIM_LISTS = { prefix: SIM_ALLIANCE_PREFIX, suffix: SIM_ALLIANCE_SUFFIX, name: SIM_NAMES, description: SIM_DESCRIPTIONS, chat: SIM_CHAT_LINES, help: SIM_HELP_LINES } as const;
+export type SimWordKind = keyof typeof SIM_LISTS;
+const simCache = new Map<string, readonly string[]>();
+
+/** One of the lists above in the language of the moment, in the same order (so a pick by position is the same word): the alliances' name
+ *  parts, the members' names, the descriptions, the chat lines, the help requests. What is made from them (a made-up alliance, a roster) keeps the
+ *  language it was made in (English: i18n/data/allianceEn.ts, `allianceSim`). */
+export function simWords(kind: SimWordKind): readonly string[] {
+  const key = `${getLanguage()}:${kind}`;
+  let words = simCache.get(key);
+  if (!words) {
+    words = SIM_LISTS[kind].map((ja, i) => tr('allianceSim', `${kind}.${i}`, 'text', ja));
+    simCache.set(key, words);
+  }
+  return words;
+}
+
+/** A made-up alliance's name from its two parts ("蒼月" + "同盟" in Japanese, "Azure Moon" + "Alliance" in English). */
+export function simAllianceName(prefix: string, suffix: string | number): string {
+  return t('alliance.sim.allianceName', { prefix, suffix });
+}

@@ -2,6 +2,7 @@
 // Japanese (a row without an English entry falls back to its Japanese, which this test then reports), and in Japanese they must still be
 // the text the data holds. Add a table here when its English is added (docs/I18N.md, "データ表の文字").
 import { getLanguage, setLanguage, t, tr, trList } from '../../src/game/i18n';
+import { enData } from '../../src/game/i18n/data/en';
 import { BUILD_TABS, BUILDINGS, VILLAGE_MATERIALS, WANDERERS } from '../../src/game/data/village';
 import { VILLAGE_GOALS, unlocksAt } from '../../src/game/data/villageGoals';
 import { VILLAGE_QUESTS } from '../../src/game/data/villageQuests';
@@ -19,7 +20,18 @@ import { WEEKDAY_DUNGEONS, WEEKDAY_TIERS } from '../../src/game/data/weekdayDung
 import { EXPEDITIONS } from '../../src/game/data/expeditions';
 import { ITEMS } from '../../src/game/data/items';
 import { TUTORIAL_STEPS, VILLAGE_TUTORIAL_STEPS } from '../../src/game/data/tutorial';
+import { HERO_SKILLS, formatSkillEffectSummary, skillKindLabel, type SkillEffectKind } from '../../src/game/data/skills';
 import { PEOPLE } from '../../src/game/ui/VillagePeople';
+import { ALL_HEROES, defShort } from '../../src/game/data/heroes';
+import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULED_GACHAS, SCHEDULE_NEXT } from '../../src/game/data/schedule';
+import { EVENTS } from '../../src/game/data/events';
+import { scheduleNotices } from '../../src/game/data/notices';
+import { scheduleItems } from '../../src/game/systems/ScheduleView';
+import { DONATIONS, DONATION_KINDS, RAID_BOSSES, SHOP_ITEMS, WAR_REWARDS, simAllianceName, simWords, type SimWordKind } from '../../src/game/data/alliance';
+import { SocialSystem } from '../../src/game/systems/SocialSystem';
+import { ChatSystem } from '../../src/game/systems/ChatSystem';
+import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
+import { OPENING_SCRIPTS, getEndingScript, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript, getRegionOutroScript, speakerName, type StoryScript } from '../../src/game/data/storyScript';
 
 let failures = 0;
 function ok(cond: unknown, label: string): void {
@@ -28,6 +40,23 @@ function ok(cond: unknown, label: string): void {
 }
 
 const JA = /[　-ヿ㐀-鿿＀-￯]/;
+
+/** Every story script, in the order the game plays them. */
+const STORY_SCRIPTS = (): StoryScript[] => [
+  ...OPENING_SCRIPTS,
+  ...[0, 1, 2, 3, 4].flatMap((i) => [getRegionIntroScript(i), getRegionOutroScript(i), getExtraIntroScript(i)]),
+  getFinalIntroScript(),
+  getEndingScript(),
+];
+
+/** One day after each event and summon of the year starts (the day its notice is on the board). */
+const SCHEDULE_NOTICE_TIMES: number[] = [...SCHEDULED_EVENTS, ...SCHEDULED_GACHAS].map((x) => new Date(x.startsAt!).getTime() + 24 * 3600 * 1000);
+
+/** The numbers in a text, as plain digits (a comma or a full-width digit does not change a number), sorted. */
+const numbersOf = (s: string): string => (s.replace(/[０-９]/g, (c) => String(c.charCodeAt(0) - 0xff10)).replace(/(\d),(\d)/g, '$1$2').match(/\d+/g) ?? []).sort().join(',');
+
+const SKILL_KINDS: SkillEffectKind[] = ['nuke_single', 'nuke_aoe', 'drain_single', 'buff_atk', 'buff_def', 'debuff_atk', 'debuff_def', 'stun', 'invincible', 'heal_single', 'heal_aoe', 'revive'];
+const SKILL_OF_KIND = new Map(Object.values(HERO_SKILLS).flat().map((def) => [def.kind, def] as const));
 
 /** [table, id, field, value] for each text field of each row. */
 function collect(): [string, string, string, string][] {
@@ -66,13 +95,65 @@ function collect(): [string, string, string, string][] {
   for (const r of Object.values(ITEMS)) add('item', r.id, r, ['name', 'short', 'description']);
   for (const step of [...TUTORIAL_STEPS, ...VILLAGE_TUTORIAL_STEPS]) if (step.lines) out.push(['tutorial', step.id, 'lines', step.lines.join('\n')]);
   for (const p of PEOPLE) out.push(['villager', p.id, 'lines', trList('villager', p.id, 'lines', p.lines).join('\n')]);
+  for (const r of ALL_HEROES) {
+    add('hero', r.id, r, ['name']);
+    out.push(['hero', r.id, 'short', defShort(r)]);
+    homeLinesFor(r.id, r.heroClass).forEach((line, i) => out.push(['heroLine', r.id, String(i + 1), line.text]));
+  }
+  for (const cls of Object.keys(CLASS_LINES) as (keyof typeof CLASS_LINES)[]) homeLinesFor('nobody', cls).forEach((line, i) => out.push(['classLine', cls, String(i + 1), line.text]));
+  for (const e of SCHEDULED_EVENTS) {
+    add('event', e.id, e, ['title', 'description', 'story', 'emblem']);
+    add('eventToken', e.id, e.token, ['name', 'glyph']);
+    for (const m of e.missions) add('eventMission', m.id, m, ['title']);
+    for (const s of e.shop) add('eventShop', s.id, s, ['name']);
+  }
+  for (const e of EVENTS.filter((x) => x.kind !== 'limited')) add('event', e.id, e, ['title', 'description', 'actionLabel']);
+  for (const g of SCHEDULED_GACHAS) add('gachaBanner', g.id, g, ['title', 'description', 'emblem']);
+  for (const c of SCHEDULED_CAMPAIGNS) add('campaign', c.id, c, ['title']);
+  out.push(['scheduleNext', 'next', 'title', SCHEDULE_NEXT.title]);
+  // the notices the calendar makes (one for each event and summon, on the day after it starts) and the lines of the yearly schedule
+  for (const at of SCHEDULE_NOTICE_TIMES) {
+    for (const n of scheduleNotices(at)) {
+      if (!out.some(([tb, id]) => tb === 'scheduleNotice' && id === n.id)) {
+        add('scheduleNotice', n.id, n, ['title', 'body']);
+      }
+    }
+  }
+  for (const item of scheduleItems()) add('scheduleItem', `${item.kind}-${item.id}`, item, ['title', 'detail']);
+  for (const b of RAID_BOSSES) add('allianceBoss', b.id, b, ['name', 'description']);
+  for (const k of DONATION_KINDS) add('allianceDonation', k, DONATIONS[k], ['label']);
+  for (const w of WAR_REWARDS) add('allianceWar', `${w.fromRank}-${w.toRank}`, w, ['label']);
+  for (const s of SHOP_ITEMS) add('allianceShop', s.id, s, ['name']);
+  for (const kind of ['prefix', 'suffix', 'name', 'description', 'chat', 'help'] as SimWordKind[]) simWords(kind).forEach((text, i) => out.push(['allianceSim', `${kind}.${i}`, 'text', text]));
+  {
+    const social = SocialSystem.createDefaultState(0);
+    [...social.friends, ...social.incoming].forEach((p) => out.push(['seedFriend', p.id, 'name', p.name]));
+    ChatSystem.createDefaultState(0).messages.forEach((m, i) => {
+      out.push(['seedChat', String(i), 'senderName', m.senderName]);
+      out.push(['seedChat', String(i), 'text', m.text]);
+    });
+  }
+  for (const script of STORY_SCRIPTS()) {
+    script.lines.forEach((line, i) => {
+      out.push(['story', `${script.id}.${i + 1}`, 'text', line.text]);
+      if (line.speaker) out.push(['storySpeaker', line.speaker, 'name', speakerName(line.speaker)]);
+    });
+  }
+  // the heroes' skills: name and description of each, the tag of each kind, and the numbers readout under a skill (level 1 and 10)
+  for (const [heroId, kit] of Object.entries(HERO_SKILLS)) kit.forEach((def, slot) => add('skill', `${heroId}_${slot}`, def, ['name', 'description']));
+  for (const kind of SKILL_KINDS) {
+    out.push(['skillKind', kind, 'label', skillKindLabel(kind)]);
+    const def = SKILL_OF_KIND.get(kind);
+    if (def) for (const level of [1, 10]) out.push(['skillSummary', `${kind}.${level}`, 'text', formatSkillEffectSummary(def, level)]);
+  }
   return out;
 }
 
 setLanguage('ja', { persist: false });
 const jaRows = collect();
 ok(jaRows.length > 400, `${jaRows.length} text fields are checked`);
-ok(jaRows.every(([, , , v]) => JA.test(v) || /^[\x20-\x7e]*$/.test(v)), 'in Japanese the rows are the Japanese the data holds');
+const notJa = jaRows.filter(([, , , v]) => !(JA.test(v) || /^[\x20-\x7e★♥♛∞π]*$/.test(v))); // (a symbol alone, such as the emblem ♥, is fine)
+ok(notJa.length === 0, `in Japanese the rows are the Japanese the data holds${notJa.length ? ` (e.g. ${notJa.slice(0, 4).map(([tb, id, f, v]) => `${tb}.${id}.${f}=${v}`).join(', ')})` : ''}`);
 ok(t('quest.feral.name', { prefix: FERAL_PREFIXES[0], animal: 'X' }) === `${FERAL_PREFIXES[0]}X`, 'an enemy name is written together in Japanese');
 
 setLanguage('en', { persist: false });
@@ -81,14 +162,109 @@ const enRows = collect();
 ok(enRows.length === jaRows.length, 'the same fields in English');
 const stillJa = enRows.filter(([, , , v]) => JA.test(v));
 ok(stillJa.length === 0, `no text field is still Japanese in English${stillJa.length ? ` (${stillJa.length}, e.g. ${stillJa.slice(0, 5).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+// a number in the text is the same number in English (the amount, the days, the count): compared row by row, in the tables whose text
+// carries them (the story and the lines have none)
+{
+  const NUMBERED = new Set(['event', 'eventToken', 'eventMission', 'eventShop', 'gachaBanner', 'campaign', 'allianceBoss', 'allianceShop', 'allianceDonation', 'allianceWar', 'allianceSim', 'seedChat']);
+  const differ = enRows.filter((row, i) => NUMBERED.has(row[0]) && numbersOf(row[3]) !== numbersOf(jaRows[i][3]));
+  ok(differ.length === 0, `the numbers in a text are the same in English${differ.length ? ` (${differ.length}, e.g. ${differ.slice(0, 4).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+}
+{
+  const storyLines = (): number[] => STORY_SCRIPTS().map((s) => s.lines.length);
+  setLanguage('ja', { persist: false });
+  const jaCounts = storyLines();
+  setLanguage('en', { persist: false });
+  ok(jaCounts.length === 5 * 3 + 3 + 2 && jaCounts.every((n, i) => n === storyLines()[i]), `${jaCounts.length} story scripts, each with its lines`);
+  const narration = STORY_SCRIPTS().flatMap((s) => s.lines).filter((l) => !l.speaker);
+  ok(narration.length > 40, 'the narration lines have no nameplate');
+}
 const empty = enRows.filter(([, , , v]) => v.trim() === '');
 ok(empty.length === 0, 'and none is empty');
+
+// numbers must survive translation: the digits of a Japanese text (full-width too, thousands commas ignored) are the digits of its English (the order may
+// change: 30回目までに★4以上 = "★4 or better by the 30th pull")
+// (a lone "1" is left out: 1回 / 1段階 / 1時間 become "once" / "one step" / "per hour")
+const digitsOf = (s: string): string => (s.normalize('NFKC').replace(/(\d),(?=\d{3})/g, '$1').match(/\d+(?:\.\d+)?/g) ?? []).filter((n) => n !== '1').sort().join(' ');
+const digitsDiffer = jaRows.filter((row, i) => digitsOf(row[3]) !== digitsOf(enRows[i][3]));
+for (const row of digitsDiffer) console.log(`      ${row[0]}.${row[1]}.${row[2]}: ${row[3].replace(/\n/g, ' / ')}  =>  ${enRows[jaRows.indexOf(row)][3].replace(/\n/g, ' / ')}`);
+ok(digitsDiffer.length === 0, `the numbers of every text field are the same in English${digitsDiffer.length ? ` (${digitsDiffer.length}, e.g. ${digitsDiffer.slice(0, 5).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
+
+// skills: a number written as a kanji in Japanese (二刀 = two swords, 百矢 = a hundred arrows, 千里 = a thousand miles) comes out as a number in English;
+// no English entry names a skill that does not exist; the name stays short (a 148 px tag at 19 px bold, and the big banner when it is cast)
+const KANJI_NUMBER: Record<string, RegExp> = { 二: /\b(2|two|twin|dual|double|pair)\b/i, 三: /\b(3|three|trident|triple)\b/i, 五: /\b(5|five)\b/i, 六: /\b(6|six)\b/i, 百: /\b(100|hundred)\b/i, 千: /\b(1,?000|thousand)\b/i };
+const skillRows = (rows: typeof jaRows): Map<string, string> => {
+  const byId = new Map<string, string>();
+  for (const [table, id, field, value] of rows) if (table === 'skill') byId.set(`${id}.${field}`, value);
+  return byId;
+};
+const jaSkills = skillRows(jaRows);
+const enSkills = skillRows(enRows);
+const lostNumbers: string[] = [];
+for (const id of new Set([...jaSkills.keys()].map((k) => k.split('.')[0]))) {
+  const ja = `${jaSkills.get(`${id}.name`)}${jaSkills.get(`${id}.description`)}`.replace(/千鳥/g, ''); // (千鳥足 = a zigzag walk, not a number)
+  const en = `${enSkills.get(`${id}.name`)} ${enSkills.get(`${id}.description`)}`;
+  for (const [kanji, word] of Object.entries(KANJI_NUMBER)) if (ja.includes(kanji) && !word.test(en)) lostNumbers.push(`${id} (${kanji})`);
+}
+ok(lostNumbers.length === 0, `a skill's number in kanji is a number in English${lostNumbers.length ? ` (${lostNumbers.join(', ')})` : ''}`);
+const skillIds = new Set(Object.entries(HERO_SKILLS).flatMap(([heroId, kit]) => kit.map((_, slot) => `${heroId}_${slot}`)));
+const strayIds = Object.keys(enData.skill ?? {}).filter((id) => !skillIds.has(id));
+ok(strayIds.length === 0 && Object.keys(enData.skill ?? {}).length === skillIds.size, `the English skills are exactly the ${skillIds.size} skills of the kits${strayIds.length ? ` (not skills: ${strayIds.slice(0, 5).join(', ')})` : ''}`);
+const longSkill = [...enSkills].filter(([k, v]) => v.length > (k.endsWith('.name') ? 20 : 80)).map(([k]) => k);
+ok(longSkill.length === 0, `skill names are 20 characters or fewer and descriptions 80 or fewer in English${longSkill.length ? ` (${longSkill.slice(0, 5).join(', ')})` : ''}`);
+
+// a skill held across a language change follows it (the text is read when it is shown), and its id does not change
+const held = HERO_SKILLS.aion[0];
+const heldId = held.id;
+ok(held.name === 'Infinite Judgment' && held.id === heldId, 'a skill read in English says so');
+setLanguage('ja', { persist: false });
+ok(held.name === '無限の裁き' && held.description.endsWith('。') && held.id === heldId && heldId === 'nuke_aoe-無限の裁き', 'the same skill, held across a language change, is Japanese again (and keeps its id)');
+setLanguage('en', { persist: false });
+ok(held.name === 'Infinite Judgment', 'and English again');
 
 // an enemy's name: an adjective and an animal, joined by a space in English, with no Japanese left
 let seed = 1;
 const rng = (): number => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 const names = REGIONS.flatMap((r) => Array.from({ length: 40 }, () => pickFeral(r, rng).name));
 ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n)), `enemy names read as English (${names.slice(0, 3).join(', ')})`);
+
+// a character's name: "Name, the Title" with the given name alone as the short form; each given name is its own (the short forms are what a
+// roster card shows, so two characters must not share one)
+{
+  const shorts = ALL_HEROES.map((r) => defShort(r));
+  ok(ALL_HEROES.every((r) => /^[A-Z][A-Za-z]+, the [A-Z][A-Za-z' -]+$/.test(r.name)), 'a name is "Given, the Title" in English');
+  ok(ALL_HEROES.every((r, i) => r.name.startsWith(`${shorts[i]}, the `)), 'the short form is the given name the full name starts with');
+  ok(new Set(shorts).size === shorts.length, `no two characters share a short name (${shorts.length - new Set(shorts).size} shared)`);
+  ok(ALL_HEROES.every((r) => r.name.length <= 40), `no name is longer than 40 letters (longest ${Math.max(...ALL_HEROES.map((r) => r.name.length))})`);
+}
+
+// the lines a character says: the same count as the Japanese, each in one piece (no stray line break), the voice stays the Japanese one
+{
+  // (the Japanese lines are the data's own: HERO_LINES / CLASS_LINES; the voice ids come from them and do not change with the language)
+  const sameCount = ALL_HEROES.every((r) => {
+    const jaLines = HERO_LINES[r.id] ?? CLASS_LINES[r.heroClass];
+    const enLines = homeLinesFor(r.id, r.heroClass);
+    return jaLines.length === enLines.length && enLines.every((l, i) => l.voice === `home_${HERO_LINES[r.id] ? r.id : r.heroClass}_${i + 1}`);
+  });
+  ok(sameCount, 'each character has as many lines in English as in Japanese, with the voice ids of the Japanese');
+  const all = ALL_HEROES.flatMap((r) => homeLinesFor(r.id, r.heroClass).map((l) => l.text));
+  const tooLong = all.filter((l) => l.length > 66);
+  ok(all.every((l) => l.length >= 8 && l.length <= 66 && !l.includes('\n')), `every line is 8 to 66 letters, one piece (the bubble is 208 px wide and grows up)${tooLong.length ? `: ${tooLong.join(' / ')}` : ''}`);
+  // nothing in the English tables that no row asks for (a typo in an id would silently leave the Japanese on screen, and a left-over would hide)
+  const known = (table: string, ids: string[]): boolean => Object.keys(enData[table] ?? {}).every((id) => ids.includes(id));
+  ok(known('hero', ALL_HEROES.map((r) => r.id)) && known('heroLine', Object.keys(HERO_LINES)) && known('classLine', Object.keys(CLASS_LINES)), 'no English name or line for a character or class that does not exist');
+  ok(known('story', STORY_SCRIPTS().flatMap((sc) => sc.lines.map((_, i) => `${sc.id}.${i + 1}`))), 'no English story line for a script line that does not exist');
+  ok(known('event', [...SCHEDULED_EVENTS.map((e) => e.id), ...EVENTS.map((e) => e.id)]) && known('scheduledGacha', SCHEDULED_GACHAS.map((g) => g.id)) && known('campaign', SCHEDULED_CAMPAIGNS.map((c) => c.id)), 'no English event, summon or campaign for an id that does not exist');
+}
+
+// the made-up alliances' words: the names are told apart (a roster picks them by name), and an alliance's name reads as two words in English
+{
+  const names = simWords('name');
+  ok(new Set(names).size === names.length && names.every((n) => /^[A-Z][a-z]+$/.test(n)), 'the made-up members have different names, one capitalized word each');
+  const all = simWords('prefix').flatMap((p) => simWords('suffix').map((s) => simAllianceName(p, s)));
+  ok(new Set(all).size === all.length && all.every((n) => /^[A-Z][A-Za-z -]+ [A-Z][a-z]+$/.test(n)), `${all.length} made-up alliance names, none repeated ("${all[0]}")`);
+  ok(simAllianceName(simWords('prefix')[0], 7) === `${simWords('prefix')[0]} 7`, 'a numbered alliance reads "Name 7"');
+  ok(simWords('chat').every((l) => l.length <= 60) && simWords('description').every((l) => l.length <= 80), 'the made-up chat lines and descriptions are of a sensible length');
+}
 
 setLanguage('ja', { persist: false });
 console.log(failures === 0 ? '\nALL PASSED' : `\n${failures} FAILED`);

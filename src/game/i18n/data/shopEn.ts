@@ -37,8 +37,8 @@ export const shopEn: DataTexts = {
   },
   gachaBanner: {
     special: { title: 'Special Summon', description: 'New ★6 "Aion, the Infinite Emperor" arrives!' },
-    first: { title: 'First Summon', description: 'A ★4 or better is guaranteed by the 30th pull!' },
-    'equip-standard': { title: 'Gear Summon', description: 'Get weapons, armor and accessories' },
+    first: { title: 'First Summon', description: 'A ★4 or better is guaranteed by the 30th pull!', emblem: '1' },
+    'equip-standard': { title: 'Gear Summon', description: 'Get weapons, armor and accessories', emblem: 'G' },
     standard: { title: 'Standard Summon', description: 'All heroes of ★5 and below can appear' },
   },
 };

@@ -1,7 +1,7 @@
 import type { Friend, FriendRequest, Group, GiftReward, SaveData, SocialState } from './SaveSystem';
 import { dmChannel, groupChannel } from './ChatSystem';
 import { SEED_FRIENDS, SEED_INCOMING } from '../data/socialSeed';
-import { t } from '../i18n';
+import { t, tr } from '../i18n';
 
 export const MAX_FRIENDS = 30;
 /** Cap on requests waiting either way (received, and sent without an answer). */
@@ -73,8 +73,8 @@ export const SocialSystem = {
   createDefaultState(now: number): SocialState {
     return {
       playerId: generatePlayerId(),
-      friends: SEED_FRIENDS.map((f) => ({ id: f.id, name: f.name, level: f.level, addedAt: now - f.addedAgoMs, lastLoginAt: now - f.lastLoginAgoMs, favorite: false })),
-      incoming: SEED_INCOMING.map((r) => ({ id: r.id, name: r.name, level: r.level, sentAt: now - r.sentAgoMs })),
+      friends: SEED_FRIENDS.map((f) => ({ id: f.id, name: tr('seedFriend', f.id, 'name', f.name), level: f.level, addedAt: now - f.addedAgoMs, lastLoginAt: now - f.lastLoginAgoMs, favorite: false })),
+      incoming: SEED_INCOMING.map((r) => ({ id: r.id, name: tr('seedFriend', r.id, 'name', r.name), level: r.level, sentAt: now - r.sentAgoMs })),
       outgoing: [],
       groups: [],
       giftSentDay: {},

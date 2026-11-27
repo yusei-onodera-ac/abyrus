@@ -48,7 +48,7 @@ export const mission: Part<'mission'> = {
   'mission.eventQuest.collectPoints': 'Collect {points}',
   'mission.eventQuest.pointsToGo': '{points} to go',
   'mission.eventQuest.exchange': 'Exchange',
-  'mission.eventQuest.tokensExpire': '{name} expires {exchangeDays, plural, one {# day} other {# days}} after the event ends',
+  'mission.eventQuest.tokensExpire': '{name} expire {exchangeDays, plural, one {# day} other {# days}} after the event ends',
   'mission.eventQuest.stockLeft': 'Left {limit} / {limit2}',
   'mission.eventQuest.exchangedOut': 'Exchanged',
   'mission.eventQuest.closed': 'Closed',

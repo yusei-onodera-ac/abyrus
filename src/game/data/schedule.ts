@@ -1,8 +1,9 @@
 import type { Rarity } from '../types';
 import type { CampaignDef, CampaignKind } from './campaigns';
 import type { GachaBannerEntry } from './gachaBanners';
-import { getHeroDefinition } from './heroes';
+import { heroNameJa } from './heroes';
 import { makeEvent, type LimitedEventDef } from './limitedEvents';
+import { localized, tr } from '../i18n';
 
 /**
  * 年間スケジュール: the year of 期間限定イベント, ピックアップガチャ and ブーストキャンペーン, from 2026-11-16 to 2027-11-15, in the order they
@@ -17,7 +18,13 @@ export const SCHEDULE_START = '2026-11-16T00:00:00';
 export const SCHEDULE_END = '2027-11-16T00:00:00';
 
 /** What comes after the year: shown as the last line of the 年間予定. */
-export const SCHEDULE_NEXT = { at: '2027-11-16T00:00:00', title: '1周年記念' };
+export const SCHEDULE_NEXT = {
+  at: '2027-11-16T00:00:00',
+  /** (looked up each time it is read: i18n/data/scheduleEn.ts) */
+  get title(): string {
+    return tr('scheduleNext', 'next', 'title', '1周年記念');
+  },
+};
 
 /** "MM-DD" -> "YYYY-MM-DD": the year runs 11-16 (2026) to 11-15 (2027), so a date from 11-16 on is 2026's and an earlier one 2027's. */
 const at = (md: string): string => `${md >= '11-16' ? 2026 : 2027}-${md}`;
@@ -268,9 +275,10 @@ const EQUIP_FEST_RATES: GachaBannerEntry['rates'] = [
   { rarity: 1, rate: 0.34 },
 ];
 
-/** The part of a name a player calls the character by: "星導のアストラ" -> "アストラ". */
+/** The part of a name a player calls the character by: "星導のアストラ" -> "アストラ". (Japanese only: the English line of each banner
+ *  is written out in i18n/data/scheduleEn.ts, and tools/tests/i18n_data.ts checks that it names the same characters.) */
 function shortName(id: string): string {
-  const name = getHeroDefinition(id)?.name ?? id;
+  const name = heroNameJa(id) ?? id;
   return name.match(/[ァ-ヶー]+$/)?.[0] ?? name;
 }
 
@@ -311,7 +319,7 @@ function pickupGacha(spec: PickupSpec): GachaBannerEntry {
   };
 }
 
-export const SCHEDULED_GACHAS: GachaBannerEntry[] = [
+const SCHEDULED_GACHA_ROWS: GachaBannerEntry[] = [
   pickupGacha({ id: 'g01-launch', title: '開幕記念 召喚祭', from: '11-16', to: '12-06', five: ['astra'], four: ['sieg', 'hild'], three: ['celes'], accent: 0x3f7a3a, emblem: '祭' }),
   pickupGacha({ id: 'g02-winter4', title: '冬支度 ★4ピックアップ', from: '12-07', to: '12-16', four: ['seira', 'gran', 'ignis'], three: ['fros', 'skadi', 'ivan'], accent: 0x3a6a9a, emblem: '冬' }),
   pickupGacha({ id: 'g03-xmas', title: '聖夜の召喚', from: '12-17', to: '12-30', five: ['serafina'], four: ['ouka', 'anju'], three: ['noel', 'celes', 'pia'], accent: 0xb8332e, emblem: '聖' }),
@@ -358,11 +366,14 @@ export const SCHEDULED_GACHAS: GachaBannerEntry[] = [
   })),
 ];
 
+/** Title, description and emblem are read through tr() each time (English: i18n/data/scheduleEn.ts, `scheduledGacha`). */
+export const SCHEDULED_GACHAS: GachaBannerEntry[] = SCHEDULED_GACHA_ROWS.map((row) => localized('scheduledGacha', row.id, row, ['title', 'description', 'emblem']));
+
 // ------------------------------------------------------------------------------------------ ブーストキャンペーン (24)
 
 const campaign = (id: string, kind: CampaignKind, mul: number, title: string, from: string, to: string): CampaignDef => ({ id, kind, mul, title, ...span(from, to) });
 
-export const SCHEDULED_CAMPAIGNS: CampaignDef[] = [
+const SCHEDULED_CAMPAIGN_ROWS: CampaignDef[] = [
   campaign('c01', 'stamina', 0.5, '冬支度応援 スタミナ半額', '12-07', '12-13'),
   campaign('c02', 'gold', 2, '年末ゴールド祭', '12-14', '12-16'),
   campaign('c03', 'exp', 2, '新年 経験値2倍', '01-14', '01-20'),
@@ -388,3 +399,6 @@ export const SCHEDULED_CAMPAIGNS: CampaignDef[] = [
   campaign('c23', 'stamina', 0.5, 'ハロウィン準備 スタミナ半額', '10-18', '10-19'),
   campaign('c24', 'gold', 2, '感謝のゴールド2倍', '11-03', '11-04'),
 ];
+
+/** The title is read through tr() each time (English: i18n/data/scheduleEn.ts). */
+export const SCHEDULED_CAMPAIGNS: CampaignDef[] = SCHEDULED_CAMPAIGN_ROWS.map((row) => localized('campaign', row.id, row, ['title']));

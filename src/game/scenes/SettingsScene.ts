@@ -35,6 +35,7 @@ import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
 import { LANGUAGES, getLanguage, setLanguage, t, type Language } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 const PAD = 14;
 const INK = '#1c130a';
@@ -114,7 +115,7 @@ export class SettingsScene extends InboxScene {
     cards.push(
       this.valueCard({
         label: t('settings.homeHero.label'),
-        value: SaveSystem.getHomeHero(this.save)?.name ?? t('settings.homeHero.notSet'),
+        value: ((h) => (h ? heroShortOf(h) : t('settings.homeHero.notSet')))(SaveSystem.getHomeHero(this.save)),
         note: t('settings.homeHero.note'),
         buttons: [{ label: t('common.change'), variant: 'wood', onTap: () => this.scene.start('HomeHero', { from: 'Settings' }) }],
         guard,

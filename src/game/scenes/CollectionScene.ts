@@ -1,6 +1,6 @@
 import type Phaser from 'phaser';
 import { CharacterGenerator } from '../characters/CharacterGenerator';
-import { HERO_ROSTER, createHeroInstance } from '../data/heroes';
+import { HERO_ROSTER, createHeroInstance, defShort } from '../data/heroes';
 import type { CollectionMilestone } from '../data/collection';
 import type { Reward } from '../data/rewards';
 import { ITEMS } from '../data/items';
@@ -187,7 +187,7 @@ export class CollectionScene extends InboxScene {
           size,
         ),
       );
-      const name = caption(this, cx, cy + size / 2 + 18, have ? def.name : t('hero.collection.unknown'), { fontSize: '15px', fontStyle: 'bold', color: have ? '#f5e6c8' : '#6f6552', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
+      const name = caption(this, cx, cy + size / 2 + 18, have ? defShort(def) : t('hero.collection.unknown'), { fontSize: '15px', fontStyle: 'bold', color: have ? '#f5e6c8' : '#6f6552', stroke: INK, strokeThickness: 3 }).setOrigin(0.5);
       const room = size + gapX - 6;
       if (name.width > room) name.setScale(room / name.width);
       container.add(name);

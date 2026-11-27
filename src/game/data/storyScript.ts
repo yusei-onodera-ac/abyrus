@@ -14,7 +14,11 @@
  * Ruri (the only character who gets a recurring portrait at all - per the
  * brief, the player stays a silent, unillustrated operator and every other
  * speaker is drawn as a plain silhouette bust).
+ *
+ * The text is Japanese here; each line is read through tr() when it is shown (English: i18n/data/storyEn.ts), and `speaker` stays the
+ * Japanese name, which is the speaker's id (StoryScene compares it, and shows `speakerName(speaker)`).
  */
+import { localized, tr } from '../i18n';
 
 export type StoryCue = 'shake' | 'flashRed' | 'none';
 export type RuriPortrait = 'normal' | 'worried' | 'determined' | 'happy' | 'flying' | 'blank';
@@ -34,6 +38,16 @@ export interface StoryLine {
 export interface StoryScript {
   id: string;
   lines: StoryLine[];
+}
+
+/** The script with each line's text read through tr() (by "<script id>.<line number from 1>") whenever it is read. */
+function localizedScript(script: StoryScript): StoryScript {
+  return { id: script.id, lines: script.lines.map((line, i) => localized('story', `${script.id}.${i + 1}`, line, ['text'])) };
+}
+
+/** The name on the plate for a speaker (`speaker` is the Japanese name in the data). */
+export function speakerName(speaker: string): string {
+  return tr('storySpeaker', speaker, 'name', speaker);
 }
 
 /** Placeholder gradient backdrop palette - top/bottom colors for a
@@ -102,7 +116,7 @@ const OPENING_TALK: StoryScript = {
   ],
 };
 
-export const OPENING_SCRIPTS: StoryScript[] = [OPENING_STORY, OPENING_RAMPAGE, OPENING_TALK];
+export const OPENING_SCRIPTS: StoryScript[] = [OPENING_STORY, OPENING_RAMPAGE, OPENING_TALK].map(localizedScript);
 
 // --- 地方1: 迷いの森 -------------------------------------------------------
 
@@ -332,8 +346,12 @@ const EXTRA_INTROS: StoryScript[] = [
   },
 ];
 
-const REGION_INTRO_SCRIPTS: StoryScript[] = [FOREST_INTRO, WASTELAND_INTRO, FROSTPEAK_INTRO, RUINS_INTRO, TWILIGHT_INTRO];
-const REGION_OUTRO_SCRIPTS: StoryScript[] = [FOREST_OUTRO, WASTELAND_OUTRO, FROSTPEAK_OUTRO, RUINS_OUTRO, TWILIGHT_OUTRO];
+const REGION_INTRO_SCRIPTS: StoryScript[] = [FOREST_INTRO, WASTELAND_INTRO, FROSTPEAK_INTRO, RUINS_INTRO, TWILIGHT_INTRO].map(localizedScript);
+const REGION_OUTRO_SCRIPTS: StoryScript[] = [FOREST_OUTRO, WASTELAND_OUTRO, FROSTPEAK_OUTRO, RUINS_OUTRO, TWILIGHT_OUTRO].map(localizedScript);
+
+const EXTRA_LOCALIZED = EXTRA_INTROS.map(localizedScript);
+const FINAL_LOCALIZED = localizedScript(FINAL_INTRO);
+const ENDING_LOCALIZED = localizedScript(ENDING);
 
 export function getRegionIntroScript(regionIndex: number): StoryScript {
   return REGION_INTRO_SCRIPTS[regionIndex];
@@ -344,13 +362,13 @@ export function getRegionOutroScript(regionIndex: number): StoryScript {
 }
 
 export function getExtraIntroScript(regionIndex: number): StoryScript {
-  return EXTRA_INTROS[regionIndex];
+  return EXTRA_LOCALIZED[regionIndex];
 }
 
 export function getFinalIntroScript(): StoryScript {
-  return FINAL_INTRO;
+  return FINAL_LOCALIZED;
 }
 
 export function getEndingScript(): StoryScript {
-  return ENDING;
+  return ENDING_LOCALIZED;
 }
