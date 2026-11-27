@@ -24,6 +24,7 @@ import { preloadNoticeArt } from './NoticeScene';
 import { preloadEventArt } from '../ui/EventPanels';
 import { EVENTS } from '../data/events';
 import { RemoteShopConfig } from '../systems/RemoteShopConfig';
+import { startStorePayments } from '../systems/NativeStore';
 import { applyHeroReleases } from '../data/heroes';
 import { RemoteNotices } from '../systems/RemoteNotices';
 import { RemoteInbox } from '../systems/RemoteInbox';
@@ -106,6 +107,8 @@ export class BootScene extends Phaser.Scene {
     const save = SaveSystem.load();
     applyMockFromUrl(save);
     this.game.registry.set('save', save);
+    // The App Store (iOS app only; everything else keeps its payment gateway): the store's part runs in the background, the game does not wait for it (systems/NativeStore.ts).
+    startStorePayments(this.game);
     // Development: `?mem` on the address prints how much texture memory is in use (what a phone has to hold).
     if ((import.meta.env.DEV || import.meta.env.VITE_DEV_ENV === '1') && new URLSearchParams(location.search).has('mem')) console.log('[mem]', JSON.stringify(textureReport(this)));
     // Opened from someone's share link (...?friend=ID): go straight to the

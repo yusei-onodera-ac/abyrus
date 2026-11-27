@@ -33,8 +33,8 @@ for (const name of names) {
     input: path.join(here, `${name}.ts`),
     platform: 'node',
     resolve: { alias: { phaser: stub } },
-    // (the Firebase SDK is loaded on demand by the game and never reached in a test: leave it out of the bundle)
-    external: [/^firebase(\/|$)/],
+    // (the Firebase SDK and Capacitor are loaded on demand by the game and never reached in a test: leave them out of the bundle)
+    external: [/^firebase(\/|$)/, /^@capacitor\//],
     logLevel: 'silent',
     transform: { define: { 'import.meta.env': '({ MODE: "test", DEV: false, PROD: false, BASE_URL: "/" })' } },
   });

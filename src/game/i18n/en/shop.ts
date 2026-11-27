@@ -27,10 +27,10 @@ export const shop: Part<'shop'> = {
   'shop.limit.perWeek': 'Limit {count} per week',
   'shop.limit.perMonth': 'Limit {count} per month',
   // PremiumPanels.ts
-  'shop.premium.priceTax': '¥{yen} (tax incl.)',
-  'shop.premium.priceTaxTest': '¥{yen} (tax incl.)  Test payment, no charge',
-  'shop.premium.confirmMessage': '{name}\n¥{yen} (tax incl.)',
-  'shop.premium.confirmMessageTest': '{name}\n¥{yen} (tax incl.)\n* Test payment. You will not be charged.',
+  'shop.premium.priceTax': '{price} (tax incl.)',
+  'shop.premium.priceTaxTest': '{price} (tax incl.)  Test payment, no charge',
+  'shop.premium.confirmMessage': '{name}\n{price} (tax incl.)',
+  'shop.premium.confirmMessageTest': '{name}\n{price} (tax incl.)\n* Test payment. You will not be charged.',
   // ShopScene.ts
   'shop.staminaNow': 'Stamina {stamina} / {stamina2}',
   'shop.held.phaseMaterials': 'Owned: {phaseMaterials}',
@@ -39,7 +39,7 @@ export const shop: Part<'shop'> = {
   'shop.tab.gems': 'Gem Shop',
   'shop.tab.items': 'Item Shop',
   'shop.section.premiumActive': 'Active ({daysLeft, plural, one {# day} other {# days}} left)',
-  'shop.section.premiumMonthly': 'Monthly {yen}',
+  'shop.section.premiumMonthly': 'Monthly {price}',
   'shop.section.packs': 'Value Packs',
   'shop.section.packsNote': 'Buy with ¥ or Gems',
   'shop.section.gemsNote': 'Prices include tax',
@@ -69,7 +69,7 @@ export const shop: Part<'shop'> = {
   // PremiumPanels.ts
   'shop.premium.active': 'Active',
   'shop.premium.inactive': 'Inactive',
-  'shop.premium.monthly': 'Monthly ¥{yen} ({durationDays} days)',
+  'shop.premium.monthly': 'Monthly {price} ({durationDays} days)',
   'shop.premium.daysLeftUntil': '{daysLeft, plural, one {# day} other {# days}} left (until {month}/{day})',
   'shop.premium.joinToUnlock': 'Join to unlock all the perks below',
   'shop.premium.benefit.gemsTitle': '{dailyGems} Gems every day',
@@ -97,4 +97,8 @@ export const shop: Part<'shop'> = {
   'shop.premium.packClaimed': 'Member Bonus Pack claimed',
   'shop.toast.paymentUnavailable': 'Payments are unavailable right now',
   'shop.toast.paymentFailed': 'Payment failed',
+  // PaymentSystem.ts / systems/StoreKitPayment.ts (the App Store)
+  'shop.toast.purchasePending': 'Waiting for approval. Your purchase will arrive once it is approved',
+  'shop.toast.purchaseLater': 'Payment received. Your items will arrive as soon as it is confirmed',
+  'shop.recovered.title': 'Purchase Delivered',
 };
