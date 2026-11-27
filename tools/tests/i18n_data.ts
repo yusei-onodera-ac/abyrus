@@ -159,6 +159,9 @@ for (const lang of ['ko', 'zh-Hans', 'zh-Hant'] as const) {
   setLanguage(lang, { persist: false });
   const rows = collect();
   generic(lang, rows);
+  // a roster card shows the short name: two characters must not share one (a name that is not written yet shows the English, which is unique)
+  const shorts = rows.filter(([tb, , f]) => tb === 'hero' && f === 'short').map((r) => r[3]);
+  ok(shorts.length === ALL_HEROES.length && new Set(shorts).size === shorts.length, `${lang}: no two characters share a short name (${shorts.length - new Set(shorts).size} shared)`);
   const pending = rows.filter((row, i) => row[3] === enRows[i][3] && /[A-Za-z]{2}/.test(row[3]));
   console.log(`INFO  ${lang}: ${pending.length} of ${rows.length} text fields still show the English (not translated yet)`);
 }
