@@ -25,6 +25,9 @@ import { SCHEDULED_CAMPAIGNS, SCHEDULED_EVENTS, SCHEDULED_GACHAS, SCHEDULE_NEXT 
 import { EVENTS } from '../../src/game/data/events';
 import { scheduleNotices } from '../../src/game/data/notices';
 import { scheduleItems } from '../../src/game/systems/ScheduleView';
+import { DONATIONS, DONATION_KINDS, RAID_BOSSES, SHOP_ITEMS, WAR_REWARDS, simAllianceName, simWords, type SimWordKind } from '../../src/game/data/alliance';
+import { SocialSystem } from '../../src/game/systems/SocialSystem';
+import { ChatSystem } from '../../src/game/systems/ChatSystem';
 import { CLASS_LINES, HERO_LINES, homeLinesFor } from '../../src/game/data/homeLines';
 import { OPENING_SCRIPTS, getEndingScript, getExtraIntroScript, getFinalIntroScript, getRegionIntroScript, getRegionOutroScript, speakerName, type StoryScript } from '../../src/game/data/storyScript';
 
@@ -112,6 +115,19 @@ function collect(): [string, string, string, string][] {
     }
   }
   for (const item of scheduleItems()) add('scheduleItem', `${item.kind}-${item.id}`, item, ['title', 'detail']);
+  for (const b of RAID_BOSSES) add('allianceBoss', b.id, b, ['name', 'description']);
+  for (const k of DONATION_KINDS) add('allianceDonation', k, DONATIONS[k], ['label']);
+  for (const w of WAR_REWARDS) add('allianceWar', `${w.fromRank}-${w.toRank}`, w, ['label']);
+  for (const s of SHOP_ITEMS) add('allianceShop', s.id, s, ['name']);
+  for (const kind of ['prefix', 'suffix', 'name', 'description', 'chat', 'help'] as SimWordKind[]) simWords(kind).forEach((text, i) => out.push(['allianceSim', `${kind}.${i}`, 'text', text]));
+  {
+    const social = SocialSystem.createDefaultState(0);
+    [...social.friends, ...social.incoming].forEach((p) => out.push(['seedFriend', p.id, 'name', p.name]));
+    ChatSystem.createDefaultState(0).messages.forEach((m, i) => {
+      out.push(['seedChat', String(i), 'senderName', m.senderName]);
+      out.push(['seedChat', String(i), 'text', m.text]);
+    });
+  }
   for (const script of STORY_SCRIPTS()) {
     script.lines.forEach((line, i) => {
       out.push(['story', `${script.id}.${i + 1}`, 'text', line.text]);
@@ -137,7 +153,7 @@ ok(stillJa.length === 0, `no text field is still Japanese in English${stillJa.le
 // a number in the text is the same number in English (the amount, the days, the count): compared row by row, in the tables whose text
 // carries them (the story and the lines have none)
 {
-  const NUMBERED = new Set(['event', 'eventToken', 'eventMission', 'eventShop', 'gachaBanner', 'campaign', 'allianceBoss', 'allianceShop', 'allianceDonation', 'allianceWar']);
+  const NUMBERED = new Set(['event', 'eventToken', 'eventMission', 'eventShop', 'gachaBanner', 'campaign', 'allianceBoss', 'allianceShop', 'allianceDonation', 'allianceWar', 'allianceSim', 'seedChat']);
   const differ = enRows.filter((row, i) => NUMBERED.has(row[0]) && numbersOf(row[3]) !== numbersOf(jaRows[i][3]));
   ok(differ.length === 0, `the numbers in a text are the same in English${differ.length ? ` (${differ.length}, e.g. ${differ.slice(0, 4).map(([tb, id, f]) => `${tb}.${id}.${f}`).join(', ')})` : ''}`);
 }
@@ -183,6 +199,16 @@ ok(names.every((n) => !JA.test(n) && /^[A-Z][A-Za-z-]+ [A-Z][A-Za-z -]+$/.test(n
   const all = ALL_HEROES.flatMap((r) => homeLinesFor(r.id, r.heroClass).map((l) => l.text));
   ok(all.every((l) => l.length >= 8 && l.length <= 75 && !l.includes('\n')), `every line is 8 to 75 letters, one piece (longest ${Math.max(...all.map((l) => l.length))})`);
   ok(Object.keys(HERO_LINES).every((id) => ALL_HEROES.some((r) => r.id === id)), 'no English lines for a character that does not exist');
+}
+
+// the made-up alliances' words: the names are told apart (a roster picks them by name), and an alliance's name reads as two words in English
+{
+  const names = simWords('name');
+  ok(new Set(names).size === names.length && names.every((n) => /^[A-Z][a-z]+$/.test(n)), 'the made-up members have different names, one capitalized word each');
+  const all = simWords('prefix').flatMap((p) => simWords('suffix').map((s) => simAllianceName(p, s)));
+  ok(new Set(all).size === all.length && all.every((n) => /^[A-Z][A-Za-z -]+ [A-Z][a-z]+$/.test(n)), `${all.length} made-up alliance names, none repeated ("${all[0]}")`);
+  ok(simAllianceName(simWords('prefix')[0], 7) === `${simWords('prefix')[0]} 7`, 'a numbered alliance reads "Name 7"');
+  ok(simWords('chat').every((l) => l.length <= 60) && simWords('description').every((l) => l.length <= 80), 'the made-up chat lines and descriptions are of a sensible length');
 }
 
 setLanguage('ja', { persist: false });

@@ -57,12 +57,6 @@ import {
   RAID_DURATION_MS,
   RAID_REWARD_PARTICIPATION,
   RAID_TICKET_TTL_MS,
-  SIM_ALLIANCE_PREFIX,
-  SIM_ALLIANCE_SUFFIX,
-  SIM_CHAT_LINES,
-  SIM_DESCRIPTIONS,
-  SIM_HELP_LINES,
-  SIM_NAMES,
   SUPPORT_RECEIVE_LIMIT,
   SUPPORT_SEND_LIMIT,
   SUPPORT_STAMINA,
@@ -78,6 +72,8 @@ import {
   expectedWarPointsPerMember,
   leagueForLevel,
   leagueIndex,
+  simAllianceName,
+  simWords,
   perksForLevel,
   raidDamageCap,
   raidDefeatReward,
@@ -95,7 +91,7 @@ import { HERO_ROSTER } from '../data/heroes';
 import { applyReport, bump, checkClaim, markClaimed, newBoard, viewOfBoard } from './missionLogic';
 import { sanitizeText, stripForbidden } from '../systems/ChatSystem';
 import { SaveSystem, type SaveData } from '../systems/SaveSystem';
-import { t as tl } from '../i18n';
+import { getLanguage, t as tl } from '../i18n';
 
 const HOUR = 60 * 60 * 1000;
 /** 長く開かなかったときに、疑似メンバーを進める最大の時間 (それより前の分は、飛ばす)。 */
@@ -133,7 +129,12 @@ interface SimDef {
 const directoryCache = new Map<string, SimDef[]>();
 
 function directoryOf(world: LocalWorld): SimDef[] {
-  const key = `${world.seed}:${Math.round(world.refPower)}`;
+  // (the language is part of the key: a made-up alliance is named in the language of the moment)
+  const key = `${getLanguage()}:${world.seed}:${Math.round(world.refPower)}`;
+  const prefixes = simWords('prefix');
+  const suffixes = simWords('suffix');
+  const descriptions = simWords('description');
+  const leaders = simWords('name');
   const cached = directoryCache.get(key);
   if (cached) return cached;
   const taken = new Set<string>();
@@ -142,11 +143,11 @@ function directoryOf(world: LocalWorld): SimDef[] {
     const r = rngOf(world.seed, 'dir', n);
     let name = '';
     for (let tries = 0; tries < 50; tries++) {
-      name = SIM_ALLIANCE_PREFIX[Math.floor(r() * SIM_ALLIANCE_PREFIX.length)] + SIM_ALLIANCE_SUFFIX[Math.floor(r() * SIM_ALLIANCE_SUFFIX.length)];
+      name = simAllianceName(prefixes[Math.floor(r() * prefixes.length)], suffixes[Math.floor(r() * suffixes.length)]);
       if (!taken.has(name)) break;
       name = '';
     }
-    if (!name) name = `${SIM_ALLIANCE_PREFIX[n % SIM_ALLIANCE_PREFIX.length]}${n}`;
+    if (!name) name = simAllianceName(prefixes[n % prefixes.length], n);
     taken.add(name);
     const level = Math.max(1, Math.min(ALLIANCE_MAX_LEVEL, 1 + Math.floor(Math.pow(r(), 1.3) * ALLIANCE_MAX_LEVEL)));
     const max = perksForLevel(level).memberMax;
@@ -159,12 +160,12 @@ function directoryOf(world: LocalWorld): SimDef[] {
       id: `sim-${n}`,
       name,
       emblem: Math.floor(r() * EMBLEM_COUNT),
-      description: SIM_DESCRIPTIONS[Math.floor(r() * SIM_DESCRIPTIONS.length)],
+      description: descriptions[Math.floor(r() * descriptions.length)],
       level,
       memberCount,
       joinPolicy,
       minPlayerLevel,
-      leaderName: SIM_NAMES[Math.floor(r() * SIM_NAMES.length)],
+      leaderName: leaders[Math.floor(r() * leaders.length)],
       power: memberCount * world.refPower * (0.5 + r() * 1.1),
     });
   }
@@ -343,7 +344,7 @@ export class LocalAllianceBackend implements AllianceBackend {
         if (m.don[kind] < DONATIONS[kind].limit && r() < m.act * 0.05 * w) this.donateAs(own, m, kind, t, false);
       }
       // 雑談
-      if (r() < 0.012 * m.act * w) this.sayAs(own, m, SIM_CHAT_LINES[Math.floor(r() * SIM_CHAT_LINES.length)], t);
+      if (r() < 0.012 * m.act * w) this.sayAs(own, m, simWords('chat')[Math.floor(r() * simWords('chat').length)], t);
       // 助っ人を借りてくれる
       if (mineMember?.helper && r() < 0.012 * m.act * w && own.me.lent < HELPER_LENDER_DAILY_LIMIT) {
         own.me.lent += 1;
@@ -359,7 +360,7 @@ export class LocalAllianceBackend implements AllianceBackend {
       // 救援要請を出す (開いているものが3つ未満のときだけ)
       if (r() < 0.002 * m.act * w && own.chat.filter((c) => c.kind === 'help' && c.help?.open).length < 3) {
         const what: 'raid' | 'village' = r() < 0.6 ? 'raid' : 'village';
-        this.push(own, { kind: 'help', senderUid: m.uid, senderName: m.name, text: SIM_HELP_LINES[what === 'raid' ? 0 : 1], sentAt: t, help: { what, helpers: [], open: true } });
+        this.push(own, { kind: 'help', senderUid: m.uid, senderName: m.name, text: simWords('help')[what === 'raid' ? 0 : 1], sentAt: t, help: { what, helpers: [], open: true } });
       }
       // 自分の救援要請に、答えてくれる
       for (const c of own.chat) {
@@ -388,7 +389,8 @@ export class LocalAllianceBackend implements AllianceBackend {
 
   private recruitOne(world: LocalWorld, own: OwnAlliance, r: () => number, t: number): void {
     const used = new Set([...own.members.map((m) => m.name), ...own.applicants.map((a) => a.name)]);
-    const name = SIM_NAMES.filter((n) => !used.has(n))[Math.floor(r() * Math.max(1, SIM_NAMES.length - used.size))] ?? `${SIM_NAMES[Math.floor(r() * SIM_NAMES.length)]}${own.members.length}`;
+    const simNames = simWords('name');
+    const name = simNames.filter((n) => !used.has(n))[Math.floor(r() * Math.max(1, simNames.length - used.size))] ?? `${simNames[Math.floor(r() * simNames.length)]}${own.members.length}`;
     const level = Math.max(1, Math.round(this.myLevel(own) * (0.6 + r() * 0.8)));
     const power = world.refPower * (0.4 + r() * 1.2);
     const uid = `sim-j${Math.floor(t / HOUR)}`;
@@ -655,7 +657,7 @@ export class LocalAllianceBackend implements AllianceBackend {
   private joinSimAlliance(world: LocalWorld, def: SimDef, me: PlayerProfile, at: number, welcome: string): OwnAlliance {
     const own = this.baseOwn(me, at, def.id, { name: def.name, emblem: def.emblem, description: def.description, joinPolicy: def.joinPolicy, minPlayerLevel: def.minPlayerLevel, level: def.level });
     const r = rngOf(world.seed, def.id, 'roster');
-    const names = [...SIM_NAMES].filter((n) => n !== def.leaderName && n !== me.name);
+    const names = [...simWords('name')].filter((n) => n !== def.leaderName && n !== me.name);
     for (let i = names.length - 1; i > 0; i--) {
       const j = Math.floor(r() * (i + 1));
       [names[i], names[j]] = [names[j], names[i]];
