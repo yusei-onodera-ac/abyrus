@@ -28,6 +28,7 @@ import { VillageFx, villageThumb } from '../ui/VillageFx';
 import { openVillageGoals } from '../ui/VillageGoalsModal';
 import { VillageGoals } from '../systems/VillageGoals';
 import { t as tl, type PlainKey } from '../i18n';
+import { textWrap } from '../ui/CardParts';
 
 const INK = '#1c130a';
 
@@ -1837,8 +1838,8 @@ export class VillageScene extends Phaser.Scene {
     content.add(this.add.zone(360, 640, w, h).setInteractive());
     content.add(heading(this, 360, top + 46, this.titleOf(b, now), { fontSize: '32px', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0.5));
     const left = 360 - w / 2 + 34;
-    content.add(caption(this, left, top + 100, def.description, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 68, useAdvancedWrap: true } }).setOrigin(0, 0));
-    content.add(caption(this, left, top + 168, this.statText(b, level, now), { fontSize: '20px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 68, useAdvancedWrap: true } }).setOrigin(0, 0));
+    content.add(caption(this, left, top + 100, def.description, { fontSize: '19px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: textWrap(w - 68, true) }).setOrigin(0, 0));
+    content.add(caption(this, left, top + 168, this.statText(b, level, now), { fontSize: '20px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: textWrap(w - 68, true) }).setOrigin(0, 0));
     let y = top + 236;
     if (next) {
       content.add(heading(this, left, y, tl('village.info.atLevel', { level: level + 1 }), { fontSize: '24px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
@@ -1877,7 +1878,7 @@ export class VillageScene extends Phaser.Scene {
       update();
       this.dockTick = update;
     } else {
-      this.dock.add(caption(this, 18, 66, this.statText(b, level, now), { fontSize: '16px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: DOCK.w - 36 - closeW - 10, useAdvancedWrap: true } }).setOrigin(0, 0.5));
+      this.dock.add(caption(this, 18, 66, this.statText(b, level, now), { fontSize: '16px', fontStyle: 'bold', color: b.damaged ? '#ffb07a' : '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: textWrap(DOCK.w - 36 - closeW - 10, true) }).setOrigin(0, 0.5));
     }
     this.dock.add(new Button(this, DOCK.w - 14 - closeW / 2, COMPACT.h / 2, closeW, 52, tl('common.close'), () => this.select(undefined), { variant: 'wood', fontSize: '22px' }));
   }
@@ -2221,7 +2222,7 @@ export class VillageScene extends Phaser.Scene {
       chip.strokeRoundedRect(-chipW / 2, -13, chipW, 26, 13);
       content.add(this.add.container(nameText.x + nameText.width + 14 + chipW / 2, y + 27, [chip, roleLabel]));
       content.add(caption(this, left + 142, y + 56, tl('village.build.countSize', { have, max, w: def.w, h: def.h }), { fontSize: '16px', fontStyle: 'bold', color: locked ? '#ff9a8a' : '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
-      content.add(caption(this, left + 142, y + 72, def.description, { fontSize: '14px', color: '#d8c49a', stroke: INK, strokeThickness: 2, wordWrap: { width: 300, useAdvancedWrap: true } }).setOrigin(0, 0));
+      content.add(caption(this, left + 142, y + 72, def.description, { fontSize: '14px', color: '#d8c49a', stroke: INK, strokeThickness: 2, wordWrap: textWrap(300, true) }).setOrigin(0, 0));
 
       this.costLines(content, left + 142, y + 122, y + 150, def.levels[0], 22, 17);
 
@@ -2346,7 +2347,7 @@ export class VillageScene extends Phaser.Scene {
     const w = DOCK.w;
     const moving = ghost.movingId ? VillageSystem.get(this.save, ghost.movingId) : undefined;
     this.dock.add(heading(this, 18, ROW.title, moving ? tl('village.place.moveTitle', { name: def.name }) : def.decor ? tl('village.place.placeTitle', { name: def.name }) : tl('village.place.buildTitle', { name: def.name }), { fontSize: '26px', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
-    this.placeMessage = caption(this, 18, ROW.line, '', { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: { width: w - 36, useAdvancedWrap: true } }).setOrigin(0, 0.5);
+    this.placeMessage = caption(this, 18, ROW.line, '', { fontSize: '15px', fontStyle: 'bold', color: '#9fe39f', stroke: INK, strokeThickness: 3, wordWrap: textWrap(w - 36, true) }).setOrigin(0, 0.5);
     this.dock.add(this.placeMessage);
     if (moving && def.decor) {
       this.dock.add(body(this, 18, ROW.cost, tl('village.place.movesInstantly'), { fontSize: '20px', fontStyle: 'bold', color: '#ffe79a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));

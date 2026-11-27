@@ -141,6 +141,15 @@ export const social = {
   'social.notice.categoryNotice': 'お知らせ',
   'social.notice.categoryEvent': 'イベント',
   'social.notice.categorySummon': 'ガチャ',
+  // the notices the calendar makes (data/notices.ts, scheduleNotices): one when each event and each rate-up summon starts
+  'social.notice.eventTitle': '「{title}」開催のお知らせ',
+  'social.notice.eventHowDungeon': 'イベントダンジョンに挑戦して、{token}を集めましょう。',
+  'social.notice.eventHowMission': 'いつもの冒険のミッションで、{token}が集まります。',
+  'social.notice.eventBody':
+    '期間限定イベント「{title}」を開催します。\n\n{story}\n\n{how}\n集めた{token}は、累計報酬や交換所のごほうびと交換できます。\n\n【開催期間】\n{period}\n※終了後{exchangeDays}日間は、交換所と報酬の受け取りだけできます。\n\nイベント画面は、画面下の「イベント」から開けます。',
+  'social.notice.gachaTitle': '「{title}」開催のお知らせ',
+  'social.notice.gachaBody':
+    'ガチャ「{title}」を開催します。\n{description}\n\n【開催期間】\n{period}\n\n排出率・ピックアップ・天井の回数は、ガチャ画面の「詳細」からご確認いただけます。',
   'social.gift.title': 'プレゼントBOX',
   'social.gift.empty': 'プレゼントはありません',
   'social.gift.friendGiftLabel': 'ゴールド ×{amount}',

@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import type { RegionDef, RegionLook, RegionMotif } from '../data/regions';
 import { CHROME } from './theme';
 import type { StageNodeState } from './Icons';
+import { fontFamily } from '../i18n';
 
 const INK = '#1c130a';
-const FONT_SERIF = 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif';
 
 /** Linear blend of two 0xRRGGBB colors (t = 0 gives `a`, 1 gives `b`). */
 export function mixColor(a: number, b: number, t: number): number {
@@ -267,7 +267,7 @@ export function stageMedallion(scene: Phaser.Scene, opts: MedallionOptions): Pha
   const fontSize = kind === 'normal' ? 26 : kind === 'final' ? 25 : 28;
   container.add(
     scene.add
-      .text(0, 0, label, { fontFamily: FONT_SERIF, fontSize: `${fontSize}px`, fontStyle: 'bold', color: locked ? '#7a6a4a' : '#fff4dc', stroke: INK, strokeThickness: 4, align: 'center', lineSpacing: lines > 1 ? -2 : 0 })
+      .text(0, 0, label, { fontFamily: fontFamily('serif'), fontSize: `${fontSize}px`, fontStyle: 'bold', color: locked ? '#7a6a4a' : '#fff4dc', stroke: INK, strokeThickness: 4, align: 'center', lineSpacing: lines > 1 ? -2 : 0 })
       .setOrigin(0.5),
   );
 

@@ -11,7 +11,7 @@ import { ScrollView } from '../ui/ScrollView';
 import { CARD_WIDTH } from '../ui/ScreenFrame';
 import { CHROME } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { t, type PlainKey } from '../i18n';
+import { fontFamily, t, type PlainKey } from '../i18n';
 
 const PAD = 14;
 const THUMB_W = 210;
@@ -75,7 +75,7 @@ export class NoticeScene extends InboxScene {
       } else {
         thumbH = Math.round(THUMB_W / FALLBACK_ASPECT);
         container.add(createPanel(this, PAD + THUMB_W / 2, PAD + thumbH / 2, THUMB_W, thumbH, { fillColor: 0x241810, borderColor: CHROME.brassDark, glowColor: CHROME.brassDark, radius: 8, gradient: false }));
-        container.add(this.add.text(PAD + THUMB_W / 2, PAD + thumbH / 2, t('social.notice.imageComingSoon'), { fontFamily: 'Arial, sans-serif', fontSize: '18px', color: '#9a8a6a' }).setOrigin(0.5));
+        container.add(this.add.text(PAD + THUMB_W / 2, PAD + thumbH / 2, t('social.notice.imageComingSoon'), { fontFamily: fontFamily('sans'), fontSize: '18px', color: '#9a8a6a' }).setOrigin(0.5));
       }
       const outline = this.add.graphics();
       outline.lineStyle(2, 0x120a04, 0.9);

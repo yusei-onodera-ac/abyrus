@@ -1,7 +1,7 @@
 import type { ChatMessage, ChatState, SaveData } from './SaveSystem';
 import { isEmojiId, type EmojiId } from '../data/emoji';
 import { SEED_CHAT } from '../data/socialSeed';
-import { t } from '../i18n';
+import { t, tr } from '../i18n';
 
 export const SELF_ID = 'self';
 export const SYSTEM_ID = 'system';
@@ -62,12 +62,13 @@ const nextId = (now: number): string => `${now}-${counter++}`;
  *  backend would feed `messages` and replace `send`. */
 export const ChatSystem = {
   createDefaultState(now: number): ChatState {
-    const messages: ChatMessage[] = SEED_CHAT.map((line) => ({
+    // (a new save is made in the language the device uses: the placeholder lines are written in it, and stay as they are, like any saved text)
+    const messages: ChatMessage[] = SEED_CHAT.map((line, i) => ({
       id: nextId(now),
       channel: line.channel === 'global' ? GLOBAL_CHANNEL : dmChannel(line.channel.friendId),
       senderId: line.senderId,
-      senderName: line.senderName,
-      text: line.text,
+      senderName: tr('seedChat', String(i), 'senderName', line.senderName),
+      text: tr('seedChat', String(i), 'text', line.text),
       sentAt: now - line.agoMs,
     }));
     return { messages };

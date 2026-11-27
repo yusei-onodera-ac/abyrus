@@ -21,6 +21,7 @@ export const gacha: Part<'gacha'> = {
   // GachaDetailScene.ts
   'gacha.detail.price': '1 pull: {costOf} Gems / 10 pulls: {costOf2} Gems',
   'gacha.detail.rateUpLine': '[Rate-Up] {pickup}',
+  'gacha.detail.pickupSeparator': ' / ',
   'gacha.detail.pityRateUp': '[Pity] Pull {at} guarantees one Rate-Up Hero of ★{minRarity} or higher.',
   'gacha.detail.pity': '[Pity] Pull {at} guarantees one Hero of ★{minRarity} or higher.',
   'gacha.detail.pityReset': 'The count resets to 0 when you get ★{minRarity} or higher. ({left, plural, one {# pull} other {# pulls}} until guaranteed)',

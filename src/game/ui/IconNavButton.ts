@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { caption } from './theme';
 import { resolveIconArt, type IconAssetName } from './IconAssets';
 
+import { fontFamily } from '../i18n';
 /** Round icon + small label nav button, used for the home screen's icon
  *  cluster (quest / gacha / roster) instead of a stacked list of long
  *  rectangle buttons. Hit-tests through a plain `Zone` with Phaser's
@@ -77,7 +78,7 @@ export class IconNavButton extends Phaser.GameObjects.Container {
       plate.lineStyle(2, 0xc9a052, 0.55);
       plate.strokeRoundedRect(-plateW / 2, plateY - plateH / 2, plateW, plateH, 16);
       const text = scene.add
-        .text(0, plateY, label, { fontFamily: 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif', fontSize: '40px', fontStyle: 'bold', color: '#f6dca0', stroke: '#2a1a08', strokeThickness: 5 })
+        .text(0, plateY, label, { fontFamily: fontFamily('serif'), fontSize: '40px', fontStyle: 'bold', color: '#f6dca0', stroke: '#2a1a08', strokeThickness: 5 })
         .setOrigin(0.5);
       if (text.width > plateW - 20) text.setScale((plateW - 20) / text.width);
       this.add([plate, text]);

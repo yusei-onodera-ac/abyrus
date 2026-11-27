@@ -7,7 +7,7 @@ import { SaveSystem, type SaveData } from '../systems/SaveSystem';
 import { applyBackground } from '../ui/Background';
 import { BottomNavBar } from '../ui/BottomNavBar';
 import { Button } from '../ui/Button';
-import { buildChip } from '../ui/CardParts';
+import { buildChip, textWrap } from '../ui/CardParts';
 import { emojiTexture } from '../ui/EmojiIcons';
 import { formatChatTime } from '../ui/format';
 import { createPanel } from '../ui/Panel';
@@ -18,7 +18,7 @@ import { ScrollView } from '../ui/ScrollView';
 import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { enter } from '../ui/Transitions';
-import { t as tl } from '../i18n';
+import { t as tl, fontFamily } from '../i18n';
 
 const INK = '#1c130a';
 const VIEW_TOP = 218;
@@ -132,7 +132,7 @@ export class AllianceChatScene extends Phaser.Scene {
   }
 
   private addSystem(parent: Phaser.GameObjects.Container, m: AllianceChatMessage, y: number): number {
-    const t = body(this, SCREEN_VIEW.w / 2, y + 16, m.text, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: { width: SCREEN_VIEW.w - 80 } }).setOrigin(0.5, 0);
+    const t = body(this, SCREEN_VIEW.w / 2, y + 16, m.text, { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3, align: 'center', wordWrap: textWrap(SCREEN_VIEW.w - 80) }).setOrigin(0.5, 0);
     parent.add(t);
     return t.height + 22;
   }
@@ -241,7 +241,7 @@ export class AllianceChatScene extends Phaser.Scene {
       inputX,
       cy,
       'input',
-      `width:${inputW}px;height:68px;box-sizing:border-box;padding:0 18px;font:bold 26px Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+      `width:${inputW}px;height:68px;box-sizing:border-box;padding:0 18px;font:bold 26px ${fontFamily('sans')};` +
         'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
         'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35);',
     );

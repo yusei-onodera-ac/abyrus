@@ -5,7 +5,7 @@ import { HERO_RELEASES } from '../game/data/heroRelease';
 import { EQUIP_DEFS, EQUIP_MAX_LEVEL, EQUIP_STAT_LABEL, equipValue, type EquipDef } from '../game/data/equipment';
 import { EXP_ITEMS, ITEMS, type ItemId } from '../game/data/items';
 import { FERAL_PREFIXES, REGIONS } from '../game/data/regions';
-import { formatSkillEffectSummary, getHeroSkillLoadout, MAX_SKILL_LEVEL, SKILL_KIND_LABELS, SKILL_SLOT_UNLOCK_LEVEL } from '../game/data/skills';
+import { formatSkillEffectSummary, getHeroSkillLoadout, MAX_SKILL_LEVEL, skillKindLabel, SKILL_SLOT_UNLOCK_LEVEL } from '../game/data/skills';
 import { ENEMY_CLASSES, ProgressionSystem, STAGES_PER_REGION } from '../game/systems/ProgressionSystem';
 import { CLASS_LABELS, MAX_LEVEL, MAX_PHASE, type HeroClass, type Rarity } from '../game/types';
 import { equipIcon, itemIcon, preloadEquipArt, preloadItemArt, skillEssenceIcon } from '../game/ui/ItemIcons';
@@ -40,7 +40,7 @@ function heroesSection(): string {
     const skills = getHeroSkillLoadout(def.id)
       .map(
         (s, i) =>
-          `<div class="skill"><b>${esc(s.name)}</b> <span class="tag">${esc(SKILL_KIND_LABELS[s.kind])}</span><span class="tag">Lv.${SKILL_SLOT_UNLOCK_LEVEL[i]}で解放</span>` +
+          `<div class="skill"><b>${esc(s.name)}</b> <span class="tag">${esc(skillKindLabel(s.kind))}</span><span class="tag">Lv.${SKILL_SLOT_UNLOCK_LEVEL[i]}で解放</span>` +
           `<small>${esc(s.description)}</small><small>Lv.1：${esc(formatSkillEffectSummary(s, 1))}　→　Lv.${MAX_SKILL_LEVEL}：${esc(formatSkillEffectSummary(s, MAX_SKILL_LEVEL))}</small></div>`,
       )
       .join('');

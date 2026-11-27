@@ -13,6 +13,7 @@ import { showRewardModal } from '../ui/RewardModal';
 import { body, caption } from '../ui/theme';
 import { InboxScene, type InboxCard } from './InboxScene';
 import { t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 const INK = '#1c130a';
 type Filter = EquipSlot | 'all';
@@ -59,7 +60,7 @@ export class EquipmentScene extends InboxScene {
           ? { label: t('hero.equipment.dismantleLocked'), variant: 'wood' as const, subLabel: t('hero.equipment.equipped'), enabled: false, onTap: () => {} }
           : { label: t('hero.equipment.dismantle'), variant: 'wood' as const, subLabel: `+${dismantleValue(item)}`, onTap: () => this.askDismantle(item.id) },
       ];
-      cards.push(buildEquipmentRow(this, item, { wornBy: owner?.name, actions, guard }));
+      cards.push(buildEquipmentRow(this, item, { wornBy: owner ? heroShortOf(owner) : undefined, actions, guard }));
     }
     return cards;
   }

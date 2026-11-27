@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { buildCardPanel } from './CardParts';
 
+import { fontFamily } from '../i18n';
 const INK = '#1c130a';
 export const INFO_HEADER_HEIGHT = 36;
 
@@ -26,7 +27,7 @@ export function buildInfoPanel(
   container.add(header);
   container.add(
     scene.add
-      .text(16, INFO_HEADER_HEIGHT / 2 + 2, title, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '21px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
+      .text(16, INFO_HEADER_HEIGHT / 2 + 2, title, { fontFamily: fontFamily('sans'), fontSize: '21px', fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
       .setOrigin(0, 0.5),
   );
   return { container, height, bodyTop: INFO_HEADER_HEIGHT };

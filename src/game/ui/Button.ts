@@ -44,6 +44,8 @@ export interface ButtonOptions {
   /** Small caption drawn under the main label, e.g. a gem cost. */
   subLabel?: string;
   fontSize?: string;
+  /** The label's font stack when it is not the current language's (the language picker names each language in its own letters). */
+  fontFamily?: string;
   /** Checked on release; returning false swallows the click. Lets a button
    *  inside a scrolling list ignore the release that ends a drag. */
   guard?: () => boolean;
@@ -103,7 +105,7 @@ export class Button extends Phaser.GameObjects.Container {
 
     const hasSub = !!opts.subLabel;
     const variantText = VARIANT_TEXT[variant];
-    const labelStyle = { ...variantText?.label, ...(opts.fontSize ? { fontSize: opts.fontSize } : {}) };
+    const labelStyle = { ...variantText?.label, ...(opts.fontSize ? { fontSize: opts.fontSize } : {}), ...(opts.fontFamily ? { fontFamily: opts.fontFamily } : {}) };
     const label1 = buttonLabel(scene, 0, hasSub ? -11 : 0, label, labelStyle).setOrigin(0.5);
     this.add(label1);
     if (hasSub) {

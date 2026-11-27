@@ -16,6 +16,7 @@ import { showToast } from '../ui/Toast';
 import type { InboxCard } from './InboxScene';
 import { AllianceScene, INK, PAD } from './AllianceBase';
 import { t } from '../i18n';
+import { heroShortOf } from '../data/heroes';
 
 const noLock = { setEnabled: () => {} };
 
@@ -124,7 +125,7 @@ export class AllianceRaidScene extends AllianceScene {
       bg.lineStyle(2, on ? CHROME.brassBright : CHROME.brassDark, 1);
       bg.strokeRoundedRect(0, 0, w - 70, rowH, 12);
       row.add(bg);
-      row.add(body(this, 20, 30, t('alliance.raid.helperRowName', { name: helper.name, level: helper.level }), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      row.add(body(this, 20, 30, t('alliance.raid.helperRowName', { name: heroShortOf(helper), level: helper.level }), { fontSize: '24px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
       row.add(body(this, 20, 66, t('alliance.raid.helperRowOwner', { ownerName: helper.ownerName, fullDigits: fullDigits(helper.power) }), { fontSize: '18px', color: '#d8c49a', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       const hit = this.add.zone((w - 70) / 2, rowH / 2, w - 70, rowH).setOrigin(0.5);
       hit.setInteractive({ useHandCursor: true });

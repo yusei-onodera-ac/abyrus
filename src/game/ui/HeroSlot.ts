@@ -4,7 +4,7 @@ import { bustKey } from '../characters/HeroArt';
 import { hex, RARITY_COLORS, type HeroData } from '../types';
 import { addRainbowFrame } from './Rainbow';
 import { CHROME } from './theme';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
 
 export const HERO_SLOT_SIZE = 108;
 
@@ -98,7 +98,7 @@ export class HeroSlot extends Phaser.GameObjects.Container {
       this.add(strip);
       this.add(
         scene.add
-          .text(0, 0, ribbon.text, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '19px', fontStyle: 'bold', color: ribbon.color, stroke: INK, strokeThickness: 3 })
+          .text(0, 0, ribbon.text, { fontFamily: fontFamily('sans'), fontSize: '19px', fontStyle: 'bold', color: ribbon.color, stroke: INK, strokeThickness: 3 })
           .setOrigin(0.5),
       );
     }

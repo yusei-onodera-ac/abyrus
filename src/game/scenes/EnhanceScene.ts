@@ -18,6 +18,7 @@ import { phaseFusionCopies, phaseMaterialCost } from '../data/phaseCost';
 import { itemIcon } from '../ui/ItemIcons';
 import { InboxScene, type InboxCard } from './InboxScene';
 import { t } from '../i18n';
+import { heroNameOf, heroShortOf } from '../data/heroes';
 
 interface EnhanceData {
   heroId: string;
@@ -86,8 +87,12 @@ export class EnhanceScene extends InboxScene {
 
     const x = PAD + 132 + 18;
     const right = CARD_WIDTH - PAD - 4;
-    container.add(body(this, x, 30, hero.name, { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
-    container.add(this.add.text(right, 30, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5));
+    const nameText = body(this, x, 30, heroNameOf(hero), { fontSize: '30px', fontStyle: 'bold', color: '#ffe9b8', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5);
+    const starsText = this.add.text(right, 30, '★'.repeat(hero.rarity), { fontSize: '24px', color: hex(RARITY_COLORS[hero.rarity]), stroke: INK, strokeThickness: 4 }).setOrigin(1, 0.5);
+    // (a long name is made to fit between the left edge and the stars)
+    const nameRoom = right - starsText.width - 14 - x;
+    if (nameText.width > nameRoom) nameText.setScale(nameRoom / nameText.width);
+    container.add([nameText, starsText]);
     container.add(caption(this, x, 64, CLASS_LABELS[hero.heroClass], { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
 
     const needed = expToNextLevel(hero.level);
@@ -271,7 +276,7 @@ export class EnhanceScene extends InboxScene {
     const after = Math.min(MAX_PHASE, hero.phase + groups.length);
     const confirmText =
       materials.length === 1
-        ? t('hero.enhance.fuseConfirmOne', { level: materials[0].level, name: materials[0].name, phase: hero.phase, after })
+        ? t('hero.enhance.fuseConfirmOne', { level: materials[0].level, name: heroShortOf(materials[0]), phase: hero.phase, after })
         : t('hero.enhance.fuseConfirmMany', { count: materials.length, phase: hero.phase, after });
     const inDeck = materials.some((m) => SaveSystem.isInAnyDeck(this.save, m.id));
     this.modal?.close();

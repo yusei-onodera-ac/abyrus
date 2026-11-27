@@ -1,5 +1,5 @@
 import { formatDateTime } from '../ui/format';
-import { t } from '../i18n';
+import { localized, t } from '../i18n';
 import type { LimitedEventDef } from './limitedEvents';
 import { SCHEDULED_EVENTS } from './schedule';
 
@@ -36,16 +36,22 @@ export interface EventEntry {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** The card of a 期間限定イベント on the Event tab. */
+/** The card of a 期間限定イベント on the Event tab. (The text is read from the event each time, so it follows the language.) */
 export function limitedEventEntry(def: LimitedEventDef): EventEntry {
   return {
     id: def.id,
     kind: 'limited',
-    title: def.title,
-    description: def.description,
+    get title() {
+      return def.title;
+    },
+    get description() {
+      return def.description;
+    },
     image: def.image,
     accent: def.accent,
-    emblem: def.emblem,
+    get emblem() {
+      return def.emblem;
+    },
     startsAt: def.startsAt,
     endsAt: def.endsAt,
     exchangeUntil: new Date(def.endsAt).getTime() + def.exchangeDays * DAY_MS,
@@ -59,7 +65,8 @@ export function limitedEventEntry(def: LimitedEventDef): EventEntry {
  * events are listed first, in this order, then the upcoming ones. No code
  * elsewhere needs to change.
  */
-export const EVENTS: EventEntry[] = [
+/** The two permanent cards' text is read through tr() each time (English: i18n/data/scheduleEn.ts, `event`). */
+const PERMANENT_EVENTS: EventEntry[] = [
   {
     id: 'infinite',
     kind: 'infinite',
@@ -79,6 +86,10 @@ export const EVENTS: EventEntry[] = [
     accent: 0xc79a2a,
     emblem: '♛',
   },
+];
+
+export const EVENTS: EventEntry[] = [
+  ...PERMANENT_EVENTS.map((row) => localized('event', row.id, row, ['title', 'description', 'actionLabel'])),
   // The 期間限定イベント of the year are added below (data/schedule.ts).
   ...SCHEDULED_EVENTS.map(limitedEventEntry),
 ];

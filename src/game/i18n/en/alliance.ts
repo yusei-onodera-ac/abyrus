@@ -568,5 +568,6 @@ export const alliance: Part<'alliance'> = {
   'alliance.error.researchMax': 'This research is already at its maximum.',
   'alliance.error.researchLevel': 'Reach Alliance Lv.{needLevel} to advance this.',
   'alliance.error.researchFund': 'The alliance Fund is too low.',
+  'alliance.sim.allianceName': '{prefix} {suffix}',
   'alliance.error.badMissionReport': 'Invalid amount.',
 };

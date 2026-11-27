@@ -3,6 +3,7 @@ import { ProgressionSystem, type EnemyUnitDef } from './ProgressionSystem';
 import { castSkill, effectiveAtk, effectiveDef, isInvincible, isStunned, pickFrontPreferred, type SkillTargetResult } from './SkillEngine';
 import { getUnlockedSkillsForHero, type UnlockedSkill } from '../data/skills';
 import type { HeroClass, HeroData, Rarity, Row } from '../types';
+import { heroShortOf } from '../data/heroes';
 
 export interface UnitInstance {
   id: string;
@@ -70,7 +71,7 @@ export const BattleSystem = {
     const atk = statMul === 1 ? stats.atk : stats.atk.mul(statMul);
     return {
       id: hero.id,
-      name: hero.name,
+      name: heroShortOf(hero),
       isPlayer: true,
       row,
       slot,

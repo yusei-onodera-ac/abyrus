@@ -19,6 +19,7 @@ export const gacha = {
   // GachaDetailScene.ts
   'gacha.detail.price': '1回 {costOf} 魔晶石　／　10連 {costOf2} 魔晶石',
   'gacha.detail.rateUpLine': '【ピックアップ】{pickup}',
+  'gacha.detail.pickupSeparator': '　',
   'gacha.detail.pityRateUp': '【天井】{at}回目のガチャで、ピックアップの★{minRarity}以上が必ず1体出ます。',
   'gacha.detail.pity': '【天井】{at}回目のガチャで、★{minRarity}以上が必ず1体出ます。',
   'gacha.detail.pityReset': '★{minRarity}以上が出ると、回数は0に戻ります。（現在 あと{left}回で確定）',
