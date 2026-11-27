@@ -39,3 +39,6 @@ tools/tests/.out/
 tools/schedule/.out/
 tools/check/.out/
 tools/i18n/.out/
+
+# Proofreaders' export (tools/i18n/export.mjs): regenerated on demand
+tools/i18n/out/
