@@ -378,7 +378,9 @@ export class HeroDetailScene extends Phaser.Scene {
       g.lineStyle(2, unlocked ? CHROME.brass : CHROME.brassDark, unlocked ? 1 : 0.6);
       g.strokeRoundedRect(x, y, w, h, 10);
       container.add(g);
-      container.add(body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));
+      const name = body(this, x + 10, y + 19, def.name, { fontSize: '19px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5);
+      if (name.width > w - 20) name.setScale((w - 20) / name.width); // (a long name in another language is squeezed to the tag, as the gear names below are)
+      container.add(name);
       const sub = unlocked ? `Lv.${hero.skillLevels[slot] ?? 1}` : t('hero.detail.chipUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] });
       container.add(caption(this, x + 10, y + 44, sub, { fontSize: '17px', color: unlocked ? '#ffd9a0' : '#a89a78', stroke: INK, strokeThickness: 3 }).setOrigin(0, 0.5));
       if (unlocked) container.add(caption(this, x + w - 10, y + 44, skillKindLabel(def.kind), { fontSize: '14px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
