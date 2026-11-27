@@ -4,7 +4,7 @@ import type { CharacterGenerator } from '../characters/CharacterGenerator';
 import { MAX_PHASE, type HeroData } from '../types';
 import { HeroSlot } from './HeroSlot';
 import { body } from './theme';
-import { t as tl } from '../i18n';
+import { t as tl, fontFamily } from '../i18n';
 
 const INK = '#1c130a';
 /** Above the scene's popups (200), under the tutorial (300). */
@@ -97,7 +97,7 @@ export function playEnhanceFx(scene: Phaser.Scene, opts: EnhanceFxOptions): void
   tween({ targets: slot, scale: 1, duration: 460, delay: 120, ease: 'Back.easeOut' });
 
   const title = scene.add
-    .text(CX, 250, look.title(), { fontFamily: 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: opts.kind === 'fuse' ? '92px' : '78px', color: look.text, stroke: look.stroke, strokeThickness: 14 })
+    .text(CX, 250, look.title(), { fontFamily: fontFamily('black'), fontSize: opts.kind === 'fuse' ? '92px' : '78px', color: look.text, stroke: look.stroke, strokeThickness: 14 })
     .setOrigin(0.5)
     .setScale(0)
     .setAlpha(0);

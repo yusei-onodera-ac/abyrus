@@ -2,9 +2,9 @@ import Phaser from 'phaser';
 import { createPanel } from './Panel';
 import { breakLines, lineText, NEWLINE, tokenize } from './TextLayout';
 import { CHROME } from './theme';
+import { fontFamily } from '../i18n';
 
 const INK = '#1c130a';
-const FONT = 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif';
 
 /** Wood-and-brass card body shared by the list screens. `highlight` gives it
  *  the bright brass border used for "needs your attention". */
@@ -29,7 +29,7 @@ export function buildChip(
 ): { container: Phaser.GameObjects.Container; width: number } {
   const fontSize = opts.fontSize ?? 16;
   const label = scene.add
-    .text(0, 0, text, { fontFamily: FONT, fontSize: `${fontSize}px`, fontStyle: 'bold', color: opts.color, stroke: INK, strokeThickness: 2 })
+    .text(0, 0, text, { fontFamily: fontFamily('sans'), fontSize: `${fontSize}px`, fontStyle: 'bold', color: opts.color, stroke: INK, strokeThickness: 2 })
     .setOrigin(0, 0.5);
   const width = label.width + 18;
   const height = fontSize + 12;
@@ -67,7 +67,7 @@ function wrapText(text: string, font: string, width: number, hangAllowance: numb
  *  are kept. For text that is revealed gradually, where the Text object itself
  *  can't be left to wrap. */
 export function wrapToWidth(text: string, width: number, fontSize: number, strokeThickness = 0, fontStyle = 'normal'): string {
-  return wrapText(text, `${fontStyle} ${fontSize}px ${FONT}`, width - strokeThickness - fontSize, fontSize);
+  return wrapText(text, `${fontStyle} ${fontSize}px ${fontFamily('sans')}`, width - strokeThickness - fontSize, fontSize);
 }
 
 /** Text that wraps at `width`: Japanese line-breaking rules (kinsoku), words kept whole in English (Phaser's own
@@ -80,7 +80,7 @@ export function wrappedText(
   width: number,
   style: Phaser.Types.GameObjects.Text.TextStyle,
 ): Phaser.GameObjects.Text {
-  const merged = { fontFamily: FONT, stroke: INK, strokeThickness: 2, ...style };
+  const merged = { fontFamily: fontFamily('sans'), stroke: INK, strokeThickness: 2, ...style };
   const size = parseInt(String(merged.fontSize ?? '16'), 10) || 16;
   const font = `${merged.fontStyle ?? 'normal'} ${size}px ${merged.fontFamily}`;
   // The outline adds to a line's drawn width; leave room for it.
@@ -105,7 +105,7 @@ export function buildAvatar(scene: Phaser.Scene, x: number, y: number, radius: n
   g.lineStyle(3, CHROME.brassBright, 0.95);
   g.strokeCircle(0, 0, radius);
   const initial = scene.add
-    .text(0, 0, Array.from(name)[0] ?? '?', { fontFamily: FONT, fontSize: `${Math.round(radius * 1.05)}px`, fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
+    .text(0, 0, Array.from(name)[0] ?? '?', { fontFamily: fontFamily('sans'), fontSize: `${Math.round(radius * 1.05)}px`, fontStyle: 'bold', color: '#ffffff', stroke: INK, strokeThickness: 4 })
     .setOrigin(0.5);
   return scene.add.container(x, y, [g, initial]);
 }

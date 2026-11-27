@@ -1,6 +1,5 @@
 import Phaser from 'phaser';
-
-const FONT = 'Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif';
+import { fontFamily } from '../i18n';
 
 export interface DomFieldOptions {
   maxLength: number;
@@ -22,7 +21,7 @@ export function addDomField(scene: Phaser.Scene, x: number, y: number, w: number
     x,
     y,
     'input',
-    `width:${w}px;height:${h}px;box-sizing:border-box;padding:0 20px;font:bold ${size}px ${FONT};` +
+    `width:${w}px;height:${h}px;box-sizing:border-box;padding:0 20px;font:bold ${size}px ${fontFamily('sans')};` +
       'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
       'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35),0 0 0 5px rgba(255,220,160,0.22);',
   );

@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { formatMessage, formatNumber, getLanguage, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
 import { detectLanguage, fallbackChain, isLanguage, LANGUAGES } from '../../src/game/i18n/languages';
+import { fontFamily } from '../../src/game/i18n/fonts';
 import { TABLES } from '../../src/game/i18n/tables';
 import { tr } from '../../src/game/i18n/dataTexts';
 import { enData } from '../../src/game/i18n/data/en';
@@ -101,6 +102,36 @@ ok(detectLanguage(undefined) === 'ja' && detectLanguage('') === 'ja' && detectLa
 ok(detectLanguage('???') === 'ja' && detectLanguage('x') === 'ja', 'garbage -> Japanese');
 ok(detectLanguage(['en-GB', 'ja']) === 'en' && detectLanguage(['ja-JP', 'en']) === 'ja', 'a list of preferences: the first one counts');
 ok(detectLanguage('jav') === 'en', '"jav" (Javanese) is not "ja"');
+
+// ---- fonts: one function picks the stack from the language; Han characters must meet the right country's font first
+{
+  ok(fontFamily('sans', 'ja') === 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', 'Japanese keeps the stack the game always had (body)');
+  ok(fontFamily('serif', 'ja') === 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif' && fontFamily('black', 'ja') === 'Arial Black, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', 'and for headings and the heavy face');
+  ok(fontFamily('sans', 'en') === fontFamily('sans', 'ja'), 'English uses the same stack as Japanese');
+  const at = (lang: 'ko' | 'zh-Hans' | 'zh-Hant', name: string): number => fontFamily('sans', lang).indexOf(name);
+  ok(at('ko', 'Apple SD Gothic Neo') > 0 && at('ko', 'Malgun Gothic') > at('ko', 'Apple SD Gothic Neo') && at('ko', 'Noto Sans KR') > at('ko', 'Malgun Gothic'), 'Korean: Apple SD Gothic Neo, Malgun Gothic, Noto Sans KR, in that order');
+  ok(at('zh-Hans', 'PingFang SC') > 0 && at('zh-Hans', 'Microsoft YaHei') > at('zh-Hans', 'PingFang SC') && at('zh-Hans', 'Noto Sans SC') > at('zh-Hans', 'Microsoft YaHei'), 'Simplified: PingFang SC, Microsoft YaHei, Noto Sans SC');
+  ok(at('zh-Hant', 'PingFang TC') > 0 && at('zh-Hant', 'Microsoft JhengHei') > at('zh-Hant', 'PingFang TC') && at('zh-Hant', 'Noto Sans TC') > at('zh-Hant', 'Microsoft JhengHei'), 'Traditional: PingFang TC, Microsoft JhengHei, Noto Sans TC');
+  ok(LANGUAGES.filter((l) => l.code !== 'ja' && l.code !== 'en').every((l) => (['sans', 'serif', 'black'] as const).every((kind) => !/Hiragino|Noto (Sans|Serif) JP/.test(fontFamily(kind, l.code)))), 'no Japanese font in the Korean or Chinese stacks (a Han character would take its Japanese shape)');
+  ok(LANGUAGES.every((l) => fontFamily('sans', l.code).startsWith('Arial, ') && fontFamily('black', l.code).startsWith('Arial Black, ') && fontFamily('serif', l.code).startsWith('Georgia, ')), 'every stack starts with the Latin face (digits and Latin letters look the same in every language)');
+  setLanguage('zh-Hant', { persist: false });
+  ok(fontFamily() === fontFamily('sans', 'zh-Hant') && fontFamily('black') === fontFamily('black', 'zh-Hant'), 'with no language given it follows the language being shown');
+  setLanguage('ja', { persist: false });
+  ok(fontFamily() === fontFamily('sans', 'ja'), 'and a language change');
+}
+
+// ---- the page's lang attribute follows the language (it decides which country's shapes a Han character gets)
+{
+  const doc = { documentElement: { lang: '' } };
+  (globalThis as { document?: unknown }).document = doc;
+  const seen: string[] = [];
+  for (const code of ['ko', 'zh-Hans', 'zh-Hant', 'en', 'ja'] as const) {
+    setLanguage(code, { persist: false });
+    seen.push(doc.documentElement.lang);
+  }
+  ok(seen.join() === 'ko,zh-Hans,zh-Hant,en,ja', `document.documentElement.lang follows the language: ${seen.join(' ')}`);
+  delete (globalThis as { document?: unknown }).document;
+}
 
 // ---- the language in a save
 {

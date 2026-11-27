@@ -18,7 +18,7 @@ import { body, caption, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { enter } from '../ui/Transitions';
 import { AllianceService } from '../alliance/AllianceService';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
 
 type MessageTab = 'global' | 'groups' | 'friends';
 
@@ -295,7 +295,7 @@ export class MessageScene extends Phaser.Scene {
       inputX,
       cy,
       'input',
-      `width:${inputW}px;height:68px;box-sizing:border-box;padding:0 18px;font:bold 26px Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+      `width:${inputW}px;height:68px;box-sizing:border-box;padding:0 18px;font:bold 26px ${fontFamily('sans')};` +
         'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
         'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35);',
     );

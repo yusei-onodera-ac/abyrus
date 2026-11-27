@@ -8,7 +8,7 @@ import { createPanel } from './Panel';
 import { coinIcon, gemIcon, staminaIcon, legionCrestIcon } from './Icons';
 import { COLORS, CHROME } from './theme';
 import type { ShopFocus } from '../data/shop';
-import { t as tl } from '../i18n';
+import { t as tl, fontFamily } from '../i18n';
 
 const INK = '#2a1608';
 
@@ -82,7 +82,7 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       const levelPos = art(156, 141);
       this.levelText = scene.add
         .text(levelPos.x, levelPos.y, '', {
-          fontFamily: 'Georgia, "Hiragino Mincho ProN", serif',
+          fontFamily: fontFamily('serif'),
           fontSize: '22px',
           color: '#ffe9b8',
           fontStyle: 'bold',
@@ -106,7 +106,7 @@ export class ResourceBar extends Phaser.GameObjects.Container {
       const namePos = art(410, 50);
       this.nameText = scene.add
         .text(namePos.x, namePos.y, '', {
-          fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif',
+          fontFamily: fontFamily('sans'),
           fontSize: '15px',
           color: '#f5e6c8',
           fontStyle: 'bold',

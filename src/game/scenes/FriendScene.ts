@@ -25,7 +25,7 @@ import { buildTabStrip } from '../ui/TabStrip';
 import { body, caption, heading, CHROME } from '../ui/theme';
 import { showToast } from '../ui/Toast';
 import { InboxScene, type InboxCard } from './InboxScene';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
 
 export type FriendTab = 'friends' | 'requests' | 'groups' | 'add';
 
@@ -440,7 +440,7 @@ export class FriendScene extends InboxScene {
       x,
       y,
       'input',
-      `width:${CARD_WIDTH - PAD * 2 - 12}px;height:62px;box-sizing:border-box;padding:0 18px;font:bold 28px Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+      `width:${CARD_WIDTH - PAD * 2 - 12}px;height:62px;box-sizing:border-box;padding:0 18px;font:bold 28px ${fontFamily('sans')};` +
         'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
         'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35);',
     );

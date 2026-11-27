@@ -3,8 +3,7 @@ import type { EmojiId } from '../data/emoji';
 import { parseParts } from '../systems/ChatSystem';
 import { emojiTexture } from './EmojiIcons';
 import { breakLines, tokenize, type LayoutToken } from './TextLayout';
-
-const FONT = 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif';
+import { fontFamily } from '../i18n';
 
 export interface RichTextStyle {
   fontSize: number;
@@ -26,7 +25,7 @@ export interface RichText {
  *  at `maxWidth` with Japanese line-breaking rules, an emoji counting as one
  *  character-sized picture. */
 export function buildRichText(scene: Phaser.Scene, text: string, maxWidth: number, style: RichTextStyle): RichText {
-  const font = `${style.fontStyle ?? 'normal'} ${style.fontSize}px ${FONT}`;
+  const font = `${style.fontStyle ?? 'normal'} ${style.fontSize}px ${fontFamily('sans')}`;
   const emojiSize = Math.round(style.fontSize * 1.32);
   const lineHeight = Math.round(style.fontSize * 1.6);
 
@@ -49,7 +48,7 @@ export function buildRichText(scene: Phaser.Scene, text: string, maxWidth: numbe
       if (last) run = run.replace(/ +$/, '');
       if (!run) return;
       const label = scene.add.text(x, y, run, {
-        fontFamily: FONT,
+        fontFamily: fontFamily('sans'),
         fontSize: `${style.fontSize}px`,
         fontStyle: style.fontStyle,
         color: style.color,

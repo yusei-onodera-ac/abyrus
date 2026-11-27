@@ -6,13 +6,12 @@ import { createPanel } from './Panel';
 import { CARD_WIDTH } from './ScreenFrame';
 import { mixColor } from './StageMap';
 import { body, CHROME } from './theme';
-import { t, type PlainKey } from '../i18n';
+import { fontFamily, t, type PlainKey } from '../i18n';
 
 export const EVENT_CARD_WIDTH = CARD_WIDTH;
 const PAD = 12;
 const INK = '#1c130a';
 const DRAWN_BANNER_H = 190;
-const FONT_SERIF = 'Georgia, "Hiragino Mincho ProN", "Noto Serif JP", serif';
 
 function bannerKey(id: string): string {
   return `event_banner_${id}`;
@@ -58,9 +57,9 @@ export function drawBanner(scene: Phaser.Scene, entry: { title: string; accent: 
   for (let i = 1; i <= 4; i++) g.strokeCircle(x + w * 0.82, y + h * 0.3, i * 46);
 
   const emblem = entry.emblem ?? Array.from(entry.title)[0] ?? '';
-  const glyph = scene.add.text(x + w * 0.5, y + h * 0.5, emblem, { fontFamily: FONT_SERIF, fontSize: '170px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setAlpha(0.13);
+  const glyph = scene.add.text(x + w * 0.5, y + h * 0.5, emblem, { fontFamily: fontFamily('serif'), fontSize: '170px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setAlpha(0.13);
   const title = scene.add
-    .text(x + w / 2, y + h / 2, entry.title, { fontFamily: FONT_SERIF, fontSize: '50px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 8, align: 'center' })
+    .text(x + w / 2, y + h / 2, entry.title, { fontFamily: fontFamily('serif'), fontSize: '50px', fontStyle: 'bold', color: '#fff4dc', stroke: INK, strokeThickness: 8, align: 'center' })
     .setOrigin(0.5);
   // Japanese has no spaces to wrap at, so a long title is shrunk to fit instead.
   if (title.width > w - 60) title.setScale((w - 60) / title.width);

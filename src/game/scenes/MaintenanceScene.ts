@@ -4,7 +4,7 @@ import { Button } from '../ui/Button';
 import { wrappedText } from '../ui/CardParts';
 import { createDivider, createPanel } from '../ui/Panel';
 import { CHROME, heading } from '../ui/theme';
-import { t } from '../i18n';
+import { fontFamily, t } from '../i18n';
 
 export interface MaintenanceData {
   message: string;
@@ -39,7 +39,7 @@ export class MaintenanceScene extends Phaser.Scene {
     heading(this, 360, cy - h / 2 + 64, t('home.maintenance.underMaintenance'), { fontSize: '40px' }).setOrigin(0.5);
     createDivider(this, 360, cy - h / 2 + 112, inner, CHROME.brassDark);
     wrappedText(this, left, cy - h / 2 + 140, maintenanceMessageText(data.message), inner, { fontSize: '25px', color: '#f5e6c8', lineSpacing: 10 });
-    const status = this.add.text(360, cy + h / 2 - 150, '', { fontFamily: 'Arial, sans-serif', fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5);
+    const status = this.add.text(360, cy + h / 2 - 150, '', { fontFamily: fontFamily('sans'), fontSize: '20px', color: '#9a8a6a' }).setOrigin(0.5);
 
     const recheck = async (): Promise<void> => {
       if (this.going) return;

@@ -15,6 +15,7 @@ import { copyText } from './share';
 import { body, heading, CHROME } from './theme';
 import { showToast } from './Toast';
 
+import { fontFamily } from '../i18n';
 /**
  * データ引き継ぎの画面 (設定 > データ引き継ぎ と、チュートリアルの 名前 step から開く)。
  *   openIssueFlow   パスワードを決める -> 暗号化して預ける -> コードを見せる (確認)
@@ -65,7 +66,7 @@ interface Status {
 
 /** A line (two at most) of feedback at a fixed place, so the buttons below do not jump about. */
 function statusLine(scene: Phaser.Scene, modal: ModalHandle, y: number): Status {
-  const t = scene.add.text(360, y, '', { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '21px', fontStyle: 'bold', color: ERROR, stroke: INK, strokeThickness: 3, align: 'center', lineSpacing: 5 }).setOrigin(0.5, 0);
+  const t = scene.add.text(360, y, '', { fontFamily: fontFamily('sans'), fontSize: '21px', fontStyle: 'bold', color: ERROR, stroke: INK, strokeThickness: 3, align: 'center', lineSpacing: 5 }).setOrigin(0.5, 0);
   modal.container.add(t);
   return {
     show: (text, kind) => {

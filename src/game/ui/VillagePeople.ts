@@ -5,7 +5,7 @@ import { villagePlotTierOf } from './VillageArt';
 import type { SaveData } from '../systems/SaveSystem';
 import { castleLevel, footprints, villageSize } from '../systems/VillageIncome';
 import { showToast } from './Toast';
-import { trList } from '../i18n';
+import { trList, fontFamily } from '../i18n';
 import type { Pt } from './VillageArt';
 
 /**
@@ -487,7 +487,7 @@ export class VillageWalkers {
    *  figure goes and is never left behind when the building layer is cleared and drawn again. */
   private say(w: Walker, mark: string): void {
     const text = this.scene.add
-      .text(0, -w.def.height - 14, mark, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4 })
+      .text(0, -w.def.height - 14, mark, { fontFamily: fontFamily('sans'), fontSize: '22px', fontStyle: 'bold', color: '#fff4dc', stroke: '#1c130a', strokeThickness: 4 })
       .setOrigin(0.5)
       .setAlpha(0);
     w.view.add(text);

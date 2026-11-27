@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CHROME } from './theme';
 
+import { fontFamily } from '../i18n';
 const INK = '#1c130a';
 const active = new WeakMap<Phaser.Scene, Phaser.GameObjects.Container>();
 
@@ -10,7 +11,7 @@ const active = new WeakMap<Phaser.Scene, Phaser.GameObjects.Container>();
 export function showToast(scene: Phaser.Scene, text: string, color = '#f0ecff'): void {
   active.get(scene)?.destroy();
   const label = scene.add
-    .text(0, 0, text, { fontFamily: 'Arial, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif', fontSize: '20px', fontStyle: 'bold', color, stroke: INK, strokeThickness: 3 })
+    .text(0, 0, text, { fontFamily: fontFamily('sans'), fontSize: '20px', fontStyle: 'bold', color, stroke: INK, strokeThickness: 3 })
     .setOrigin(0.5);
   const pillW = label.width + 56;
   const pillH = 52;

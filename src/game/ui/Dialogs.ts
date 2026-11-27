@@ -3,7 +3,7 @@ import { Button, type ButtonVariant } from './Button';
 import { openModal, type ModalHandle, type ModalLock } from './Modal';
 import { createPanel } from './Panel';
 import { body, heading, CHROME } from './theme';
-import { t } from '../i18n';
+import { t, fontFamily } from '../i18n';
 
 const INK = '#1c130a';
 
@@ -62,7 +62,7 @@ export function openTextPrompt(scene: Phaser.Scene, scroll: ModalLock, opts: Tex
     360,
     top + 174,
     'input',
-    `width:${fieldW}px;height:${fieldH}px;box-sizing:border-box;padding:0 20px;font:bold 32px Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+    `width:${fieldW}px;height:${fieldH}px;box-sizing:border-box;padding:0 20px;font:bold 32px ${fontFamily('sans')};` +
       'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
       'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35),0 0 0 5px rgba(255,220,160,0.22);',
   );
@@ -225,7 +225,7 @@ export function openMessageForm(scene: Phaser.Scene, scroll: ModalLock, opts: Me
     360,
     boxTop + boxH / 2,
     'textarea',
-    `width:${inner}px;height:${boxH}px;box-sizing:border-box;padding:14px 18px;resize:none;font:24px/1.5 Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;` +
+    `width:${inner}px;height:${boxH}px;box-sizing:border-box;padding:14px 18px;resize:none;font:24px/1.5 ${fontFamily('sans')};` +
       'color:#2a1608;background:#fff4dc;border:3px solid #c9a052;border-radius:12px;outline:none;caret-color:#7a1717;' +
       'box-shadow:inset 0 3px 8px rgba(0,0,0,0.35),0 0 0 5px rgba(255,220,160,0.22);',
   );
