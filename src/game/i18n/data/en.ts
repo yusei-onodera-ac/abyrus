@@ -3,6 +3,7 @@ import { tutorialEn } from './tutorialEn';
 import { villageEn } from './villageEn';
 import { missionsEn } from './missionsEn';
 import { shopEn } from './shopEn';
+import { skillsEn } from './skillsEn';
 import { worldEn } from './worldEn';
 import { heroesEn } from './heroesEn';
 import { heroLinesEn } from './heroLinesEn';
@@ -19,6 +20,7 @@ export const enData: DataTexts = {
   ...villageEn,
   ...missionsEn,
   ...shopEn,
+  ...skillsEn,
   ...worldEn,
   ...heroesEn,
   ...heroLinesEn,
