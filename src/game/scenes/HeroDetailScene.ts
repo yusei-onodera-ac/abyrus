@@ -437,7 +437,8 @@ export class HeroDetailScene extends Phaser.Scene {
     const unlocked = isSkillSlotUnlocked(slot, hero.level);
     modal.add(body(this, x, y + 20, def.name, { fontSize: '27px', fontStyle: 'bold', color: unlocked ? '#fff4dc' : '#7a6a4a', stroke: INK, strokeThickness: 5 }).setOrigin(0, 0.5));
     modal.add(caption(this, x + w, y + 20, skillKindLabel(def.kind), { fontSize: '20px', color: '#cdbb94', stroke: INK, strokeThickness: 3 }).setOrigin(1, 0.5));
-    modal.add(caption(this, x, y + 56, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0.5));
+    // (hung from its top, so a description of two lines in another language grows downward, clear of the name above)
+    modal.add(caption(this, x, y + 44, def.description, { fontSize: '17px', color: '#d8c49a', stroke: INK, strokeThickness: 3, wordWrap: { width: w, useAdvancedWrap: true } }).setOrigin(0, 0));
 
     if (!unlocked) {
       modal.add(caption(this, x, y + h - 14, t('hero.detail.rowUnlock', { SKILL_SLOT_UNLOCK_LEVEL: SKILL_SLOT_UNLOCK_LEVEL[slot] }), { fontSize: '21px', fontStyle: 'bold', color: '#ff9a8a', stroke: INK, strokeThickness: 4 }).setOrigin(0, 0.5));

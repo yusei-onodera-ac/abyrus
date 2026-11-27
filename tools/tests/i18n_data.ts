@@ -124,8 +124,8 @@ ok(lostNumbers.length === 0, `a skill's number in kanji is a number in English${
 const skillIds = new Set(Object.entries(HERO_SKILLS).flatMap(([heroId, kit]) => kit.map((_, slot) => `${heroId}_${slot}`)));
 const strayIds = Object.keys(enData.skill ?? {}).filter((id) => !skillIds.has(id));
 ok(strayIds.length === 0 && Object.keys(enData.skill ?? {}).length === skillIds.size, `the English skills are exactly the ${skillIds.size} skills of the kits${strayIds.length ? ` (not skills: ${strayIds.slice(0, 5).join(', ')})` : ''}`);
-const longSkill = [...enSkills].filter(([k, v]) => v.length > (k.endsWith('.name') ? 20 : 110)).map(([k]) => k);
-ok(longSkill.length === 0, `skill names are 20 characters or fewer and descriptions 110 or fewer in English${longSkill.length ? ` (${longSkill.slice(0, 5).join(', ')})` : ''}`);
+const longSkill = [...enSkills].filter(([k, v]) => v.length > (k.endsWith('.name') ? 20 : 80)).map(([k]) => k);
+ok(longSkill.length === 0, `skill names are 20 characters or fewer and descriptions 80 or fewer in English${longSkill.length ? ` (${longSkill.slice(0, 5).join(', ')})` : ''}`);
 
 // a skill held across a language change follows it (the text is read when it is shown), and its id does not change
 const held = HERO_SKILLS.aion[0];
