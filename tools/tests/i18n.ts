@@ -2,7 +2,7 @@
 // that every key the code asks for exists in the Japanese table.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { formatMessage, formatNumber, getLanguage, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
+import { formatMessage, formatNumber, getLanguage, pluralOf, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
 import { detectLanguage, fallbackChain, isLanguage, LANGUAGES } from '../../src/game/i18n/languages';
 import { fontFamily } from '../../src/game/i18n/fonts';
 import { abbreviatedNumber, dataCells, dataProblems, digitsOf, leftover, messageProblems, placeholdersOf } from '../i18n/lang-rules.mjs';
@@ -84,6 +84,10 @@ ok(translate('en', 'test.mixed', { who: 'Ann', count: 1 }) === 'Ann has 1 item (
 ok(translate('ja', 'test.mixed', { who: 'アン', count: 4 }) === 'アンが4個', 'the same key in Japanese');
 ok(formatNumber(1234567, 'en') === '1,234,567' && formatNumber(1234567, 'ja') === '1,234,567', 'numbers are grouped, with every digit');
 ok(formatNumber(123456789012345678901234567890n, 'en') === '123,456,789,012,345,678,901,234,567,890', 'even a bigint is written in full');
+// (Korean and Chinese could write 억 / 万 / 億 with a compact notation: the game never asks for it, and neither does anything here)
+ok(LANGUAGES.every((l) => formatNumber(1234567890123, l.code) === '1,234,567,890,123' && formatNumber(123456789012345678901234567890n, l.code) === '123,456,789,012,345,678,901,234,567,890' && formatNumber(12345, l.code) === '12,345'), 'every language writes a big number with every digit, grouped by thousands (no 万 億 亿 萬 만 억)');
+ok(LANGUAGES.every((l) => /^[\d,]+$/.test((98765432101234).toLocaleString(l.locale)) && /^[\d,]+$/.test((98765432101234).toLocaleString('ja-JP'))), 'and so does toLocaleString, which the screens call with ja-JP');
+ok(['ko', 'zh-Hans', 'zh-Hant'].every((code) => pluralOf(1, code as 'ko') === 'other' && pluralOf(2, code as 'ko') === 'other') && pluralOf(1, 'en') === 'one', 'Korean and Chinese have one plural form, English two');
 
 // ---- device language (first run)
 ok(detectLanguage('ja') === 'ja' && detectLanguage('ja-JP') === 'ja' && detectLanguage('JA-jp') === 'ja', 'ja* -> Japanese');
