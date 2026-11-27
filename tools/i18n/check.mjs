@@ -1,48 +1,49 @@
 // i18n checker (npm run i18n:check). See docs/I18N.md.
 //
 //   1. The translation tables agree: every language has exactly the Japanese table's keys (a language marked `partial` in
-//      languages.ts may lack some: reported, not failed), the same {placeholders}, keys start with their file's namespace,
-//      and no key is defined twice; no t()/tr() call runs at load time (module level, class field).  A failure here exits 1.
+//      languages.ts may lack some: its gaps are COUNTED per language - UI keys and data-table rows - and not failed), the same
+//      {placeholders} and numbers, no script left over from the source and no shortened big number (tools/i18n/lang-rules.mjs),
+//      keys start with their file's namespace, and no key is defined twice; no t()/tr() call runs at load time (module level, class
+//      field); the generated Traditional Chinese is up to date with the Simplified.  A failure here exits 1.
+//        --strict-lang=ko,zh-Hans   a gap in those languages fails too (use it when that language's translation is meant to be finished)
 //   2. The Japanese still hard-coded in src/ outside the tables (listed per file, so later phases can burn the list down).
 //      Only a report: exit 0.   --list shows every line,  --strict makes a remaining one fail,  --survey prints the
 //      table used in docs/I18N.md.
 import { rolldown } from 'rolldown';
 import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { posix, scanFile, scanStaleCalls, walk } from './scan.mjs';
+import { dataCells, dataProblems, messageProblems } from './lang-rules.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const args = new Set(process.argv.slice(2));
+const strictLangs = new Set(process.argv.flatMap((a) => (a.startsWith('--strict-lang=') ? a.slice('--strict-lang='.length).split(',') : [])).filter(Boolean));
 const tmp = path.join(root, 'tools', 'i18n', '.out');
 
 // ---------------------------------------------------------------- 1. the tables
-async function loadTables() {
+async function bundleOf(entry, name) {
   mkdirSync(tmp, { recursive: true });
-  const bundle = await rolldown({ input: path.join(root, 'src/game/i18n/tables.ts'), platform: 'node', logLevel: 'silent' });
-  const file = path.join(tmp, 'tables.mjs');
+  const bundle = await rolldown({ input: path.join(root, entry), platform: 'node', logLevel: 'silent' });
+  const file = path.join(tmp, `${name}.mjs`);
   await bundle.write({ file, format: 'esm' });
   await bundle.close();
-  const mod = await import(`${pathToFileURL(file).href}?t=${Date.now()}`);
+  return import(`${pathToFileURL(file).href}?t=${Date.now()}`);
+}
+
+async function loadTables() {
+  const mod = await bundleOf('src/game/i18n/tables.ts', 'tables');
+  const data = await bundleOf('src/game/i18n/dataTexts.ts', 'dataTexts');
   rmSync(tmp, { recursive: true, force: true });
-  return mod;
+  return { ...mod, DATA_TEXTS: data.DATA_TEXTS };
 }
 
-/** Names of the {placeholders} of a message, "{n, plural, one {# a} other {# b}}" included (not the plural's inner text). */
-function placeholders(message) {
-  const names = new Set();
-  const re = /\{\s*([A-Za-z_]\w*)\s*(,|\})/g;
-  let depthText = message;
-  // drop the option bodies of plurals: `one {...}` groups after "plural,"
-  depthText = depthText.replace(/\{\s*[A-Za-z_]\w*\s*,\s*plural\s*,((?:[^{}]|\{[^{}]*\})*)\}/g, (m) => m.replace(/(\w|=\d+)\s*\{[^{}]*\}/g, ''));
-  for (const m of depthText.matchAll(re)) names.add(m[1]);
-  return names;
-}
-
-const sameSet = (a, b) => a.size === b.size && [...a].every((x) => b.has(x));
+/** The folder of a language's namespace files: zh-Hans -> zhHans (the code of a language is not an identifier). */
+const dirOf = (code) => code.replace(/-([A-Za-z])/g, (_, c) => c.toUpperCase());
 
 function partFiles(lang) {
-  const dir = path.join(root, 'src/game/i18n', lang);
+  const dir = path.join(root, 'src/game/i18n', dirOf(lang));
   try {
     return readdirSync(dir).filter((f) => f.endsWith('.ts')).map((f) => ({ ns: f.replace(/\.ts$/, ''), file: path.join(dir, f) }));
   } catch {
@@ -57,10 +58,14 @@ function keysOfPart(file) {
 
 const problems = [];
 const notes = [];
-const { TABLES, LANGUAGES } = await loadTables();
+const { TABLES, LANGUAGES, DATA_TEXTS } = await loadTables();
 const ja = TABLES.ja;
 const jaKeys = Object.keys(ja);
-notes.push(`ja: ${jaKeys.length} keys`);
+// The data tables have no Japanese copy to count against (the Japanese is the game's data itself): the English table is the reference
+// of which rows exist, and another language is complete when it has every row English has.
+const enCells = dataCells(DATA_TEXTS.en);
+notes.push(`ja: ${jaKeys.length} UI keys`);
+for (const code of strictLangs) if (!LANGUAGES.some((l) => l.code === code)) problems.push(`--strict-lang=${code}: no such language`);
 
 for (const lang of LANGUAGES) {
   if (lang.code === 'ja') continue;
@@ -68,16 +73,33 @@ for (const lang of LANGUAGES) {
   const keys = new Set(Object.keys(table));
   const missing = jaKeys.filter((k) => !keys.has(k));
   const extra = [...keys].filter((k) => !(k in ja));
-  const covered = jaKeys.length - missing.length;
-  notes.push(`${lang.code}: ${covered}/${jaKeys.length} keys${lang.partial ? ' (partial language: gaps fall back to Japanese)' : ''}`);
+  const cells = dataCells(DATA_TEXTS[lang.code]);
+  const dataMissing = lang.code === 'en' ? [] : [...enCells.keys()].filter((c) => !cells.has(c));
+  const dataExtra = lang.code === 'en' ? [] : [...cells.keys()].filter((c) => !enCells.has(c));
+  const pct = (n, total) => (total ? `${Math.floor((n / total) * 100)}%` : '-');
+  const ui = jaKeys.length - missing.length;
+  notes.push(
+    `${lang.code.padEnd(8)} UI ${String(ui).padStart(4)}/${jaKeys.length} keys (${missing.length} gaps, ${pct(ui, jaKeys.length)})` +
+      `   data ${String(cells.size).padStart(4)}/${enCells.size} rows (${dataMissing.length} gaps, ${pct(cells.size, enCells.size)})${lang.partial ? '   [partial: a gap shows in the fallback language]' : ''}`,
+  );
   if (missing.length && !lang.partial) problems.push(`${lang.code}: ${missing.length} key(s) missing, e.g. ${missing.slice(0, 5).join(', ')}`);
-  if (extra.length) problems.push(`${lang.code}: ${extra.length} key(s) that ja does not have, e.g. ${extra.slice(0, 5).join(', ')}`);
-  for (const k of keys) {
-    if (!(k in ja)) continue;
-    const a = placeholders(ja[k]);
-    const b = placeholders(table[k]);
-    if (!sameSet(a, b)) problems.push(`${lang.code}: ${k}: placeholders {${[...b].join(',')}} differ from ja's {${[...a].join(',')}}`);
+  if (strictLangs.has(lang.code)) {
+    if (missing.length) problems.push(`${lang.code} (--strict-lang): ${missing.length} UI key(s) not translated, e.g. ${missing.slice(0, 5).join(', ')}`);
+    if (dataMissing.length) problems.push(`${lang.code} (--strict-lang): ${dataMissing.length} data row(s) not translated, e.g. ${dataMissing.slice(0, 5).join(', ')}`);
   }
+  if (extra.length) problems.push(`${lang.code}: ${extra.length} key(s) that ja does not have, e.g. ${extra.slice(0, 5).join(', ')}`);
+  if (dataExtra.length) problems.push(`${lang.code}: ${dataExtra.length} data row(s) that English does not have (a misspelled id?), e.g. ${dataExtra.slice(0, 5).join(', ')}`);
+  for (const [k, why] of messageProblems(lang.code, table, ja)) problems.push(`${lang.code}: ${k}: ${why}`);
+  for (const [cell, why] of dataProblems(lang.code, DATA_TEXTS[lang.code])) problems.push(`${lang.code}: data ${cell}: ${why}`);
+}
+
+// Traditional Chinese is generated from Simplified (tools/i18n/zh-hant.mjs): it must be what the generator would write now
+{
+  const run = spawnSync(process.execPath, [path.join(root, 'tools/i18n/zh-hant.mjs'), '--check'], { encoding: 'utf8', cwd: root });
+  const said = (run.stdout ?? '').split('\n').filter((l) => l.trim() && !l.includes('note:'));
+  const last = (said[said.length - 1] ?? '').trim();
+  if (run.status !== 0) problems.push(`zh-Hant is out of date or broken: ${last || (run.stderr ?? '').trim() || 'run `node tools/i18n/zh-hant.mjs`'}`);
+  else notes.push(last || 'zh-hant: ok');
 }
 
 // namespaces and duplicates, from the part files' text
@@ -85,7 +107,7 @@ const seen = new Map();
 for (const lang of LANGUAGES) {
   for (const { ns, file } of partFiles(lang.code)) {
     for (const key of keysOfPart(file)) {
-      if (!key.startsWith(`${ns}.`)) problems.push(`${lang.code}/${ns}.ts: key "${key}" must start with "${ns}."`);
+      if (!key.startsWith(`${ns}.`)) problems.push(`${dirOf(lang.code)}/${ns}.ts: key "${key}" must start with "${ns}."`);
       const id = `${lang.code}:${key}`;
       if (seen.has(id)) problems.push(`${lang.code}: key "${key}" is defined twice (${seen.get(id)} and ${ns}.ts)`);
       else seen.set(id, `${ns}.ts`);

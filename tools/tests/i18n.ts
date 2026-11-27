@@ -5,8 +5,9 @@ import path from 'node:path';
 import { formatMessage, formatNumber, getLanguage, onLanguageChange, setLanguage, t, tDynamic, translate } from '../../src/game/i18n/core';
 import { detectLanguage, fallbackChain, isLanguage, LANGUAGES } from '../../src/game/i18n/languages';
 import { fontFamily } from '../../src/game/i18n/fonts';
+import { abbreviatedNumber, dataCells, dataProblems, digitsOf, leftover, messageProblems, placeholdersOf } from '../i18n/lang-rules.mjs';
 import { TABLES } from '../../src/game/i18n/tables';
-import { tr } from '../../src/game/i18n/dataTexts';
+import { DATA_TEXTS, tr } from '../../src/game/i18n/dataTexts';
 import { enData } from '../../src/game/i18n/data/en';
 import { SettingsSystem } from '../../src/game/systems/SettingsSystem';
 import { SaveSystem } from '../../src/game/systems/SaveSystem';
@@ -152,12 +153,13 @@ ok(detectLanguage('jav') === 'en', '"jav" (Javanese) is not "ja"');
 {
   setLanguage('en', { persist: false });
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: a text with no translation is the Japanese of the data');
-  enData.hero = { nobody: { name: 'Luri' } };
+  const heroTable = enData.hero; // (the real table: put back below, other checks read it)
+  enData.hero = { ...heroTable, nobody: { name: 'Luri' } };
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'Luri', 'tr: a translated text comes from the data table');
   ok(tr('hero', 'nobody', 'title', '先生') === '先生', 'tr: a field with no translation falls back too');
   setLanguage('ja', { persist: false });
   ok(tr('hero', 'nobody', 'name', 'ルリ') === 'ルリ', 'tr: Japanese is the data as it is');
-  delete enData.hero;
+  enData.hero = heroTable;
 }
 
 // ---- every key the code asks for exists
@@ -198,5 +200,40 @@ for (const k of ['test.both', 'test.onlyJa', 'test.hello', 'test.items', 'test.m
   delete ja[k];
   delete en[k];
 }
+
+// ---- the rules every language's text follows (tools/i18n/lang-rules.mjs: what `npm run i18n:check` also runs)
+{
+  ok(leftover('en', 'Gems are not enough.') === null && leftover('en', 'Gems が足りません') !== null && leftover('en', '（Gems）') !== null, 'en: Japanese in a text is found (kana, kanji, full-width forms)');
+  ok(leftover('ko', '마정석이 부족합니다') === null && leftover('ko', '마정석が足りない') !== null && leftover('ko', '魔晶石이 부족') !== null && leftover('ko', '카타카나ー') !== null, 'ko: kana and kanji in a text are found');
+  ok(leftover('zh-Hans', '魔晶石不足，请先获得') === null && leftover('zh-Hans', '魔晶石が足りない') !== null && leftover('zh-Hans', 'ステージ', 'ステージ') !== null, 'zh: kana is found, and a kana source that is passed through unchanged');
+  ok(leftover('zh-Hant', '魔晶石', '魔晶石') === null && leftover('zh-Hant', '魔晶石不足', '魔晶石が足りない') === null, 'zh: a text made of kanji only is a fine translation even when it equals the source (kanji cannot tell)');
+  const big = ['10万', '3億', '1000万', '10亿', '5萬', '5만', '3억', '10K', '2.5M', '1,000B', '3 兆', '7조'];
+  const fine = ['10,000', '1,234,567', 'Lv.5', '2h 05m', '30分', '3 minutes', '100 골드', '金币100', 'x3', '+25%', '2.4s', '2026/11/20', 'Max HP', 'NEW', 'VIP'];
+  ok(big.every((s) => abbreviatedNumber(s)), `a shortened big number is found: ${big.filter((s) => !abbreviatedNumber(s)).join(' ') || big.join(' ')}`);
+  ok(fine.every((s) => abbreviatedNumber(s) === null), `and a full one is not: ${fine.filter((s) => abbreviatedNumber(s)).join(' ') || 'all fine'}`);
+  ok(digitsOf('★4以上を30回目までに') === digitsOf('By the 30th pull, ★4 or better') && digitsOf('1回') === digitsOf('once') && digitsOf('1,500個') === digitsOf('1500 pcs') && digitsOf('１２３') === '123', 'numbers are compared as digits (order, commas, full-width and a lone 1 are free)');
+  ok(digitsOf('100') !== digitsOf('10') && digitsOf('3回') !== digitsOf('4 times'), 'and a different number is a difference');
+  ok(placeholdersOf('{name}が{count}個') === 'count,name' && placeholdersOf('{n, plural, one {# item} other {# items}}') === 'n' && placeholdersOf('{count}개의 {name}') === 'count,name', 'placeholders are compared by name');
+
+  // every language's tables, as written
+  const jaTable = TABLES.ja as Record<string, string>;
+  const enData = DATA_TEXTS.en!;
+  const enCells = dataCells(enData);
+  for (const lang of LANGUAGES) {
+    if (lang.code === 'ja') continue;
+    const table = TABLES[lang.code] as Record<string, string>;
+    const extra = Object.keys(table).filter((k) => !(k in jaTable));
+    ok(extra.length === 0, `${lang.code}: no UI key that Japanese does not have${extra.length ? ` (${extra.slice(0, 5).join(', ')})` : ''}`);
+    const problems = messageProblems(lang.code, table, jaTable);
+    ok(problems.length === 0, `${lang.code}: ${Object.keys(table).length} UI messages keep their placeholders and numbers, leave no source script, shorten no number${problems.length ? ` (${problems.length}, e.g. ${problems.slice(0, 3).map(([k, why]) => `${k}: ${why}`).join('; ')})` : ''}`);
+    const cells = dataCells(DATA_TEXTS[lang.code]);
+    const dataExtra = lang.code === 'en' ? [] : [...cells.keys()].filter((c) => !enCells.has(c));
+    ok(dataExtra.length === 0, `${lang.code}: no data row that English does not have (a misspelled id)${dataExtra.length ? ` (${dataExtra.slice(0, 5).join(', ')})` : ''}`);
+    const dataBad = dataProblems(lang.code, DATA_TEXTS[lang.code]);
+    ok(dataBad.length === 0, `${lang.code}: ${cells.size} data rows leave no source script and shorten no number${dataBad.length ? ` (${dataBad.length}, e.g. ${dataBad.slice(0, 3).map(([k, why]) => `${k}: ${why}`).join('; ')})` : ''}`);
+    if (lang.partial) console.log(`INFO  ${lang.code}: ${Object.keys(table).length}/${Object.keys(jaTable).length} UI keys and ${cells.size}/${enCells.size} data rows written`);
+  }
+}
 void t;
+void enData;
 process.exit(failures ? 1 : 0);
